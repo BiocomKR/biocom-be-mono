@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// 사용자 테이블
+/// 애플리케이션의 모든 사용자 정보를 저장
+model User {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  password    String
+  nickname    String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime?    @updatedAt @map("updated_at")
+  fileUploads FileUpload[]
+
+  @@map("users")
+}
+
+/// 파일 업로드 테이블
+/// 사용자가 업로드한 파일 정보를 저장
+model FileUpload {
+  id             Int       @id @default(autoincrement())
+  userId         Int       @map("user_id")
+  originalName   String    @map("original_name")
+  filename       String
+  mimetype       String
+  size           Int
+  path           String
+  uploadedAt     DateTime  @default(now()) @map("uploaded_at")
+  fileType       String    @map("file_type")
+  uploadCategory String    @map("upload_category")
+  user           User      @relation(fields: [userId], references: [id])
+
+  @@map("file_uploads")
+}

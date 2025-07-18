@@ -1,0 +1,17 @@
+apiVersion: v2
+name: be-temp
+description: 백엔드 애플리케이션 Helm 차트
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - nestjs
+  - backend
+  - kubernetes
+maintainers:
+  - name: backend-team
+    email: admin@example.com
+home: https://github.com/example/backend
+sources:
+  - https://github.com/example/backend
+dependencies: []

@@ -1,0 +1,51 @@
+# EKS 클러스터 설정 파일
+# eksctl이 읽어서 클러스터를 생성하는 설정 파일
+apiVersion: eksctl.io/v1alpha5  # eksctl API 버전
+kind: ClusterConfig              # 리소스 타입 (클러스터 설정)
+
+metadata:
+  name: biocom-cluster          # 클러스터 이름 (AWS 콘솔에 표시됨)
+  region: ap-northeast-2        # AWS 리전 (서울)
+  version: "1.30"               # Kubernetes 버전 (최신 안정 버전)
+
+# 관리형 노드 그룹 (AWS가 EC2 인스턴스 자동 관리)
+managedNodeGroups:
+  - name: app-nodes             # 노드 그룹 이름
+    instanceType: t3.medium     # t2.micro는 EKS에 너무 작음
+    desiredCapacity: 2          # 시작할 때 생성할 노드 수
+    minSize: 1                  # 최소 노드 수 (스케일 다운 한계)
+    maxSize: 4                  # 최대 노드 수 (스케일 업 한계)
+    volumeSize: 30              # 각 노드의 EBS 볼륨 크기 (GB)
+    spot: true                  # 스팟 인스턴스 사용 (온디맨드 대비 70% 저렴)
+    privateNetworking: true     # Private 서브넷에 배치 (표준 방식)
+    labels:                     # 노드에 붙일 라벨 (Pod 스케줄링에 사용)
+      role: apps
+    tags:                       # AWS 태그 (비용 추적, 관리용)
+      Name: biocom-worker
+
+# VPC 네트워크 설정  
+vpc:
+  cidr: 172.16.0.0/16           # VPC IP 대역 (65,536개 IP)
+  nat:
+    gateway: Single             # NAT Gateway 1개 (운영 표준)
+
+# 클러스터 애드온 (필수 구성 요소)
+addons:
+  - name: vpc-cni               # Pod 네트워킹을 위한 CNI 플러그인
+    version: latest
+  - name: kube-proxy            # 서비스 네트워킹을 위한 프록시
+    version: latest
+  - name: coredns               # 클러스터 내부 DNS 서버
+    version: latest
+  - name: aws-ebs-csi-driver    # EBS 볼륨 사용을 위한 CSI 드라이버
+    version: latest
+
+# IAM 설정
+iam:
+  withOIDC: true                # OIDC 공급자 생성 (Pod가 AWS 서비스 접근 가능)
+  serviceAccounts:              # 서비스 계정과 IAM 역할 연결
+    - metadata:
+        name: aws-load-balancer-controller    # ALB 컨트롤러용 서비스 계정
+        namespace: kube-system                # 시스템 네임스페이스
+      wellKnownPolicies:
+        awsLoadBalancerController: true       # ALB 생성/관리 권한 자동 부여
