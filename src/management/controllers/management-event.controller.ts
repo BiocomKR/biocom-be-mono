@@ -240,13 +240,13 @@ export class ManagementEventController {
   /**
    * 특정 이벤트 상세 조회
    */
-  @Get(':id')
+  @Get(':eventId')
   @ApiOperation({
     summary: '이벤트 상세 조회',
     description: '특정 이벤트의 상세 정보를 조회합니다.',
   })
   @ApiParam({
-    name: 'id',
+    name: 'eventId',
     type: 'number',
     description: '이벤트 ID',
     example: 1,
@@ -256,14 +256,14 @@ export class ManagementEventController {
     description: '이벤트 조회 성공',
   })
   async getEvent(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any>> {
-    this.logger.log(`이벤트 상세 조회 요청 - ID: ${id}`);
+    this.logger.log(`이벤트 상세 조회 요청 - ID: ${eventId}`);
 
     try {
-      const event = await this.eventService.getEventById(id);
+      const event = await this.eventService.getEventById(eventId);
       
-      this.logger.log(`이벤트 상세 조회 성공 - ID: ${id}`);
+      this.logger.log(`이벤트 상세 조회 성공 - ID: ${eventId}`);
       
       return {
         success: true,
@@ -272,7 +272,7 @@ export class ManagementEventController {
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`이벤트 상세 조회 실패 - ID: ${id}`, error);
+      this.logger.error(`이벤트 상세 조회 실패 - ID: ${eventId}`, error);
       throw error;
     }
   }
@@ -280,13 +280,13 @@ export class ManagementEventController {
   /**
    * 이벤트 수정
    */
-  @Put(':id')
+  @Put(':eventId')
   @ApiOperation({
     summary: '이벤트 수정',
     description: '기존 이벤트 정보를 수정합니다.',
   })
   @ApiParam({
-    name: 'id',
+    name: 'eventId',
     type: 'number',
     description: '이벤트 ID',
     example: 1,
@@ -309,15 +309,15 @@ export class ManagementEventController {
     description: '이벤트 수정 성공',
   })
   async updateEvent(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('eventId', ParseIntPipe) eventId: number,
     @Body() updateDto: any,
   ): Promise<ApiResponseDto<any>> {
-    this.logger.log(`이벤트 수정 요청 - ID: ${id}`);
+    this.logger.log(`이벤트 수정 요청 - ID: ${eventId}`);
 
     try {
-      const updated = await this.eventService.updateEvent(id, updateDto);
+      const updated = await this.eventService.updateEvent(eventId, updateDto);
       
-      this.logger.log(`이벤트 수정 성공 - ID: ${id}`);
+      this.logger.log(`이벤트 수정 성공 - ID: ${eventId}`);
       
       return {
         success: true,
@@ -326,7 +326,7 @@ export class ManagementEventController {
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`이벤트 수정 실패 - ID: ${id}`, error);
+      this.logger.error(`이벤트 수정 실패 - ID: ${eventId}`, error);
       throw error;
     }
   }
@@ -334,13 +334,13 @@ export class ManagementEventController {
   /**
    * 이벤트 삭제
    */
-  @Delete(':id')
+  @Delete(':eventId')
   @ApiOperation({
     summary: '이벤트 삭제',
     description: '이벤트를 삭제합니다. 참여자가 없는 경우에만 가능합니다.',
   })
   @ApiParam({
-    name: 'id',
+    name: 'eventId',
     type: 'number',
     description: '이벤트 ID',
     example: 1,
@@ -350,14 +350,14 @@ export class ManagementEventController {
     description: '이벤트 삭제 성공',
   })
   async deleteEvent(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<void>> {
-    this.logger.log(`이벤트 삭제 요청 - ID: ${id}`);
+    this.logger.log(`이벤트 삭제 요청 - ID: ${eventId}`);
 
     try {
-      await this.eventService.deleteEvent(id);
+      await this.eventService.deleteEvent(eventId);
       
-      this.logger.log(`이벤트 삭제 성공 - ID: ${id}`);
+      this.logger.log(`이벤트 삭제 성공 - ID: ${eventId}`);
       
       return {
         success: true,
@@ -366,7 +366,7 @@ export class ManagementEventController {
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`이벤트 삭제 실패 - ID: ${id}`, error);
+      this.logger.error(`이벤트 삭제 실패 - ID: ${eventId}`, error);
       throw error;
     }
   }
