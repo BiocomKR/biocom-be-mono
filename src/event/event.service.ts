@@ -58,6 +58,14 @@ export class EventService {
           include: {
             quiz: true
           }
+        },
+        eventContents: {
+          include: {
+            content: true
+          },
+          orderBy: {
+            day: 'asc'
+          }
         }
       }
     });
@@ -251,6 +259,14 @@ export class EventService {
           include: {
             quiz: true
           }
+        },
+        eventContents: {
+          include: {
+            content: true
+          },
+          orderBy: {
+            day: 'asc'
+          }
         }
       }
     });
@@ -313,6 +329,14 @@ export class EventService {
         eventQuizzes: {
           include: {
             quiz: true
+          }
+        },
+        eventContents: {
+          include: {
+            content: true
+          },
+          orderBy: {
+            day: 'asc'
           }
         }
       },
