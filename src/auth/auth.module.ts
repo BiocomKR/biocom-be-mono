@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
+import { HttpModule } from '@nestjs/axios';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaService } from '../common/services/prisma.service';
 import { ConfigService } from '../common/services/config.service';
+import { ImwebModule } from '@/imweb/imweb.module';
 
 /**
  * 인증 모듈
@@ -21,6 +23,8 @@ import { ConfigService } from '../common/services/config.service';
  */
 @Module({
   imports: [
+    HttpModule,
+    ImwebModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

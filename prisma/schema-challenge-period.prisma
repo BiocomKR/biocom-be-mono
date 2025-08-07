@@ -1,0 +1,23 @@
+/// 챌린지 기간 관리 테이블
+/// 전체 사용자가 공통으로 참여하는 챌린지의 시작/종료일 관리
+model ChallengePeriod {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(100)              // 챌린지명 (예: "2025년 7월 건강 챌린지")
+  startDate   DateTime  @map("start_date") @db.Date   // 챌린지 시작일
+  endDate     DateTime  @map("end_date") @db.Date     // 챌린지 종료일 (시작일 + 20일)
+  totalDays   Int       @default(21) @map("total_days") // 챌린지 총 일수
+  isActive    Boolean   @default(false) @map("is_active") // 현재 활성 챌린지 여부
+  description String?   @db.Text                      // 챌린지 설명
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  
+  @@index([isActive, startDate])
+  @@index([startDate, endDate])
+  @@map("challenge_periods")
+}
+
+// 사용 예시:
+// - isActive = true인 레코드는 1개만 존재
+// - 새 챌린지 시작 시 기존 isActive를 false로 변경
+// - 날짜 계산: 현재날짜 - startDate + 1 = 챌린지 일차
+// - 21일 초과 시 "챌린지 종료" 처리

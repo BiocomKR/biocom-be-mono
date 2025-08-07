@@ -71,21 +71,21 @@ export class PrismaHealthIndicator extends HealthIndicator {
   async getDetailedStatus(key: string): Promise<HealthIndicatorResult> {
     try {
       // 데이터베이스 버전 조회
-      const versionResult = await this.prisma.$queryRaw<any[]>`SELECT version()`;
+      const versionResult = await this.prisma.$queryRaw`SELECT version()` as any[];
       const version = versionResult[0]?.version || 'unknown';
 
       // 활성 연결 수 조회
-      const connectionsResult = await this.prisma.$queryRaw<any[]>`
+      const connectionsResult = await this.prisma.$queryRaw`
         SELECT count(*) as active_connections 
         FROM pg_stat_activity 
         WHERE state = 'active'
-      `;
+      ` as any[];
       const activeConnections = connectionsResult[0]?.active_connections || 0;
 
       // 데이터베이스 크기 조회
-      const sizeResult = await this.prisma.$queryRaw<any[]>`
+      const sizeResult = await this.prisma.$queryRaw`
         SELECT pg_database_size(current_database()) as size
-      `;
+      ` as any[];
       const dbSize = sizeResult[0]?.size || 0;
       const dbSizeMB = Math.round(dbSize / (1024 * 1024));
 

@@ -26,7 +26,7 @@ export class AuthService {
    * @returns 생성된 사용자 정보와 JWT 토큰
    */
   async signUp(signUpDto: SignUpDto) {
-    const { email, password, nickname } = signUpDto;
+    const { email, password, name, mobile } = signUpDto;
 
     this.logger.log(`회원가입 시도: ${email}`);
 
@@ -48,12 +48,15 @@ export class AuthService {
       data: {
         email,
         password: hashedPassword,
-        nickname,
+        name,
+        mobile,
       },
       select: {
         id: true,
         email: true,
-        nickname: true,
+        name: true,
+        mobile: true,
+        points: true,
         createdAt: true,
       },
     });
@@ -88,7 +91,9 @@ export class AuthService {
         id: true,
         email: true,
         password: true,
-        nickname: true,
+        name: true,
+        mobile: true,
+        points: true,
         createdAt: true,
       },
     });
@@ -153,7 +158,9 @@ export class AuthService {
       select: {
         id: true,
         email: true,
-        nickname: true,
+        name: true,
+        mobile: true,
+        points: true,
         createdAt: true,
       },
     });
@@ -162,6 +169,10 @@ export class AuthService {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
     }
 
-    return user;
+    // req.user에 저장될 사용자 정보 (sub 추가)
+    return {
+      ...user,
+      sub: user.id // JWT payload의 sub 필드와 일치시키기 위해 추가
+    };
   }
 }

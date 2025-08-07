@@ -8,7 +8,7 @@ metadata:
   region: ap-northeast-2        # AWS 리전 (서울)
   version: "1.30"               # Kubernetes 버전 (최신 안정 버전)
 
-# 관리형 노드 그룹 (AWS가 EC2 인스턴스 자동 관리)
+# 관리형 노드 그룹 (AWS가 EC2 인스턴스 자동 관리
 managedNodeGroups:
   - name: app-nodes             # 노드 그룹 이름
     instanceType: t3.medium     # t2.micro는 EKS에 너무 작음

@@ -1,0 +1,36 @@
+{
+    "mcpServers": {
+        "filesystem": {
+            "command": "/opt/homebrew/bin/npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "/Users/daegilchoi"
+            ]
+        },
+        "github": {
+            "command": "/opt/homebrew/bin/npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-github"
+            ],
+            "env": {
+                "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+            }
+        },
+        "memory": {
+            "command": "/opt/homebrew/bin/npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-memory"
+            ]
+        },
+        "puppeteer": {
+            "command": "/opt/homebrew/bin/npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-puppeteer"
+            ]
+        }
+    }
+}

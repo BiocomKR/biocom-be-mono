@@ -11,7 +11,8 @@ import {
   ParseIntPipe,
   HttpStatus,
   Logger,
-  BadRequestException
+  BadRequestException,
+  UseGuards
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { 
@@ -21,12 +22,14 @@ import {
   ApiConsumes,
   ApiBody,
   ApiParam,
-  ApiQuery as ApiQueryDecorator
+  ApiQuery as ApiQueryDecorator,
+  ApiBearerAuth
 } from '@nestjs/swagger';
 import { Express } from 'express';
 import { UploadService } from './upload.service';
 import { FileUploadResponseDto } from './dto/file-upload-response.dto';
 import { ApiSuccessResponse } from '../common/dto/api-response.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
  * 파일 업로드 컨트롤러
@@ -43,6 +46,8 @@ export class UploadController {
    * 이미지 파일 업로드
    */
   @Post('image')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ 
     summary: '이미지 파일 업로드', 
@@ -72,11 +77,6 @@ export class UploadController {
     description: '잘못된 파일 형식 또는 크기' 
   })
   @ApiQueryDecorator({ 
-    name: 'email', 
-    required: true, 
-    description: '사용자 이메일' 
-  })
-  @ApiQueryDecorator({ 
     name: 'relatedType', 
     required: true, 
     description: '연관된 활동 타입 (예: DIET, DAILY_MISSION, SUPPLEMENT)',
@@ -85,7 +85,6 @@ export class UploadController {
   async uploadImage(
     @Req() req: any,
     @UploadedFile() file: Express.Multer.File,
-    @Query('email') email: string,
     @Query('relatedType') relatedType: string
   ): Promise<ApiSuccessResponse<FileUploadResponseDto>> {
     if (!file) {
@@ -96,10 +95,10 @@ export class UploadController {
       throw new BadRequestException('연관된 활동 타입(relatedType)을 지정해주세요.');
     }
 
-    this.logger.log(`이미지 업로드 요청 - 사용자: ${req.userId}, 파일: ${file.originalname}, 타입: ${relatedType}`);
+    this.logger.log(`이미지 업로드 요청 - 사용자: ${req.user.sub}, 파일: ${file.originalname}, 타입: ${relatedType}`);
 
     const uploadedFile = await this.uploadService.uploadImage(
-      req.userId,
+      req.user.sub,
       file,
       relatedType
     );
@@ -116,6 +115,8 @@ export class UploadController {
    * 파일 정보 조회
    */
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ 
     summary: '파일 정보 조회', 
     description: '특정 파일의 정보를 조회합니다.' 
@@ -134,14 +135,8 @@ export class UploadController {
     status: HttpStatus.NOT_FOUND, 
     description: '파일을 찾을 수 없음' 
   })
-  @ApiQueryDecorator({ 
-    name: 'email', 
-    required: true, 
-    description: '사용자 이메일' 
-  })
   async getFileInfo(
-    @Param('id', ParseIntPipe) id: number,
-    @Query('email') email: string
+    @Param('id', ParseIntPipe) id: number
   ): Promise<ApiSuccessResponse<FileUploadResponseDto>> {
     this.logger.log(`파일 정보 조회 요청 - ID: ${id}`);
 
@@ -159,6 +154,8 @@ export class UploadController {
    * 사용자의 업로드 파일 목록 조회
    */
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ 
     summary: '업로드 파일 목록 조회', 
     description: '현재 사용자의 업로드된 파일 목록을 조회합니다.' 
@@ -169,11 +166,6 @@ export class UploadController {
     description: '연관된 활동 타입으로 필터링',
     example: 'DIET' 
   })
-  @ApiQueryDecorator({ 
-    name: 'email', 
-    required: true, 
-    description: '사용자 이메일' 
-  })
   @ApiResponse({ 
     status: HttpStatus.OK, 
     description: '파일 목록 조회 성공',
@@ -181,13 +173,12 @@ export class UploadController {
   })
   async getUserFiles(
     @Req() req: any,
-    @Query('email') email: string,
     @Query('relatedType') relatedType?: string
   ): Promise<ApiSuccessResponse<FileUploadResponseDto[]>> {
-    this.logger.log(`사용자 파일 목록 조회 요청 - 사용자: ${req.userId}, 타입: ${relatedType || '전체'}`);
+    this.logger.log(`사용자 파일 목록 조회 요청 - 사용자: ${req.user.sub}, 타입: ${relatedType || '전체'}`);
 
     const files = await this.uploadService.getUserFiles(
-      req.userId,
+      req.user.sub,
       relatedType
     );
 
@@ -203,6 +194,8 @@ export class UploadController {
    * 파일 삭제
    */
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ 
     summary: '파일 삭제', 
     description: '업로드된 파일을 삭제합니다.' 
@@ -221,19 +214,13 @@ export class UploadController {
     status: HttpStatus.NOT_FOUND, 
     description: '파일을 찾을 수 없거나 삭제 권한 없음' 
   })
-  @ApiQueryDecorator({ 
-    name: 'email', 
-    required: true, 
-    description: '사용자 이메일' 
-  })
   async deleteFile(
     @Req() req: any,
-    @Param('id', ParseIntPipe) id: number,
-    @Query('email') email: string
+    @Param('id', ParseIntPipe) id: number
   ): Promise<ApiSuccessResponse<void>> {
-    this.logger.log(`파일 삭제 요청 - 사용자: ${req.userId}, ID: ${id}`);
+    this.logger.log(`파일 삭제 요청 - 사용자: ${req.user.sub}, ID: ${id}`);
 
-    await this.uploadService.deleteFile(id, req.userId);
+    await this.uploadService.deleteFile(id, req.user.sub);
 
     return {
       success: true,

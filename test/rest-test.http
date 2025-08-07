@@ -1,0 +1,27 @@
+###
+### 1. 인가코드 발급
+GET https://openapi.imweb.me/oauth2/authorize?responseType=code&clientId=dbecc12b-0121-4d0a-869d-fa4f91582cc0&redirectUri=https://api-dev.biocom.ai.kr/api/auth/redirect&scope=member-info%3Aread%20site-info%3Awrite&20product%3Awrite%20order%3Awrite&siteCode=S20190715619285c855898
+
+
+### 2. 토큰 발급
+POST https://openapi.imweb.me/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+clientId=dbecc12b-0121-4d0a-869d-fa4f91582cc0&clientSecret=381b378c-28f7-479b-8454-af74e4a68713&grantType=authorization_code&code=c21aa12fa823a0b3b8aadc651cd7033477f0d257d0b61a2b916fd087742c0830&redirectUri=https%3A%2F%2Fapi-dev.biocom.ai.kr%2Fapi%2Fauth%2Fredirect
+
+
+
+### 3. 바이오컴 회원 목록 조회
+GET https://openapi.imweb.me/member-info/members?page=1&limit=10&unitCode=u201907155d2bfcd44e8de&callnum=01056060746
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlQ29kZSI6IlMyMDE5MDcxNTYxOTI4NWM4NTU4OTgiLCJhcHBDb2RlIjoiZ2EyMDI1MDcyMmY5ZGI2YTc0OWEwYzgiLCJ1bml0Q29kZSI6WyJ1MjAxOTA3MTU1ZDJiZmNkNDRlOGRlIl0sInNjb3BlIjpbIm1lbWJlci1pbmZvOnJlYWQiLCJzaXRlLWluZm86d3JpdGUiLCJwcm9tb3Rpb246d3JpdGUiXSwic2l0ZVZlcnNpb24iOiJwcm8iLCJpYXQiOjE3NTM0MzIzMzUsImV4cCI6MTc1MzQzOTUzNX0.dBjEAj-7er7Toh0ZvIk6ejVzCDGqrYqutL_WyO9muio
+
+### 4-1. 바이오컴 회원 상세 조회
+GET https://openapi.imweb.me/member-info/members/lemoniss@naver.com?unitCode=u201907155d2bfcd44e8de
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlQ29kZSI6IlMyMDE5MDcxNTYxOTI4NWM4NTU4OTgiLCJhcHBDb2RlIjoiZ2EyMDI1MDcyMmY5ZGI2YTc0OWEwYzgiLCJ1bml0Q29kZSI6WyJ1MjAxOTA3MTU1ZDJiZmNkNDRlOGRlIl0sInNjb3BlIjpbIm1lbWJlci1pbmZvOnJlYWQiLCJzaXRlLWluZm86d3JpdGUiLCJwcm9tb3Rpb246d3JpdGUiXSwic2l0ZVZlcnNpb24iOiJwcm8iLCJpYXQiOjE3NTM0MzIzMzUsImV4cCI6MTc1MzQzOTUzNX0.dBjEAj-7er7Toh0ZvIk6ejVzCDGqrYqutL_WyO9muio
+
+### 4-2. 바이오컴 회원 상세 조회
+GET https://openapi.imweb.me/member-info/members/daegil@biocom.kr?unitCode=u201907155d2bfcd44e8de
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlQ29kZSI6IlMyMDE5MDcxNTYxOTI4NWM4NTU4OTgiLCJhcHBDb2RlIjoiZ2EyMDI1MDcyMmY5ZGI2YTc0OWEwYzgiLCJ1bml0Q29kZSI6WyJ1MjAxOTA3MTU1ZDJiZmNkNDRlOGRlIl0sInNjb3BlIjpbIm1lbWJlci1pbmZvOnJlYWQiLCJzaXRlLWluZm86d3JpdGUiLCJwcm9tb3Rpb246d3JpdGUiXSwic2l0ZVZlcnNpb24iOiJwcm8iLCJpYXQiOjE3NTM0MzIzMzUsImV4cCI6MTc1MzQzOTUzNX0.dBjEAj-7er7Toh0ZvIk6ejVzCDGqrYqutL_WyO9muio
+
+
+

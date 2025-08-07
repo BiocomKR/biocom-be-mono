@@ -1,0 +1,757 @@
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../common/services/prisma.service';
+import { MissionResponseDto, UserMissionProgressDto } from './dto/mission-response.dto';
+import { QuizService } from './quiz.service';
+import { SpecialContentItem } from '../common/types/special-content.types';
+import { parseKoreanDate, formatKoreanDate, getDaysDifferenceKST } from '../common/utils/date.util';
+
+/**
+ * 일일 미션 관리 서비스
+ * 미션 정보 조회 및 사용자별 진행 상황 관리
+ */
+@Injectable()
+export class MissionService {
+  private readonly logger = new Logger(MissionService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly quizService: QuizService
+  ) {}
+
+  /**
+   * 챌린지 시작일로부터 현재 일차 계산 (한국 시간 기준)
+   */
+  private calculateChallengeDay(date: string): number {
+    const challengeStartDate = parseKoreanDate('2025-06-30'); // 챌린지 시작일 (KST)
+    const targetDate = parseKoreanDate(date);
+    const diffDays = getDaysDifferenceKST(challengeStartDate, targetDate);
+    return diffDays + 1; // 1일차부터 시작
+  }
+
+  /**
+   * 특정 날짜의 활성 미션 조회
+   */
+  async getDailyMissions(userId: number, date: string): Promise<MissionResponseDto[]> {
+    this.logger.log(`특정 날짜의 활성 미션 조회 - 사용자 ID: ${userId}, 날짜: ${date}`);
+    
+    // 사용자 정보 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, createdAt: true }
+    });
+    
+    if (!user) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    }
+    // 챌린지 시작일: 2025년 6월 30일 (1일차) - 한국 시간 기준
+    const challengeStartDate = parseKoreanDate('2025-06-30');
+    const targetDate = parseKoreanDate(date);
+    let challengeDay = getDaysDifferenceKST(targetDate, challengeStartDate) + 1;
+    this.logger.log(`getDailyMissions - 날짜: ${date}, 계산된 일차: ${challengeDay}`);
+    
+    // 테스트용: 챌린지 시작 전 날짜는 1일차로 간주
+    if (challengeDay <= 0) {
+      challengeDay = 1;
+      this.logger.log(`챌린지 시작 전 날짜 - 1일차로 간주: ${date}`);
+    }
+    
+    // 기본 미션과 특별 미션 조회
+    const dailyMissions = await this.prisma.mission.findMany({
+      where: { 
+        isActive: true,
+        OR: [
+          { category: 'DAILY' },
+          { category: 'SPECIAL' }
+        ]
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    // 특별 미션 조회 (SPECIAL 카테고리 - 1일 1미션)
+    const specialMission = await this.prisma.dailySpecialMission.findUnique({
+      where: { day: challengeDay }
+    });
+    
+    if (specialMission) {
+      this.logger.log(`특별 미션 조회 성공 - 일차: ${challengeDay}, 제목: ${specialMission.title}, 타입: ${specialMission.verifyType}`);
+    } else {
+      this.logger.log(`특별 미션 없음 - 일차: ${challengeDay}`);
+    }
+
+    // 일일 컨텐츠 조회 (DAILY_CONTENT)
+    const dailyContent = await this.prisma.dailyContent.findUnique({
+      where: { day: challengeDay }
+    });
+
+    if (dailyContent) {
+      this.logger.log(`일일 컨텐츠 조회 성공 - 일차: ${challengeDay}, 제목: ${dailyContent.title}`);
+    } else {
+      this.logger.log(`일일 컨텐츠 없음 - 일차: ${challengeDay}`);
+    }
+
+    // 이벤트 미션 조회 (EVENT 카테고리)
+    const eventMissions = await this.prisma.mission.findMany({
+      where: {
+        isActive: true,
+        category: 'EVENT',
+        specificDay: challengeDay
+      }
+    });
+
+    // 모든 미션 합치기
+    const allMissions = [...dailyMissions, ...eventMissions];
+
+    // 퀴즈 정보 조회 (QUIZ 미션이 있는 경우)
+    let quizInfo: { question: string; options: any[] } | null = null;
+    const hasQuizMission = allMissions.some(m => m.code === 'QUIZ');
+    if (hasQuizMission) {
+      try {
+        const quiz = await this.quizService.getQuizByDate(date);
+        quizInfo = { question: quiz.question, options: quiz.options };
+      } catch (error) {
+        this.logger.warn(`퀴즈 정보 조회 실패: ${error.message}`);
+      }
+    }
+
+    // 1일 1미션의 경우 특별 처리
+    const result = allMissions.map(mission => {
+      if (mission.code === 'DAILY_MISSION') {
+        if (specialMission) {
+          this.logger.log(`특별 미션 적용: ${specialMission.title} (${specialMission.verifyType})`);
+          return {
+            id: mission.id,
+            code: mission.code,
+            name: specialMission.title,
+            description: specialMission.description,
+            points: specialMission.points,
+            requireUpload: true, // 1일 1미션은 항상 업로드 필요
+            uploadType: specialMission.verifyType, // PHOTO 또는 TEXT
+            sortOrder: mission.sortOrder,
+            // 특별 미션 추가 정보
+            specialMissionDay: specialMission.day,
+            verifyType: specialMission.verifyType,
+            imageUrl: specialMission.imageUrl, // 특별 미션 이미지 URL
+            reason: specialMission.reason, // 수행 이유
+            method: specialMission.method, // 수행 방법 추가
+            quizQuestion: undefined,
+            quizOptions: undefined,
+          };
+        }
+      } else if (mission.code === 'DAILY_CONTENT') {
+        if (dailyContent) {
+          this.logger.log(`일일 컨텐츠 적용: ${dailyContent.title}`);
+          return {
+            id: mission.id,
+            code: mission.code,
+            name: dailyContent.title,
+            description: dailyContent.description || '',
+            points: mission.points, // 포인트는 daily_missions 테이블 값 사용
+            requireUpload: false,
+            uploadType: null,
+            sortOrder: mission.sortOrder,
+            // 컨텐츠 추가 정보
+            contentDay: dailyContent.day,
+            contentType: dailyContent.contentType,
+            contentUrl: dailyContent.contentUrl,
+            thumbnailUrl: dailyContent.thumbnailUrl,
+            items: dailyContent.items as unknown as SpecialContentItem[] | undefined,
+          };
+        }
+      }
+      
+      return {
+        id: mission.id,
+        code: mission.code,
+        name: mission.name,
+        description: mission.description || '',
+        points: mission.points,
+        requireUpload: mission.requireUpload,
+        uploadType: mission.uploadType,
+        sortOrder: mission.sortOrder,
+        imageUrl: null, // 일반 미션은 이미지 URL이 없음
+        quizQuestion: mission.code === 'QUIZ' && quizInfo ? quizInfo.question : undefined,
+        quizOptions: mission.code === 'QUIZ' && quizInfo ? quizInfo.options : undefined,
+      };
+    });
+
+    return result;
+  }
+
+
+  /**
+   * 모든 활성 미션 조회 (관리자용)
+   */
+  async getAllMissions(userId: number): Promise<MissionResponseDto[]> {
+    this.logger.log('모든 활성 미션 조회');
+
+    const missions = await this.prisma.mission.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return missions.map(mission => ({
+      id: mission.id,
+      code: mission.code,
+      name: mission.name,
+      description: mission.description || '',
+      points: mission.points,
+      requireUpload: mission.requireUpload,
+      uploadType: mission.uploadType,
+      sortOrder: mission.sortOrder,
+      imageUrl: null, // 일반 미션은 이미지 URL이 없음
+    }));
+  }
+
+  /**
+   * 사용자의 미션 진행 상황 조회
+   */
+  async getUserMissionProgress(
+    userId: number,
+    date: string
+  ): Promise<UserMissionProgressDto> {
+    this.logger.log(`사용자 미션 진행 상황 조회 - 사용자: ${userId}, 날짜: ${date}`);
+
+    const targetDate = parseKoreanDate(date);
+    this.logger.log(`getUserMissionProgress - targetDate: ${targetDate.toISOString()}, 원본 날짜: ${date}`);
+
+    // 해당 날짜의 미션만 조회 (이벤트 미션, 1일 1미션 포함)
+    const missions = await this.getDailyMissions(userId, date);
+
+    // DECLARATION과 SELF_PRAISE 미션 정보 추가
+    const declarationMission = await this.prisma.mission.findFirst({
+      where: {
+        code: 'DECLARATION',
+        isActive: true
+      }
+    });
+
+    const selfPraiseMission = await this.prisma.mission.findFirst({
+      where: {
+        code: 'SELF_PRAISE',
+        isActive: true
+      }
+    });
+
+    // DECLARATION과 SELF_PRAISE를 missions 배열에 추가 (이미 포함되어 있지 않은 경우)
+    if (declarationMission && !missions.some(m => m.code === 'DECLARATION')) {
+      missions.push({
+        id: declarationMission.id,
+        code: declarationMission.code,
+        name: declarationMission.name,
+        description: declarationMission.description || '',
+        points: declarationMission.points,
+        requireUpload: declarationMission.requireUpload,
+        uploadType: declarationMission.uploadType,
+        sortOrder: declarationMission.sortOrder,
+        imageUrl: null,
+      });
+    }
+
+    if (selfPraiseMission && !missions.some(m => m.code === 'SELF_PRAISE')) {
+      missions.push({
+        id: selfPraiseMission.id,
+        code: selfPraiseMission.code,
+        name: selfPraiseMission.name,
+        description: selfPraiseMission.description || '',
+        points: selfPraiseMission.points,
+        requireUpload: selfPraiseMission.requireUpload,
+        uploadType: selfPraiseMission.uploadType,
+        sortOrder: selfPraiseMission.sortOrder,
+        imageUrl: null,
+      });
+    }
+
+    // 해당 날짜의 완료된 활동 조회
+    this.logger.log(`활동 조회 쿼리 - userId: ${userId}, date: ${targetDate.toISOString()}`);
+    const completedActivities = await this.prisma.activityRecord.findMany({
+      where: {
+        userId,
+        date: targetDate,
+        isCompleted: true,
+      },
+    });
+    this.logger.log(`조회된 활동 수: ${completedActivities.length}`);
+
+    // DECLARATION과 SELF_PRAISE는 날짜와 관계없이 조회
+    const declarationActivity = await this.prisma.activityRecord.findFirst({
+      where: {
+        userId,
+        type: 'DECLARATION',
+        isCompleted: true,
+      },
+    });
+
+    const selfPraiseActivity = await this.prisma.activityRecord.findFirst({
+      where: {
+        userId,
+        type: 'SELF_PRAISE',
+        isCompleted: true,
+      },
+    });
+
+    // 미션별 진행 상황 계산
+    const missionProgress = await Promise.all(missions.map(async mission => {
+      if (mission.code === 'DIET') {
+        // 식단 미션의 경우 3번까지 가능
+        const dietActivities = completedActivities.filter(a => a.type === 'DIET');
+        const currentCount = dietActivities.length;
+        const maxCount = 3;
+        const completed = currentCount >= maxCount;
+        return {
+          mission: {
+            id: mission.id,
+            code: mission.code,
+            name: mission.name,
+            description: mission.description || '',
+            points: mission.points,
+            requireUpload: mission.requireUpload,
+            uploadType: mission.uploadType,
+            sortOrder: mission.sortOrder,
+            imageUrl: null, // 일반 미션은 이미지 URL이 없음
+            quizQuestion: undefined,
+            quizOptions: undefined,
+          },
+          completed,
+          completedAt: completed ? dietActivities[maxCount - 1]?.createdAt || null : null,
+          earnedPoints: completed ? mission.points : 0,
+          currentCount,
+          maxCount,
+        };
+      } else if (mission.code === 'SUPPLEMENT') {
+        // 영양제 미션의 경우 2번까지 가능
+        const supplementActivities = completedActivities.filter(a => a.type === 'SUPPLEMENT');
+        const currentCount = supplementActivities.length;
+        const maxCount = 2;
+        const completed = currentCount > 0; // 영양제는 1번만 기록해도 완료
+        return {
+          mission: {
+            id: mission.id,
+            code: mission.code,
+            name: mission.name,
+            description: mission.description || '',
+            points: mission.points,
+            requireUpload: mission.requireUpload,
+            uploadType: mission.uploadType,
+            sortOrder: mission.sortOrder,
+            imageUrl: null, // 일반 미션은 이미지 URL이 없음
+            quizQuestion: undefined,
+            quizOptions: undefined,
+          },
+          completed,
+          completedAt: supplementActivities[0]?.createdAt || null,
+          earnedPoints: completed ? mission.points : 0,
+          currentCount,
+          maxCount,
+        };
+      } else {
+        // DECLARATION과 SELF_PRAISE는 날짜와 관계없이 완료 상태 확인
+        let completed: any;
+        if (mission.code === 'DECLARATION') {
+          completed = declarationActivity;
+        } else if (mission.code === 'SELF_PRAISE') {
+          completed = selfPraiseActivity;
+        } else {
+          completed = completedActivities.find(a => a.type === mission.code);
+          
+          // DAILY_CONTENT의 경우 날짜가 정확히 일치하는지 재확인
+          if (mission.code === 'DAILY_CONTENT' && completed) {
+            const completedDateStr = formatKoreanDate(new Date(completed.date));
+            if (completedDateStr !== date) {
+              this.logger.log(`DAILY_CONTENT 날짜 불일치 - 요청: ${date}, 완료 기록: ${completedDateStr}, 제외함`);
+              completed = null;
+            }
+          }
+        }
+        
+        // 퀴즈 미션인 경우 퀴즈 정보 추가
+        let quizQuestion: string | undefined;
+        let quizOptions: any[] | undefined;
+        
+        if (mission.code === 'QUIZ') {
+          try {
+            const quiz = await this.quizService.getQuizByDate(date);
+            quizQuestion = quiz.question;
+            quizOptions = quiz.options;
+          } catch (error) {
+            this.logger.warn(`퀴즈 정보 조회 실패: ${error.message}`);
+          }
+        }
+        
+        return {
+          mission: {
+            id: mission.id,
+            code: mission.code,
+            name: mission.name,
+            description: mission.description || '',
+            points: mission.points,
+            requireUpload: mission.requireUpload,
+            uploadType: mission.uploadType,
+            sortOrder: mission.sortOrder,
+            imageUrl: null, // 일반 미션은 이미지 URL이 없음
+            quizQuestion,
+            quizOptions,
+          },
+          completed: !!completed,
+          completedAt: completed?.createdAt || null,
+          earnedPoints: completed ? mission.points : 0,
+        };
+      }
+    }));
+
+    // 총 진행 상황 계산
+    const totalMissions = missions.length;
+    const completedMissions = missionProgress.filter(m => m.completed).length;
+    const totalEarnedPoints = missionProgress.reduce((sum, m) => sum + m.earnedPoints, 0);
+    const totalPossiblePoints = missions.reduce((sum, m) => sum + m.points, 0);
+    const completionRate = totalMissions > 0 ? (completedMissions / totalMissions) * 100 : 0;
+
+    // 전체 미션 수 계산 (sum(totalDays)로 원복)
+    const allMissions = await this.prisma.mission.findMany({
+      where: { isActive: true },
+      select: { totalDays: true }
+    });
+    const totalMissionCount = allMissions.reduce((sum, m) => sum + m.totalDays, 0);
+
+    // 완료된 미션 수 계산: findMany로 가져와서 unique (date, type) Set으로 count
+    const completedActivitiesSet = await this.prisma.activityRecord.findMany({
+      where: {
+        userId,
+        isCompleted: true
+      },
+      select: { date: true, type: true }
+    });
+    const uniqueCompleted = new Set(completedActivitiesSet.map(act => `${act.date.toISOString()}_${act.type}`));
+    const completedMissionCount = uniqueCompleted.size;
+
+    // 전체 완료율 계산 (100% 초과 방지)
+    const overallCompletionRate = totalMissionCount > 0 ? Math.min(100, Math.floor((completedMissionCount / totalMissionCount) * 100)) : 0;
+
+    this.logger.log(`User ${userId} overall completion: ${completedMissionCount}/${totalMissionCount} = ${overallCompletionRate}%`);
+
+    return {
+      date,
+      missions: missionProgress,
+      summary: {
+        totalMissions,
+        completedMissions,
+        remainingMissions: totalMissions - completedMissions,
+        totalEarnedPoints,
+        totalPossiblePoints,
+        completionRate: Math.round(completionRate),
+        // 전체 이행률 관련 필드 추가
+        totalMissionCount,
+        completedMissionCount,
+        overallCompletionRate: Math.round(overallCompletionRate), // 정수형
+      },
+    };
+  }
+
+  /**
+   * 사용자의 주간 미션 진행 상황 조회
+   */
+  async getUserWeeklyProgress(
+    userId: number,
+    startDate: string,
+    endDate: string
+  ): Promise<{ date: string; completed: number; total: number; points: number }[]> {
+    this.logger.log(`사용자 주간 미션 진행 상황 조회 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+
+    const start = parseKoreanDate(startDate);
+    
+    const end = parseKoreanDate(endDate);
+    // 종료일은 그날의 마지막 시간으로 설정 (한국 시간 기준)
+    end.setUTCHours(14, 59, 59, 999); // UTC 14:59:59 = KST 23:59:59
+
+    // 모든 활성 미션 조회
+    const missions = await this.prisma.mission.findMany({
+      where: { isActive: true },
+    });
+
+    // 기간 내 완료된 활동 조회
+    const completedActivities = await this.prisma.activityRecord.findMany({
+      where: {
+        userId,
+        date: {
+          gte: start,
+          lte: end,
+        },
+        isCompleted: true,
+      },
+    });
+
+    // 날짜별로 그룹화
+    const dailyProgress: Map<string, { completed: number; points: number }> = new Map();
+    
+    completedActivities.forEach(activity => {
+      const dateKey = formatKoreanDate(activity.date);
+      const current = dailyProgress.get(dateKey) || { completed: 0, points: 0 };
+      current.completed += 1;
+      // 포인트는 미션 정보에서 가져와야 함
+      const mission = missions.find(m => m.code === activity.type);
+      if (mission) {
+        current.points += mission.points;
+      }
+      dailyProgress.set(dateKey, current);
+    });
+
+    // 결과 배열 생성
+    const result = [];
+    const currentDate = new Date(start.getTime()); // 시작 날짜를 복사하여 사용
+    
+    while (currentDate <= end) {
+      const dateKey = formatKoreanDate(currentDate);
+      const progress = dailyProgress.get(dateKey) || { completed: 0, points: 0 };
+      
+      result.push({
+        date: dateKey,
+        completed: progress.completed,
+        total: missions.length,
+        points: progress.points,
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return result;
+  }
+
+  /**
+   * 개별 미션 상세 정보 조회 (DAILY_CONTENT의 경우 포인트 자동 지급)
+   */
+  async getMissionDetail(
+    userId: number,
+    missionCode: string,
+    date: string
+  ): Promise<MissionResponseDto> {
+    this.logger.log(`개별 미션 상세 조회 - 사용자 ID: ${userId}, 미션 코드: ${missionCode}, 날짜: ${date}`);
+
+    // 사용자 확인
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    // DAILY_CONTENT 미션인 경우 특별 처리
+    if (missionCode === 'DAILY_CONTENT') {
+      const targetDate = parseKoreanDate(date);
+
+      // 챌린지 시작일 기준으로 일차 계산 (한국 시간 기준)
+      const challengeStartDate = parseKoreanDate('2025-06-30');
+      let challengeDay = getDaysDifferenceKST(targetDate, challengeStartDate) + 1;
+      
+      if (challengeDay <= 0) {
+        challengeDay = 1;
+      }
+
+      // 해당 일차의 컨텐츠 조회
+      const content = await this.prisma.dailyContent.findUnique({
+        where: { day: challengeDay }
+      });
+
+      if (!content) {
+        throw new NotFoundException(`${challengeDay}일차 컨텐츠를 찾을 수 없습니다.`);
+      }
+
+      // 이미 활동 기록이 있는지 확인
+      const existingActivity = await this.prisma.activityRecord.findFirst({
+        where: {
+          userId: user.id,
+          type: 'DAILY_CONTENT',
+          date: targetDate,
+        }
+      });
+
+      // 활동 기록이 없으면 생성하고 포인트 지급
+      if (!existingActivity) {
+        await this.prisma.$transaction(async (tx) => {
+          // 활동 기록 생성
+          await tx.activityRecord.create({
+            data: {
+              userId: user.id,
+              type: 'DAILY_CONTENT',
+              date: targetDate,
+              data: {
+                contentId: content.id
+              },
+              // points는 ActivityRecord에 없음
+              isCompleted: true,
+            }
+          });
+
+          // 사용자 포인트 업데이트
+          const updatedUser = await tx.user.update({
+            where: { id: user.id },
+            data: { 
+              points: {
+                increment: 200
+              }
+            },
+            select: { id: true, points: true }
+          });
+
+          // 포인트 내역 기록
+          await tx.pointHistory.create({
+            data: {
+              userId: user.id,
+              type: 'EARN',
+              amount: 200,
+              balance: updatedUser.points,
+              description: `일일 컨텐츠 시청: ${content.title}`,
+              relatedType: 'DAILY_CONTENT',
+              relatedId: content.id,
+            }
+          });
+        });
+
+        this.logger.log(`DAILY_CONTENT 활동 기록 생성 및 포인트 지급 완료 - 사용자: ${user.id}`);
+      }
+
+      // DAILY_CONTENT 미션 정보 반환 (special_contents 정보 포함)
+      const mission = await this.prisma.mission.findFirst({
+        where: { code: 'DAILY_CONTENT' }
+      });
+
+      if (!mission) {
+        throw new NotFoundException('DAILY_CONTENT 미션을 찾을 수 없습니다.');
+      }
+
+      // special_contents 정보를 포함하여 반환
+      // existingActivity가 있으면 이미 포인트를 받았으므로 0, 없으면 200
+      const actualPoints = existingActivity ? 0 : mission.points;
+      
+      return {
+        id: mission.id,
+        code: mission.code,
+        name: content.title, // special_contents의 제목 사용
+        description: content.description || '', // special_contents의 설명 사용
+        points: actualPoints,
+        requireUpload: false,
+        uploadType: null,
+        sortOrder: mission.sortOrder,
+        // 컨텐츠 추가 정보
+        contentDay: content.day,
+        contentType: content.contentType,
+        contentUrl: content.contentUrl,
+        thumbnailUrl: content.thumbnailUrl,
+        items: content.items as unknown as SpecialContentItem[] | undefined,
+      };
+    }
+
+    // QUIZ 미션인 경우 특별 처리
+    if (missionCode === 'QUIZ') {
+      const mission = await this.prisma.mission.findFirst({
+        where: { code: 'QUIZ' }
+      });
+
+      if (!mission) {
+        throw new NotFoundException('퀴즈 미션을 찾을 수 없습니다.');
+      }
+
+      const targetDate = parseKoreanDate(date);
+
+      // 챌린지 시작일 기준으로 일차 계산 (한국 시간 기준)
+      const challengeStartDate = parseKoreanDate('2025-06-30');
+      let challengeDay = getDaysDifferenceKST(targetDate, challengeStartDate) + 1;
+      
+      if (challengeDay <= 0) {
+        challengeDay = 1;
+      }
+
+      // 퀴즈 정보 가져오기
+      let quizQuestion: string | undefined;
+      let quizOptions: any[] | undefined;
+      
+      try {
+        const quiz = await this.quizService.getQuizByDate(date);
+        quizQuestion = quiz.question;
+        quizOptions = quiz.options;
+      } catch (error) {
+        this.logger.warn(`${challengeDay}일차 퀴즈를 찾을 수 없습니다.`);
+      }
+
+      return {
+        id: mission.id,
+        code: mission.code,
+        name: mission.name,
+        description: mission.description || '',
+        points: mission.points,
+        requireUpload: mission.requireUpload,
+        uploadType: mission.uploadType,
+        sortOrder: mission.sortOrder,
+        imageUrl: null,
+        quizQuestion,
+        quizOptions,
+      };
+    }
+
+    // DAILY_MISSION인 경우 특별 처리
+    if (missionCode === 'DAILY_MISSION') {
+      const mission = await this.prisma.mission.findFirst({
+        where: { code: 'DAILY_MISSION' }
+      });
+
+      if (!mission) {
+        throw new NotFoundException('1일 1미션을 찾을 수 없습니다.');
+      }
+
+      const targetDate = parseKoreanDate(date);
+
+      // 챌린지 시작일 기준으로 일차 계산 (한국 시간 기준)
+      const challengeStartDate = parseKoreanDate('2025-06-30');
+      let challengeDay = getDaysDifferenceKST(targetDate, challengeStartDate) + 1;
+      
+      if (challengeDay <= 0) {
+        challengeDay = 1;
+      }
+
+      // 특별 미션 조회
+      const specialMission = await this.prisma.dailySpecialMission.findUnique({
+        where: { day: challengeDay }
+      });
+
+      if (!specialMission) {
+        throw new NotFoundException(`${challengeDay}일차 특별 미션을 찾을 수 없습니다.`);
+      }
+
+      return {
+        id: mission.id,
+        code: mission.code,
+        name: specialMission.title,
+        description: specialMission.description || '',
+        points: mission.points,
+        requireUpload: true,
+        uploadType: specialMission.verifyType,
+        sortOrder: mission.sortOrder,
+        specialMissionDay: specialMission.day,
+        verifyType: specialMission.verifyType,
+        imageUrl: specialMission.imageUrl,
+        reason: specialMission.reason,
+        method: specialMission.method,
+      };
+    }
+
+    // 일반 미션 조회
+    const mission = await this.prisma.mission.findFirst({
+      where: { code: missionCode }
+    });
+
+    if (!mission) {
+      throw new NotFoundException(`미션을 찾을 수 없습니다: ${missionCode}`);
+    }
+
+    return {
+      id: mission.id,
+      code: mission.code,
+      name: mission.name,
+      description: mission.description || '',
+      points: mission.points,
+      requireUpload: mission.requireUpload,
+      uploadType: mission.uploadType,
+      sortOrder: mission.sortOrder,
+      imageUrl: null,
+    };
+  }
+}

@@ -38,7 +38,8 @@ export class UsersService {
     const where = search ? {
       OR: [
         { email: { contains: search, mode: 'insensitive' as const } },
-        { nickname: { contains: search, mode: 'insensitive' as const } },
+        { name: { contains: search, mode: 'insensitive' as const } },
+        { mobile: { contains: search } },
       ],
     } : {};
 
@@ -78,7 +79,9 @@ export class UsersService {
             select: {
               id: true,
               email: true,
-              nickname: true,
+              name: true,
+              mobile: true,
+              points: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -141,7 +144,9 @@ export class UsersService {
             select: {
               id: true,
               email: true,
-              nickname: true,
+              name: true,
+              mobile: true,
+              points: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -166,7 +171,7 @@ export class UsersService {
    * 향상된 유효성 검사 및 중복 확인
    */
   async create(createUserDto: CreateUserDto) {
-    const { email, password, nickname } = createUserDto;
+    const { email, password, name, mobile } = createUserDto;
     
     this.logger.log(`사용자 생성 시도 - 이메일: ${email}`);
 
@@ -188,12 +193,15 @@ export class UsersService {
         data: {
           email,
           password: hashedPassword,
-          nickname,
+          name,
+          mobile,
         },
         select: {
           id: true,
           email: true,
-          nickname: true,
+          name: true,
+          mobile: true,
+          points: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -251,7 +259,9 @@ export class UsersService {
         select: {
           id: true,
           email: true,
-          nickname: true,
+          name: true,
+          mobile: true,
+          points: true,
           createdAt: true,
           updatedAt: true,
         },

@@ -31,17 +31,23 @@
 
 ### 1. 환경 설정
 ```bash
-# 환경 변수 파일 생성
-cp .env.eks.example .env.eks
+# 개발 환경 설정
+cp .env.eks.example .env.eks.dev
 
-# .env.eks 파일 편집하여 필요한 값 설정
-# 특히 DATABASE_URL, JWT_SECRET 등 중요 값 확인
+# 운영 환경 설정  
+cp .env.eks.example .env.eks.prod
+
+# 각 환경 파일을 편집하여 필요한 값 설정
+# 특히 DATABASE_URL, JWT_SECRET, CLUSTER_NAME 등 확인
 ```
 
 ### 2. EKS 클러스터 배포
 ```bash
-# 전체 인프라 구축 및 애플리케이션 배포 (약 20분 소요)
-./scripts/eks-deploy.sh
+# 개발 환경 배포 (약 20분 소요)
+./scripts/eks-deploy.sh dev
+
+# 운영 환경 배포
+./scripts/eks-deploy.sh prod
 ```
 
 이 스크립트 하나로:
@@ -68,10 +74,10 @@ cp .env.eks.example .env.eks
 │   ├── users/                 # 사용자 모듈
 │   └── common/                # 공통 모듈
 ├── infrastructure/            # 인프라 설정
-│   ├── helm/be_temp/         # Helm 차트
+│   ├── helm/biocom-api/      # Helm 차트
 │   └── docs/                 # 인프라 문서
 ├── scripts/                   # 자동화 스크립트
-│   ├── eks-deploy.sh         # EKS 배포
+│   ├── eks-deploy.sh         # 통합 배포 (환경별)
 │   ├── eks-monitor.sh        # 모니터링
 │   └── eks-cleanup.sh        # 리소스 정리
 ├── prisma/                    # Prisma 스키마
@@ -82,9 +88,14 @@ cp .env.eks.example .env.eks
 ## 🛠️ 주요 스크립트
 
 ### eks-deploy.sh
-전체 배포를 자동으로 처리합니다.
+통합 배포 스크립트로 모든 것을 자동으로 처리합니다.
+```bash
+./scripts/eks-deploy.sh [dev|prod]
+```
+- 환경별 설정 자동 로드 (.env.eks.dev 또는 .env.eks.prod)
 - 클러스터가 없으면 생성
-- 이미 있으면 애플리케이션만 업데이트
+- Docker 이미지 빌드 및 ECR 푸시
+- Helm 차트 배포
 - 타임스탬프 기반 이미지 태깅으로 항상 최신 버전 배포
 
 ### eks-monitor.sh

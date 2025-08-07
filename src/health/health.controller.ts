@@ -42,7 +42,7 @@ export class HealthController {
       example: {
         status: 'ok',
         timestamp: '2024-01-01T00:00:00.000Z',
-        service: 'nestjs-backend-template',
+        service: 'biocom-api',
         version: '1.0.0',
         uptime: '00:05:30'
       }
@@ -58,7 +58,7 @@ export class HealthController {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
-      service: 'nestjs-backend-template',
+      service: 'biocom-api',
       version: '1.0.0',
       uptime,
     };

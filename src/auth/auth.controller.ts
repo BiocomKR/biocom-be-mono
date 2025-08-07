@@ -1,12 +1,13 @@
-import { Controller, Post, Body, UseGuards, Get, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, Get } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { LoginRateLimit, SignupRateLimit } from '../common/decorators/throttle.decorator';
+import { Public } from '../common/decorators/public.decorator';
+import { ImwebAuthService } from '@/imweb/imweb-auth.service';
 
 /**
  * 인증 컨트롤러
@@ -15,7 +16,13 @@ import { LoginRateLimit, SignupRateLimit } from '../common/decorators/throttle.d
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly imwebAuthService: ImwebAuthService,
+  ) {
+    console.log('[AuthController] 생성자 호출');
+    console.log('[AuthController] imwebAuthService 주입됨:', !!this.imwebAuthService);
+  }
 
   /**
    * 회원가입
@@ -105,44 +112,33 @@ export class AuthController {
     };
   }
 
-  /**
-   * 내 프로필 조회
-   */
-  @Get('profile')
-  @UseGuards(JwtAuthGuard)
-  @SkipThrottle() // 인증된 사용자는 Rate Limiting 제외
-  @ApiBearerAuth()
+
+  @Get('test-token')
+  @Public()
+  @SkipThrottle()
   @ApiOperation({ 
-    summary: '내 프로필 조회', 
-    description: '현재 로그인한 사용자의 프로필을 조회합니다.' 
+    summary: '토큰 발행 테스트', 
+    description: '액세스 토큰 발행 및 저장 테스트' 
   })
-  @ApiResponse({ 
-    status: 200, 
-    description: '프로필 조회 성공',
-    schema: {
-      example: {
-        success: true,
-        message: '프로필을 조회했습니다.',
-        data: {
-          id: 1,
-          email: 'user@example.com',
-          nickname: 'nickname',
-          createdAt: '2024-01-01T00:00:00.000Z'
-        },
-        timestamp: '2024-01-01T00:00:00.000Z'
+  async testToken() {
+    console.log('[test-token] 메서드 진입');
+    try {
+      // 현재 저장된 토큰 확인
+      const currentToken = await this.imwebAuthService.getValidAccessToken('S20190715619285c855898');
+      console.log('[test-token] 새로운 액세스 토큰:', currentToken);
+      
+      return {
+        message: '토큰 발행 및 저장 테스트',
+        accessToken: currentToken
+      };
+    } catch (error) {
+      console.error('[test-token] 에러 발생:', error);
+      // 에러 상세 정보 로깅
+      if (error.error && error.error.details) {
+        console.error('[test-token] 에러 상세:', JSON.stringify(error.error.details, null, 2));
       }
+      throw error;
     }
-  })
-  @ApiResponse({ 
-    status: 401, 
-    description: '인증되지 않은 요청' 
-  })
-  async getProfile(@Request() req): Promise<ApiResponseDto> {
-    return {
-      success: true,
-      message: '프로필을 조회했습니다.',
-      data: req.user,
-      timestamp: new Date(),
-    };
   }
+  
 }

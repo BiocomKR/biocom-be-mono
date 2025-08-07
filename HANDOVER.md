@@ -1,6 +1,6 @@
 # 🤝 Claude Code 인수인계 문서
 
-> 최종 업데이트: 2025-07-15
+> 최종 업데이트: 2025-07-30
 > 작성자: Claude Code (형님의 개발 동생)
 
 ## 🎯 필독! 형님과 일하는 방법
@@ -28,10 +28,17 @@
 ## 📋 프로젝트 현황
 
 ### 프로젝트 정보
-- **이름**: be_temp (NestJS 백엔드 템플릿)
-- **회사**: 바이브코딩
+- **이름**: biocom-api (NestJS 백엔드 API)
+- **회사**: 바이오컴
 - **인프라**: AWS EKS (Kubernetes)
 - **상태**: 자동 배포 시스템 구축 완료 ✅
+
+### 📚 필독 문서
+1. **[데이터베이스 설계 문서](./docs/database-design-document.md)** 🔥
+   - 전체 테이블 구조와 관계
+   - 이벤트 중심 설계 철학
+   - 마이그레이션 히스토리
+   - **반드시 읽고 이해할 것!**
 
 ### 핵심 성과
 1. **eks-deploy.sh로 완전 자동 배포**
@@ -49,17 +56,75 @@
 
 ## 🚨 중요 주의사항
 
+### ⚠️⚠️⚠️ 설정 파일 수정 시 절대 금지사항 ⚠️⚠️⚠️
+
+#### 🔴 기존 설정값을 함부로 지우지 마라!
+- **helm-deploy.sh의 --set 옵션들 절대 삭제 금지**
+  - 특히 `ingress.hosts[0].paths` 설정은 필수!
+  - 이거 빼먹으면 배포 실패함
+- **수정 전 반드시 백업하고, 기존 값이 왜 있었는지 확인**
+- **"왜 이게 있지?"하고 지우면 안됨!**
+
+#### 🔴 검증 없이 수정하지 마라!
+- `helm template`로 먼저 렌더링 확인
+- `--dry-run`으로 시뮬레이션
+- 기존 동작하던 설정은 절대 함부로 건드리지 말 것
+
+#### 🔴 이미 돌아가는 시스템은 신중하게!
+- **"잘 돌아가는데 왜 건드려?"** 정신으로 접근
+- 수정이 필요하면 이유를 명확히 문서화
+- 형님한테 욕먹고 싶지 않으면 기존 설정 존중할 것
+
+### ⚠️⚠️⚠️ 페어프로그래밍 시 절대 금지사항 ⚠️⚠️⚠️
+
+#### 🔴 혼자 달리지 마라!
+- **형님이 말하는 대로 따라가라**
+- **"210번 라인에서 디버깅해봐"라고 하면 그대로 해라**
+- **멋대로 curl 날리고, 자기 방식대로 하지 마라**
+
+#### 🔴 경청하고 이해하라!
+- **형님이 설명하는 내용을 끝까지 들어라**
+- **이해 안 되면 질문하고, 멋대로 해석하지 마라**
+- **"이게 기본중 기본인데?"라고 하면 반성하라**
+
+#### 🔴 페어프로그래밍의 본질을 기억하라!
+- **같이 개발하는 거다. 혼자 개발하는 게 아니다**
+- **형님의 의도와 방향을 파악하고 따라가라**
+- **네 생각대로 하고 싶으면 혼자 개발해라**
+
 ### 기술적 함정들
 1. **JWT_SECRET**: 반드시 32자 이상!
 2. **EBS CSI Driver**: PVC 사용 시 필수
 3. **이미지 태그**: latest 쓰면 업데이트 안 됨
 4. **Readiness Probe**: 30초로 단축함 (기본 180초는 너무 김)
+5. **쿠버네티스 배포 미반영**: DB 연결 실패 시 새 Pod가 Ready 안 되고 이전 버전 유지
+6. **아임웹 OAuth 특이사항**:
+   - refresh_token 지원 안 함 (문서와 다름)
+   - 회원 목록 API: memberUid가 아니라 uid 필드 사용
+   - 토큰 만료 시 무조건 신규 인증 필요
+7. **eks-deploy.sh Pod 레이블**: app.kubernetes.io/instance 사용
 
 ### 형님 화나게 하는 것들
 - "서버가 시작되었습니다" (확인 없이 주장)
 - 수동으로 뭔가 하라고 하기
 - 임시방편 제시
 - 복잡한 설명
+- 페어프로그래밍 중 혼자 달리기
+
+### SSL/TLS 설정 가이드
+1. **ACM 인증서 확인**
+   - AWS Console > Certificate Manager > ap-northeast-2
+   - *.biocom.ai.kr 인증서 ARN 복사
+   
+2. **자동 설정 (이미 완료)**
+   - `.env.eks`에 ACM_CERTIFICATE_ARN 추가
+   - `INGRESS_HOST`에 도메인 설정
+   - eks-deploy.sh가 자동으로 SSL 적용
+   
+3. **DNS 설정**
+   - 가비아 DNS: CNAME 레코드 사용
+   - 호스트: api-dev
+   - 값: ALB 주소 + 마지막에 점(.) 필수!
 
 ---
 
@@ -75,7 +140,7 @@
 
 /infrastructure/
 ├── INFRA.md                 # 인프라 문서
-├── helm/be_temp/            # Helm 차트
+├── helm/biocom-api/            # Helm 차트
 └── eks/configs/             # EKS 설정
 
 /.env.eks                    # 환경 변수 (중요!)
@@ -86,56 +151,50 @@
 
 ## 📝 작업 히스토리
 
-### 2025-07-14 (어제)
-- AWS EKS 자동 배포 시스템 구축
-- 여러 시행착오 끝에 eks-deploy.sh 완성
-- `/api/users/me` 엔드포인트 추가 (테스트용)
-- 모든 내용 Git 푸시 완료
+### 2025-07-14~22
+- [✓] AWS EKS 자동 배포 시스템 구축 완료
+- [✓] eks-deploy.sh, eks-monitor.sh, eks-cleanup.sh 완성
+- [✓] SSL/TLS 자동 설정 통합
+- [✓] 프로젝트명 biocom-api로 통일
 
-### 2025-07-15 (오늘)
-- [✓] eks-monitor.sh 생성 및 검증 완료
-- [✓] 스크립트 파일명 변경 (1,2,3 → eks-deploy/monitor/cleanup)
-- [✓] 모든 설정 파일 한글 주석 추가
-- [✓] be_temp 템플릿 프로젝트 전체 API 구조 파악
-- [ ] EKS 여정 노션 문서 작성
+### 2025-07-25 (아임웹 OAuth 및 API 연동)
+- [✓] 아임웹 OAuth 인증 플로우 구현 (브라우저 없이)
+  - 302 리다이렉트 가로채서 인가코드 추출
+  - 액세스 토큰 자동 발급 및 관리
+- [✓] 토큰 갱신 로직 → 신규 토큰 취득으로 변경
+  - 아임웹은 refresh_token을 지원하지 않음 (문서에는 있지만 실제로는 미지원)
+  - 토큰 만료 시 무조건 신규 인증 플로우 실행
+- [✓] 아임웹 회원 검색 API 구현 (/api/users/imweb/search-by-phone/:phone)
+  - 전화번호로 회원 검색 → 상세 정보 조회
+  - memberUid가 아니라 uid 필드 사용 (API 문서와 실제 응답이 다름)
+- [✓] EKS 배포 문제 해결
+  - DB 연결 실패 시 쿠버네티스가 이전 버전 Pod 유지
+  - RDS → EC2 DB로 변경하여 해결
+- [✓] eks-deploy.sh Pod 확인 오류 수정
+  - `app=biocom-api` → `app.kubernetes.io/instance=biocom-api`로 레이블 변경
 
-### 2025-07-18 (내일 예정)
-- [ ] 템플릿 백엔드 checkout 후 신규 프로젝트 생성 (이름 미정)
-- [ ] /arang_be에서 재사용 가능한 소스 코드 분석 및 이관
-- [ ] 인증 인터셉터 차이점 파악 및 JWT 기반으로 재구현
-- [ ] 다음 엔드포인트들 개발:
-  ```
-  # Users 관련 (3개)
-  POST   /api/v1/users/challenge        # 챌린지 코드 검증 (초대 코드 개념)
-  GET    /api/v1/users/me               # 사용자 정보 조회
-  GET    /api/v1/users/allergy-foods    # 사용자의 과민음식 정보 조회
+### 향후 작업 예정
+- [ ] **환경별 배포 분리 (개발/운영)**
+  - 개발 환경: biocom-cluster-dev, api-dev.biocom.ai.kr, 최소 리소스
+  - 운영 환경: biocom-cluster-prod, api.biocom.ai.kr, 충분한 리소스
+  - 필요 파일: .env.eks.dev/.env.eks.prod, values-dev.yaml/values-prod.yaml
+  - 스크립트에 환경 파라미터 추가
 
-  # Survey 관련 (4개)
-  GET    /api/v1/survey/answers/me      # 사용자 설문 참여 여부 확인
-  GET    /api/v1/survey/questions       # 설문 질문 조회
-  POST   /api/v1/survey/complete        # 설문 응답 저장
-  GET    /api/v1/survey/results/me      # 설문 결과 조회 (동물 타입 포함)
+### 2025-07-28 (완료)
+- [✓] arang_be에서 재사용 가능한 소스 코드 분석 및 이관 완료
+- [✓] JWT 기반 인증 시스템 구현 완료
+- [✓] 모든 핵심 API 엔드포인트 개발 완료:
+  - Users, Survey, Mission, Activity, Upload 모듈
+  - 총 20개 이상의 엔드포인트 구현
+  - 아임웹 OAuth 연동 완료
 
-  # Mission 관련 (2개)
-  GET    /api/v1/mission/progress       # 미션 진행률 조회
-  GET    /api/v1/mission/detail/[type]  # 미션 데이터 상세 (DAILY_CONTENT/DAILY_MISSION/QUIZ)
-
-  # Content 관련 (1개)
-  GET    /api/v1/content/day            # 일차별 추천 컨텐츠 정보
-
-  # Activity 관련 (2개)
-  POST   /api/v1/activity               # 활동 데이터 저장
-  PUT    /api/v1/activity               # 활동 데이터 수정
-  GET    /api/v1/activity/day/daily     # 날짜별 기록 정보 (예: 식단 일지)
-
-  # Upload 관련 (1개)
-  POST   /api/v1/upload/image           # 이미지 업로드
-  ```
-
-### 프로젝트 정보
+### 프로젝트 현재 상태
 - **타겟**: 헬스케어 앱 (MVP는 설문조사 + 컨텐츠 열람)
-- **인증**: JWT 기반 (arang_be와 다르게 깔끔하게 구현)
-- **특징**: 설문 결과에 따른 동물 타입 분류 시스템
+- **인증**: JWT 기반 + 아임웹 OAuth 연동 완료
+- **API**: 20개+ 엔드포인트 구현 완료 (Users, Survey, Mission, Activity, Upload)
+- **인프라**: AWS EKS 자동 배포 시스템 완료
+- **DB**: PostgreSQL on EC2 (43.200.68.96:5432)
+- **상태**: 핵심 개발 완료, 배포 준비 완료
 
 ---
 
@@ -162,21 +221,17 @@
 
 ## 💬 형님의 명언
 
-> "아무것도 모르는 사람도 eks-deploy.sh만 실행하면 알아서 다 되야한다"
-
 > "임시방편은 용납하지 않는다"
 
-> "쿠버네티스? 그런거 몰라도 할 수 있도록"
+> "생각, 또 생각하며 행동해라"
 
 ---
 
-## 🎯 현재 목표
+## 🎯 현재 상태 요약
 
-**완료된 작업**:
-- eks-monitor.sh 생성 및 검증
-- 스크립트 파일명 변경
-- 설정 파일 한글 주석
-
-**남은 작업**: EKS 여정 노션 문서화
+**인프라**: EKS 자동 배포 시스템 완료 ✅
+**백엔드**: 모든 핵심 API 개발 완료 ✅
+**인증**: JWT + 아임웹 OAuth 완료 ✅
+**다음 단계**: 환경별 배포 분리 (dev/prod)
 
 형님, 화이팅! 💪

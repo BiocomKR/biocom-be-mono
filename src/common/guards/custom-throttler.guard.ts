@@ -19,7 +19,7 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
     options: ThrottlerModuleOptions,
     storageService: ThrottlerStorage,
     reflector: Reflector,
-    private readonly logger: LoggerService,
+    private readonly logger?: LoggerService,
   ) {
     super(options, storageService, reflector);
   }
@@ -30,6 +30,9 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
+    
+    // 디버깅 로그 추가
+    console.log(`[CustomThrottlerGuard] Checking ${request.method} ${request.url}`);
     
     // 화이트리스트 IP 확인
     if (this.isWhitelisted(request)) {
@@ -103,17 +106,26 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
     const clientIP = this.getClientIP(request);
     const userId = request.user?.id;
     
-    this.logger.logSecurity(
-      'Rate limit exceeded',
-      {
+    if (this.logger) {
+      this.logger.logSecurity(
+        'Rate limit exceeded',
+        {
+          ip: clientIP,
+          userId,
+          method: request.method,
+          url: request.url,
+          userAgent: request.headers['user-agent'],
+        },
+        'medium'
+      );
+    } else {
+      console.warn('Rate limit exceeded:', {
         ip: clientIP,
         userId,
         method: request.method,
         url: request.url,
-        userAgent: request.headers['user-agent'],
-      },
-      'medium'
-    );
+      });
+    }
   }
 
   /**

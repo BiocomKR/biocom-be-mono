@@ -1,0 +1,220 @@
+# 🚀 바이브코딩 백엔드 Helm 차트 설정값
+# 이 파일의 모든 값은 오버라이드 가능합니다
+
+# 전역 설정
+global:
+  # AWS 계정 정보
+  aws:
+    accountId: "183631338083"    # AWS 계정 ID
+    region: "ap-northeast-2"      # AWS 리전 (서울)
+  
+# 애플리케이션 기본 정보
+app:
+  name: backend-api               # 애플리케이션 이름
+  label: backend-api              # Kubernetes 라벨
+
+# 복제본 수 (HPA 사용시 초기값)
+replicaCount: 2                   # 기본 Pod 개수 (dev환경에서는 4로 오버라이드)
+
+# 컨테이너 이미지
+image:
+  repository: 183631338083.dkr.ecr.ap-northeast-2.amazonaws.com/backend-v2  # ECR 리포지토리
+  tag: latest                     # 이미지 태그 (배포시 타임스탬프로 오버라이드)
+  pullPolicy: Always              # 항상 최신 이미지 pull
+  # ECR pull secret이 필요한 경우
+  # pullSecrets:
+  #   - name: ecr-secret
+
+# 서비스 설정
+service:
+  type: ClusterIP                 # 클러스터 내부 통신용
+  port: 80                        # 서비스 포트
+  targetPort: 3000               # 컨테이너 포트 (NestJS 기본값)
+  annotations: {}                 # 추가 어노테이션
+  labels: {}                      # 추가 라벨
+
+# Ingress (ALB) 설정
+ingress:
+  enabled: true                   # ALB 생성 활성화
+  className: alb                  # AWS Load Balancer Controller 사용
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing              # 인터넷 연결 ALB
+    alb.ingress.kubernetes.io/target-type: ip                      # Pod IP 직접 연결
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health        # 헬스체크 경로
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"   # 헬스체크 간격
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"     # 헬스체크 타임아웃
+    alb.ingress.kubernetes.io/success-codes: "200"                 # 정상 응답 코드
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"         # 정상 판정 횟수
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"       # 비정상 판정 횟수
+    # SSL/TLS 설정
+    alb.ingress.kubernetes.io/certificate-arn: ""                  # ACM 인증서 ARN (배포시 오버라이드)
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'  # HTTP/HTTPS 포트 모두 수신
+    alb.ingress.kubernetes.io/ssl-redirect: '443'                  # HTTP → HTTPS 리다이렉트
+  hosts:
+    - host: "api-dev.biocom.ai.kr"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  
+# 리소스 제한
+resources:
+  limits:
+    cpu: 500m        # CPU 최대 사용량 (0.5 코어)
+    memory: 1Gi      # 메모리 최대 사용량
+  requests:
+    cpu: 250m        # CPU 최소 보장량 (0.25 코어)
+    memory: 512Mi    # 메모리 최소 보장량
+
+# 오토스케일링
+autoscaling:
+  enabled: true                          # HPA 활성화 여부
+  minReplicas: 2                         # 최소 Pod 수
+  maxReplicas: 10                        # 최대 Pod 수
+  targetCPUUtilizationPercentage: 70     # CPU 사용률 임계값 (%)
+  targetMemoryUtilizationPercentage: 80  # 메모리 사용률 임계값 (%)
+  # 추가 메트릭 (선택사항)
+  # behavior:
+  #   scaleDown:
+  #     stabilizationWindowSeconds: 300   # 스케일 다운 안정화 시간 (5분)
+  #   scaleUp:
+  #     stabilizationWindowSeconds: 60    # 스케일 업 안정화 시간 (1분)
+
+# 환경 변수
+env:
+  # 일반 환경변수
+  - name: NODE_ENV
+    value: production
+  - name: PORT
+    value: "3000"
+  - name: RATE_LIMIT_TTL
+    value: "60"
+  - name: RATE_LIMIT_LIMIT
+    value: "1000"
+
+# Secret 참조
+secrets:
+  # 기존 secret 사용
+  existingSecret: backend-secrets
+  # 또는 Helm으로 생성
+  # create: true
+  # data:
+  #   database-url: "postgresql://user:pass@host:5432/db"
+  #   jwt-secret: "your-jwt-secret"
+  #   session-secret: "your-session-secret"
+
+# 볼륨 설정
+volumes:
+  uploads:
+    enabled: true
+    storageClass: ebs-sc
+    size: 10Gi
+    accessMode: ReadWriteOnce
+    # 기존 PVC 사용
+    existingClaim: uploads-pvc
+  logs:
+    enabled: true
+    emptyDir: {}
+
+# 프로브 설정
+probes:
+  liveness:
+    enabled: true
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    httpGet:
+      path: /api/health
+      port: 3000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+# Pod 보안 설정
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+# 컨테이너 보안 설정
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# 노드 선택자
+nodeSelector: {}
+  # role: apps
+
+# 허용/제외 규칙
+tolerations: []
+
+# 어피니티 설정
+affinity: {}
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #   - weight: 100
+  #     podAffinityTerm:
+  #       labelSelector:
+  #         matchExpressions:
+  #         - key: app
+  #           operator: In
+  #           values:
+  #           - backend-api
+  #       topologyKey: kubernetes.io/hostname
+
+# 추가 라벨
+labels: {}
+
+# 추가 주석
+annotations: {}
+
+# ServiceAccount
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+
+# 모니터링
+monitoring:
+  enabled: false
+  # Prometheus ServiceMonitor
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    path: /metrics
+
+# PVC 생성 설정
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: gp2
+
+# PostgreSQL 설정 (개발 환경용)
+postgres:
+  enabled: false  # 개발 환경에서 true로 변경
+  user: biocom
+  password: biocom123
+  database: biocom_db
+  persistence:
+    size: 10Gi
+    storageClass: gp2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi

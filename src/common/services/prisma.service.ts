@@ -1,5 +1,237 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { CryptoUtil } from '../utils/crypto.util';
+
+/**
+ * Prisma 확장 타입 정의
+ * 자동 암/복호화 기능이 추가된 PrismaClient 타입
+ */
+type ExtendedPrismaClient = ReturnType<typeof createExtendedPrismaClient>;
+
+/**
+ * Date 객체를 KST로 변환 (읽기 시)
+ */
+function convertToKST(date: Date | null): Date | null {
+  if (!date || !(date instanceof Date)) return date;
+  return new Date(date.getTime() + (9 * 60 * 60 * 1000));
+}
+
+/**
+ * Date 객체를 UTC로 변환 (저장 시)
+ */
+function convertToUTC(date: Date | string | null): Date | null {
+  if (!date) return null;
+  if (typeof date === 'string') date = new Date(date);
+  if (!(date instanceof Date)) return null;
+  return new Date(date.getTime() - (9 * 60 * 60 * 1000));
+}
+
+/**
+ * 객체 내의 모든 Date 필드를 KST로 변환
+ */
+function convertDatesToKST<T>(obj: T): T {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (obj instanceof Date) return convertToKST(obj) as any;
+  if (Array.isArray(obj)) return obj.map(item => convertDatesToKST(item)) as any;
+  
+  const converted: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value instanceof Date) {
+      converted[key] = convertToKST(value);
+    } else if (value && typeof value === 'object') {
+      converted[key] = convertDatesToKST(value);
+    } else {
+      converted[key] = value;
+    }
+  }
+  return converted;
+}
+
+/**
+ * 객체 내의 모든 Date 필드를 UTC로 변환
+ */
+function convertDatesToUTC<T>(obj: T): T {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (obj instanceof Date || typeof obj === 'string') return convertToUTC(obj) as any;
+  if (Array.isArray(obj)) return obj.map(item => convertDatesToUTC(item)) as any;
+  
+  const converted: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value instanceof Date || (typeof value === 'string' && isDateString(value))) {
+      converted[key] = convertToUTC(value);
+    } else if (value && typeof value === 'object') {
+      converted[key] = convertDatesToUTC(value);
+    } else {
+      converted[key] = value;
+    }
+  }
+  return converted;
+}
+
+/**
+ * 문자열이 날짜 형식인지 확인
+ */
+function isDateString(str: string): boolean {
+  if (/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/.test(str)) {
+    const date = new Date(str);
+    return !isNaN(date.getTime());
+  }
+  return false;
+}
+
+/**
+ * Prisma Client Extension으로 암호화 및 시간대 변환 기능 추가
+ */
+function createExtendedPrismaClient() {
+  const logger = new Logger('PrismaExtension');
+  
+  const prisma = new PrismaClient({
+    log: ['query', 'info', 'warn', 'error'],
+  }).$extends({
+    // 조회 시 자동 복호화
+    result: {
+      user: {
+        name: {
+          needs: { name: true },
+          compute(user) {
+            return user.name ? CryptoUtil.decrypt(user.name) : user.name;
+          },
+        },
+        mobile: {
+          needs: { mobile: true },
+          compute(user) {
+            return user.mobile ? CryptoUtil.decrypt(user.mobile) : user.mobile;
+          },
+        },
+      },
+    },
+    // 생성/수정 시 자동 암호화 및 시간대 변환
+    query: {
+      // 모든 모델에 대한 시간대 변환
+      $allModels: {
+        // 생성 시 KST → UTC 변환
+        async create({ args, query, model }) {
+          if (args.data) {
+            args.data = convertDatesToUTC(args.data);
+          }
+          const result = await query(args);
+          return convertDatesToKST(result);
+        },
+        
+        // 다중 생성 시 KST → UTC 변환
+        async createMany({ args, query, model }) {
+          if (args.data) {
+            if (Array.isArray(args.data)) {
+              args.data = args.data.map(item => convertDatesToUTC(item));
+            } else {
+              args.data = convertDatesToUTC(args.data);
+            }
+          }
+          return query(args);
+        },
+        
+        // 업데이트 시 KST → UTC 변환
+        async update({ args, query, model }) {
+          if (args.data) {
+            args.data = convertDatesToUTC(args.data);
+          }
+          const result = await query(args);
+          return convertDatesToKST(result);
+        },
+        
+        // 다중 업데이트 시 KST → UTC 변환
+        async updateMany({ args, query, model }) {
+          if (args.data) {
+            args.data = convertDatesToUTC(args.data);
+          }
+          return query(args);
+        },
+        
+        // 조회 시 UTC → KST 변환
+        async findUnique({ args, query, model }) {
+          const result = await query(args);
+          return result ? convertDatesToKST(result) : result;
+        },
+        
+        // 첫 번째 조회 시 UTC → KST 변환
+        async findFirst({ args, query, model }) {
+          const result = await query(args);
+          return result ? convertDatesToKST(result) : result;
+        },
+        
+        // 다중 조회 시 UTC → KST 변환
+        async findMany({ args, query, model }) {
+          const results = await query(args);
+          return results.map(result => convertDatesToKST(result));
+        },
+        
+        // Upsert 시 KST → UTC 변환
+        async upsert({ args, query, model }) {
+          if (args.create) {
+            args.create = convertDatesToUTC(args.create);
+          }
+          if (args.update) {
+            args.update = convertDatesToUTC(args.update);
+          }
+          const result = await query(args);
+          return convertDatesToKST(result);
+        },
+      },
+      
+      // User 모델의 암호화 처리 (기존 코드 유지)
+      user: {
+        async create({ args, query }) {
+          // name 암호화
+          if (args.data.name && typeof args.data.name === 'string') {
+            args.data.name = CryptoUtil.encrypt(args.data.name);
+          }
+          // mobile 암호화
+          if (args.data.mobile && typeof args.data.mobile === 'string') {
+            args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+          }
+          return query(args);
+        },
+        async createMany({ args, query }) {
+          // createMany의 경우 data 배열 처리
+          if (Array.isArray(args.data)) {
+            args.data = args.data.map(item => ({
+              ...item,
+              name: item.name ? CryptoUtil.encrypt(item.name) : item.name,
+              mobile: item.mobile ? CryptoUtil.encrypt(item.mobile) : item.mobile,
+            }));
+          } else if (args.data) {
+            // 단일 객체인 경우
+            if (args.data.name) args.data.name = CryptoUtil.encrypt(args.data.name);
+            if (args.data.mobile) args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+          }
+          return query(args);
+        },
+        async update({ args, query }) {
+          // update의 data 암호화
+          if (args.data.name && typeof args.data.name === 'string') {
+            args.data.name = CryptoUtil.encrypt(args.data.name);
+          }
+          if (args.data.mobile && typeof args.data.mobile === 'string') {
+            args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+          }
+          return query(args);
+        },
+        async updateMany({ args, query }) {
+          // updateMany의 data 암호화
+          if (args.data.name && typeof args.data.name === 'string') {
+            args.data.name = CryptoUtil.encrypt(args.data.name);
+          }
+          if (args.data.mobile && typeof args.data.mobile === 'string') {
+            args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+          }
+          return query(args);
+        },
+      },
+    },
+  });
+
+  return prisma;
+}
 
 /**
  * Prisma 서비스 클래스
@@ -10,15 +242,75 @@ import { PrismaClient } from '@prisma/client';
  * - 애플리케이션 시작/종료 시 자동 연결/해제
  * - 구조화된 로깅을 통한 데이터베이스 작업 추적
  * - 트랜잭션 지원
+ * - 개인정보(이름, 휴대폰번호) 자동 암/복호화
  */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
+  private prisma: ExtendedPrismaClient;
 
   constructor() {
-    super({
-      log: ['query', 'info', 'warn', 'error'],
-    });
+    this.prisma = createExtendedPrismaClient();
+    
+    // Prisma Middleware로 시간대 자동 변환 추가
+    this.setupTimezoneMiddleware();
+    
+    // PrismaClient의 모든 속성을 PrismaService에 바인딩
+    const delegateProperties = Object.keys(this.prisma).filter(
+      key => !['$on', '$connect', '$disconnect', '$use', '$transaction', '$executeRaw', '$queryRaw'].includes(key)
+    );
+    
+    for (const prop of delegateProperties) {
+      Object.defineProperty(this, prop, {
+        get: () => (this.prisma as any)[prop],
+      });
+    }
+  }
+
+  // PrismaClient의 주요 메서드들을 명시적으로 노출
+  get user() { return this.prisma.user; }
+  get fileUpload() { return this.prisma.fileUpload; }
+  get imwebInfo() { return this.prisma.imwebInfo; }
+  get survey() { return this.prisma.survey; }
+  get surveyQuestion() { return this.prisma.surveyQuestion; }
+  get surveyOption() { return this.prisma.surveyOption; }
+  get surveyAnswer() { return this.prisma.surveyAnswer; }
+  get categoryDetail() { return this.prisma.categoryDetail; }
+  get pointHistory() { return this.prisma.pointHistory; }
+  get mission() { return this.prisma.mission; }
+  get missionSchedule() { return this.prisma.missionSchedule; }
+  get event() { return this.prisma.event; }
+  get eventMission() { return this.prisma.eventMission; }
+  get eventSurvey() { return this.prisma.eventSurvey; }
+  get eventQuiz() { return this.prisma.eventQuiz; }
+  get eventUser() { return this.prisma.eventUser; }
+  get missionCompletion() { return this.prisma.missionCompletion; }
+  get quiz() { return this.prisma.quiz; }
+  get quizAnswer() { return this.prisma.quizAnswer; }
+  get apiKey() { return this.prisma.apiKey; }
+  get content() { return this.prisma.content; }
+  get contentFile() { return this.prisma.contentFile; }
+  get eventContent() { return this.prisma.eventContent; }
+
+  // 메서드 바인딩
+  $transaction(arg: any) {
+    return (this.prisma as any).$transaction(arg);
+  }
+  
+  $queryRaw(query: TemplateStringsArray, ...values: any[]) {
+    return (this.prisma as any).$queryRaw(query, ...values);
+  }
+  
+  $executeRaw(query: TemplateStringsArray, ...values: any[]) {
+    return (this.prisma as any).$executeRaw(query, ...values);
+  }
+  
+  $connect() {
+    return this.prisma.$connect();
+  }
+  
+  $disconnect() {
+    return this.prisma.$disconnect();
   }
 
   /**
@@ -64,5 +356,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.logger.error('데이터베이스 헬스체크 실패:', error);
       return false;
     }
+  }
+
+  /**
+   * Prisma Middleware로 시간대 자동 변환 설정
+   * - 쓰기 작업: KST → UTC 변환
+   * - 읽기 작업: UTC → KST 변환
+   */
+  private setupTimezoneMiddleware() {
+    // Prisma Extension의 query 훅에서 자동 처리됨
   }
 }

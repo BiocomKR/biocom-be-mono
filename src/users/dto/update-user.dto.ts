@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, IsOptional, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsString, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
 
 /**
  * 사용자 수정 DTO
@@ -38,17 +38,30 @@ export class UpdateUserDto {
   password?: string;
 
   /**
-   * 닉네임 (선택사항)
-   * 사용자 표시명으로 사용
+   * 이름 (선택사항)
+   * 사용자 실명
    */
   @ApiProperty({
-    description: '사용자 닉네임',
-    example: 'newcooluser123',
+    description: '사용자 이름',
+    example: '김철수',
     required: false,
     maxLength: 50,
   })
   @IsOptional()
-  @IsString({ message: '닉네임은 문자열이어야 합니다.' })
-  @MaxLength(50, { message: '닉네임은 최대 50자까지 입력 가능합니다.' })
-  nickname?: string;
+  @IsString({ message: '이름은 문자열이어야 합니다.' })
+  @MaxLength(50, { message: '이름은 최대 50자까지 입력 가능합니다.' })
+  name?: string;
+
+  /**
+   * 휴대폰 번호 (선택사항)
+   */
+  @ApiProperty({
+    description: '휴대폰 번호',
+    example: '01087654321',
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: '휴대폰 번호는 문자열이어야 합니다.' })
+  @Matches(/^01[0-9]{8,9}$/, { message: '올바른 휴대폰 번호 형식이 아닙니다.' })
+  mobile?: string;
 }

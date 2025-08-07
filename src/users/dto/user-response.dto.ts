@@ -25,14 +25,31 @@ export class UserResponseDto {
   email: string;
 
   /**
-   * 닉네임
+   * 이름
    */
   @ApiProperty({
-    description: '사용자 닉네임',
-    example: 'cooluser123',
-    nullable: true,
+    description: '사용자 이름',
+    example: '홍길동',
   })
-  nickname: string | null;
+  name: string;
+
+  /**
+   * 휴대폰 번호
+   */
+  @ApiProperty({
+    description: '휴대폰 번호',
+    example: '01012345678',
+  })
+  mobile: string;
+
+  /**
+   * 포인트
+   */
+  @ApiProperty({
+    description: '보유 포인트',
+    example: 1000,
+  })
+  points: number;
 
   /**
    * 생성일시

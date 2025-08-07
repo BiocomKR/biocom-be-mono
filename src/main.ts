@@ -89,8 +89,8 @@ async function bootstrap() {
 
   // Swagger API 문서화 설정
   const config = new DocumentBuilder()
-    .setTitle('NestJS Backend Template API')
-    .setDescription('NestJS 백엔드 템플릿 API 문서')
+    .setTitle('Biocom API')
+    .setDescription('바이오컴 백엔드 API 문서')
     .setVersion('1.0')
     .addBearerAuth(
       {
@@ -107,6 +107,16 @@ async function bootstrap() {
     .addTag('auth', '인증')
     .addTag('upload', '파일 업로드')
     .addTag('users', '사용자 관리')
+    .addTag('event', '이벤트')
+    .addTag('mission', '미션')
+    .addTag('survey', '설문')
+    .addTag('management-api-key', '관리자 API 키')
+    .addTag('management-event', '관리자 이벤트')
+    .addTag('management-users', '관리자 사용자')
+    .addTag('management-mission', '관리자 미션')
+    .addTag('management-survey', '관리자 설문')
+    .addTag('management-quiz', '관리자 퀴즈')
+    .addTag('management-content', '관리자 컨텐츠')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

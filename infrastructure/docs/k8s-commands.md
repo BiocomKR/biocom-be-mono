@@ -123,16 +123,16 @@ kubectl get deployment metrics-server -n kube-system
 helm list
 
 # 릴리즈 상태 확인
-helm status temp-backend
+helm status biocom-api
 
 # 릴리즈 히스토리
-helm history temp-backend
+helm history biocom-api
 
 # values 확인
-helm get values temp-backend
+helm get values biocom-api
 
 # 업그레이드 (개발환경)
-helm upgrade temp-backend ./infrastructure/helm/be_temp -f ./infrastructure/helm/be_temp/values-dev.yaml
+helm upgrade biocom-api ./infrastructure/helm/biocom-api -f ./infrastructure/helm/biocom-api/values-dev.yaml
 ```
 
 ## 🚀 바이브코딩 EKS 스크립트

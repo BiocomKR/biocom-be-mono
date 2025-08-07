@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService as NestConfigService } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD, Reflector } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
 import { PrismaService } from './common/services/prisma.service';
 import { ConfigService } from './common/services/config.service';
+import { LoggerService } from './common/services/logger.service';
 import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { LoggerModule } from './common/modules/logger.module';
@@ -16,6 +17,11 @@ import { HealthModule } from './health/health.module';
 import { validationSchema, configuration } from './common/config/env.validation';
 import { UsersModule } from './users/users.module';
 import { CommonModule } from './common/common.module';
+import { ImwebModule } from './imweb/imweb.module';
+import { MissionModule } from './mission/mission.module';
+import { SurveyModule } from './survey/survey.module';
+import { EventModule } from './event/event.module';
+import { ManagementModule } from './management/management.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -76,8 +82,13 @@ import { CommonModule } from './common/common.module';
     AuthModule,       // JWT 인증 모듈
     UploadModule,     // 파일 업로드 모듈
     UsersModule,      // 사용자 관리 모듈 (V2 방식)
+    ImwebModule,      // 아임웹 API 통합 모듈
+    MissionModule,    // 미션 모듈
+    SurveyModule,     // 설문 모듈
+    EventModule,      // 이벤트 기간 관리 모듈
+    ManagementModule, // 백오피스 관리 모듈
   ],
-  controllers: [], // 컨트롤러 없음
+  controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [
     PrismaService,  // 글로벌 데이터베이스 서비스
     ConfigService,  // 타입 안전한 설정 서비스

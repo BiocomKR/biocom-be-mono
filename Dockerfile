@@ -68,10 +68,10 @@ EXPOSE 3000
 # 이후 모든 명령은 nestjs 사용자 권한으로 실행
 USER nestjs
 
-# 헬스체크 설정 (Kubernetes 프로브와 별개로 Docker 레벨 체크)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node dist/health-check.js || exit 1
+# 헬스체크 설정 (HTTP endpoint 사용)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => { process.exit(1); })"
 
 # 애플리케이션 시작 (운영 모드)
 # 컴파일된 메인 파일 실행
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

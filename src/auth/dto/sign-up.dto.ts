@@ -35,15 +35,25 @@ export class SignUpDto {
   password: string;
 
   /**
-   * 닉네임
+   * 이름
    */
   @ApiProperty({
-    description: '사용자 닉네임',
+    description: '사용자 이름',
     example: '홍길동',
-    required: false,
   })
   @IsString()
-  @MinLength(2, { message: '닉네임은 최소 2자 이상이어야 합니다.' })
-  @MaxLength(20, { message: '닉네임은 20자 이하여야 합니다.' })
-  nickname?: string;
+  @MinLength(2, { message: '이름은 최소 2자 이상이어야 합니다.' })
+  @MaxLength(20, { message: '이름은 20자 이하여야 합니다.' })
+  name: string;
+
+  /**
+   * 휴대폰 번호
+   */
+  @ApiProperty({
+    description: '휴대폰 번호',
+    example: '01012345678',
+  })
+  @IsString()
+  @Matches(/^01[0-9]{8,9}$/, { message: '올바른 휴대폰 번호 형식이 아닙니다.' })
+  mobile: string;
 }

@@ -7,7 +7,7 @@
 ```
 infrastructure/
 ├── helm/               # Helm 차트
-│   └── be_temp/       # 애플리케이션 Helm 차트
+│   └── biocom-api/       # 애플리케이션 Helm 차트
 │       ├── Chart.yaml
 │       ├── values.yaml
 │       ├── values-dev.yaml
@@ -60,7 +60,7 @@ cp .env.eks.example .env.eks
 
 ## 🎯 Helm 차트
 
-### 차트 구조 (`infrastructure/helm/be_temp/`)
+### 차트 구조 (`infrastructure/helm/biocom-api/`)
 - `Chart.yaml` - 차트 메타데이터
 - `values.yaml` - 기본 설정값
 - `values-dev.yaml` - 개발 환경 오버라이드
@@ -106,7 +106,7 @@ ECR_REPOSITORY=backend-v2
 
 # 애플리케이션 설정
 APP_NAME=backend-api
-HELM_RELEASE_NAME=temp-backend
+HELM_RELEASE_NAME=biocom-api
 
 # 데이터베이스 및 보안
 DATABASE_URL=postgresql://...

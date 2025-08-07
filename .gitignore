@@ -8,11 +8,12 @@ dist
 /generated/prisma
 
 # environment variables
-# 초기 개발 단계에서 팀원들과 공유를 위해 일시적으로 포함
-# .env
-# .env.local
-# .env.development
-# .env.production
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
 
 # logs
 *.log
