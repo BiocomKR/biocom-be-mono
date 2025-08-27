@@ -23,10 +23,32 @@ export class MissionService {
    * 모든 활성 미션 조회
    */
   async getAllMissions(): Promise<Mission[]> {
-    return await this.prisma.mission.findMany({
-      where: { isActive: true },
-      orderBy: { sortOrder: 'asc' },
+    this.logger.log('현재 활성 이벤트의 모든 미션 목록 조회');
+    
+    // 현재 활성 이벤트 확인
+    const activeEvent = await this.eventService.getActiveEvent();
+    
+    // 현재 이벤트에 속한 활성화된 미션들만 조회
+    const eventMissions = await this.prisma.eventMission.findMany({
+      where: {
+        eventId: activeEvent.id,
+        isActive: true,
+      },
+      include: {
+        mission: true,
+      },
+      orderBy: {
+        mission: { sortOrder: 'asc' },
+      },
     });
+    
+    // Mission 객체만 추출하여 반환
+    const missions = eventMissions
+      .filter(em => em.mission.isActive) // 미션 자체도 활성화되어 있어야 함
+      .map(em => em.mission);
+    
+    this.logger.log(`활성 이벤트(${activeEvent.id})의 미션 ${missions.length}개 조회 완료`);
+    return missions;
   }
 
   /**
@@ -277,10 +299,46 @@ export class MissionService {
     specificDay: number | null;
   }>): Promise<Mission> {
     this.logger.log(`미션 수정 - ID: ${id}`);
+    this.logger.log(`받은 데이터:`, JSON.stringify(data, null, 2));
+
+    // 관계 필드들과 메타데이터 필드들을 제거하고 순수한 미션 데이터만 추출
+    const {
+      schedules,
+      eventMissions,
+      id: dataId,
+      createdAt,
+      updatedAt,
+      code,
+      ...updateData
+    } = data as any;
+
+    // 허용된 필드만 업데이트 (필드명 매핑 포함)
+    const allowedFields = {
+      name: updateData.name,
+      description: updateData.description,
+      type: updateData.type,
+      points: updateData.points,
+      isActive: updateData.isActive,
+      sortOrder: updateData.sortOrder,
+      specificDay: updateData.specificDay,
+      dailyLimit: updateData.dailyLimit,
+      totalDays: updateData.totalDays,
+      requireUpload: updateData.requireUpload,
+      uploadType: updateData.uploadType,
+      category: updateData.category,
+    };
+
+    // undefined 값 제거
+    const cleanData = Object.fromEntries(
+      Object.entries(allowedFields).filter(([_, value]) => value !== undefined)
+    );
+
+    this.logger.log(`미션 수정 - 업데이트할 필드: ${Object.keys(cleanData).join(', ')}`);
+    this.logger.log(`최종 업데이트 데이터:`, JSON.stringify(cleanData, null, 2));
 
     const mission = await this.prisma.mission.update({
       where: { id },
-      data,
+      data: cleanData,
     });
 
     this.logger.log(`미션 수정 완료 - ID: ${id}`);

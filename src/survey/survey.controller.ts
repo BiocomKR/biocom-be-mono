@@ -49,7 +49,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
  * - GET /survey/results/me: 내 설문 결과 조회  
  * - GET /survey/results/compare: 전후 비교 결과 조회
  */
-@ApiTags('survey')
+@ApiTags('챌린지-survey')
 @Controller('survey')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access-token')

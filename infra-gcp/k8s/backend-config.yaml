@@ -1,0 +1,28 @@
+# 🔧 BackendConfig - GKE 백엔드 설정
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: biocom-api-backend-config
+  namespace: biocom-api
+spec:
+  # 헬스체크 설정
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /api/health
+    port: 10804
+  
+  # 연결 드레이닝
+  connectionDraining:
+    drainingTimeoutSec: 30
+    
+  # 타임아웃 설정
+  timeoutSec: 30
+  
+  # 세션 어피니티 (필요한 경우)
+  # sessionAffinity:
+  #   affinityType: "CLIENT_IP"
+  #   affinityCookieTtlSec: 86400

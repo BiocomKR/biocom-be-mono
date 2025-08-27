@@ -15,6 +15,16 @@ import { ManagementApiKeyController } from './controllers/management-api-key.con
 import { ManagementEventController } from './controllers/management-event.controller';
 import { ManagementQuizMasterController } from './controllers/management-quiz-master.controller';
 import { ManagementContentController } from './controllers/management-content.controller';
+import { ManagementPointController } from './controllers/management-point.controller';
+import { ManagementShopController } from './controllers/management-shop.controller';
+import { ManagementDashboardController } from './controllers/management-dashboard.controller';
+import { ManagementShippingController } from './controllers/management-shipping.controller';
+import { ManagementRefundController } from './controllers/management-refund.controller';
+import { ManagementShopService } from './services/management-shop.service';
+import { ManagementDashboardService } from './services/management-dashboard.service';
+import { ManagementShippingService } from './services/management-shipping.service';
+import { ManagementRefundService } from './services/management-refund.service';
+import { PointModule } from '../point/point.module';
 
 /**
  * Management 모듈
@@ -30,6 +40,7 @@ import { ManagementContentController } from './controllers/management-content.co
     EventModule,
     QuizModule,
     ContentModule,
+    PointModule,
   ],
   controllers: [
     ManagementUsersController,
@@ -39,10 +50,19 @@ import { ManagementContentController } from './controllers/management-content.co
     ManagementEventController,
     ManagementQuizMasterController,
     ManagementContentController,
+    ManagementPointController,
+    ManagementShopController,
+    ManagementDashboardController,
+    ManagementShippingController,
+    ManagementRefundController,
   ],
   providers: [
     ApiKeyGuard,
     ApiKeyService,
+    ManagementShopService,
+    ManagementDashboardService,
+    ManagementShippingService,
+    ManagementRefundService,
   ],
   exports: [ApiKeyGuard],
 })

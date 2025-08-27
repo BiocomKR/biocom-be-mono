@@ -77,29 +77,29 @@ export class QuizAnswerService {
 
       // 정답인 경우 포인트 적립
       if (isCorrect) {
-        await tx.pointHistory.create({
-          data: {
-            userId: userId,
-            type: 'EARN',
-            amount: pointsEarned,
-            balance: 0, // 나중에 계산
-            description: `${day}일차 퀴즈 정답`,
-            relatedType: 'QUIZ_ANSWER',
-            relatedId: answer.id,
-          },
-        });
-
         // 사용자 포인트 업데이트
-        await tx.user.update({
+        const updatedUser = await tx.user.update({
           where: { id: userId },
           data: {
             points: { increment: pointsEarned },
           },
         });
+
+        // 포인트 적립 이력 (실제 잔액 포함)
+        await tx.pointHistory.create({
+          data: {
+            userId: userId,
+            type: 'EARN',
+            amount: pointsEarned,
+            balance: updatedUser.points, // 실제 잔액
+            description: `${day}일차 퀴즈 정답`,
+            relatedType: 'QUIZ_ANSWER',
+            relatedId: answer.id,
+          },
+        });
       }
 
-      // 이벤트 참여자 통계 업데이트
-      await this.updateEventUserStats(tx, eventUser.id);
+      // EventUser.totalPoints 제거됨 - 필요시 SUM 쿼리로 계산
 
       this.logger.log(`퀴즈 답변 처리 완료 - ID: ${answer.id}, 정답: ${isCorrect}, 포인트: ${pointsEarned}`);
       return answer;
@@ -160,37 +160,36 @@ export class QuizAnswerService {
   }
 
   /**
-   * 이벤트 참여자 통계 업데이트
+   * 이벤트 참여자 통계 조회 (실시간 계산)
+   * EventUser.totalPoints, completedDays 제거로 인해 필요시 SUM으로 계산
    */
-  private async updateEventUserStats(tx: any, eventUserId: number): Promise<void> {
+  async getEventUserStats(eventUserId: number): Promise<{
+    totalPoints: number;
+    completedDays: number;
+  }> {
     // 미션 포인트
-    const missionPoints = await tx.missionCompletion.aggregate({
-      where: { eventUserId: eventUserId },
+    const missionPoints = await this.prisma.missionCompletion.aggregate({
+      where: { eventUserId },
       _sum: { pointsEarned: true },
     });
 
     // 퀴즈 포인트
-    const quizPoints = await tx.quizAnswer.aggregate({
-      where: { eventUserId: eventUserId },
+    const quizPoints = await this.prisma.quizAnswer.aggregate({
+      where: { eventUserId },
       _sum: { pointsEarned: true },
     });
 
     // 완료 일수 계산
-    const missionDays = await tx.missionCompletion.findMany({
-      where: { eventUserId: eventUserId },
+    const missionDays = await this.prisma.missionCompletion.findMany({
+      where: { eventUserId },
       select: { day: true },
       distinct: ['day'],
     });
 
-    const total = (missionPoints._sum.pointsEarned || 0) + (quizPoints._sum.pointsEarned || 0);
-
-    await tx.eventUser.update({
-      where: { id: eventUserId },
-      data: {
-        totalPoints: total,
-        completedDays: missionDays.length,
-      },
-    });
+    return {
+      totalPoints: (missionPoints._sum.pointsEarned || 0) + (quizPoints._sum.pointsEarned || 0),
+      completedDays: missionDays.length,
+    };
   }
 
   /**

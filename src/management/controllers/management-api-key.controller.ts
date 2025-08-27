@@ -11,13 +11,6 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiHeader,
-} from '@nestjs/swagger';
 import { ApiKeyGuard } from '../guards/api-key.guard';
 import { ApiKeyService } from '../services/api-key.service';
 import { CreateApiKeyDto } from '../dto/create-api-key.dto';
@@ -29,14 +22,8 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
  * API Key의 생성, 조회, 활성화/비활성화 등을 관리
  * 자기 자신을 관리하는 API이므로 API Key 인증 필요
  */
-@ApiTags('management-api-key')
 @Controller('management/api-keys')
 @UseGuards(ApiKeyGuard)
-@ApiHeader({
-  name: 'X-API-KEY',
-  description: 'API Key for authentication',
-  required: true,
-})
 export class ManagementApiKeyController {
   private readonly logger = new Logger(ManagementApiKeyController.name);
 
@@ -47,16 +34,7 @@ export class ManagementApiKeyController {
    * 보안을 위해 key 값은 일부만 노출
    */
   @Get()
-  @ApiOperation({
-    summary: 'API Key 목록 조회',
-    description: '모든 API Key 목록을 조회합니다. 보안을 위해 key 값은 앞 8자리만 표시됩니다.',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'API Key 목록 조회 성공',
-    type: [ApiKeyListResponseDto],
-  })
-  async findAll(): Promise<ApiResponseDto<ApiKeyListResponseDto[]>> {
+      async findAll(): Promise<ApiResponseDto<ApiKeyListResponseDto[]>> {
     this.logger.log('API Key 목록 조회 요청');
 
     try {
@@ -92,26 +70,7 @@ export class ManagementApiKeyController {
    * 전체 key 값 포함
    */
   @Get(':id')
-  @ApiOperation({
-    summary: 'API Key 상세 조회',
-    description: '특정 API Key의 상세 정보를 조회합니다. 전체 key 값이 포함됩니다.',
-  })
-  @ApiParam({
-    name: 'id',
-    type: 'number',
-    description: 'API Key ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'API Key 조회 성공',
-    type: ApiKeyResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'API Key를 찾을 수 없음',
-  })
-  async findOne(
+          async findOne(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ApiResponseDto<ApiKeyResponseDto>> {
     this.logger.log(`API Key 상세 조회 요청 - ID: ${id}`);
@@ -137,20 +96,7 @@ export class ManagementApiKeyController {
    * 새로운 API Key 생성
    */
   @Post()
-  @ApiOperation({
-    summary: 'API Key 생성',
-    description: '새로운 API Key를 생성합니다. UUID 형식의 고유한 key가 자동으로 생성됩니다.',
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'API Key 생성 성공',
-    type: ApiKeyResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.CONFLICT,
-    description: '동일한 이름의 API Key가 이미 존재함',
-  })
-  async create(
+        async create(
     @Body() createApiKeyDto: CreateApiKeyDto,
   ): Promise<ApiResponseDto<ApiKeyResponseDto>> {
     this.logger.log(`API Key 생성 요청 - 이름: ${createApiKeyDto.name}`);
@@ -179,26 +125,7 @@ export class ManagementApiKeyController {
    * API Key 활성화
    */
   @Put(':id/activate')
-  @ApiOperation({
-    summary: 'API Key 활성화',
-    description: '비활성화된 API Key를 활성화합니다.',
-  })
-  @ApiParam({
-    name: 'id',
-    type: 'number',
-    description: 'API Key ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'API Key 활성화 성공',
-    type: ApiKeyResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'API Key를 찾을 수 없음',
-  })
-  async activate(
+          async activate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ApiResponseDto<ApiKeyResponseDto>> {
     this.logger.log(`API Key 활성화 요청 - ID: ${id}`);
@@ -224,26 +151,7 @@ export class ManagementApiKeyController {
    * API Key 비활성화
    */
   @Put(':id/deactivate')
-  @ApiOperation({
-    summary: 'API Key 비활성화',
-    description: '활성화된 API Key를 비활성화합니다. 비활성화된 key는 인증에 사용할 수 없습니다.',
-  })
-  @ApiParam({
-    name: 'id',
-    type: 'number',
-    description: 'API Key ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'API Key 비활성화 성공',
-    type: ApiKeyResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'API Key를 찾을 수 없음',
-  })
-  async deactivate(
+          async deactivate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ApiResponseDto<ApiKeyResponseDto>> {
     this.logger.log(`API Key 비활성화 요청 - ID: ${id}`);
@@ -269,26 +177,7 @@ export class ManagementApiKeyController {
    * API Key 재생성
    */
   @Put(':id/regenerate')
-  @ApiOperation({
-    summary: 'API Key 재생성',
-    description: '기존 API Key를 새로운 UUID로 재생성합니다. 기존 key는 즉시 사용할 수 없게 됩니다.',
-  })
-  @ApiParam({
-    name: 'id',
-    type: 'number',
-    description: 'API Key ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'API Key 재생성 성공',
-    type: ApiKeyResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'API Key를 찾을 수 없음',
-  })
-  async regenerate(
+          async regenerate(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ApiResponseDto<ApiKeyResponseDto>> {
     this.logger.log(`API Key 재생성 요청 - ID: ${id}`);
@@ -314,25 +203,7 @@ export class ManagementApiKeyController {
    * API Key 삭제
    */
   @Delete(':id')
-  @ApiOperation({
-    summary: 'API Key 삭제',
-    description: 'API Key를 완전히 삭제합니다. 삭제된 key는 복구할 수 없습니다.',
-  })
-  @ApiParam({
-    name: 'id',
-    type: 'number',
-    description: 'API Key ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: 'API Key 삭제 성공',
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: 'API Key를 찾을 수 없음',
-  })
-  async remove(
+          async remove(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ApiResponseDto<null>> {
     this.logger.log(`API Key 삭제 요청 - ID: ${id}`);

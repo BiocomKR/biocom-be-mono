@@ -54,17 +54,17 @@ export class SurveyService {
    * @returns 생성된 설문
    */
   async createSurvey(createSurveyDto: {
-    title: string;
+    name: string;  // title 대신 name으로 변경
     description?: string;
-    type: string;
+    type?: string;
     category?: string;
     isActive?: boolean;
   }): Promise<any> {
-    this.logger.log(`설문 생성 - 제목: ${createSurveyDto.title}`);
+    this.logger.log(`설문 생성 - 이름: ${createSurveyDto.name}`);
 
     const survey = await this.prisma.survey.create({
       data: {
-        name: createSurveyDto.title,  // title이 아닌 name 필드 사용
+        name: createSurveyDto.name,  // name 필드 직접 사용
         description: createSurveyDto.description,
         isActive: createSurveyDto.isActive ?? true,
       }
@@ -109,7 +109,7 @@ export class SurveyService {
   async updateSurvey(
     id: number,
     updateSurveyDto: Partial<{
-      title: string;
+      name: string;  // title 대신 name 사용
       description: string;
       isActive: boolean;
     }>
@@ -117,8 +117,8 @@ export class SurveyService {
     this.logger.log(`설문 수정 - ID: ${id}`);
 
     const updateData: any = {};
-    if (updateSurveyDto.title !== undefined) {
-      updateData.name = updateSurveyDto.title;  // title → name 변환
+    if (updateSurveyDto.name !== undefined) {
+      updateData.name = updateSurveyDto.name;  // name 필드 직접 사용
     }
     if (updateSurveyDto.description !== undefined) {
       updateData.description = updateSurveyDto.description;

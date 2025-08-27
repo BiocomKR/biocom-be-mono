@@ -16,6 +16,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { UsersService } from './users.service';
 import { ImwebApiService } from '../imweb/imweb-api.service';
+import {
+  SearchImwebMembersResponseDto,
+  GetMyProfileResponseDto,
+  UpdateUserResponseDto,
+  GetMyPointsResponseDto,
+} from './dto/user-response.dto';
+import { ApiErrorResponseDto } from '../common/dto/api-response.dto';
 
 /**
  * 사용자 컨트롤러
@@ -47,30 +54,12 @@ export class UsersController {
   @ApiResponse({ 
     status: 200, 
     description: '회원 검색 성공',
-    schema: {
-      example: {
-        success: true,
-        message: '아임웹 회원 검색이 완료되었습니다.',
-        data: [
-          {
-            memberUid: 'example@email.com',
-            name: '홍길동',
-            phone: '01056060746',
-            // ... 기타 회원 정보
-          }
-        ],
-        meta: {
-          version: 'v2',
-          timestamp: '2024-01-01T00:00:00.000Z',
-          count: 1
-        },
-        timestamp: '2024-01-01T00:00:00.000Z'
-      }
-    }
+    type: SearchImwebMembersResponseDto,
   })
   @ApiResponse({ 
     status: 404, 
-    description: '해당 전화번호로 등록된 회원을 찾을 수 없음' 
+    description: '해당 전화번호로 등록된 회원을 찾을 수 없음',
+    type: ApiErrorResponseDto,
   })
   async searchImwebMembersByPhone(
     @Param('phone') phone: string

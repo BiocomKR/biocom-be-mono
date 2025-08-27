@@ -184,6 +184,132 @@ export class ContentService {
   }
 
   /**
+   * 컨텐츠 목록 조회 (사용자용)
+   */
+  async getContentList(params: {
+    page: number;
+    limit: number;
+    type?: string;
+    category?: string;
+    search?: string;
+    isActive?: boolean;
+  }): Promise<PaginatedResult<any>> {
+    this.logger.log(`컨텐츠 목록 조회 - page: ${params.page}, limit: ${params.limit}`);
+
+    const where: any = {};
+
+    // 검색어 필터
+    if (params.search) {
+      where.OR = [
+        { title: { contains: params.search, mode: 'insensitive' } },
+        { content: { contains: params.search, mode: 'insensitive' } },
+      ];
+    }
+
+    // 타입 필터
+    if (params.type) {
+      where.type = params.type;
+    }
+
+    // 카테고리 필터 (메타데이터에서 필터링)
+    if (params.category) {
+      where.metadata = {
+        path: '$.category',
+        equals: params.category,
+      };
+    }
+
+    // 활성화 상태 필터
+    if (params.isActive !== undefined) {
+      where.isActive = params.isActive;
+    }
+
+    // 페이징 처리
+    const result = await PaginationHelper.paginate<any>(
+      this.prisma.content,
+      { page: params.page, limit: params.limit },
+      {
+        where,
+        include: {
+          contentFiles: {
+            orderBy: { sortOrder: 'asc' },
+          },
+          _count: {
+            select: {
+              eventContents: true,
+            },
+          },
+        },
+      },
+      { sortBy: 'createdAt', sortOrder: 'desc' }
+    );
+
+    this.logger.log(`컨텐츠 목록 조회 완료 - 총 ${result.total}개`);
+
+    return result;
+  }
+
+  /**
+   * 조회수 증가
+   * Note: viewCount 필드가 없으므로 나중에 스키마 업데이트 필요
+   */
+  async increaseViewCount(id: number): Promise<void> {
+    // TODO: viewCount 필드 추가 후 구현
+    this.logger.log(`컨텐츠 조회 - ID: ${id}`);
+  }
+
+  /**
+   * 이벤트별 컨텐츠 조회
+   */
+  async getContentsByEventId(eventId: number): Promise<any[]> {
+    const eventContents = await this.prisma.eventContent.findMany({
+      where: { eventId },
+      include: {
+        content: {
+          include: {
+            contentFiles: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+      orderBy: { day: 'asc' },
+    });
+
+    // 활성화된 컨텐츠만 필터링
+    return eventContents
+      .filter(ec => ec.content.isActive)
+      .map(ec => ({
+        ...ec.content,
+        day: ec.day,
+      }));
+  }
+
+  /**
+   * 인기 컨텐츠 조회
+   * Note: viewCount 필드가 없으므로 최근 생성된 컨텐츠를 반환
+   */
+  async getPopularContents(limit: number): Promise<any[]> {
+    const contents = await this.prisma.content.findMany({
+      where: { isActive: true },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        contentFiles: {
+          orderBy: { sortOrder: 'asc' },
+        },
+        _count: {
+          select: {
+            eventContents: true,
+          },
+        },
+      },
+    });
+
+    return contents;
+  }
+
+  /**
    * 페이징 처리된 컨텐츠 목록 조회
    */
   async getContentsWithPagination(

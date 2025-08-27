@@ -24,7 +24,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
  * 이벤트 컨트롤러
  * 일반 사용자용 이벤트 정보 조회 API
  */
-@ApiTags('event')
+@ApiTags('챌린지-event')
 @Controller('event')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access-token')

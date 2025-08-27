@@ -209,6 +209,15 @@ export class ImwebAuthService {
   }
 
   /**
+   * Authorization Code를 Access Token으로 교환
+   * OAuth 콜백에서 받은 code를 사용하여 토큰 발급
+   */
+  async exchangeCodeForToken(code: string): Promise<string> {
+    const result = await this.getAccessToken(code);
+    return result.accessToken;
+  }
+
+  /**
    * 아임웹 인증 프로세스 (인가코드 발급 → 토큰 발급 → DB 저장)
    * - 사이트코드는 일단 하드코딩
    */

@@ -22,6 +22,14 @@ import { MissionModule } from './mission/mission.module';
 import { SurveyModule } from './survey/survey.module';
 import { EventModule } from './event/event.module';
 import { ManagementModule } from './management/management.module';
+import { PointModule } from './point/point.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ProductsModule } from './products/products.module';
+import { CartModule } from './cart/cart.module';
+import { OrdersModule } from './orders/orders.module';
+import { PaymentModule } from './payment/payment.module';
+import { ShippingModule } from './shipping/shipping.module';
+import { RefundModule } from './refund/refund.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -87,6 +95,14 @@ import { ManagementModule } from './management/management.module';
     SurveyModule,     // 설문 모듈
     EventModule,      // 이벤트 기간 관리 모듈
     ManagementModule, // 백오피스 관리 모듈
+    PointModule,      // 포인트 관리 모듈
+    CategoriesModule, // 카테고리 관리 모듈
+    ProductsModule,   // 상품 관리 모듈
+    CartModule,       // 장바구니 모듈
+    OrdersModule,     // 주문 관리 모듈
+    PaymentModule,    // 결제 연동 모듈
+    ShippingModule,   // 배송 관리 모듈
+    RefundModule,     // 환불 처리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [

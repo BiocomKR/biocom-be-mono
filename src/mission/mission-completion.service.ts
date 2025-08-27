@@ -83,29 +83,28 @@ export class MissionCompletionService {
         },
       });
 
-      // 포인트 적립
-      await tx.pointHistory.create({
-        data: {
-          userId: userId,
-          type: 'EARN',
-          amount: eventMission.points,
-          balance: 0, // 나중에 계산
-          description: `${eventMission.mission.name} 완료`,
-          relatedType: 'MISSION_COMPLETION',
-          relatedId: completion.id,
-        },
-      });
-
       // 사용자 포인트 업데이트
-      await tx.user.update({
+      const updatedUser = await tx.user.update({
         where: { id: userId },
         data: {
           points: { increment: eventMission.points },
         },
       });
 
-      // 이벤트 참여자 통계 업데이트
-      await this.updateEventUserStats(tx, eventUser.id);
+      // 포인트 적립 이력 (실제 잔액 포함)
+      await tx.pointHistory.create({
+        data: {
+          userId: userId,
+          type: 'EARN',
+          amount: eventMission.points,
+          balance: updatedUser.points, // 실제 잔액
+          description: `${eventMission.mission.name} 완료`,
+          relatedType: 'MISSION_COMPLETION',
+          relatedId: completion.id,
+        },
+      });
+
+      // EventUser.totalPoints 제거됨 - 필요시 SUM 쿼리로 계산
 
       this.logger.log(`미션 완료 처리 성공 - ID: ${completion.id}, 포인트: ${eventMission.points}`);
       return completion;
@@ -179,37 +178,36 @@ export class MissionCompletionService {
   }
 
   /**
-   * 이벤트 참여자 통계 업데이트
+   * 이벤트 참여자 통계 조회 (실시간 계산)
+   * EventUser.totalPoints 제거로 인해 필요시 SUM으로 계산
    */
-  private async updateEventUserStats(tx: any, eventUserId: number): Promise<void> {
-    // 총 포인트 계산
-    const totalPoints = await tx.missionCompletion.aggregate({
-      where: { eventUserId: eventUserId },
+  async getEventUserStats(eventUserId: number): Promise<{
+    totalPoints: number;
+    completedDays: number;
+  }> {
+    // 미션 포인트 합계
+    const missionPoints = await this.prisma.missionCompletion.aggregate({
+      where: { eventUserId },
       _sum: { pointsEarned: true },
     });
 
-    // 완료 일수 계산 (중복 제거)
-    const completedDays = await tx.missionCompletion.findMany({
-      where: { eventUserId: eventUserId },
+    // 퀴즈 포인트 합계
+    const quizPoints = await this.prisma.quizAnswer.aggregate({
+      where: { eventUserId },
+      _sum: { pointsEarned: true },
+    });
+
+    // 완료 일수 (중복 제거)
+    const completedDays = await this.prisma.missionCompletion.findMany({
+      where: { eventUserId },
       select: { day: true },
       distinct: ['day'],
     });
 
-    // 퀴즈 포인트도 포함
-    const quizPoints = await tx.quizAnswer.aggregate({
-      where: { eventUserId: eventUserId },
-      _sum: { pointsEarned: true },
-    });
-
-    const total = (totalPoints._sum.pointsEarned || 0) + (quizPoints._sum.pointsEarned || 0);
-
-    await tx.eventUser.update({
-      where: { id: eventUserId },
-      data: {
-        totalPoints: total,
-        completedDays: completedDays.length,
-      },
-    });
+    return {
+      totalPoints: (missionPoints._sum.pointsEarned || 0) + (quizPoints._sum.pointsEarned || 0),
+      completedDays: completedDays.length,
+    };
   }
 
   /**
@@ -288,10 +286,13 @@ export class MissionCompletionService {
       };
     }
 
+    // EventUser.totalPoints 제거로 인해 실시간 계산
+    const stats = await this.getEventUserStats(eventUser.id);
+    
     return {
       completions: eventUser.missionCompletions,
-      totalPoints: eventUser.totalPoints,
-      completedDays: eventUser.completedDays,
+      totalPoints: stats.totalPoints,
+      completedDays: stats.completedDays,
     };
   }
 }

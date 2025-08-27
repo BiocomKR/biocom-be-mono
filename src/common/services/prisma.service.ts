@@ -269,6 +269,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // PrismaClient의 주요 메서드들을 명시적으로 노출
   get user() { return this.prisma.user; }
+  get refreshToken() { return this.prisma.refreshToken; }
   get fileUpload() { return this.prisma.fileUpload; }
   get imwebInfo() { return this.prisma.imwebInfo; }
   get survey() { return this.prisma.survey; }
@@ -291,6 +292,30 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get content() { return this.prisma.content; }
   get contentFile() { return this.prisma.contentFile; }
   get eventContent() { return this.prisma.eventContent; }
+  
+  // 쇼핑몰 도메인 테이블
+  get category() { return this.prisma.category; }
+  get product() { return this.prisma.product; }
+  get productOption() { return this.prisma.productOption; }
+  get productImage() { return this.prisma.productImage; }
+  get cart() { return this.prisma.cart; }
+  get cartItem() { return this.prisma.cartItem; }
+  get order() { return this.prisma.order; }
+  get orderItem() { return this.prisma.orderItem; }
+  get orderStateLog() { return this.prisma.orderStateLog; }
+  get payment() { return this.prisma.payment; }
+  get refund() { return this.prisma.refund; }
+  get refundPolicy() { return this.prisma.refundPolicy; }
+  get shipping() { return this.prisma.shipping; }
+  get shippingTrack() { return this.prisma.shippingTrack; }
+  get shippingPolicy() { return this.prisma.shippingPolicy; }
+  get inventoryCache() { return this.prisma.inventoryCache; }
+  get inventoryApiLog() { return this.prisma.inventoryApiLog; }
+  get inventorySyncQueue() { return this.prisma.inventorySyncQueue; }
+  get productReview() { return this.prisma.productReview; }
+  get productQuestion() { return this.prisma.productQuestion; }
+  get wishlist() { return this.prisma.wishlist; }
+  get recentlyViewed() { return this.prisma.recentlyViewed; }
 
   // 메서드 바인딩
   $transaction(arg: any) {

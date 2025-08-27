@@ -13,15 +13,6 @@ import {
   UseGuards,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiQuery,
-  ApiHeader,
-  ApiBody,
-} from '@nestjs/swagger';
 import { ApiKeyGuard } from '../guards/api-key.guard';
 import { EventService } from '../../event/event.service';
 import { EventManagementService } from '../../event/event-management.service';
@@ -32,14 +23,8 @@ import { EventType } from '../../event/event.types';
  * Management 이벤트 관리 컨트롤러
  * 백오피스에서 이벤트와 관련 컨텐츠를 관리하는 API
  */
-@ApiTags('management-event')
 @Controller('management/events')
 @UseGuards(ApiKeyGuard)
-@ApiHeader({
-  name: 'X-API-KEY',
-  description: 'API Key for authentication',
-  required: true,
-})
 export class ManagementEventController {
   private readonly logger = new Logger(ManagementEventController.name);
 
@@ -54,84 +39,7 @@ export class ManagementEventController {
    * 모든 이벤트 목록 조회 (페이징 및 필터링)
    */
   @Get()
-  @ApiOperation({
-    summary: '이벤트 목록 조회',
-    description: '이벤트 목록을 페이징 처리하여 조회합니다.',
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: '페이지 번호 (기본값: 1)',
-    example: 1,
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: '페이지당 항목 수 (기본값: 20)',
-    example: 20,
-  })
-  @ApiQuery({
-    name: 'search',
-    required: false,
-    description: '검색어 (이벤트명, 설명)',
-  })
-  @ApiQuery({
-    name: 'type',
-    required: false,
-    description: '이벤트 타입',
-    enum: ['CHALLENGE', 'PROMOTION', 'CAMPAIGN'],
-  })
-  @ApiQuery({
-    name: 'isActive',
-    required: false,
-    description: '활성화 상태',
-    type: 'boolean',
-  })
-  @ApiQuery({
-    name: 'startDate',
-    required: false,
-    description: '시작일 이후 (YYYY-MM-DD)',
-  })
-  @ApiQuery({
-    name: 'endDate',
-    required: false,
-    description: '종료일 이전 (YYYY-MM-DD)',
-  })
-  @ApiQuery({
-    name: 'sortBy',
-    required: false,
-    description: '정렬 기준',
-    enum: ['createdAt', 'startDate', 'endDate', 'name'],
-  })
-  @ApiQuery({
-    name: 'sortOrder',
-    required: false,
-    description: '정렬 순서',
-    enum: ['asc', 'desc'],
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 목록 조회 성공',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        message: { type: 'string' },
-        data: {
-          type: 'object',
-          properties: {
-            items: { type: 'array' },
-            total: { type: 'number' },
-            page: { type: 'number' },
-            limit: { type: 'number' },
-            totalPages: { type: 'number' },
-          },
-        },
-        timestamp: { type: 'string' },
-      },
-    },
-  })
-  async getAllEvents(
+                        async getAllEvents(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
@@ -188,28 +96,7 @@ export class ManagementEventController {
    * 새 이벤트 생성
    */
   @Post()
-  @ApiOperation({
-    summary: '새 이벤트 생성',
-    description: '새로운 이벤트를 생성합니다.',
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: '이벤트명' },
-        startDate: { type: 'string', format: 'date', description: '시작일 (YYYY-MM-DD)' },
-        totalDays: { type: 'number', description: '총 일수 (기본값: 21)' },
-        description: { type: 'string', description: '이벤트 설명' },
-        type: { type: 'string', enum: ['CHALLENGE', 'PROMOTION', 'CAMPAIGN'], description: '이벤트 타입' },
-      },
-      required: ['name', 'startDate'],
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: '이벤트 생성 성공',
-  })
-  async createEvent(
+        async createEvent(
     @Body() createDto: {
       name: string;
       startDate: string;
@@ -241,21 +128,7 @@ export class ManagementEventController {
    * 특정 이벤트 상세 조회
    */
   @Get(':eventId')
-  @ApiOperation({
-    summary: '이벤트 상세 조회',
-    description: '특정 이벤트의 상세 정보를 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 조회 성공',
-  })
-  async getEvent(
+        async getEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any>> {
     this.logger.log(`이벤트 상세 조회 요청 - ID: ${eventId}`);
@@ -281,34 +154,7 @@ export class ManagementEventController {
    * 이벤트 수정
    */
   @Put(':eventId')
-  @ApiOperation({
-    summary: '이벤트 수정',
-    description: '기존 이벤트 정보를 수정합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: '이벤트명' },
-        description: { type: 'string', description: '이벤트 설명' },
-        startDate: { type: 'string', format: 'date', description: '시작일' },
-        endDate: { type: 'string', format: 'date', description: '종료일' },
-        isActive: { type: 'boolean', description: '활성화 여부' },
-        type: { type: 'string', enum: ['CHALLENGE', 'PROMOTION', 'CAMPAIGN'], description: '이벤트 타입' },
-      },
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 수정 성공',
-  })
-  async updateEvent(
+          async updateEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Body() updateDto: any,
   ): Promise<ApiResponseDto<any>> {
@@ -335,21 +181,7 @@ export class ManagementEventController {
    * 이벤트 삭제
    */
   @Delete(':eventId')
-  @ApiOperation({
-    summary: '이벤트 삭제',
-    description: '이벤트를 삭제합니다. 참여자가 없는 경우에만 가능합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 삭제 성공',
-  })
-  async deleteEvent(
+        async deleteEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<void>> {
     this.logger.log(`이벤트 삭제 요청 - ID: ${eventId}`);
@@ -375,15 +207,7 @@ export class ManagementEventController {
    * 현재 활성 이벤트 조회
    */
   @Get('active/current')
-  @ApiOperation({
-    summary: '현재 활성 이벤트 조회',
-    description: '현재 활성화된 이벤트를 조회합니다.',
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '활성 이벤트 조회 성공',
-  })
-  async getActiveEvent(): Promise<ApiResponseDto<any>> {
+      async getActiveEvent(): Promise<ApiResponseDto<any>> {
     this.logger.log('현재 활성 이벤트 조회 요청');
 
     try {
@@ -409,34 +233,7 @@ export class ManagementEventController {
    * 이벤트에 미션 추가
    */
   @Post(':eventId/missions')
-  @ApiOperation({
-    summary: '이벤트에 미션 추가',
-    description: '특정 이벤트에 미션을 연결합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        missionId: { type: 'number', description: '미션 ID' },
-        points: { type: 'number', description: '포인트 (선택적)' },
-        activeFromDay: { type: 'number', description: '활성화 시작 일차' },
-        activeToDay: { type: 'number', description: '활성화 종료 일차' },
-        sortOrder: { type: 'number', description: '정렬 순서' },
-      },
-      required: ['missionId'],
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: '미션 연결 성공',
-  })
-  async attachMissionToEvent(
+          async attachMissionToEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Body() attachDto: any,
   ): Promise<ApiResponseDto<any>> {
@@ -472,27 +269,7 @@ export class ManagementEventController {
    * 이벤트에서 미션 제거
    */
   @Delete(':eventId/missions/:missionId')
-  @ApiOperation({
-    summary: '이벤트에서 미션 제거',
-    description: '특정 이벤트에서 미션 연결을 해제합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiParam({
-    name: 'missionId',
-    type: 'number',
-    description: '미션 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '미션 연결 해제 성공',
-  })
-  async detachMissionFromEvent(
+          async detachMissionFromEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Param('missionId', ParseIntPipe) missionId: number,
   ): Promise<ApiResponseDto<void>> {
@@ -519,21 +296,7 @@ export class ManagementEventController {
    * 이벤트별 미션 목록 조회
    */
   @Get(':eventId/missions')
-  @ApiOperation({
-    summary: '이벤트별 미션 목록 조회',
-    description: '특정 이벤트의 미션 목록을 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 미션 목록 조회 성공',
-  })
-  async getEventMissions(
+        async getEventMissions(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any[]>> {
     this.logger.log(`이벤트별 미션 목록 조회 요청 - 이벤트 ID: ${eventId}`);
@@ -561,32 +324,7 @@ export class ManagementEventController {
    * 이벤트에 퀴즈 연결
    */
   @Post(':eventId/quizzes')
-  @ApiOperation({
-    summary: '이벤트에 퀴즈 연결',
-    description: '특정 이벤트의 특정 일차에 퀴즈를 연결합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        quizId: { type: 'number', description: '퀴즈 ID' },
-        day: { type: 'number', description: '퀴즈 출제 일차' },
-        sortOrder: { type: 'number', description: '정렬 순서', default: 0 },
-      },
-      required: ['quizId', 'day'],
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: '퀴즈 연결 성공',
-  })
-  async attachQuizToEvent(
+          async attachQuizToEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Body() attachQuizDto: any,
   ): Promise<ApiResponseDto<any>> {
@@ -618,27 +356,7 @@ export class ManagementEventController {
    * 이벤트에서 퀴즈 연결 해제
    */
   @Delete(':eventId/quizzes/:quizId')
-  @ApiOperation({
-    summary: '이벤트에서 퀴즈 연결 해제',
-    description: '특정 이벤트에서 퀴즈 연결을 해제합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiParam({
-    name: 'quizId',
-    type: 'number',
-    description: '퀴즈 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '퀴즈 연결 해제 성공',
-  })
-  async detachQuizFromEvent(
+          async detachQuizFromEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Param('quizId', ParseIntPipe) quizId: number,
   ): Promise<ApiResponseDto<void>> {
@@ -665,21 +383,7 @@ export class ManagementEventController {
    * 이벤트별 퀴즈 목록 조회
    */
   @Get(':eventId/quizzes')
-  @ApiOperation({
-    summary: '이벤트별 퀴즈 목록 조회',
-    description: '특정 이벤트의 퀴즈 목록을 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 퀴즈 목록 조회 성공',
-  })
-  async getEventQuizzes(
+        async getEventQuizzes(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any[]>> {
     this.logger.log(`이벤트별 퀴즈 목록 조회 요청 - 이벤트 ID: ${eventId}`);
@@ -707,32 +411,7 @@ export class ManagementEventController {
    * 이벤트에 설문 연결
    */
   @Post(':eventId/surveys')
-  @ApiOperation({
-    summary: '이벤트에 설문 연결',
-    description: '특정 이벤트에 설문을 연결합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        surveyId: { type: 'number', description: '설문 ID' },
-        type: { type: 'string', enum: ['before', 'after'], description: '설문 타입' },
-        fromDay: { type: 'number', description: '설문 시작 일차' },
-      },
-      required: ['surveyId', 'type'],
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: '설문 연결 성공',
-  })
-  async attachSurveyToEvent(
+          async attachSurveyToEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Body() attachDto: any,
   ): Promise<ApiResponseDto<any>> {
@@ -766,27 +445,7 @@ export class ManagementEventController {
    * 이벤트에서 설문 연결 해제
    */
   @Delete(':eventId/surveys/:surveyId')
-  @ApiOperation({
-    summary: '이벤트에서 설문 연결 해제',
-    description: '특정 이벤트에서 설문 연결을 해제합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiParam({
-    name: 'surveyId',
-    type: 'number',
-    description: '설문 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '설문 연결 해제 성공',
-  })
-  async detachSurveyFromEvent(
+          async detachSurveyFromEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Param('surveyId', ParseIntPipe) surveyId: number,
   ): Promise<ApiResponseDto<void>> {
@@ -813,21 +472,7 @@ export class ManagementEventController {
    * 이벤트별 설문 목록 조회
    */
   @Get(':eventId/surveys')
-  @ApiOperation({
-    summary: '이벤트별 설문 목록 조회',
-    description: '특정 이벤트의 설문 목록을 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 설문 목록 조회 성공',
-  })
-  async getEventSurveys(
+        async getEventSurveys(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any[]>> {
     this.logger.log(`이벤트별 설문 목록 조회 요청 - 이벤트 ID: ${eventId}`);
@@ -855,31 +500,7 @@ export class ManagementEventController {
    * 이벤트에 컨텐츠 연결
    */
   @Post(':eventId/contents')
-  @ApiOperation({
-    summary: '이벤트에 컨텐츠 연결',
-    description: '특정 이벤트의 특정 일차에 컨텐츠를 연결합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        contentId: { type: 'number', description: '컨텐츠 ID' },
-        day: { type: 'number', description: '표시할 일차' },
-      },
-      required: ['contentId', 'day'],
-    },
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: '컨텐츠 연결 성공',
-  })
-  async attachContentToEvent(
+          async attachContentToEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Body() attachDto: any,
   ): Promise<ApiResponseDto<any>> {
@@ -910,27 +531,7 @@ export class ManagementEventController {
    * 이벤트에서 컨텐츠 연결 해제
    */
   @Delete(':eventId/contents/:contentId')
-  @ApiOperation({
-    summary: '이벤트에서 컨텐츠 연결 해제',
-    description: '특정 이벤트에서 컨텐츠 연결을 해제합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiParam({
-    name: 'contentId',
-    type: 'number',
-    description: '컨텐츠 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '컨텐츠 연결 해제 성공',
-  })
-  async detachContentFromEvent(
+          async detachContentFromEvent(
     @Param('eventId', ParseIntPipe) eventId: number,
     @Param('contentId', ParseIntPipe) contentId: number,
   ): Promise<ApiResponseDto<void>> {
@@ -957,21 +558,7 @@ export class ManagementEventController {
    * 이벤트별 컨텐츠 목록 조회
    */
   @Get(':eventId/contents')
-  @ApiOperation({
-    summary: '이벤트별 컨텐츠 목록 조회',
-    description: '특정 이벤트의 컨텐츠 목록을 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 컨텐츠 목록 조회 성공',
-  })
-  async getEventContents(
+        async getEventContents(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any[]>> {
     this.logger.log(`이벤트별 컨텐츠 목록 조회 요청 - 이벤트 ID: ${eventId}`);
@@ -999,21 +586,7 @@ export class ManagementEventController {
    * 이벤트 참여 사용자 목록 조회
    */
   @Get(':eventId/users')
-  @ApiOperation({
-    summary: '이벤트 참여 사용자 목록 조회',
-    description: '특정 이벤트에 참여한 사용자 목록을 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 참여 사용자 목록 조회 성공',
-  })
-  async getEventUsers(
+        async getEventUsers(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any[]>> {
     this.logger.log(`이벤트 참여 사용자 목록 조회 요청 - 이벤트 ID: ${eventId}`);
@@ -1039,21 +612,7 @@ export class ManagementEventController {
    * 이벤트 통계 조회
    */
   @Get(':eventId/statistics')
-  @ApiOperation({
-    summary: '이벤트 통계 조회',
-    description: '특정 이벤트의 참여율, 완료율 등 통계를 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    type: 'number',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트 통계 조회 성공',
-  })
-  async getEventStatistics(
+        async getEventStatistics(
     @Param('eventId', ParseIntPipe) eventId: number,
   ): Promise<ApiResponseDto<any>> {
     this.logger.log(`이벤트 통계 조회 요청 - 이벤트 ID: ${eventId}`);

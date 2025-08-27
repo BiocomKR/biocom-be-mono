@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { SurveyService } from './survey.service';
 import { SurveyMasterService } from './survey-master.service';
 import { SurveyController } from './survey.controller';
-import { PrismaService } from '../common/services/prisma.service';
 import { EventModule } from '../event/event.module';
 
 /**
@@ -22,7 +21,7 @@ import { EventModule } from '../event/event.module';
 @Module({
   imports: [EventModule],
   controllers: [SurveyController],
-  providers: [SurveyService, SurveyMasterService, PrismaService],
+  providers: [SurveyService, SurveyMasterService],
   exports: [SurveyService, SurveyMasterService], // 다른 모듈에서 서비스를 사용할 수 있도록 내보냄
 })
 export class SurveyModule {}

@@ -1,0 +1,150 @@
+# 🌐 Ingress - 외부 트래픽 라우팅
+# AWS ALB Ingress Controller와 동일한 기능
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: biocom-api-ingress
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+  annotations:
+    # GCP Load Balancer 클래스 지정
+    kubernetes.io/ingress.class: "gce"  # GKE requires annotation, not ingressClassName!
+    
+    # HTTPS 리다이렉트 설정
+    kubernetes.io/ingress.allow-http: "true"
+    
+    # SSL 인증서 매핑 (Certificate Manager - Wildcard)
+    # networking.gke.io/managed-certificates: "biocom-api-ssl-cert"  # 기존 방식 제거
+    
+    # Certificate Map 사용 (와일드카드 지원)
+    networking.gke.io/certificate-map: "biocom-cert-map"
+    
+    # 백엔드 설정 참조
+    cloud.google.com/backend-config: '{"default": "biocom-api-backend-config"}'
+    
+    # 정적 IP 사용 (terraform에서 생성한 IP)
+    kubernetes.io/ingress.global-static-ip-name: "biocom-cluster-external-ip"
+    
+    # 추가 설정
+    cloud.google.com/neg: '{"ingress": true}'  # NEG 활성화
+    
+    # 타임아웃 설정
+    cloud.google.com/load-balancer-type: "External"
+    
+    # CORS는 애플리케이션 레벨에서 처리 (GKE Ingress는 CORS annotation 지원 안함)
+    
+spec:
+  # ingressClassName은 사용하지 않음 - GKE는 annotation만 지원
+  # 라우팅 규칙
+  rules:
+  # API 서브도메인 라우팅
+  - host: api-dev.biocom.ai.kr
+    http:
+      paths:
+      # API 경로
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+      
+      # Swagger 문서
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+      
+      # 헬스체크
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+      
+      # 루트 경로 (기본값)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+  
+
+---
+# 🔒 ManagedCertificate - Google Managed SSL 인증서
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: biocom-api-ssl-cert
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+spec:
+  domains:
+  - api-dev.biocom.ai.kr
+
+---
+# 🛡️ FrontendConfig - 추가 로드 밸런서 설정
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: biocom-api-frontend-config
+  namespace: biocom-api
+spec:
+  # SSL 정책
+  sslPolicy: "biocom-ssl-policy"  # terraform에서 생성 필요
+  
+  # 리다이렉트 설정
+  redirectToHttps:
+    enabled: true
+    responseCodeName: "MOVED_PERMANENTLY_DEFAULT"
+
+---
+# 📋 Ingress 사용 가이드
+#
+# 🔧 AWS ALB Ingress와의 주요 차이점:
+#
+# 1. 어노테이션:
+#    - AWS: alb.ingress.kubernetes.io/*
+#    - GCP: cloud.google.com/*, networking.gke.io/*
+#
+# 2. SSL 인증서:
+#    - AWS: ACM 인증서 ARN 지정
+#    - GCP: ManagedCertificate 리소스 사용
+#
+# 3. 로드 밸런서 타입:
+#    - AWS: ALB (Application Load Balancer)
+#    - GCP: GCLB (Google Cloud Load Balancer)
+#
+# 4. 백엔드 설정:
+#    - AWS: TargetGroup 어노테이션
+#    - GCP: BackendConfig 리소스
+#
+# 🚀 배포 순서:
+# 1. terraform apply (인프라 생성)
+# 2. kubectl apply -f namespace.yaml
+# 3. kubectl apply -f configmap.yaml
+# 4. kubectl apply -f secret.yaml (실제 값으로 수정 후)
+# 5. kubectl apply -f service.yaml
+# 6. kubectl apply -f deployment.yaml
+# 7. kubectl apply -f ingress.yaml
+#
+# 📊 상태 확인:
+# kubectl get ingress -n biocom-api
+# kubectl describe ingress biocom-api-ingress -n biocom-api
+# kubectl get managedcertificate -n biocom-api
+#
+# 🔍 문제 해결:
+# - Ingress IP 할당: 약 5-10분 소요
+# - SSL 인증서 발급: 최대 24시간 소요 (DNS 전파 시간)
+# - 백엔드 헬스체크: Pod가 Ready 상태여야 함

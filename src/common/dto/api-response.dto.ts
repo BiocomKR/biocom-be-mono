@@ -129,3 +129,81 @@ export class PaginatedResponseDto<T = any> extends ApiResponseDto<T[]> {
  * 표준 API 성공 응답 DTO (ApiResponseDto의 별칭)
  */
 export class ApiSuccessResponse<T = any> extends ApiResponseDto<T> {}
+
+/**
+ * 표준 에러 응답 DTO
+ * 모든 에러 응답의 표준 형식을 정의
+ */
+export class ApiErrorResponseDto {
+  /**
+   * 응답 성공 여부 (항상 false)
+   */
+  @ApiProperty({
+    description: '응답 성공 여부',
+    example: false,
+  })
+  success: boolean;
+
+  /**
+   * HTTP 상태 코드
+   */
+  @ApiProperty({
+    description: 'HTTP 상태 코드',
+    example: 400,
+  })
+  statusCode: number;
+
+  /**
+   * 에러 메시지
+   */
+  @ApiProperty({
+    description: '에러 메시지',
+    example: '잘못된 요청입니다.',
+  })
+  message: string | string[];
+
+  /**
+   * 에러 타입
+   */
+  @ApiProperty({
+    description: '에러 타입',
+    example: 'Bad Request',
+  })
+  error: string;
+
+  /**
+   * 에러 상세 정보
+   */
+  @ApiProperty({
+    description: '에러 상세 정보',
+    required: false,
+  })
+  details?: any;
+
+  /**
+   * 요청 경로
+   */
+  @ApiProperty({
+    description: '요청 경로',
+    example: '/api/auth/signin',
+  })
+  path: string;
+
+  /**
+   * 응답 생성 시각
+   */
+  @ApiProperty({
+    description: '응답 생성 시각',
+    example: '2024-01-01T00:00:00.000Z',
+  })
+  timestamp: string;
+
+  /**
+   * 스택 트레이스 (개발 환경에서만)
+   */
+  @ApiProperty({
+    description: '스택 트레이스 (개발 환경에서만)',
+    required: false,
+  })
+  stack?: string;
+}

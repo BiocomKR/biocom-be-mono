@@ -44,7 +44,11 @@ export class ConfigService {
   get jwt() {
     return {
       secret: this.nestConfigService.get('JWT_SECRET', { infer: true }),
-      expiresIn: this.nestConfigService.get('JWT_EXPIRES_IN', { infer: true }),
+      accessTokenExpiresIn: this.nestConfigService.get('JWT_ACCESS_TOKEN_EXPIRES_IN', { infer: true }),
+      refreshTokenExpiresIn: this.nestConfigService.get('JWT_REFRESH_TOKEN_EXPIRES_IN', { infer: true }),
+      refreshTokenSecret: this.nestConfigService.get('JWT_REFRESH_TOKEN_SECRET', { infer: true }),
+      // 기존 expiresIn 유지 (하위 호환성)
+      expiresIn: this.nestConfigService.get('JWT_ACCESS_TOKEN_EXPIRES_IN', { infer: true }),
     };
   }
 

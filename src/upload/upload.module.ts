@@ -4,7 +4,6 @@ import { diskStorage } from 'multer';
 import { extname, basename } from 'path';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
-import { PrismaService } from '../common/services/prisma.service';
 import { BadRequestException } from '@nestjs/common';
 import { UploadSecurityConfig } from './upload.security.config';
 
@@ -100,7 +99,7 @@ import { UploadSecurityConfig } from './upload.security.config';
     }),
   ],
   controllers: [UploadController],
-  providers: [UploadService, PrismaService],
+  providers: [UploadService],
   exports: [UploadService],
 })
 export class UploadModule {}

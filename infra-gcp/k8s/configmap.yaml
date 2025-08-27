@@ -1,0 +1,82 @@
+# ⚙️ ConfigMap - 애플리케이션 설정 관리
+# AWS EKS의 ConfigMap과 동일한 기능
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biocom-api-config
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+    environment: dev
+data:
+  # 데이터베이스 설정 (민감하지 않은 정보)
+  DB_HOST: "34.47.106.104"  # Cloud SQL 직접 접속
+  DB_PORT: "5432"
+  DB_NAME: "biocom"
+  DB_USERNAME: "biocom"
+  DATABASE_URL: "postgresql://biocom:biocom2025dev@34.47.106.104:5432/biocom"
+  
+  # 애플리케이션 설정
+  NODE_ENV: "production"
+  PORT: "10804"
+  
+  # API 설정
+  API_PREFIX: "/api"
+  SWAGGER_PATH: "/docs"
+  
+  # 로깅 설정
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  
+  # ImWeb API 설정
+  IMWEB_API_BASE_URL: "https://api.imweb.me"
+  IMWEB_REDIRECT_URI: "https://api-gcp.biocom.ai.kr/auth/redirect"
+  
+  # CORS 설정
+  # CORS 설정 - 개발 환경에서는 모든 origin 허용
+  # 운영 환경에서는 특정 도메인만 허용하도록 변경 필요
+  CORS_ORIGIN: "*"
+  
+  # Google Cloud Storage 설정
+  GCS_BUCKET_NAME: "PROJECT_ID-biocom-uploads"
+  GCS_PROJECT_ID: "PROJECT_ID"
+  GCS_TEMP_BUCKET_NAME: "PROJECT_ID-biocom-temp"
+  
+  # 파일 업로드 설정
+  MAX_FILE_SIZE: "10485760"  # 10MB
+  ALLOWED_FILE_TYPES: "image/jpeg,image/png,image/gif,application/pdf"
+  UPLOAD_PATH: "/var/app/uploads"  # Dockerfile에서 생성한 경로 사용
+  
+  # Rate Limiting 설정
+  RATE_LIMIT_TTL: "60"  # 60초
+  RATE_LIMIT_LIMIT: "100"  # 60초에 100개 요청 허용
+  
+  # 기타 설정
+  TIMEZONE: "Asia/Seoul"
+  
+---
+# 📝 로깅 설정용 ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biocom-api-logging
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+    component: logging
+data:
+  # 구조화된 로깅 설정
+  logging.json: |
+    {
+      "level": "info",
+      "format": "json",
+      "timestamp": true,
+      "colorize": false,
+      "metadata": true,
+      "fields": {
+        "service": "biocom-api",
+        "environment": "dev",
+        "version": "1.0.0"
+      }
+    }

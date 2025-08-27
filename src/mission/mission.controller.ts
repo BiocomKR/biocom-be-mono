@@ -29,7 +29,7 @@ import { ApiSuccessResponse } from '../common/dto/api-response.dto';
  * 일일 미션 관리 컨트롤러
  * 미션 정보 조회 및 진행 상황 확인 API
  */
-@ApiTags('mission')
+@ApiTags('챌린지-mission')
 @Controller('mission')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access-token')
@@ -123,6 +123,7 @@ export class MissionController {
       uploadType: mission.uploadType,
       category: mission.category,
       dailyLimit: mission.dailyLimit,
+      totalDays: mission.totalDays,
       sortOrder: mission.sortOrder,
     }));
 

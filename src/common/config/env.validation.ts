@@ -30,10 +30,20 @@ export const validationSchema = Joi.object({
     .min(32)
     .description('JWT 서명 키 (최소 32자)'),
     
-  JWT_EXPIRES_IN: Joi.string()
-    .default('24h')
+  JWT_ACCESS_TOKEN_EXPIRES_IN: Joi.string()
+    .default('20m')
     .pattern(/^\d+[hdm]$/)
-    .description('JWT 만료 시간 (예: 24h, 7d, 30m)'),
+    .description('Access Token 만료 시간'),
+    
+  JWT_REFRESH_TOKEN_EXPIRES_IN: Joi.string()
+    .default('180d')
+    .pattern(/^\d+[hdm]$/)
+    .description('Refresh Token 만료 시간'),
+    
+  JWT_REFRESH_TOKEN_SECRET: Joi.string()
+    .required()
+    .min(32)
+    .description('Refresh Token 서명 키'),
 
   // 로깅 설정
   LOG_PATH: Joi.string()
@@ -132,7 +142,9 @@ export interface EnvironmentVariables {
   
   // JWT
   JWT_SECRET: string;
-  JWT_EXPIRES_IN: string;
+  JWT_ACCESS_TOKEN_EXPIRES_IN: string;
+  JWT_REFRESH_TOKEN_EXPIRES_IN: string;
+  JWT_REFRESH_TOKEN_SECRET: string;
   
   // 로깅
   LOG_PATH: string;
@@ -172,7 +184,9 @@ export const configuration = () => ({
   },
   jwt: {
     secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN,
+    accessTokenExpiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRES_IN,
+    refreshTokenExpiresIn: process.env.JWT_REFRESH_TOKEN_EXPIRES_IN,
+    refreshTokenSecret: process.env.JWT_REFRESH_TOKEN_SECRET,
   },
   logging: {
     path: process.env.LOG_PATH,

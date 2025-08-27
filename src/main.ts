@@ -107,25 +107,66 @@ async function bootstrap() {
     .addTag('auth', '인증')
     .addTag('upload', '파일 업로드')
     .addTag('users', '사용자 관리')
-    .addTag('event', '이벤트')
-    .addTag('mission', '미션')
-    .addTag('survey', '설문')
-    .addTag('management-api-key', '관리자 API 키')
-    .addTag('management-event', '관리자 이벤트')
-    .addTag('management-users', '관리자 사용자')
-    .addTag('management-mission', '관리자 미션')
-    .addTag('management-survey', '관리자 설문')
-    .addTag('management-quiz', '관리자 퀴즈')
-    .addTag('management-content', '관리자 컨텐츠')
+    .addTag('챌린지-event', '이벤트')
+    .addTag('챌린지-mission', '미션')
+    .addTag('챌린지-survey', '설문')
+    .addTag('챌린지-content', '컨텐츠')
+    .addTag('points', '포인트')
+    .addTag('쇼핑몰-Categories', '카테고리')
+    .addTag('쇼핑몰-Products', '상품')
+    .addTag('쇼핑몰-Cart', '장바구니')
+    .addTag('쇼핑몰-Orders', '주문')
+    .addTag('쇼핑몰-Payment', '결제')
+    .addTag('쇼핑몰-Shipping', '배송')
+    .addTag('쇼핑몰-Refund', '환불')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
+  
+  // management 경로 제거
+  Object.keys(document.paths).forEach(path => {
+    if (path.includes('/management/')) {
+      delete document.paths[path];
+    }
+  });
+  
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true, // 인증 정보 유지
       tagsSorter: 'alpha', // 태그 알파벳 순서로 정렬
       operationsSorter: 'alpha', // 오퍼레이션 알파벳 순서로 정렬
+      docExpansion: 'none', // 모든 태그를 접힌 상태로 시작 ('none' | 'list' | 'full')
+      defaultModelsExpandDepth: -1, // 모델 스키마도 접힌 상태로
+      defaultModelExpandDepth: 0, // 개별 모델도 접힌 상태로
     },
+    customCss: `
+      /* 쇼핑몰 관련 태그 스타일 */
+      .opblock-tag[data-tag*="쇼핑몰"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
+        font-weight: bold !important;
+      }
+      
+      /* 챌린지 관련 태그 스타일 */
+      .opblock-tag[data-tag*="챌린지"] {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+        color: white !important;
+        font-weight: bold !important;
+      }
+      
+      /* 태그 그룹 헤더 스타일 */
+      .opblock-tag-section h3.opblock-tag[data-tag*="쇼핑몰"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        padding: 10px !important;
+        border-radius: 4px !important;
+      }
+      
+      .opblock-tag-section h3.opblock-tag[data-tag*="챌린지"] {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
+        padding: 10px !important;
+        border-radius: 4px !important;
+      }
+    `,
   });
   // 서버 포트 설정
   const port = configService.app.port;

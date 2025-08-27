@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CommonModule } from '../common/common.module';
 import { ContentService } from './content.service';
+import { ContentController } from './content.controller';
 
 /**
  * 컨텐츠 모듈
@@ -8,6 +9,7 @@ import { ContentService } from './content.service';
  */
 @Module({
   imports: [CommonModule],
+  controllers: [ContentController],
   providers: [ContentService],
   exports: [ContentService],
 })
