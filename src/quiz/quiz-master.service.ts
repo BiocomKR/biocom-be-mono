@@ -37,9 +37,9 @@ export class QuizMasterService {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id },
       include: {
-        eventQuizzes: {
+        challengeQuizzes: {
           include: {
-            event: true,
+            challenge: true,
           },
         },
       },
@@ -140,19 +140,19 @@ export class QuizMasterService {
   async deleteQuiz(id: number) {
     this.logger.log(`퀴즈 삭제 - ID: ${id}`);
 
-    // 이벤트와 연결된 퀴즈인지 확인
-    const eventQuizCount = await this.prisma.eventQuiz.count({
+    // 챌린지와 연결된 퀴즈인지 확인
+    const challengeQuizCount = await this.prisma.challengeQuiz.count({
       where: { quizId: id },
     });
 
-    if (eventQuizCount > 0) {
-      throw new BadRequestException(`이미 이벤트에서 사용 중인 퀴즈는 삭제할 수 없습니다. (연결된 이벤트 수: ${eventQuizCount})`);
+    if (challengeQuizCount > 0) {
+      throw new BadRequestException(`이미 챌린지에서 사용 중인 퀴즈는 삭제할 수 없습니다. (연결된 챌린지 수: ${challengeQuizCount})`);
     }
 
     // 답변이 있는지 확인
     const answerCount = await this.prisma.quizAnswer.count({
       where: {
-        eventQuiz: {
+        challengeQuiz: {
           quizId: id,
         },
       },
@@ -259,7 +259,7 @@ export class QuizMasterService {
         include: {
           _count: {
             select: {
-              eventQuizzes: true,
+              challengeQuizzes: true,
             },
           },
         },

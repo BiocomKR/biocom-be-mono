@@ -247,9 +247,9 @@ export class ManagementDashboardService {
       const product = productMap.get(item.productId);
       return {
         productId: item.productId,
-        productName: product?.name || 'Unknown',
-        productSku: product?.sku || '',
-        categoryName: product?.category?.name || '',
+        productName: (product as any)?.name || 'Unknown',
+        productSku: (product as any)?.sku || '',
+        categoryName: (product as any)?.category?.name || '',
         quantity: item._sum.quantity || 0,
         sales: Number(item._sum.subtotal || 0),
         orderCount: item._count
@@ -501,11 +501,11 @@ export class ManagementDashboardService {
       return {
         sku: item.sku,
         availableQty: item.availableQty,
-        productId: option?.product?.id,
-        productName: option?.product?.name || 'Unknown',
-        productSku: option?.product?.sku,
-        optionName: option?.optionName,
-        status: option?.product?.status,
+        productId: (option as any)?.product?.id,
+        productName: (option as any)?.product?.name || 'Unknown',
+        productSku: (option as any)?.product?.sku,
+        optionName: (option as any)?.optionName,
+        status: (option as any)?.product?.status,
         alertLevel: item.availableQty === 0 ? 'OUT_OF_STOCK' : 
                     item.availableQty < 5 ? 'CRITICAL' : 'LOW'
       };

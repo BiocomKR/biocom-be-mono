@@ -1,76 +1,155 @@
 import {
   Controller,
   Get,
+  Post,
   Param,
   ParseIntPipe,
   Query,
   HttpStatus,
   Logger,
   NotFoundException,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ContentService } from './content.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
+import { ContentCompletionResponseDto } from './dto/content-completion.dto';
 
 /**
- * 사용자용 컨텐츠 조회 컨트롤러
+ * 사용자용 컨텐츠 컨트롤러
+ * 컨텐츠 조회 및 시청 완료 처리
  */
-@ApiTags('챌린지-content')
-@Controller('content')
+@ApiTags('contents')
+@Controller('contents')
 export class ContentController {
   private readonly logger = new Logger(ContentController.name);
 
-  constructor(private readonly contentService: ContentService) {}
+  constructor(
+    private readonly contentService: ContentService,
+  ) {}
 
   /**
-   * 컨텐츠 목록 조회 (페이지네이션)
+   * 강의 목록 조회 (주차별, 사용자 상태별)
    */
-  @Get()
+  @Get('lectures')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: '컨텐츠 목록 조회',
-    description: '활성화된 컨텐츠 목록을 페이지네이션하여 조회합니다.',
+    summary: '강의 목록 조회',
+    description: '사용자 상태(챌린지/구독)에 따라 강의 목록을 조회합니다.',
+  })
+  @ApiQuery({ name: 'week', required: false, description: '주차 (1,2,3)', example: 1 })
+  @ApiQuery({ name: 'challengeId', required: false, description: '챌린지 ID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: '강의 목록 조회 성공',
+  })
+  async getLectures(
+    @Request() req: any,
+    @Query('week') week?: string,
+    @Query('challengeId') challengeId?: string
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`강의 목록 조회 요청 - 사용자: ${req.user.userId}, 주차: ${week}`);
+
+    try {
+      const weekNum = week ? parseInt(week, 10) : undefined;
+      const challengeIdNum = challengeId ? parseInt(challengeId, 10) : undefined;
+
+      const result = await this.contentService.getLectures(req.user.userId, weekNum, challengeIdNum);
+
+      this.logger.log(`강의 목록 조회 성공 - ${result.lectures.length}개`);
+
+      return {
+        success: true,
+        message: '강의 목록이 성공적으로 조회되었습니다.',
+        data: result,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error('강의 목록 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 칼럼 목록 조회 (검색, 정렬, 페이징)
+   */
+  @Get('columns')
+  @ApiOperation({
+    summary: '칼럼 목록 조회',
+    description: '칼럼 목록을 검색, 정렬, 페이징하여 조회합니다.',
   })
   @ApiQuery({ name: 'page', required: false, description: '페이지 번호', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: '페이지당 항목 수', example: 10 })
-  @ApiQuery({ name: 'type', required: false, description: '컨텐츠 타입 필터' })
-  @ApiQuery({ name: 'category', required: false, description: '카테고리 필터' })
-  @ApiQuery({ name: 'search', required: false, description: '검색어 (제목, 설명)' })
+  @ApiQuery({ name: 'search', required: false, description: '검색어 (제목, 내용)' })
+  @ApiQuery({ name: 'sort', required: false, description: '정렬 (popular: 인기순, latest: 최신순)', example: 'popular' })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: '컨텐츠 목록 조회 성공',
+    description: '칼럼 목록 조회 성공',
   })
-  async getContentList(
+  async getColumns(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @Query('type') type?: string,
-    @Query('category') category?: string,
     @Query('search') search?: string,
+    @Query('sort') sort?: string,
   ): Promise<ApiResponseDto<any>> {
-    this.logger.log('사용자 컨텐츠 목록 조회 요청');
+    this.logger.log(`칼럼 목록 조회 요청 - 검색: ${search}, 정렬: ${sort}`);
 
     try {
       const pageNum = parseInt(page || '1', 10);
       const limitNum = parseInt(limit || '10', 10);
 
-      const result = await this.contentService.getContentList({
+      const result = await this.contentService.getColumns({
         page: pageNum,
         limit: limitNum,
-        type,
-        category,
         search,
-        isActive: true, // 사용자는 활성화된 컨텐츠만 조회
+        sort: sort as 'popular' | 'latest'
       });
 
-      this.logger.log(`컨텐츠 목록 조회 성공 - 총 ${result.total}개`);
+      this.logger.log(`칼럼 목록 조회 성공 - 총 ${result.total}개`);
 
       return {
         success: true,
-        message: '컨텐츠 목록이 성공적으로 조회되었습니다.',
+        message: '칼럼 목록이 성공적으로 조회되었습니다.',
         data: result,
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error('컨텐츠 목록 조회 실패', error);
+      this.logger.error('칼럼 목록 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 오늘의 칼럼 조회 (최신 5개)
+   */
+  @Get('columns/today')
+  @ApiOperation({
+    summary: '오늘의 칼럼 조회',
+    description: '최신 칼럼 5개를 조회합니다 (롤링 배너용).',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: '오늘의 칼럼 조회 성공',
+  })
+  async getTodayColumns(): Promise<ApiResponseDto<any>> {
+    this.logger.log('오늘의 칼럼 조회 요청');
+
+    try {
+      const columns = await this.contentService.getTodayColumns();
+
+      this.logger.log(`오늘의 칼럼 조회 성공 - ${columns.length}개`);
+
+      return {
+        success: true,
+        message: '오늘의 칼럼이 성공적으로 조회되었습니다.',
+        data: columns,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error('오늘의 칼럼 조회 실패', error);
       throw error;
     }
   }
@@ -106,7 +185,7 @@ export class ContentController {
         throw new NotFoundException(`컨텐츠를 찾을 수 없습니다: ${id}`);
       }
 
-      // 조회수 증가
+      // 조회수 증가 (익명 사용자도 조회수 증가하지만 중복 방지는 안됨)
       await this.contentService.increaseViewCount(id);
 
       this.logger.log(`컨텐츠 상세 조회 성공 - ID: ${id}`);
@@ -123,44 +202,6 @@ export class ContentController {
     }
   }
 
-  /**
-   * 이벤트별 컨텐츠 목록 조회
-   */
-  @Get('event/:eventId')
-  @ApiOperation({
-    summary: '이벤트별 컨텐츠 조회',
-    description: '특정 이벤트에 연결된 컨텐츠 목록을 조회합니다.',
-  })
-  @ApiParam({
-    name: 'eventId',
-    description: '이벤트 ID',
-    example: 1,
-  })
-  @ApiResponse({
-    status: HttpStatus.OK,
-    description: '이벤트별 컨텐츠 조회 성공',
-  })
-  async getContentByEvent(
-    @Param('eventId', ParseIntPipe) eventId: number,
-  ): Promise<ApiResponseDto<any>> {
-    this.logger.log(`이벤트별 컨텐츠 조회 요청 - 이벤트 ID: ${eventId}`);
-
-    try {
-      const contents = await this.contentService.getContentsByEventId(eventId);
-      
-      this.logger.log(`이벤트별 컨텐츠 조회 성공 - 이벤트 ID: ${eventId}, 컨텐츠 수: ${contents.length}`);
-
-      return {
-        success: true,
-        message: '이벤트별 컨텐츠가 성공적으로 조회되었습니다.',
-        data: contents,
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(`이벤트별 컨텐츠 조회 실패 - 이벤트 ID: ${eventId}`, error);
-      throw error;
-    }
-  }
 
   /**
    * 인기 컨텐츠 목록 조회
@@ -195,6 +236,53 @@ export class ContentController {
       };
     } catch (error) {
       this.logger.error('인기 컨텐츠 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 컨텐츠 시청 완료 처리
+   * @description 컨텐츠를 시청 완료하고 최초 1회에 한해 보상 포인트를 지급합니다
+   */
+  @Post(':id/complete')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '컨텐츠 시청 완료',
+    description: '컨텐츠 시청을 완료 처리합니다. 최초 시청 시에만 보상 포인트가 지급됩니다.'
+  })
+  @ApiParam({
+    name: 'id',
+    description: '컨텐츠 ID',
+    example: 1,
+  })
+  @ApiResponse({
+    status: 201,
+    description: '컨텐츠 시청 완료 성공',
+    type: ContentCompletionResponseDto
+  })
+  @ApiResponse({
+    status: 400,
+    description: '잘못된 요청'
+  })
+  @ApiResponse({
+    status: 404,
+    description: '컨텐츠를 찾을 수 없음'
+  })
+  async completeContent(
+    @Param('id', ParseIntPipe) contentId: number,
+    @Request() req: any
+  ) {
+    this.logger.log(`컨텐츠 시청 완료 요청 - 사용자: ${req.user.userId}, 컨텐츠: ${contentId}`);
+
+    try {
+      const result = await this.contentService.completeContent(req.user.userId, contentId);
+      
+      this.logger.log(`컨텐츠 시청 완료 성공 - 사용자: ${req.user.userId}, 컨텐츠: ${contentId}`);
+      
+      return result;
+    } catch (error) {
+      this.logger.error(`컨텐츠 시청 완료 실패 - 사용자: ${req.user.userId}, 컨텐츠: ${contentId}`, error);
       throw error;
     }
   }

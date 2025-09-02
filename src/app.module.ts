@@ -20,7 +20,7 @@ import { CommonModule } from './common/common.module';
 import { ImwebModule } from './imweb/imweb.module';
 import { MissionModule } from './mission/mission.module';
 import { SurveyModule } from './survey/survey.module';
-import { EventModule } from './event/event.module';
+import { ChallengeModule } from './challenge/challenge.module';
 import { ManagementModule } from './management/management.module';
 import { PointModule } from './point/point.module';
 import { CategoriesModule } from './categories/categories.module';
@@ -93,7 +93,7 @@ import { RefundModule } from './refund/refund.module';
     ImwebModule,      // 아임웹 API 통합 모듈
     MissionModule,    // 미션 모듈
     SurveyModule,     // 설문 모듈
-    EventModule,      // 이벤트 기간 관리 모듈
+    ChallengeModule,  // 챌린지 관리 모듈
     ManagementModule, // 백오피스 관리 모듈
     PointModule,      // 포인트 관리 모듈
     CategoriesModule, // 카테고리 관리 모듈

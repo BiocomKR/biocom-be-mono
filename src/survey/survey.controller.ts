@@ -30,7 +30,7 @@ import {
   SurveyOptionResponseDto,
   SurveyAnswerResponseDto,
 } from './dto/survey-response.dto';
-import { SurveyResultResponseDto, SurveyComparisonResponseDto } from './dto/survey-result-response.dto';
+import { SurveyResultResponseDto } from './dto/survey-result-response.dto';
 import { SurveyStatusResponseDto } from './dto/survey-status-response.dto';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 
@@ -49,8 +49,8 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
  * - GET /survey/results/me: 내 설문 결과 조회  
  * - GET /survey/results/compare: 전후 비교 결과 조회
  */
-@ApiTags('챌린지-survey')
-@Controller('survey')
+@ApiTags('surveys')
+@Controller('surveys')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access-token')
 export class SurveyController {
@@ -377,54 +377,6 @@ export class SurveyController {
 
   // ==================== 설문 결과 관련 엔드포인트 ====================
 
-  /**
-   * 설문 완료 및 결과 계산
-   * 모든 질문에 답변 완료 후 호출하여 결과를 계산하고 저장
-   * 
-   * @param req Express Request 객체 (미들웨어에서 userId 추가됨)
-   * @param type 설문 타입 ('before' 또는 'after')
-   * @returns 계산된 설문 결과
-   */
-  @Post('complete')
-  @ApiOperation({
-    summary: '설문 완료 및 결과 계산',
-    description: '모든 설문 답변 완료 후 결과를 계산하고 저장합니다. 카테고리별 점수와 전체 평균을 반환합니다.',
-  })
-  @ApiBody({
-    type: CompleteSurveyDto,
-    description: '설문 완료 데이터',
-  })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: '설문 결과가 성공적으로 계산되고 저장되었습니다.',
-    type: SurveyResultResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.NOT_FOUND,
-    description: '사용자의 설문 답변을 찾을 수 없습니다.',
-  })
-  async completeAndCalculate(
-    @Req() req: Request,
-    @Body() completeSurveyDto: CompleteSurveyDto,
-  ): Promise<ApiResponseDto<SurveyResultResponseDto>> {
-    this.logger.log(`설문 완료 및 결과 계산 요청 - 사용자: ${req.user.sub}, 타입: ${completeSurveyDto.type}, 답변 수: ${completeSurveyDto.answers.length}`);
-
-    try {
-      const result = await this.surveyService.completeWithAnswers(req.user.sub, completeSurveyDto.type, completeSurveyDto.answers);
-      
-      this.logger.log(`설문 결과 계산 완료 - 사용자: ${req.user.sub}, 총점: ${result.totalScore}`);
-      
-      return {
-        success: true,
-        message: '설문이 완료되었고 결과가 계산되었습니다.',
-        data: result,
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(`설문 결과 계산 실패 - 사용자: ${req.user.sub}`, error);
-      throw error;
-    }
-  }
 
   /**
    * 내 설문 결과 조회
@@ -474,41 +426,144 @@ export class SurveyController {
     }
   }
 
+
+  // ==================== 설문 기반 API (surveyId 사용) ====================
+
   /**
-   * 내 설문 전후 비교 결과 조회
-   * 
-   * @param req Express Request 객체 (미들웨어에서 userId 추가됨)
-   * @param email 사용자 이메일 (미들웨어에서 처리)
-   * @returns 사용자의 before/after 비교 결과
+   * 설문 질문 조회 (Before/After 통합)
    */
-  @Get('results/compare')
+  @Get(':surveyId/:type')
   @ApiOperation({
-    summary: '설문 전후 비교 결과 조회',
-    description: '사용자의 사전/사후 설문 결과를 비교하여 개선 정도를 확인합니다.',
+    summary: '설문 질문 조회',
+    description: '특정 설문의 사전/사후 질문들을 조회합니다.',
+  })
+  @ApiParam({
+    name: 'surveyId',
+    description: '설문 ID',
+    example: 1,
+  })
+  @ApiParam({
+    name: 'type',
+    description: '설문 타입',
+    enum: ['before', 'after'],
+    example: 'before',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: '전후 비교 결과가 성공적으로 조회되었습니다.',
-    type: SurveyComparisonResponseDto,
+    description: '설문 질문이 성공적으로 조회되었습니다.',
   })
-  async compareMyResults(
-    @Req() req: Request,
-  ): Promise<ApiResponseDto<SurveyComparisonResponseDto>> {
-    this.logger.log(`설문 전후 비교 요청 - 사용자: ${req.user.sub}`);
+  async getSurveyQuestions(
+    @Param('surveyId', ParseIntPipe) surveyId: number,
+    @Param('type') type: 'before' | 'after',
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`설문 질문 조회 요청 - 설문ID: ${surveyId}, 타입: ${type}`);
 
     try {
-      const comparison = await this.surveyService.compareResults(req.user.sub);
-      
-      this.logger.log(`설문 전후 비교 조회 성공 - 사용자: ${req.user.sub}`);
+      let survey;
+      if (type === 'before') {
+        survey = await this.surveyService.getSurveyBeforeQuestions(surveyId);
+      } else {
+        survey = await this.surveyService.getSurveyAfterQuestions(surveyId);
+      }
       
       return {
         success: true,
-        message: '설문 전후 비교 결과가 성공적으로 조회되었습니다.',
+        message: `설문 ${type === 'before' ? '사전' : '사후'} 질문이 성공적으로 조회되었습니다.`,
+        data: survey,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error(`설문 질문 조회 실패 - 설문ID: ${surveyId}, 타입: ${type}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 설문 완료 (기존 :id/complete과 통합됨)
+   */
+  @Post(':surveyId/complete')
+  @ApiOperation({
+    summary: '설문 완료',
+    description: '특정 설문의 Before/After를 완료하고 CategoryDetail 기반으로 동물 캐릭터를 배정합니다.',
+  })
+  @ApiParam({
+    name: 'surveyId',
+    description: '설문 ID',
+    example: 1,
+  })
+  @ApiBody({
+    type: CompleteSurveyDto,
+    description: '설문 완료 데이터',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: '설문이 성공적으로 완료되었습니다.',
+  })
+  async completeSurvey(
+    @Param('surveyId', ParseIntPipe) surveyId: number,
+    @Req() req: Request,
+    @Body() completeSurveyDto: CompleteSurveyDto,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`설문 완료 요청 - 사용자: ${req.user.sub}, 설문ID: ${surveyId}, 타입: ${completeSurveyDto.type}`);
+
+    try {
+      const result = await this.surveyService.completeSurveyById(
+        req.user.sub, 
+        surveyId, 
+        completeSurveyDto.type, 
+        completeSurveyDto.answers
+      );
+      
+      this.logger.log(`설문 완료 성공 - 사용자: ${req.user.sub}, 동물: ${result.animalCharacter || '미배정'}`);
+      
+      return {
+        success: true,
+        message: '설문이 성공적으로 완료되었습니다.',
+        data: result,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error(`설문 완료 실패 - 사용자: ${req.user.sub}, 설문ID: ${surveyId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 설문 Before & After 비교 조회
+   */
+  @Get(':surveyId/comparison')
+  @ApiOperation({
+    summary: '설문 결과 비교',
+    description: '특정 설문의 사전/사후 결과를 비교합니다.',
+  })
+  @ApiParam({
+    name: 'surveyId',
+    description: '설문 ID',
+    example: 1,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: '설문 결과 비교가 성공적으로 조회되었습니다.',
+  })
+  async getSurveyComparison(
+    @Param('surveyId', ParseIntPipe) surveyId: number,
+    @Req() req: Request,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`설문 결과 비교 요청 - 사용자: ${req.user.sub}, 설문ID: ${surveyId}`);
+
+    try {
+      const comparison = await this.surveyService.getSurveyComparison(req.user.sub, surveyId);
+      
+      this.logger.log(`설문 결과 비교 조회 성공 - 사용자: ${req.user.sub}`);
+      
+      return {
+        success: true,
+        message: '설문 결과 비교가 성공적으로 조회되었습니다.',
         data: comparison,
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`설문 전후 비교 조회 실패 - 사용자: ${req.user.sub}`, error);
+      this.logger.error(`설문 결과 비교 조회 실패 - 사용자: ${req.user.sub}, 설문ID: ${surveyId}`, error);
       throw error;
     }
   }

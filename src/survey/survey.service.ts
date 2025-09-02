@@ -1,10 +1,7 @@
-import { Injectable, Logger, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { EventService } from '../event/event.service';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
-import { SurveyAnswer } from '@prisma/client';
-import { EventSurveyOptions, isEventSurveyOptions } from '../event/event.types';
-import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.util';
+import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption, User } from '@prisma/client';
 
 /**
  * 설문 서비스
@@ -16,263 +13,23 @@ export class SurveyService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly eventService: EventService,
   ) {}
 
-  // ==================== 관리자용 CRUD API ====================
+  // ==================== 사용자용 설문 답변 및 결과 API ====================
 
   /**
-   * 모든 설문 목록 조회
-   * 
-   * @returns 설문 목록
+   * 설문 답변 생성 (간단버전)
    */
-  async getAllSurveys(): Promise<any[]> {
-    this.logger.log('모든 설문 목록 조회');
-
-    const surveys = await this.prisma.survey.findMany({
-      include: {
-        surveyQuestions: {
-          orderBy: { sortOrder: 'asc' }
-        },
-        eventSurveys: {
-          include: {
-            event: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    this.logger.log(`설문 목록 조회 완료 - 총 ${surveys.length}개`);
-    return surveys;
-  }
-
-  /**
-   * 새로운 설문 생성
-   * 
-   * @param createSurveyDto 설문 생성 정보
-   * @returns 생성된 설문
-   */
-  async createSurvey(createSurveyDto: {
-    name: string;  // title 대신 name으로 변경
-    description?: string;
-    type?: string;
-    category?: string;
-    isActive?: boolean;
-  }): Promise<any> {
-    this.logger.log(`설문 생성 - 이름: ${createSurveyDto.name}`);
-
-    const survey = await this.prisma.survey.create({
-      data: {
-        name: createSurveyDto.name,  // name 필드 직접 사용
-        description: createSurveyDto.description,
-        isActive: createSurveyDto.isActive ?? true,
-      }
-    });
-
-    this.logger.log(`설문 생성 완료 - ID: ${survey.id}`);
-    return survey;
-  }
-
-  /**
-   * 설문 상세 조회
-   * 
-   * @param id 설문 ID
-   * @returns 설문 정보
-   */
-  async getSurveyById(id: number): Promise<any> {
-    this.logger.log(`설문 상세 조회 - ID: ${id}`);
-
-    const survey = await this.prisma.survey.findUnique({
-      where: { id },
-      include: {
-        surveyQuestions: {
-          orderBy: { sortOrder: 'asc' }
-        }
-      }
-    });
-
-    if (!survey) {
-      throw new NotFoundException(`설문을 찾을 수 없습니다: ${id}`);
-    }
-
-    return survey;
-  }
-
-  /**
-   * 설문 수정
-   * 
-   * @param id 설문 ID
-   * @param updateSurveyDto 수정할 정보
-   * @returns 수정된 설문
-   */
-  async updateSurvey(
-    id: number,
-    updateSurveyDto: Partial<{
-      name: string;  // title 대신 name 사용
-      description: string;
-      isActive: boolean;
-    }>
-  ): Promise<any> {
-    this.logger.log(`설문 수정 - ID: ${id}`);
-
-    const updateData: any = {};
-    if (updateSurveyDto.name !== undefined) {
-      updateData.name = updateSurveyDto.name;  // name 필드 직접 사용
-    }
-    if (updateSurveyDto.description !== undefined) {
-      updateData.description = updateSurveyDto.description;
-    }
-    if (updateSurveyDto.isActive !== undefined) {
-      updateData.isActive = updateSurveyDto.isActive;
-    }
-
-    const survey = await this.prisma.survey.update({
-      where: { id },
-      data: updateData
-    });
-
-    this.logger.log(`설문 수정 완료 - ID: ${id}`);
-    return survey;
-  }
-
-  /**
-   * 설문 삭제
-   * 
-   * @param id 설문 ID
-   */
-  async deleteSurvey(id: number): Promise<void> {
-    this.logger.log(`설문 삭제 - ID: ${id}`);
-
-    // 관련 답변이 있는지 확인
-    const answers = await this.prisma.surveyAnswer.count({
-      where: {
-        surveyQuestion: {
-          surveyId: id
-        }
-      }
-    });
-
-    if (answers > 0) {
-      throw new BadRequestException(`답변이 존재하는 설문은 삭제할 수 없습니다. (답변 수: ${answers})`);
-    }
-
-    // 트랜잭션으로 관련 데이터 모두 삭제
-    await this.prisma.$transaction(async (tx) => {
-      // 설문 옵션 삭제
-      await tx.surveyOption.deleteMany({
-        where: {
-          surveyQuestion: {
-            surveyId: id
-          }
-        }
-      });
-
-      // 설문 질문 삭제
-      await tx.surveyQuestion.deleteMany({
-        where: { surveyId: id }
-      });
-
-      // 이벤트-설문 연결 삭제
-      await tx.eventSurvey.deleteMany({
-        where: { surveyId: id }
-      });
-
-      // 설문 삭제
-      await tx.survey.delete({
-        where: { id }
-      });
-    });
-
-    this.logger.log(`설문 삭제 완료 - ID: ${id}`);
-  }
-
-  /**
-   * 설문에 질문 추가
-   * 
-   * @param surveyId 설문 ID
-   * @param createQuestionDto 질문 생성 정보
-   * @returns 생성된 질문
-   */
-  async addQuestionToSurvey(
-    surveyId: number,
-    createQuestionDto: {
-      categoryCode: string;
-      categoryName: string;
-      questionText: string;
-      questionType: string;
-      options?: string[];
-      sortOrder?: number;
-      isRequired?: boolean;
-    }
-  ): Promise<any> {
-    this.logger.log(`설문에 질문 추가 - 설문 ID: ${surveyId}, 질문: ${createQuestionDto.questionText}`);
-
-    // 설문 존재 확인
-    await this.getSurveyById(surveyId);
-
-    // 트랜잭션으로 질문과 옵션 생성
-    const result = await this.prisma.$transaction(async (tx) => {
-      // 질문 생성
-      const question = await tx.surveyQuestion.create({
-        data: {
-          surveyId,
-          categoryCode: createQuestionDto.categoryCode,
-          categoryName: createQuestionDto.categoryName,
-          questionText: createQuestionDto.questionText,
-          questionType: createQuestionDto.questionType,
-          sortOrder: createQuestionDto.sortOrder || 0,
-          isRequired: createQuestionDto.isRequired ?? true,
-        }
-      });
-
-      // 옵션이 있으면 생성
-      if (createQuestionDto.options && createQuestionDto.options.length > 0) {
-        await tx.surveyOption.createMany({
-          data: createQuestionDto.options.map((optionText, index) => ({
-            surveyQuestionId: question.id,
-            optionText,
-            score: index + 1,
-          }))
-        });
-      }
-
-      // 생성된 질문 조회
-      return await tx.surveyQuestion.findUnique({
-        where: { id: question.id }
-      });
-    });
-
-    this.logger.log(`설문에 질문 추가 완료 - 질문 ID: ${result.id}`);
-    return result;
-  }
-
-  /**
-   * 설문 답변 생성
-   */
-  async createAnswer(createSurveyAnswerDto: CreateSurveyAnswerDto): Promise<SurveyAnswer> {
+  async createAnswer(createSurveyAnswerDto: CreateSurveyAnswerDto): Promise<SurveyAnswer & {
+    surveyQuestion: SurveyQuestion;
+    surveyOption: SurveyOption;
+  }> {
     this.logger.log(`설문 답변 생성 - 사용자: ${createSurveyAnswerDto.userId}, 타입: ${createSurveyAnswerDto.type}`);
-
-    // 활성 이벤트 확인
-    const activeEvent = await this.eventService.getActiveEvent();
-    
-    // 설문 사용 가능 여부 확인
-    await this.validateSurveyAvailability(
-      activeEvent,
-      createSurveyAnswerDto.type,
-      createSurveyAnswerDto.userId
-    );
 
     // 질문과 선택지 검증
     await this.validateQuestionAndOption(
       createSurveyAnswerDto.surveyQuestionId,
       createSurveyAnswerDto.surveyOptionId
-    );
-
-    // 이벤트 참여자 확인/생성
-    const eventUser = await this.getOrCreateEventUser(
-      createSurveyAnswerDto.userId,
-      activeEvent.id
     );
 
     // 중복 답변 체크
@@ -307,7 +64,7 @@ export class SurveyService {
   }
 
   /**
-   * 설문 답변 대량 생성
+   * 설문 답변 대량 생성 (간단버전)
    */
   async createBulkAnswers(
     userId: number,
@@ -315,11 +72,6 @@ export class SurveyService {
     answers: Array<{ questionId: number; optionId: number }>
   ): Promise<SurveyAnswer[]> {
     this.logger.log(`설문 답변 대량 생성 - 사용자: ${userId}, 개수: ${answers.length}`);
-
-    const activeEvent = await this.eventService.getActiveEvent();
-    await this.validateSurveyAvailability(activeEvent, type, userId);
-
-    const eventUser = await this.getOrCreateEventUser(userId, activeEvent.id);
 
     return await this.prisma.$transaction(async (tx) => {
       const createdAnswers: SurveyAnswer[] = [];
@@ -350,78 +102,6 @@ export class SurveyService {
     });
   }
 
-  /**
-   * 설문 사용 가능 여부 검증
-   */
-  private async validateSurveyAvailability(
-    activeEvent: any,
-    type: 'before' | 'after',
-    userId: number
-  ): Promise<void> {
-    // 이벤트-설문 관계 확인
-    const eventSurvey = activeEvent.eventSurveys?.find((es: any) => {
-      if (!es.isActive || !es.surveyOptions) return false;
-      if (isEventSurveyOptions(es.surveyOptions)) {
-        return es.surveyOptions.type === type;
-      }
-      return false;
-    });
-
-    if (!eventSurvey) {
-      throw new BadRequestException(`이 이벤트는 ${type === 'before' ? '사전' : '사후'} 설문을 사용하지 않습니다.`);
-    }
-
-    const surveyOptions = eventSurvey.surveyOptions as EventSurveyOptions;
-
-    // 일차 확인
-    const currentDay = await this.eventService.calculateEventDay(
-      new Date().toISOString().split('T')[0]
-    );
-    
-    const fromDay = surveyOptions.fromDay || (type === 'before' ? 1 : activeEvent.totalDays);
-    if (currentDay < fromDay) {
-      throw new BadRequestException(
-        `${type === 'before' ? '사전' : '사후'} 설문은 ${fromDay}일차부터 가능합니다.`
-      );
-    }
-
-    // 사후 설문의 경우 사전 설문 완료 체크
-    if (type === 'after') {
-      await this.validateBeforeSurveyCompletion(activeEvent, userId);
-    }
-  }
-
-  /**
-   * 사전 설문 완료 여부 확인
-   */
-  private async validateBeforeSurveyCompletion(
-    activeEvent: any,
-    userId: number
-  ): Promise<void> {
-    const hasBeforeSurvey = activeEvent.eventSurveys?.some((es: any) => {
-      if (!es.isActive || !es.surveyOptions) return false;
-      if (isEventSurveyOptions(es.surveyOptions)) {
-        return es.surveyOptions.type === 'before';
-      }
-      return false;
-    });
-
-    if (!hasBeforeSurvey) return;
-
-    const totalQuestions = await this.prisma.surveyQuestion.count();
-    const beforeAnswerCount = await this.prisma.surveyAnswer.count({
-      where: {
-        userId: userId,
-        type: 'before',
-      },
-    });
-
-    if (beforeAnswerCount < totalQuestions) {
-      throw new BadRequestException(
-        `사전 설문을 먼저 완료해주세요. (${beforeAnswerCount}/${totalQuestions})`
-      );
-    }
-  }
 
   /**
    * 질문과 선택지 검증
@@ -444,31 +124,6 @@ export class SurveyService {
     }
   }
 
-  /**
-   * 이벤트 참여자 확인/생성
-   */
-  private async getOrCreateEventUser(userId: number, eventId: number) {
-    let eventUser = await this.prisma.eventUser.findUnique({
-      where: {
-        eventId_userId: {
-          eventId: eventId,
-          userId: userId,
-        },
-      },
-    });
-
-    if (!eventUser) {
-      eventUser = await this.prisma.eventUser.create({
-        data: {
-          eventId: eventId,
-          userId: userId,
-          status: 'ACTIVE',
-        },
-      });
-    }
-
-    return eventUser;
-  }
 
   /**
    * 사용자 설문 답변 조회
@@ -476,8 +131,11 @@ export class SurveyService {
   async getUserAnswers(
     userId: number,
     type?: 'before' | 'after'
-  ): Promise<(SurveyAnswer & { surveyQuestion: any; surveyOption: any })[]> {
-    const where: any = { userId };
+  ): Promise<(SurveyAnswer & { 
+    surveyQuestion: SurveyQuestion; 
+    surveyOption: SurveyOption; 
+  })[]> {
+    const where: Prisma.SurveyAnswerWhereInput = { userId };
     if (type) where.type = type;
 
     return await this.prisma.surveyAnswer.findMany({
@@ -553,7 +211,7 @@ export class SurveyService {
   }
 
   /**
-   * 설문 진행 상태 조회
+   * 설문 진행 상태 조회 (간단버전)
    */
   async getSurveyStatus(userId: number): Promise<{
     beforeSurvey: {
@@ -574,16 +232,6 @@ export class SurveyService {
     canTakeAfterSurvey: boolean;
     nextAction: 'TAKE_BEFORE_SURVEY' | 'WAIT_FOR_AFTER_SURVEY' | 'TAKE_AFTER_SURVEY' | 'COMPLETED';
   }> {
-    const activeEvent = await this.eventService.getActiveEvent();
-    
-    const beforeEnabled = activeEvent.eventSurveys?.some((es: any) => 
-      es.isActive && isEventSurveyOptions(es.surveyOptions) && es.surveyOptions.type === 'before'
-    );
-    
-    const afterEnabled = activeEvent.eventSurveys?.some((es: any) => 
-      es.isActive && isEventSurveyOptions(es.surveyOptions) && es.surveyOptions.type === 'after'
-    );
-
     const totalQuestions = await this.prisma.surveyQuestion.count();
     const [beforeAnswers, afterAnswers] = await Promise.all([
       this.getUserAnswers(userId, 'before'),
@@ -592,15 +240,13 @@ export class SurveyService {
 
     const beforeCompleted = beforeAnswers.length === totalQuestions;
     const afterCompleted = afterAnswers.length === totalQuestions;
-    const canTakeAfterSurvey = !beforeEnabled || beforeCompleted;
+    const canTakeAfterSurvey = beforeCompleted; // 사전 설문 완료 후 사후 설문 가능
     
     let nextAction: 'TAKE_BEFORE_SURVEY' | 'WAIT_FOR_AFTER_SURVEY' | 'TAKE_AFTER_SURVEY' | 'COMPLETED';
     
-    if (!beforeCompleted && beforeEnabled) {
+    if (!beforeCompleted) {
       nextAction = 'TAKE_BEFORE_SURVEY';
-    } else if (afterEnabled && !canTakeAfterSurvey) {
-      nextAction = 'WAIT_FOR_AFTER_SURVEY';
-    } else if (afterEnabled && !afterCompleted) {
+    } else if (!afterCompleted) {
       nextAction = 'TAKE_AFTER_SURVEY';
     } else {
       nextAction = 'COMPLETED';
@@ -608,13 +254,13 @@ export class SurveyService {
 
     return {
       beforeSurvey: {
-        enabled: !!beforeEnabled,
+        enabled: true, // 항상 사용 가능
         completed: beforeCompleted,
         answeredCount: beforeAnswers.length,
         totalQuestions,
       },
       afterSurvey: {
-        enabled: !!afterEnabled,
+        enabled: true, // 항상 사용 가능
         available: canTakeAfterSurvey,
         completed: afterCompleted,
         answeredCount: afterAnswers.length,
@@ -627,83 +273,13 @@ export class SurveyService {
     };
   }
 
-  /**
-   * 모든 설문 질문 조회
-   */
-  async getAllQuestions() {
-    return await this.prisma.surveyQuestion.findMany({
-      orderBy: { sortOrder: 'asc' },
-    });
-  }
-
-  /**
-   * 모든 설문 선택지 조회
-   */
-  async getAllOptions() {
-    return await this.prisma.surveyOption.findMany({
-      orderBy: { id: 'asc' },
-    });
-  }
-
-  /**
-   * 설문 질문 생성 (관리자용)
-   */
-  async createQuestion(data: any) {
-    return await this.prisma.surveyQuestion.create({
-      data,
-      include: {
-        survey: true,
-      },
-    });
-  }
-
-  /**
-   * 설문 질문 조회
-   */
-  async findQuestions(categoryCode?: string) {
-    const where = categoryCode ? { categoryCode } : {};
-    
-    return await this.prisma.surveyQuestion.findMany({
-      where,
-      include: {
-        survey: true,
-      },
-      orderBy: { sortOrder: 'asc' },
-    });
-  }
-
-  /**
-   * 특정 설문 질문 조회
-   */
-  async findOneQuestion(id: number) {
-    const question = await this.prisma.surveyQuestion.findUnique({
-      where: { id },
-      include: {
-        survey: true,
-      },
-    });
-
-    if (!question) {
-      throw new NotFoundException(`설문 질문을 찾을 수 없습니다: ${id}`);
-    }
-
-    return question;
-  }
-
-  /**
-   * 설문 선택지 생성 (관리자용)
-   */
-  async createOption(data: any) {
-    return await this.prisma.surveyOption.create({
-      data,
-    });
-  }
+  // 관리자용 메서드들을 management/services/management-survey.service.ts로 이동
 
   /**
    * 사용자별 답변 조회
    */
   async findAnswersByUser(userId: number, type?: 'before' | 'after') {
-    const where: any = { userId };
+    const where: Prisma.SurveyAnswerWhereInput = { userId };
     if (type) where.type = type;
 
     return await this.prisma.surveyAnswer.findMany({
@@ -720,30 +296,73 @@ export class SurveyService {
     });
   }
 
-  /**
-   * 질문별 답변 조회
-   */
-  async findAnswersByQuestion(questionId: number, type?: 'before' | 'after') {
-    const where: any = { surveyQuestionId: questionId };
-    if (type) where.type = type;
+  // 질문별 답변 조회는 management로 이동
 
-    return await this.prisma.surveyAnswer.findMany({
-      where,
-      include: {
-        user: true,
-        surveyOption: true,
-      },
+  /**
+   * 챌린지별 설문 완료 처리 (새로운 로직)
+   * CategoryDetail 기반 동물 배정 및 Before/After 결과 저장
+   */
+  async completeChallengeSurvey(
+    userId: number,
+    challengeId: number,
+    type: 'before' | 'after',
+    answers: Array<{ questionId: number; optionId: number }>
+  ) {
+    this.logger.log(`챌린지 설문 완료 처리 - 사용자: ${userId}, 챌린지: ${challengeId}, 타입: ${type}`);
+
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. 설문 답변 저장
+      for (const answer of answers) {
+        await tx.surveyAnswer.create({
+          data: {
+            userId,
+            type,
+            surveyQuestionId: answer.questionId,
+            surveyOptionId: answer.optionId,
+          },
+        });
+      }
+
+      // 2. 카테고리별 점수 계산 (old-survey.service.ts 로직 적용)
+      const categoryScores = await this.calculateCategoryScores(answers, tx);
+      this.logger.debug(`카테고리별 점수: ${JSON.stringify(categoryScores)}`);
+
+      // 3. 최저점수 카테고리 찾기
+      const lowestCategory = this.findLowestScoreCategory(categoryScores);
+      this.logger.log(`최저점수 카테고리: ${lowestCategory}`);
+
+      // 4. UserChallengeSurveyResult 저장/업데이트
+      await this.saveOrUpdateSurveyResult(userId, challengeId, type, categoryScores, lowestCategory, tx);
+
+      // 5. CategoryDetail에서 동물 캐릭터 정보 조회
+      const categoryDetail = await tx.categoryDetail.findFirst({
+        where: { categoryCode: lowestCategory },
+      });
+
+      // 6. 챌린지 진행 상황 업데이트
+      await this.processChallengeIntegration(tx, userId, challengeId);
+
+      return {
+        scores: categoryScores,
+        lowestCategory,
+        animalCharacter: categoryDetail?.animalCharacter,
+        characterKeyword: categoryDetail?.characterKeyword,
+        detailedFeatures: categoryDetail?.detailedFeatures,
+      };
     });
   }
 
   /**
-   * 설문 완료 (답변 포함)
+   * 설문 ID 기반 설문 완료 처리
    */
-  async completeWithAnswers(
+  async completeSurveyById(
     userId: number,
+    surveyId: number,
     type: 'before' | 'after',
     answers: Array<{ questionId: number; optionId: number }>
   ) {
+    this.logger.log(`설문 완료 처리 - 사용자: ${userId}, 설문ID: ${surveyId}, 타입: ${type}`);
+
     // 트랜잭션으로 처리
     return await this.prisma.$transaction(async (tx) => {
       // 기존 답변 삭제
@@ -764,9 +383,241 @@ export class SurveyService {
         })),
       });
 
+      // 🔥 챌린지 연동 로직 추가
+      await this.processChallengeIntegration(tx, userId, surveyId);
+
       // 결과 분석
       return await this.analyzeSurveyResult(userId, type);
     });
+  }
+
+  /**
+   * 카테고리별 점수 계산 (old-survey.service.ts 로직 적용)
+   * 100점에서 답변 점수를 차감하는 방식
+   */
+  private async calculateCategoryScores(
+    answers: Array<{ questionId: number; optionId: number }>,
+    tx: Prisma.TransactionClient,
+  ): Promise<Record<string, number>> {
+    // 초기 점수는 각 카테고리별로 100점
+    const categoryScores = {
+      SKIN_HEALTH: 100,
+      METABOLISM: 100,
+      IMMUNE_BALANCE: 100,
+      GUT_HEALTH: 100,
+    };
+
+    // 각 답변에 대해 점수 차감
+    for (const answer of answers) {
+      const option = await tx.surveyOption.findUnique({
+        where: { id: answer.optionId },
+        include: { question: true },
+      });
+
+      if (option && option.category && option.score) {
+        const category = option.category as keyof typeof categoryScores;
+        if (categoryScores[category] !== undefined) {
+          categoryScores[category] -= option.score;
+        }
+      }
+    }
+
+    // 점수가 0 미만이 되지 않도록 보정
+    Object.keys(categoryScores).forEach((key) => {
+      if (categoryScores[key] < 0) {
+        categoryScores[key] = 0;
+      }
+    });
+
+    return categoryScores;
+  }
+
+  /**
+   * 최저점수 카테고리 찾기 (old-survey.service.ts 우선순위 적용)
+   * 우선순위: GUT_HEALTH → METABOLISM → SKIN_HEALTH → IMMUNE_BALANCE
+   */
+  private findLowestScoreCategory(categoryScores: Record<string, number>): string {
+    const priorityOrder = ['GUT_HEALTH', 'METABOLISM', 'SKIN_HEALTH', 'IMMUNE_BALANCE'];
+    
+    let lowestScore = Math.min(...Object.values(categoryScores));
+    
+    // 우선순위에 따라 최저점수 카테고리 선택
+    for (const category of priorityOrder) {
+      if (categoryScores[category] === lowestScore) {
+        return category;
+      }
+    }
+    
+    return 'GUT_HEALTH';
+  }
+
+  /**
+   * 사용자별 챌린지별 설문 결과 저장/업데이트
+   */
+  private async saveOrUpdateSurveyResult(
+    userId: number,
+    challengeId: number,
+    surveyType: 'before' | 'after',
+    categoryScores: Record<string, number>,
+    lowestCategory: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const existing = await tx.userChallengeSurveyResult.findUnique({
+      where: {
+        userId_challengeId: {
+          userId,
+          challengeId,
+        },
+      },
+    });
+
+    const updateData: Prisma.UserChallengeSurveyResultUpdateInput = {};
+    
+    if (surveyType === 'before') {
+      updateData.beforeCategory = lowestCategory;
+      updateData.beforeSkinHealthScore = categoryScores.SKIN_HEALTH;
+      updateData.beforeMetabolismScore = categoryScores.METABOLISM;
+      updateData.beforeImmuneScore = categoryScores.IMMUNE_BALANCE;
+      updateData.beforeGutHealthScore = categoryScores.GUT_HEALTH;
+      updateData.beforeCompletedAt = new Date();
+    } else {
+      updateData.afterCategory = lowestCategory;
+      updateData.afterSkinHealthScore = categoryScores.SKIN_HEALTH;
+      updateData.afterMetabolismScore = categoryScores.METABOLISM;
+      updateData.afterImmuneScore = categoryScores.IMMUNE_BALANCE;
+      updateData.afterGutHealthScore = categoryScores.GUT_HEALTH;
+      updateData.afterCompletedAt = new Date();
+    }
+
+    if (existing) {
+      await tx.userChallengeSurveyResult.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
+    } else {
+      await tx.userChallengeSurveyResult.create({
+        data: {
+          userId,
+          challengeId,
+          ...updateData,
+        },
+      });
+    }
+  }
+
+  /**
+   * 챌린지 연동 처리
+   * 설문 완료 시 활성 챌린지가 있으면 포인트 적립 및 진행상황 업데이트
+   */
+  private async processChallengeIntegration(
+    tx: Prisma.TransactionClient, 
+    userId: number, 
+    challengeIdOrSurveyId: number
+  ): Promise<void> {
+    try {
+      // 1️⃣ 활성 챌린지 조회
+      const activeChallenge = await tx.userChallenge.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE'
+        },
+        include: { challenge: true }
+      });
+
+      if (!activeChallenge) {
+        this.logger.log(`설문 완료 - 활성 챌린지 없음 (사용자: ${userId})`);
+        return;
+      }
+
+      // 2️⃣ 특정 설문이 오늘의 챌린지 설문인지 확인
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      const currentDay = activeChallenge.currentDay;
+
+      const todaySurvey = await tx.challengeSurvey.findFirst({
+        where: {
+          challengeId: activeChallenge.challengeId,
+          day: currentDay,
+          surveyId: challengeIdOrSurveyId,  // 완료한 설문이 오늘의 설문과 일치하는지 확인
+          isActive: true
+        },
+        include: { survey: true }
+      });
+
+      if (!todaySurvey) {
+        this.logger.log(`설문 완료 - 완료한 설문(${challengeIdOrSurveyId})이 오늘(${currentDay}일차) 챌린지 설문이 아님`);
+        return;
+      }
+
+      // 3️⃣ DailyProgress 조회/생성
+      let dailyProgress = await tx.dailyProgress.findFirst({
+        where: {
+          userChallengeId: activeChallenge.id,
+          day: currentDay
+        }
+      });
+
+      if (!dailyProgress) {
+        dailyProgress = await tx.dailyProgress.create({
+          data: {
+            userChallengeId: activeChallenge.id,
+            day: currentDay,
+            date: new Date(todayStr)
+          }
+        });
+      }
+
+      // 4️⃣ 설문 포인트 계산 (기본 50포인트)
+      const surveyPoints = 50;
+
+      // 5️⃣ DailyProgress 업데이트
+      await tx.dailyProgress.update({
+        where: {
+          userChallengeId_day: {
+            userChallengeId: activeChallenge.id,
+            day: currentDay
+          }
+        },
+        data: {
+          surveysCompleted: { increment: 1 },
+          pointsEarned: { increment: surveyPoints }
+        }
+      });
+
+      // 6️⃣ 사용자 총 포인트 업데이트
+      await tx.userChallenge.update({
+        where: { id: activeChallenge.id },
+        data: {
+          totalPoints: { increment: surveyPoints }
+        }
+      });
+
+      // 7️⃣ 포인트 히스토리 기록
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: {
+          points: { increment: surveyPoints }
+        }
+      });
+
+      await tx.pointHistory.create({
+        data: {
+          userId,
+          type: 'EARNED',
+          amount: surveyPoints,
+          balance: user.points,
+          description: `설문 완료: ${todaySurvey.survey.name}`,
+          relatedType: 'SURVEY',
+          relatedId: todaySurvey.id
+        }
+      });
+
+      this.logger.log(`설문 완료 챌린지 연동 성공 - 사용자: ${userId}, 설문: ${todaySurvey.survey.name}, 포인트: ${surveyPoints}`);
+
+    } catch (error) {
+      this.logger.error('설문 완료 챌린지 연동 실패:', error);
+      // 챌린지 연동 실패해도 설문 완료는 진행
+    }
   }
 
   /**
@@ -805,7 +656,181 @@ export class SurveyService {
   }
 
   /**
-   * 설문 전후 비교
+   * 설문 ID 기반 설문 전후 비교
+   */
+  async getSurveyComparison(userId: number, surveyId: number) {
+    this.logger.log(`사용자 ${userId}의 설문 ${surveyId} 결과 비교를 조회합니다.`);
+
+    // 설문에서 연결된 챌린지 찾기
+    const challengeSurvey = await this.prisma.challengeSurvey.findFirst({
+      where: {
+        surveyId,
+        isActive: true,
+      },
+    });
+
+    if (!challengeSurvey) {
+      throw new NotFoundException('설문과 연결된 챌린지를 찾을 수 없습니다.');
+    }
+
+    const result = await this.prisma.userChallengeSurveyResult.findUnique({
+      where: {
+        userId_challengeId: {
+          userId,
+          challengeId: challengeSurvey.challengeId,
+        },
+      },
+    });
+
+    if (!result) {
+      throw new NotFoundException('설문 결과를 찾을 수 없습니다.');
+    }
+
+    // Before 동물 캐릭터 정보
+    const beforeCategoryDetail = result.beforeCategory 
+      ? await this.prisma.categoryDetail.findFirst({
+          where: { categoryCode: result.beforeCategory },
+        })
+      : null;
+
+    // After 동물 캐릭터 정보
+    const afterCategoryDetail = result.afterCategory
+      ? await this.prisma.categoryDetail.findFirst({
+          where: { categoryCode: result.afterCategory },
+        })
+      : null;
+
+    return {
+      userId,
+      surveyId,
+      challengeId: challengeSurvey.challengeId,
+      before: {
+        category: result.beforeCategory,
+        animalCharacter: beforeCategoryDetail?.animalCharacter,
+        characterKeyword: beforeCategoryDetail?.characterKeyword,
+        detailedFeatures: beforeCategoryDetail?.detailedFeatures,
+        scores: {
+          skinHealth: result.beforeSkinHealthScore,
+          metabolism: result.beforeMetabolismScore,
+          immune: result.beforeImmuneScore,
+          gutHealth: result.beforeGutHealthScore,
+        },
+        completedAt: result.beforeCompletedAt,
+      },
+      after: result.afterCategory ? {
+        category: result.afterCategory,
+        animalCharacter: afterCategoryDetail?.animalCharacter,
+        characterKeyword: afterCategoryDetail?.characterKeyword,
+        detailedFeatures: afterCategoryDetail?.detailedFeatures,
+        scores: {
+          skinHealth: result.afterSkinHealthScore,
+          metabolism: result.afterMetabolismScore,
+          immune: result.afterImmuneScore,
+          gutHealth: result.afterGutHealthScore,
+        },
+        completedAt: result.afterCompletedAt,
+      } : null,
+      improvement: this.calculateImprovement(result),
+    };
+  }
+
+  /**
+   * Before & After 개선도 계산
+   */
+  private calculateImprovement(result: any) {
+    if (!result.beforeCategory || !result.afterCategory) {
+      return null;
+    }
+
+    const beforeTotalScore = 
+      (result.beforeSkinHealthScore || 0) +
+      (result.beforeMetabolismScore || 0) +
+      (result.beforeImmuneScore || 0) +
+      (result.beforeGutHealthScore || 0);
+
+    const afterTotalScore = 
+      (result.afterSkinHealthScore || 0) +
+      (result.afterMetabolismScore || 0) +
+      (result.afterImmuneScore || 0) +
+      (result.afterGutHealthScore || 0);
+
+    return {
+      totalScoreImprovement: afterTotalScore - beforeTotalScore,
+      categoryScoreChanges: {
+        skinHealth: (result.afterSkinHealthScore || 0) - (result.beforeSkinHealthScore || 0),
+        metabolism: (result.afterMetabolismScore || 0) - (result.beforeMetabolismScore || 0),
+        immune: (result.afterImmuneScore || 0) - (result.beforeImmuneScore || 0),
+        gutHealth: (result.afterGutHealthScore || 0) - (result.beforeGutHealthScore || 0),
+      },
+    };
+  }
+
+  /**
+   * 설문 ID로 사전설문 조회
+   */
+  async getSurveyBeforeQuestions(surveyId: number) {
+    this.logger.log(`설문 ${surveyId}의 사전설문 질문들을 조회합니다.`);
+
+    const survey = await this.prisma.survey.findUnique({
+      where: {
+        id: surveyId,
+        isActive: true,
+      },
+      include: {
+        questions: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            options: {
+              where: { isActive: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!survey) {
+      throw new NotFoundException(`설문 ${surveyId}을 찾을 수 없습니다.`);
+    }
+
+    return survey;
+  }
+
+  /**
+   * 설문 ID로 사후설문 조회
+   */
+  async getSurveyAfterQuestions(surveyId: number) {
+    this.logger.log(`설문 ${surveyId}의 사후설문 질문들을 조회합니다.`);
+
+    const survey = await this.prisma.survey.findUnique({
+      where: {
+        id: surveyId,
+        isActive: true,
+      },
+      include: {
+        questions: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            options: {
+              where: { isActive: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!survey) {
+      throw new NotFoundException(`설문 ${surveyId}을 찾을 수 없습니다.`);
+    }
+
+    return survey;
+  }
+
+  /**
+   * 설문 전후 비교 (기존 로직 - 호환성 유지)
    */
   async compareResults(userId: number) {
     const beforeResult = await this.analyzeSurveyResult(userId, 'before');
@@ -850,69 +875,5 @@ export class SurveyService {
     };
   }
 
-  /**
-   * 페이징 처리된 설문 목록 조회
-   * 
-   * @param page 페이지 번호
-   * @param limit 페이지당 항목 수
-   * @param filters 필터 조건
-   * @param sort 정렬 조건
-   * @returns 페이징 처리된 설문 목록
-   */
-  async getSurveysWithPagination(
-    page: number,
-    limit: number,
-    filters: {
-      search?: string;
-      type?: string;
-      category?: string;
-      isActive?: boolean;
-    },
-    sort: {
-      sortBy: string;
-      sortOrder: 'asc' | 'desc';
-    }
-  ): Promise<PaginatedResult<any>> {
-    this.logger.log(`페이징 처리된 설문 목록 조회 - page: ${page}, limit: ${limit}`);
-
-    // WHERE 조건 구성
-    const where: any = {};
-
-    // 검색어 필터
-    if (filters.search) {
-      const searchCondition = PaginationHelper.createSearchCondition(filters.search, ['name', 'description']);
-      if (searchCondition) {
-        Object.assign(where, searchCondition);
-      }
-    }
-
-    // 기타 필터
-    const additionalFilters = PaginationHelper.buildWhereClause({
-      isActive: filters.isActive,
-    });
-    
-    Object.assign(where, additionalFilters);
-
-    // 페이징 처리
-    const result = await PaginationHelper.paginate(
-      this.prisma.survey,
-      { page, limit },
-      {
-        where,
-        include: {
-          _count: {
-            select: {
-              surveyQuestions: true,
-              eventSurveys: true,
-            },
-          },
-        },
-      },
-      sort
-    );
-
-    this.logger.log(`페이징 처리된 설문 목록 조회 완료 - 총 ${result.total}개, ${result.totalPages} 페이지`);
-
-    return result;
-  }
+  // 페이징 처리된 설문 목록 조회는 management로 이동
 }

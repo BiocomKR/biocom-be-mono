@@ -10,29 +10,45 @@ datasource db {
 /// 사용자 테이블
 /// 애플리케이션의 모든 사용자 정보를 저장
 model User {
-  id             Int            @id @default(autoincrement())
-  email          String         @unique
-  password       String
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime?      @updatedAt @map("updated_at")
-  points         Int            @default(0)
-  mobile         String
-  name           String
-  isActive       Boolean        @default(true) @map("is_active")  // 계정 활성화 상태 (false = 차단)
-  deletedAt      DateTime?      @map("deleted_at")               // 회원탈퇴 일시 (논리적 삭제)
-  eventUsers     EventUser[]
-  fileUploads    FileUpload[]
-  pointHistories PointHistory[]
-  surveyAnswers  SurveyAnswer[]
-  refreshTokens  RefreshToken[]
+  id               Int                @id @default(autoincrement())
+  email            String             @unique
+  password         String
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime?          @updatedAt @map("updated_at")
+  points           Int                @default(0)
+  mobile           String
+  name             String
+  isActive         Boolean            @default(true) @map("is_active")  // 계정 활성화 상태 (false = 차단)
+  deletedAt        DateTime?          @map("deleted_at")               // 회원탈퇴 일시 (논리적 삭제)
+  
+  // 온보딩 관련
+  characterId      Int?               @map("character_id")             // 선택한 AI 코치 캐릭터
+  // Animal 필드들 제거 - CategoryDetail 테이블로 동물 정보 관리
+  
+  // 관계 설정
+  aiCharacter      AiCharacter?       @relation(fields: [characterId], references: [id])
+  
+  // 챌린지 관련
+  challengeTickets ChallengeTicket[]
+  userChallenges   UserChallenge[]
+  userRecords      UserRecord[]
+  missionAttempts  MissionAttempt[]
+  
+  fileUploads      FileUpload[]
+  pointHistories   PointHistory[]
+  surveyAnswers    SurveyAnswer[]
+  refreshTokens    RefreshToken[]
   
   // 쇼핑몰 관련
-  cart           Cart?
-  orders         Order[]
-  productReviews ProductReview[]
+  cart             Cart?
+  orders           Order[]
+  productReviews   ProductReview[]
   productQuestions ProductQuestion[]
-  wishlist       Wishlist[]
-  recentlyViewed RecentlyViewed[]
+  wishlist         Wishlist[]
+  recentlyViewed   RecentlyViewed[]
+  
+  // 챌린지별 설문 결과
+  challengeSurveyResults UserChallengeSurveyResult[]
 
   @@map("users")
 }
@@ -65,8 +81,8 @@ model FileUpload {
   uploadedAt         DateTime            @default(now()) @map("uploaded_at")
   fileType           String              @map("file_type")
   uploadCategory     String              @map("upload_category")
-  user               User                @relation(fields: [userId], references: [id])
-  missionCompletions MissionCompletion[]
+  user            User              @relation(fields: [userId], references: [id])
+  missionAttempts MissionAttempt[]
 
   @@map("file_uploads")
 }
@@ -74,16 +90,16 @@ model FileUpload {
 /// 컨텐츠 마스터 테이블
 /// 재사용 가능한 컨텐츠들을 관리
 model Content {
-  id            Int             @id @default(autoincrement())
-  title         String          @db.VarChar(255)
-  content       String          @db.Text
-  type          String?         @db.VarChar(50)
-  isActive      Boolean         @default(true) @map("is_active")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime?       @updatedAt @map("updated_at")
+  id                Int                @id @default(autoincrement())
+  title             String             @db.VarChar(255)
+  content           String             @db.Text
+  type              String?            @db.VarChar(50)
+  isActive          Boolean            @default(true) @map("is_active")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime?          @updatedAt @map("updated_at")
   
-  eventContents EventContent[]
-  contentFiles  ContentFile[]
+  challengeContents ChallengeContent[]
+  contentFiles      ContentFile[]
   
   @@index([type, isActive])
   @@map("contents")
@@ -106,25 +122,23 @@ model ContentFile {
   @@map("content_files")
 }
 
-/// 이벤트-컨텐츠 관계 테이블
-model EventContent {
+/// 챌린지-컨텐츠 관계 테이블
+model ChallengeContent {
   id          Int       @id @default(autoincrement())
-  eventId     Int       @map("event_id")
+  challengeId Int       @map("challenge_id")
   contentId   Int       @map("content_id")
-  day         Int
+  weekNumber  Int       @map("week_number")  // 1, 2, 3주차
   isActive    Boolean   @default(true) @map("is_active")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @updatedAt @map("updated_at")
   
-  event       Event     @relation(fields: [eventId], references: [id])
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
   content     Content   @relation(fields: [contentId], references: [id])
   
-  @@unique([eventId, day])
-  @@unique([eventId, contentId, day])
-  @@index([eventId, isActive])
+  @@unique([challengeId, contentId])
+  @@index([challengeId, weekNumber])
   @@index([contentId])
-  @@index([day])
-  @@map("event_contents")
+  @@map("challenge_contents")
 }
 
 /// 아임웹 사이트 정보 테이블
@@ -159,15 +173,17 @@ model ImwebInfo {
 /// 설문 마스터 테이블
 /// 설문 세트를 관리 (예: "기본 건강 설문", "다이어트 설문" 등)
 model Survey {
-  id              Int              @id @default(autoincrement())
-  name            String           @db.VarChar(100)
-  description     String?
-  isActive        Boolean          @default(true) @map("is_active")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime?        @updatedAt @map("updated_at")
-  eventSurveys    EventSurvey[]
-  surveyQuestions SurveyQuestion[]
+  id               Int               @id @default(autoincrement())
+  name             String            @db.VarChar(100)
+  description      String?
+  type             String            @default("before") @db.VarChar(20) /// 설문 타입 ('before': 사전설문, 'after': 사후설문)
+  isActive         Boolean           @default(true) @map("is_active")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime?         @updatedAt @map("updated_at")
+  challengeSurveys ChallengeSurvey[]
+  surveyQuestions  SurveyQuestion[]
 
+  @@index([type, isActive])
   @@map("surveys")
 }
 
@@ -204,23 +220,23 @@ model SurveyOption {
 /// 사용자 설문 참여 테이블
 /// 사용자가 설문에 참여한 실제 답변 데이터를 저장
 model SurveyAnswer {
-  id               Int            @id @default(autoincrement())
-  userId           Int            @map("user_id")
-  surveyOptionId   Int            @map("survey_option_id")
-  surveyQuestionId Int            @map("survey_question_id")
-  type             String
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime?      @updatedAt @map("updated_at")
-  eventUserId      Int?           @map("event_user_id")
-  eventUser        EventUser?     @relation(fields: [eventUserId], references: [id], onDelete: Cascade)
-  surveyOption     SurveyOption   @relation(fields: [surveyOptionId], references: [id])
-  surveyQuestion   SurveyQuestion @relation(fields: [surveyQuestionId], references: [id], onDelete: Cascade)
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                Int             @id @default(autoincrement())
+  userId            Int             @map("user_id")
+  surveyOptionId    Int             @map("survey_option_id")
+  surveyQuestionId  Int             @map("survey_question_id")
+  type              String
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime?       @updatedAt @map("updated_at")
+  userChallengeId   Int?            @map("user_challenge_id")
+  userChallenge     UserChallenge?  @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
+  surveyOption      SurveyOption    @relation(fields: [surveyOptionId], references: [id])
+  surveyQuestion    SurveyQuestion  @relation(fields: [surveyQuestionId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, surveyQuestionId, type])
-  @@unique([eventUserId, surveyQuestionId, type])
+  @@unique([userChallengeId, surveyQuestionId, type])
   @@index([userId])
-  @@index([eventUserId])
+  @@index([userChallengeId])
   @@index([createdAt])
   @@map("survey_answers")
 }
@@ -261,24 +277,25 @@ model PointHistory {
 /// 미션 정의 테이블
 /// 챌린지에서 수행할 모든 미션 타입 정의
 model Mission {
-  id            Int               @id @default(autoincrement())
-  code          String            @unique
-  name          String
-  description   String?
-  points        Int
-  requireUpload Boolean           @default(false) @map("require_upload")
-  sortOrder     Int               @map("sort_order")
-  isActive      Boolean           @default(true) @map("is_active")
-  createdAt     DateTime          @default(now()) @map("created_at")
-  updatedAt     DateTime?         @updatedAt @map("updated_at")
-  category      String            @default("DAILY")
-  type          String            @default("DAILY") @db.VarChar(20)
-  dailyLimit    Int               @default(1) @map("daily_limit")
-  specificDay   Int?              @map("specific_day")
-  totalDays     Int               @default(21) @map("total_days")
-  uploadType    String?           @map("upload_type")
-  eventMissions EventMission[]
-  schedules     MissionSchedule[]
+  id               Int               @id @default(autoincrement())
+  code             String            @unique
+  name             String
+  description      String?
+  points           Int
+  requireUpload    Boolean           @default(false) @map("require_upload")
+  sortOrder        Int               @map("sort_order")
+  isActive         Boolean           @default(true) @map("is_active")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime?         @updatedAt @map("updated_at")
+  category         String            @default("DAILY")
+  type             String            @default("MISSION") @db.VarChar(20) // MISSION, RECORD
+  recordType       String?           @map("record_type") @db.VarChar(50) // DIET, SLEEP, EXERCISE 등
+  dailyLimit       Int               @default(1) @map("daily_limit")
+  specificDay      Int?              @map("specific_day")
+  totalDays        Int               @default(21) @map("total_days")
+  uploadType       String?           @map("upload_type")
+  challengeMissions ChallengeMission[]
+  schedules        MissionSchedule[]
 
   @@index([category, isActive])
   @@index([sortOrder])
@@ -307,184 +324,262 @@ model MissionSchedule {
   @@map("mission_schedules")
 }
 
-/// 이벤트 관리 테이블
-/// 챌린지, 프로모션, 캠페인 등 모든 기간 기반 이벤트 관리
-model Event {
-  id            Int            @id @default(autoincrement())
-  name          String         @db.VarChar(100)
-  startDate     DateTime       @map("start_date") @db.Date
-  endDate       DateTime       @map("end_date") @db.Date
-  totalDays     Int            @default(21) @map("total_days")
-  isActive      Boolean        @default(false) @map("is_active")
-  description   String?
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime?      @updatedAt @map("updated_at")
-  type          String         @default("CHALLENGE") @db.VarChar(20)
-  eventMissions EventMission[]
-  eventQuizzes  EventQuiz[]
-  eventSurveys  EventSurvey[]
-  eventUsers    EventUser[]
-  eventContents EventContent[]
+/// 챌린지 마스터 테이블
+/// 챌린지 타입별 콘텐츠 및 구성 관리
+model Challenge {
+  id                Int                 @id @default(autoincrement())
+  name              String              @db.VarChar(100)
+  description       String?
+  totalDays         Int                 @default(21) @map("total_days")
+  isActive          Boolean             @default(true) @map("is_active")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime?           @updatedAt @map("updated_at")
+  
+  // 상품과의 관계
+  challengeProducts ChallengeProduct[]
+  
+  challengeTickets  ChallengeTicket[]
+  userChallenges    UserChallenge[]
+  challengeMissions ChallengeMission[]
+  challengeQuizzes  ChallengeQuiz[]
+  challengeSurveys  ChallengeSurvey[]
+  challengeContents ChallengeContent[]
+  surveyResults     UserChallengeSurveyResult[]
 
-  @@index([isActive, startDate])
-  @@index([startDate, endDate])
-  @@index([type, isActive])
-  @@map("events")
+  @@index([isActive])
+  @@map("challenges")
 }
 
-/// 이벤트별 미션 매핑 테이블
-/// 각 이벤트(챌린지)에서 사용할 미션과 포인트를 관리
-model EventMission {
-  id                 Int                 @id @default(autoincrement())
-  eventId            Int                 @map("event_id")
-  missionId          Int                 @map("mission_id")
-  points             Int
-  activeFromDay      Int?                @map("active_from_day")
-  activeToDay        Int?                @map("active_to_day")
-  isActive           Boolean             @default(true) @map("is_active")
-  sortOrder          Int                 @default(0) @map("sort_order")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime?           @updatedAt @map("updated_at")
-  event              Event               @relation(fields: [eventId], references: [id])
-  mission            Mission             @relation(fields: [missionId], references: [id])
-  missionCompletions MissionCompletion[]
+/// 챌린지-미션 연결 테이블
+/// 각 챌린지에서 사용할 미션과 일차별 매핑
+model ChallengeMission {
+  id          Int       @id @default(autoincrement())
+  challengeId Int       @map("challenge_id")
+  missionId   Int       @map("mission_id")
+  day         Int
+  points      Int       @default(100)
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  
+  challenge        Challenge        @relation(fields: [challengeId], references: [id])
+  mission          Mission          @relation(fields: [missionId], references: [id])
+  missionAttempts  MissionAttempt[]
 
-  @@unique([eventId, missionId, activeFromDay])
-  @@index([eventId, isActive])
+  @@unique([challengeId, missionId, day])
+  @@index([challengeId, day])
   @@index([missionId])
-  @@map("event_missions")
+  @@map("challenge_missions")
 }
 
-/// 이벤트별 설문 매핑 테이블
-/// 각 이벤트에서 사용할 설문을 관리
-model EventSurvey {
-  id            Int         @id @default(autoincrement())
-  eventId       Int         @map("event_id")
-  isActive      Boolean     @default(true) @map("is_active")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime?   @updatedAt @map("updated_at")
-  surveyId      Int         @map("survey_id")
-  surveyOptions Json?       @map("survey_options")
-  event         Event       @relation(fields: [eventId], references: [id])
-  survey        Survey      @relation(fields: [surveyId], references: [id])
+/// 챌린지-설문 연결 테이블
+/// 각 챌린지에서 사용할 설문을 일차별로 관리
+model ChallengeSurvey {
+  id          Int       @id @default(autoincrement())
+  challengeId Int       @map("challenge_id")
+  surveyId    Int       @map("survey_id")
+  day         Int
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  survey      Survey    @relation(fields: [surveyId], references: [id])
 
-  @@unique([eventId, surveyId])
-  @@index([eventId, isActive])
+  @@unique([challengeId, surveyId, day])
+  @@index([challengeId, day])
   @@index([surveyId])
-  @@map("event_surveys")
+  @@map("challenge_surveys")
 }
 
 /// 퀴즈 마스터 테이블
 /// 재사용 가능한 퀴즈 문제들을 관리
 model Quiz {
-  id            Int         @id @default(autoincrement())
-  title         String      @db.VarChar(255)
-  question      String
-  options       Json
-  correctAnswer Int         @map("correct_answer")
-  points        Int?        @default(50)
-  category      String?     @db.VarChar(255)
-  difficulty    String?     @db.VarChar(50)
-  isActive      Boolean?    @default(true) @map("is_active")
-  createdAt     DateTime?   @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt     DateTime?   @updatedAt @map("updated_at") @db.Timestamp(6)
-  eventQuizzes  EventQuiz[]
+  id               Int             @id @default(autoincrement())
+  title            String          @db.VarChar(255)
+  question         String
+  options          Json
+  correctAnswer    Int             @map("correct_answer")
+  points           Int?            @default(50)
+  category         String?         @db.VarChar(255)
+  difficulty       String?         @db.VarChar(50)
+  isActive         Boolean?        @default(true) @map("is_active")
+  createdAt        DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime?       @updatedAt @map("updated_at") @db.Timestamp(6)
+  challengeQuizzes ChallengeQuiz[]
 
   @@map("quizzes")
 }
 
-/// 이벤트-퀴즈 관계 테이블
-/// 이벤트와 퀴즈를 일차별로 연결
-model EventQuiz {
-  id          Int          @id @default(autoincrement())
-  eventId     Int          @map("event_id")
+/// 챌린지-퀴즈 연결 테이블
+/// 챌린지와 퀴즈를 일차별로 연결
+model ChallengeQuiz {
+  id          Int       @id @default(autoincrement())
+  challengeId Int       @map("challenge_id")
+  quizId      Int       @map("quiz_id")
   day         Int
-  isActive    Boolean      @default(true) @map("is_active")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime?    @updatedAt @map("updated_at")
-  quizId      Int          @map("quiz_id")
-  sortOrder   Int?         @default(0) @map("sort_order")
-  event       Event        @relation(fields: [eventId], references: [id])
-  quiz        Quiz         @relation(fields: [quizId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_event_quiz_quiz")
-  quizAnswers QuizAnswer[]
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  quiz        Quiz      @relation(fields: [quizId], references: [id])
 
-  @@unique([eventId, day])
-  @@unique([eventId, quizId, day], map: "unique_event_quiz_day")
-  @@index([day])
-  @@index([eventId, isActive])
-  @@index([eventId, day], map: "idx_event_quizzes_event_day")
-  @@index([quizId], map: "idx_event_quizzes_quiz")
-  @@map("event_quizzes")
+  @@unique([challengeId, quizId, day])
+  @@index([challengeId, day])
+  @@index([quizId])
+  @@map("challenge_quizzes")
 }
 
-/// 이벤트 참여자 관리 테이블
-/// 각 이벤트에 참여하는 사용자를 관리
-model EventUser {
-  id                 Int                 @id @default(autoincrement())
-  eventId            Int                 @map("event_id")
-  userId             Int                 @map("user_id")
-  joinedAt           DateTime            @default(now()) @map("joined_at")
-  status             String              @default("ACTIVE")
-  completedAt        DateTime?           @map("completed_at")
-  totalPoints        Int                 @default(0) @map("total_points")
-  completedDays      Int                 @default(0) @map("completed_days")
-  createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime?           @updatedAt @map("updated_at")
-  event              Event               @relation(fields: [eventId], references: [id])
-  user               User                @relation(fields: [userId], references: [id])
-  missionCompletions MissionCompletion[]
-  quizAnswers        QuizAnswer[]
-  surveyAnswers      SurveyAnswer[]
+/// 챌린지-상품 연결 테이블
+/// 상품으로 구매 가능한 챌린지 매핑
+model ChallengeProduct {
+  id          Int       @id @default(autoincrement())
+  challengeId Int       @map("challenge_id")
+  productId   Int       @map("product_id")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  
+  challenge   Challenge @relation(fields: [challengeId], references: [id])
+  product     Product   @relation(fields: [productId], references: [id])
 
-  @@unique([eventId, userId])
-  @@index([eventId, status])
-  @@index([userId])
-  @@map("event_users")
+  @@unique([challengeId, productId])
+  @@index([challengeId])
+  @@index([productId])
+  @@map("challenge_products")
 }
 
-/// 미션 완료 기록 테이블
-/// 이벤트 참여자의 미션 수행 기록을 관리
-model MissionCompletion {
-  id             Int          @id @default(autoincrement())
-  eventUserId    Int          @map("event_user_id")
-  eventMissionId Int          @map("event_mission_id")
-  day            Int
-  completedAt    DateTime     @default(now()) @map("completed_at")
-  pointsEarned   Int          @map("points_earned")
-  fileUploadId   Int?         @map("file_upload_id")
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime?    @updatedAt @map("updated_at")
-  eventMission   EventMission @relation(fields: [eventMissionId], references: [id])
-  eventUser      EventUser    @relation(fields: [eventUserId], references: [id], onDelete: Cascade)
-  fileUpload     FileUpload?  @relation(fields: [fileUploadId], references: [id])
+/// 챌린지 구매권 테이블
+/// 주문을 통해 획득한 챌린지 수행권
+model ChallengeTicket {
+  id            Int             @id @default(autoincrement())
+  userId        Int             @map("user_id")
+  challengeId   Int             @map("challenge_id")
+  orderItemId   Int?            @map("order_item_id") // 주문 상품 ID (구매 확인)
+  purchaseDate  DateTime        @default(now()) @map("purchase_date")
+  status        String          @default("PURCHASED") @db.VarChar(20) // PURCHASED, ACTIVATED, COMPLETED, EXPIRED
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime?       @updatedAt @map("updated_at")
+  
+  user           User            @relation(fields: [userId], references: [id])
+  challenge      Challenge       @relation(fields: [challengeId], references: [id])
+  orderItem      OrderItem?      @relation(fields: [orderItemId], references: [id])
+  userChallenges UserChallenge[]
 
-  @@unique([eventUserId, eventMissionId, day])
-  @@index([eventUserId, day])
-  @@index([eventMissionId])
-  @@index([completedAt])
-  @@map("mission_completions")
+  @@index([userId, status])
+  @@map("challenge_tickets")
 }
 
-/// 퀴즈 답변 테이블
-/// 이벤트 참여자의 퀴즈 답변을 관리
-model QuizAnswer {
-  id             Int       @id @default(autoincrement())
-  eventUserId    Int       @map("event_user_id")
-  eventQuizId    Int       @map("event_quiz_id")
-  selectedAnswer Int       @map("selected_answer")
-  isCorrect      Boolean   @map("is_correct")
-  pointsEarned   Int       @map("points_earned")
-  answeredAt     DateTime  @default(now()) @map("answered_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime? @updatedAt @map("updated_at")
-  eventQuiz      EventQuiz @relation(fields: [eventQuizId], references: [id])
-  eventUser      EventUser @relation(fields: [eventUserId], references: [id], onDelete: Cascade)
+/// 사용자별 활성 챌린지
+/// 활성화된 챌린지 진행 상황 관리
+model UserChallenge {
+  id            Int             @id @default(autoincrement())
+  userId        Int             @map("user_id")
+  challengeId   Int             @map("challenge_id")
+  ticketId      Int             @map("ticket_id")
+  activatedAt   DateTime        @map("activated_at")
+  expiresAt     DateTime        @map("expires_at")
+  currentDay    Int             @default(1) @map("current_day")
+  totalPoints   Int             @default(0) @map("total_points")
+  status        String          @default("ACTIVE") @db.VarChar(20) // ACTIVE, COMPLETED, EXPIRED
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime?       @updatedAt @map("updated_at")
+  
+  user            User             @relation(fields: [userId], references: [id])
+  challenge       Challenge        @relation(fields: [challengeId], references: [id])
+  ticket          ChallengeTicket  @relation(fields: [ticketId], references: [id])
+  dailyProgress   DailyProgress[]
+  surveyAnswers   SurveyAnswer[]
+  userRecords     UserRecord[]
+  missionAttempts MissionAttempt[]
 
-  @@unique([eventUserId, eventQuizId])
-  @@index([eventUserId])
-  @@index([eventQuizId])
-  @@index([answeredAt])
-  @@map("quiz_answers")
+  @@unique([userId, status])  // 한 번에 하나만 활성화
+  @@index([userId, status])
+  @@map("user_challenges")
+}
+
+/// 일별 진행 상황
+/// 사용자 챌린지의 일차별 진행 상황 관리
+model DailyProgress {
+  id                 Int           @id @default(autoincrement())
+  userChallengeId    Int           @map("user_challenge_id")
+  day                Int
+  date               DateTime      @db.Date
+  
+  // 미션 진행
+  missionsTotal      Int           @default(0) @map("missions_total")
+  missionsCompleted  Int           @default(0) @map("missions_completed")
+  
+  // 설문 진행
+  surveysTotal       Int           @default(0) @map("surveys_total")
+  surveysCompleted   Int           @default(0) @map("surveys_completed")
+  
+  // 퀴즈 진행
+  quizzesTotal       Int           @default(0) @map("quizzes_total")
+  quizzesCorrect     Int           @default(0) @map("quizzes_correct")
+  
+  // 컨텐츠 진행
+  contentsTotal      Int           @default(0) @map("contents_total")
+  contentsViewed     Int           @default(0) @map("contents_viewed")
+  
+  // 기록 진행
+  trackingsTotal     Int           @default(0) @map("trackings_total")
+  trackingsCompleted Int           @default(0) @map("trackings_completed")
+  
+  pointsEarned       Int           @default(0) @map("points_earned")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime?     @updatedAt @map("updated_at")
+  
+  userChallenge      UserChallenge @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
+
+  @@unique([userChallengeId, day])
+  @@index([userChallengeId])
+  @@map("daily_progress")
+}
+
+/// 기록 항목 마스터
+/// 기록 가능한 항목들의 메타데이터
+model RecordItem {
+  id            Int           @id @default(autoincrement())
+  code          String        @unique @db.VarChar(50) // DIET, SLEEP, EXERCISE, WATER, MEDICATION, FASTING, INNER_BEAUTY
+  name          String        @db.VarChar(100)
+  unit          String?       @db.VarChar(20)
+  defaultTarget Int?          @map("default_target")
+  inputType     String        @db.VarChar(20) // NUMBER, TIME, PHOTO, SELECT, SURVEY
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime?     @updatedAt @map("updated_at")
+  
+  userRecords   UserRecord[]
+
+  @@map("record_items")
+}
+
+/// 사용자 기록 데이터
+/// 사용자의 실제 기록 데이터 (수면, 식단, 운동 등)
+model UserRecord {
+  id              Int            @id @default(autoincrement())
+  userId          Int            @map("user_id")
+  userChallengeId Int?           @map("user_challenge_id")
+  recordCode      String         @map("record_code") @db.VarChar(50)
+  date            DateTime       @db.Date
+  value           String?        @db.Text
+  unit            String?        @db.VarChar(20)
+  metadata        Json?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime?      @updatedAt @map("updated_at")
+  
+  user            User             @relation(fields: [userId], references: [id])
+  userChallenge   UserChallenge?   @relation(fields: [userChallengeId], references: [id])
+  recordItem      RecordItem       @relation(fields: [recordCode], references: [code])
+  missionAttempts MissionAttempt[]
+
+  @@unique([userId, recordCode, date])
+  @@index([userId, date])
+  @@index([userChallengeId])
+  @@map("user_records")
 }
 
 model ApiKey {
@@ -549,15 +644,17 @@ model Product {
   updatedAt    DateTime? @updatedAt @map("updated_at") /// 수정일시
 
   // Relations
-  category       Category         @relation(fields: [categoryId], references: [id])
-  options        ProductOption[]
-  images         ProductImage[]
-  cartItems      CartItem[]
-  orderItems     OrderItem[]
-  reviews        ProductReview[]
-  questions      ProductQuestion[]
-  wishlistItems  Wishlist[]
-  recentlyViewed RecentlyViewed[]
+  category          Category           @relation(fields: [categoryId], references: [id])
+  options           ProductOption[]
+  images            ProductImage[]
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  reviews           ProductReview[]
+  questions         ProductQuestion[]
+  wishlistItems     Wishlist[]
+  recentlyViewed    RecentlyViewed[]
+  challengeProducts ChallengeProduct[]
+  // Animal 관련 추천 기능 제거
 
   @@index([sku])
   @@index([categoryId, status])
@@ -717,10 +814,11 @@ model OrderItem {
   updatedAt       DateTime? @updatedAt @map("updated_at") /// 수정일시
 
   // Relations
-  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product       Product       @relation(fields: [productId], references: [id])
-  productOption ProductOption @relation(fields: [productOptionId], references: [id])
-  reviews       ProductReview[]
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product          Product           @relation(fields: [productId], references: [id])
+  productOption    ProductOption     @relation(fields: [productOptionId], references: [id])
+  reviews          ProductReview[]
+  challengeTickets ChallengeTicket[]
 
   @@index([orderId])
   @@map("order_items")
@@ -1051,4 +1149,96 @@ model RecentlyViewed {
   @@unique([userId, productId])
   @@index([userId, viewedAt])
   @@map("recently_viewed")
+}
+
+// ===== 온보딩 관련 =====
+
+/// AI 코치 캐릭터 테이블
+/// 챌린지를 도와주는 AI 코치 캐릭터들
+model AiCharacter {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(50)                   /// 캐릭터 이름 (철민님, 유진님, 뽑이)
+  description String?  @db.Text                          /// 캐릭터 설명
+  personality String?  @db.Text                          /// 캐릭터 성격/대화 스타일
+  avatarUrl   String?  @map("avatar_url") @db.VarChar(500) /// 캐릭터 이미지 URL
+  isActive    Boolean  @default(true) @map("is_active")  /// 활성화 여부
+  sortOrder   Int      @default(0) @map("sort_order")    /// 정렬 순서
+  createdAt   DateTime @default(now()) @map("created_at") /// 생성일시
+  updatedAt   DateTime? @updatedAt @map("updated_at")    /// 수정일시
+
+  // Relations
+  users User[]
+
+  @@index([isActive, sortOrder])
+  @@map("ai_characters")
+}
+
+/// Animal 테이블 제거 - CategoryDetail 테이블의 character 필드로 동물 정보 관리
+
+/// 사용자별 챌린지별 설문 결과 테이블
+/// 챌린지마다 다른 사전/사후 설문 결과 저장
+model UserChallengeSurveyResult {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @map("user_id")                  /// 사용자 ID
+  challengeId     Int      @map("challenge_id")             /// 챌린지 ID
+  beforeCategory         String?  @map("before_category") @db.VarChar(50)  /// 사전설문 최저점수 카테고리 (CategoryDetail.category 참조)
+  afterCategory          String?  @map("after_category") @db.VarChar(50)   /// 사후설문 최저점수 카테고리 (CategoryDetail.category 참조)
+  
+  // 사전설문 카테고리별 점수
+  beforeSkinHealthScore  Int?     @map("before_skin_health_score")   /// 사전설문 피부건강 점수
+  beforeMetabolismScore  Int?     @map("before_metabolism_score")    /// 사전설문 대사 점수
+  beforeImmuneScore      Int?     @map("before_immune_score")        /// 사전설문 면역 점수
+  beforeGutHealthScore   Int?     @map("before_gut_health_score")    /// 사전설문 장건강 점수
+  beforeTotalScore       Int?     @map("before_total_score")         /// 사전설문 총점
+  
+  // 사후설문 카테고리별 점수
+  afterSkinHealthScore   Int?     @map("after_skin_health_score")    /// 사후설문 피부건강 점수
+  afterMetabolismScore   Int?     @map("after_metabolism_score")     /// 사후설문 대사 점수
+  afterImmuneScore       Int?     @map("after_immune_score")         /// 사후설문 면역 점수
+  afterGutHealthScore    Int?     @map("after_gut_health_score")     /// 사후설문 장건강 점수
+  afterTotalScore        Int?     @map("after_total_score")          /// 사후설문 총점
+  beforeCompletedAt DateTime? @map("before_completed_at")   /// 사전설문 완료일시
+  afterCompletedAt  DateTime? @map("after_completed_at")    /// 사후설문 완료일시
+  createdAt       DateTime @default(now()) @map("created_at") /// 생성일시
+  updatedAt       DateTime? @updatedAt @map("updated_at")   /// 수정일시
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challenge       Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId])
+  @@index([challengeId])
+  @@map("user_challenge_survey_results")
+}
+
+/// 미션 시도 기록 테이블
+/// 사용자의 미션 수행 시도를 기록하고, dailyLimit 기반 진행도 추적
+model MissionAttempt {
+  id                Int           @id @default(autoincrement())
+  userId            Int           @map("user_id")                 /// 사용자 ID
+  challengeMissionId Int          @map("challenge_mission_id")    /// 챌린지 미션 ID
+  userChallengeId   Int           @map("user_challenge_id")       /// 사용자 챌린지 ID
+  day               Int                                           /// 챌린지 진행 일차
+  attemptNumber     Int           @map("attempt_number")          /// 당일 시도 순서 (1, 2, 3...)
+  isCompleted       Boolean       @default(false) @map("is_completed") /// 최종 완료 여부 (dailyLimit 달성)
+  pointsEarned      Int           @default(0) @map("points_earned")     /// 획득 포인트 (최종 완료시만)
+  fileUploadId      Int?          @map("file_upload_id")          /// 업로드된 파일 ID
+  trackingRecordId  Int?          @map("tracking_record_id")      /// 기록형 미션의 UserRecord ID
+  metadata          Json?                                         /// 추가 데이터
+  createdAt         DateTime      @default(now()) @map("created_at") /// 시도 일시
+  updatedAt         DateTime?     @updatedAt @map("updated_at")   /// 수정일시
+
+  // Relations
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeMission  ChallengeMission  @relation(fields: [challengeMissionId], references: [id], onDelete: Cascade)
+  userChallenge     UserChallenge     @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
+  fileUpload        FileUpload?       @relation(fields: [fileUploadId], references: [id])
+  trackingRecord    UserRecord?       @relation(fields: [trackingRecordId], references: [id])
+
+  @@unique([userId, challengeMissionId, day, attemptNumber])
+  @@index([userId, day])
+  @@index([challengeMissionId])
+  @@index([userChallengeId, day])
+  @@index([createdAt])
+  @@map("mission_attempts")
 }

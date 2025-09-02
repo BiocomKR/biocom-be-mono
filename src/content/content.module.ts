@@ -5,7 +5,7 @@ import { ContentController } from './content.controller';
 
 /**
  * 컨텐츠 모듈
- * 컨텐츠 관리 기능을 제공하는 모듈
+ * 컨텐츠 마스터 데이터 관리 및 사용자 컨텐츠 완료
  */
 @Module({
   imports: [CommonModule],

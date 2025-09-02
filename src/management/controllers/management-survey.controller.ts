@@ -13,7 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiKeyGuard } from '../guards/api-key.guard';
-import { SurveyService } from '../../survey/survey.service';
+import { ManagementSurveyService } from '../services/management-survey.service';
 import { CreateSurveyQuestionDto } from '../../survey/dto/create-survey-question.dto';
 import { CreateSurveyOptionDto } from '../../survey/dto/create-survey-option.dto';
 import {
@@ -32,7 +32,7 @@ import { ApiResponseDto } from '../../common/dto/api-response.dto';
 export class ManagementSurveyController {
   private readonly logger = new Logger(ManagementSurveyController.name);
 
-  constructor(private readonly surveyService: SurveyService) {}
+  constructor(private readonly managementSurveyService: ManagementSurveyService) {}
 
   /**
    * 모든 설문 목록 조회 (페이징 및 필터링)
@@ -68,7 +68,7 @@ export class ManagementSurveyController {
         sortOrder: (sortOrder || 'desc') as 'asc' | 'desc',
       };
 
-      const result = await this.surveyService.getSurveysWithPagination(
+      const result = await this.managementSurveyService.getSurveysWithPagination(
         pageNum,
         limitNum,
         filters,
@@ -99,7 +99,7 @@ export class ManagementSurveyController {
     this.logger.log(`설문 생성 요청 - 이름: ${createSurveyDto.name}`);
 
     try {
-      const survey = await this.surveyService.createSurvey(createSurveyDto);
+      const survey = await this.managementSurveyService.createSurvey(createSurveyDto);
       
       this.logger.log(`설문 생성 성공 - ID: ${survey.id}`);
       
@@ -125,7 +125,7 @@ export class ManagementSurveyController {
     this.logger.log(`설문 상세 조회 요청 - ID: ${id}`);
 
     try {
-      const survey = await this.surveyService.getSurveyById(id);
+      const survey = await this.managementSurveyService.getSurveyById(id);
       
       this.logger.log(`설문 상세 조회 성공 - ID: ${id}`);
       
@@ -152,7 +152,7 @@ export class ManagementSurveyController {
     this.logger.log(`설문 수정 요청 - ID: ${id}`);
 
     try {
-      const survey = await this.surveyService.updateSurvey(id, updateSurveyDto);
+      const survey = await this.managementSurveyService.updateSurvey(id, updateSurveyDto);
       
       this.logger.log(`설문 수정 성공 - ID: ${id}`);
       
@@ -178,7 +178,7 @@ export class ManagementSurveyController {
     this.logger.log(`설문 삭제 요청 - ID: ${id}`);
 
     try {
-      await this.surveyService.deleteSurvey(id);
+      await this.managementSurveyService.deleteSurvey(id);
       
       this.logger.log(`설문 삭제 성공 - ID: ${id}`);
       
@@ -205,7 +205,7 @@ export class ManagementSurveyController {
     this.logger.log(`설문에 질문 추가 요청 - 설문 ID: ${surveyId}, 질문: ${createQuestionDto.questionText}`);
 
     try {
-      const question = await this.surveyService.addQuestionToSurvey(surveyId, createQuestionDto);
+      const question = await this.managementSurveyService.addQuestionToSurvey(surveyId, createQuestionDto);
       
       this.logger.log(`설문에 질문 추가 성공 - 질문 ID: ${question.id}`);
       
@@ -231,7 +231,7 @@ export class ManagementSurveyController {
     this.logger.log(`설문 질문 생성 요청 - 질문: ${createSurveyQuestionDto.questionText}`);
 
     try {
-      const question = await this.surveyService.createQuestion(createSurveyQuestionDto);
+      const question = await this.managementSurveyService.createQuestion(createSurveyQuestionDto);
       
       this.logger.log(`설문 질문 생성 응답 성공 - ID: ${question.id}`);
       
@@ -257,7 +257,7 @@ export class ManagementSurveyController {
     this.logger.log(`설문 선택지 생성 요청 - 질문 ID: ${createSurveyOptionDto.surveyQuestionId}`);
 
     try {
-      const option = await this.surveyService.createOption(createSurveyOptionDto);
+      const option = await this.managementSurveyService.createOption(createSurveyOptionDto);
       
       this.logger.log(`설문 선택지 생성 응답 성공 - ID: ${option.id}`);
       
@@ -293,7 +293,7 @@ export class ManagementSurveyController {
     this.logger.log(`질문별 설문 답변 조회 요청 - 질문 ID: ${questionId}, 타입: ${type || '전체'}`);
 
     try {
-      const answers = await this.surveyService.findAnswersByQuestion(questionId, type);
+      const answers = await this.managementSurveyService.findAnswersByQuestion(questionId, type);
       
       this.logger.log(`질문별 설문 답변 조회 응답 성공 - 질문 ID: ${questionId}, 답변 수: ${answers.length}`);
       

@@ -549,8 +549,8 @@ export class ManagementShopService {
         sku: item.sku,
         availableQty: item.availableQty,
         lastUpdated: item.lastUpdated,
-        product: option?.product?.name,
-        option: option?.optionName,
+        product: (option as any)?.product?.name,
+        option: (option as any)?.optionName,
         isLowStock: item.availableQty < 10
       };
     });

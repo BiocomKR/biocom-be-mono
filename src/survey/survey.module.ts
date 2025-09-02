@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { SurveyService } from './survey.service';
-import { SurveyMasterService } from './survey-master.service';
+// SurveyMasterService는 management/services/management-survey.service.ts로 이동
 import { SurveyController } from './survey.controller';
-import { EventModule } from '../event/event.module';
+import { CommonModule } from '../common/common.module';
 
 /**
  * 설문 모듈
@@ -19,9 +19,9 @@ import { EventModule } from '../event/event.module';
  * - SurveyAnswer: 사용자 설문 답변
  */
 @Module({
-  imports: [EventModule],
+  imports: [CommonModule],
   controllers: [SurveyController],
-  providers: [SurveyService, SurveyMasterService],
-  exports: [SurveyService, SurveyMasterService], // 다른 모듈에서 서비스를 사용할 수 있도록 내보냄
+  providers: [SurveyService],
+  exports: [SurveyService], // 다른 모듈에서 서비스를 사용할 수 있도록 내보냄
 })
 export class SurveyModule {}

@@ -1,27 +1,17 @@
 import { Module } from '@nestjs/common';
-import { MissionController } from './mission.controller';
+import { CommonModule } from '../common/common.module';
 import { MissionService } from './mission.service';
+import { MissionController } from './mission.controller';
 import { MissionCompletionService } from './mission-completion.service';
-import { QuizService } from './quiz.service';
-import { QuizAnswerService } from './quiz-answer.service';
-import { PrismaService } from '../common/services/prisma.service';
-import { EventModule } from '../event/event.module';
 
+/**
+ * 미션 모듈
+ * 미션 마스터 데이터 관리 및 사용자 미션 수행
+ */
 @Module({
-  imports: [EventModule],
+  imports: [CommonModule],
   controllers: [MissionController],
-  providers: [
-    MissionService, 
-    MissionCompletionService,
-    QuizService, 
-    QuizAnswerService,
-    PrismaService
-  ],
-  exports: [
-    MissionService, 
-    MissionCompletionService,
-    QuizService,
-    QuizAnswerService
-  ],
+  providers: [MissionService, MissionCompletionService],
+  exports: [MissionService],
 })
 export class MissionModule {}

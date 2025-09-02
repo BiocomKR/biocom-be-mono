@@ -22,7 +22,7 @@
 - **GKE (Google Kubernetes Engine)**: 컨테이너 오케스트레이션
 - **Cloud SQL (PostgreSQL)**: 데이터베이스
 - **Cloud Load Balancer**: 부하 분산
-- **Cloud Storage**: 파일 저장소
+- **Cloud Storage (GCS)**: 파일 저장소 (AWS S3 대체)
 - **Artifact Registry**: 도커 이미지 저장소
 
 ### 프로젝트 구조
@@ -385,14 +385,140 @@ kubectl get ingress biocom-api-ingress -o jsonpath='{.status.loadBalancer.ingres
 
 ---
 
+## 📦 Cloud Storage (GCS) 사용 가이드
+
+### 생성되는 버킷
+인프라 구축 시 자동으로 생성되는 GCS 버킷:
+
+| 버킷 이름 | 용도 | 설명 |
+|----------|------|------|
+| `PROJECT_ID-biocom-uploads` | 메인 파일 저장소 | 이미지, 문서 등 영구 파일 |
+| `PROJECT_ID-biocom-temp` | 임시 파일 | 24시간 후 자동 삭제 |
+
+### 버킷 구조
+```
+biocom-api-dev-biocom-uploads/
+├── images/      # 미션 인증샷, 이벤트 이미지
+├── documents/   # PDF, 문서 파일
+├── profiles/    # 사용자 프로필 이미지
+└── temp/        # 임시 파일
+```
+
+### 버킷 확인
+```bash
+# 버킷 목록 확인
+gcloud storage buckets list --project=biocom-api-dev
+
+# 버킷 내용 확인
+gsutil ls gs://biocom-api-dev-biocom-uploads/
+
+# 버킷 상세 정보
+gsutil ls -L -b gs://biocom-api-dev-biocom-uploads
+```
+
+### Node.js에서 사용하기
+
+#### 1. 패키지 설치
+```bash
+npm install @google-cloud/storage
+```
+
+#### 2. 환경 변수 설정 (.env)
+```env
+GCS_BUCKET_NAME=biocom-api-dev-biocom-uploads
+GCS_PROJECT_ID=biocom-api-dev
+```
+
+#### 3. 업로드 코드 예시
+```javascript
+const { Storage } = require('@google-cloud/storage');
+const storage = new Storage({
+  projectId: process.env.GCS_PROJECT_ID
+});
+
+// 파일 업로드
+async function uploadFile(localFilePath, destinationPath) {
+  const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+  await bucket.upload(localFilePath, {
+    destination: destinationPath, // 예: 'images/photo.jpg'
+  });
+  console.log(`파일 업로드 완료: gs://${process.env.GCS_BUCKET_NAME}/${destinationPath}`);
+}
+
+// Buffer 업로드
+async function uploadBuffer(buffer, destinationPath, mimeType) {
+  const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+  const file = bucket.file(destinationPath);
+  
+  await file.save(buffer, {
+    metadata: { contentType: mimeType }
+  });
+  
+  // 공개 URL 생성 (선택사항)
+  const publicUrl = `https://storage.googleapis.com/${process.env.GCS_BUCKET_NAME}/${destinationPath}`;
+  return publicUrl;
+}
+```
+
+#### 4. 다운로드 코드 예시
+```javascript
+// 파일 다운로드
+async function downloadFile(fileName, localDestPath) {
+  const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+  await bucket.file(fileName).download({
+    destination: localDestPath
+  });
+}
+
+// 서명된 URL 생성 (임시 접근 링크)
+async function generateSignedUrl(fileName) {
+  const bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+  const [url] = await bucket.file(fileName).getSignedUrl({
+    version: 'v4',
+    action: 'read',
+    expires: Date.now() + 15 * 60 * 1000, // 15분
+  });
+  return url;
+}
+```
+
+### GCS vs AWS S3 비교
+
+| 기능 | GCS | AWS S3 |
+|------|-----|--------|
+| 버킷 생성 | `google_storage_bucket` | `aws_s3_bucket` |
+| 권한 관리 | IAM + 버킷 정책 | IAM + 버킷 정책 |
+| 라이프사이클 | `lifecycle_rule` | `lifecycle_configuration` |
+| 비용 | S3보다 약간 저렴 | 표준 요금 |
+| 리전 | asia-northeast3 (서울) | ap-northeast-2 (서울) |
+
+### 기존 로컬 파일 마이그레이션
+
+```bash
+# 로컬 uploads 폴더를 GCS로 복사
+gsutil -m cp -r ./uploads/* gs://biocom-api-dev-biocom-uploads/
+
+# 특정 확장자만 업로드
+gsutil -m cp ./uploads/**/*.jpg gs://biocom-api-dev-biocom-uploads/images/
+gsutil -m cp ./uploads/**/*.pdf gs://biocom-api-dev-biocom-uploads/documents/
+```
+
+### 보안 설정
+- **버킷 레벨**: 공개 액세스 차단 (기본값)
+- **IAM**: 애플리케이션 서비스 계정만 접근 가능
+- **서명된 URL**: 임시 공유 시 사용
+
+---
+
 ## 💰 비용 관리
 
 ### 예상 월 비용 (개발 환경)
 - GKE 클러스터 (e2-standard-2 x 2): ~$100
 - Cloud SQL (db-f1-micro): ~$30
+- Cloud Storage (GCS): ~$5-10
 - Load Balancer: ~$25
-- Storage & Network: ~$10
-- **총합**: 약 $165/월
+- Network & 기타: ~$5-10
+- **총합**: 약 $165-175/월
 
 ### 비용 절감 팁
 ```bash

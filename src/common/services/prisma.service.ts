@@ -2,11 +2,8 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { PrismaClient } from '@prisma/client';
 import { CryptoUtil } from '../utils/crypto.util';
 
-/**
- * Prisma 확장 타입 정의
- * 자동 암/복호화 기능이 추가된 PrismaClient 타입
- */
-type ExtendedPrismaClient = ReturnType<typeof createExtendedPrismaClient>;
+// 싱글톤 인스턴스
+let prismaInstance: any = null;
 
 /**
  * Date 객체를 KST로 변환 (읽기 시)
@@ -83,6 +80,11 @@ function isDateString(str: string): boolean {
  * Prisma Client Extension으로 암호화 및 시간대 변환 기능 추가
  */
 function createExtendedPrismaClient() {
+  // 이미 인스턴스가 있으면 재사용
+  if (prismaInstance) {
+    return prismaInstance;
+  }
+  
   const logger = new Logger('PrismaExtension');
   
   const prisma = new PrismaClient({
@@ -230,6 +232,8 @@ function createExtendedPrismaClient() {
     },
   });
 
+  // 싱글톤 인스턴스 저장
+  prismaInstance = prisma;
   return prisma;
 }
 
@@ -247,7 +251,7 @@ function createExtendedPrismaClient() {
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
-  private prisma: ExtendedPrismaClient;
+  private prisma: any;
 
   constructor() {
     this.prisma = createExtendedPrismaClient();
@@ -280,18 +284,24 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get pointHistory() { return this.prisma.pointHistory; }
   get mission() { return this.prisma.mission; }
   get missionSchedule() { return this.prisma.missionSchedule; }
-  get event() { return this.prisma.event; }
-  get eventMission() { return this.prisma.eventMission; }
-  get eventSurvey() { return this.prisma.eventSurvey; }
-  get eventQuiz() { return this.prisma.eventQuiz; }
-  get eventUser() { return this.prisma.eventUser; }
   get missionCompletion() { return this.prisma.missionCompletion; }
   get quiz() { return this.prisma.quiz; }
   get quizAnswer() { return this.prisma.quizAnswer; }
   get apiKey() { return this.prisma.apiKey; }
   get content() { return this.prisma.content; }
   get contentFile() { return this.prisma.contentFile; }
-  get eventContent() { return this.prisma.eventContent; }
+  
+  // 챌린지 도메인 테이블
+  get challenge() { return this.prisma.challenge; }
+  get challengeTicket() { return this.prisma.challengeTicket; }
+  get userChallenge() { return this.prisma.userChallenge; }
+  get challengeMission() { return this.prisma.challengeMission; }
+  get challengeSurvey() { return this.prisma.challengeSurvey; }
+  get challengeQuiz() { return this.prisma.challengeQuiz; }
+  get challengeContent() { return this.prisma.challengeContent; }
+  get recordItem() { return this.prisma.recordItem; }
+  get userRecord() { return this.prisma.userRecord; }
+  get dailyProgress() { return this.prisma.dailyProgress; }
   
   // 쇼핑몰 도메인 테이블
   get category() { return this.prisma.category; }
@@ -316,6 +326,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get productQuestion() { return this.prisma.productQuestion; }
   get wishlist() { return this.prisma.wishlist; }
   get recentlyViewed() { return this.prisma.recentlyViewed; }
+  
+  // 온보딩 관련 테이블
+  get aiCharacter() { return this.prisma.aiCharacter; }
+  get userChallengeSurveyResult() { return this.prisma.userChallengeSurveyResult; }
 
   // 메서드 바인딩
   $transaction(arg: any) {
