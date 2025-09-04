@@ -16,16 +16,16 @@
 ### 1.1 프로젝트 생성
 
 ```bash
-*# GCP 로그인
+# GCP 로그인
 gcloud auth login --account=*[서비스 계정]
 
-*# GCP 프로젝트 생성*
+# GCP 프로젝트 생성
 gcloud projects create [프로젝트ID] --name="[프로젝트명]"
 
 # cli가 오류발생시 gcloud beta billing 으로 실행
 gcloud billing projects link [프로젝트ID] --billing-account=[결제계정ID]
 
-*# 기본 프로젝트 설정*
+*# 기본 프로젝트 설정
 gcloud config set project [프로젝트ID]
 ```
 
