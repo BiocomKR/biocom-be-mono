@@ -23,9 +23,53 @@ gcloud config set project api-dev-biocom
 ```
 
 ### **1.2 필수 권한 설정**
+
+#### **📋 계정 및 역할 설정**
 - **서비스 계정**: `ai@biocom.kr`
-- **역할**: Project Owner, Editor
-- **활성화된 API**: 10개 핵심 API 자동 활성화
+- **필수 IAM 역할 (우선순위)**:
+  1. `roles/owner` - 모든 리소스에 대한 전체 제어 권한 (최우선)
+  2. `roles/editor` - 대부분의 리소스 생성/수정 권한 (대안)
+  3. `roles/serviceusage.serviceUsageAdmin` - API 활성화 권한 (최소 필수)
+
+#### **🔧 권한 자동 설정 로직**
+배포 스크립트가 자동으로 다음 순서로 권한을 확인하고 부여:
+```bash
+# 1단계: 현재 권한 확인
+gcloud projects get-iam-policy api-dev-biocom --filter="user:ai@biocom.kr"
+
+# 2단계: 권한 부여 (우선순위대로)
+# Owner 권한 시도 → Editor 권한 시도 → ServiceUsage Admin 권한 시도
+gcloud projects add-iam-policy-binding api-dev-biocom \
+  --member="user:ai@biocom.kr" --role="roles/owner"
+```
+
+#### **🌐 필수 GCP API 활성화 (10개)**
+자동으로 활성화되는 핵심 API 목록:
+
+| API 이름 | 용도 | 필수도 |
+|----------|------|--------|
+| `compute.googleapis.com` | GCE, 네트워크, Load Balancer | ⭐⭐⭐ |
+| `container.googleapis.com` | GKE 클러스터 관리 | ⭐⭐⭐ |
+| `sqladmin.googleapis.com` | Cloud SQL 데이터베이스 | ⭐⭐⭐ |
+| `certificatemanager.googleapis.com` | SSL 인증서 관리 | ⭐⭐⭐ |
+| `artifactregistry.googleapis.com` | Docker 이미지 저장소 | ⭐⭐⭐ |
+| `storage.googleapis.com` | Cloud Storage | ⭐⭐ |
+| `dns.googleapis.com` | Cloud DNS | ⭐⭐ |
+| `sql-component.googleapis.com` | Cloud SQL 구성요소 | ⭐⭐ |
+| `cloudresourcemanager.googleapis.com` | 프로젝트 관리 | ⭐ |
+| `iam.googleapis.com` | 권한 관리 | ⭐ |
+
+#### **⚠️ 권한 문제 해결**
+권한 오류 발생 시 수동 설정:
+```bash
+# 프로젝트 Owner 권한 부여
+gcloud projects add-iam-policy-binding api-dev-biocom \
+  --member="user:ai@biocom.kr" --role="roles/owner"
+
+# 또는 Editor 권한 부여
+gcloud projects add-iam-policy-binding api-dev-biocom \
+  --member="user:ai@biocom.kr" --role="roles/editor"
+```
 
 ---
 

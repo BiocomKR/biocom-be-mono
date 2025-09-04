@@ -1,215 +1,195 @@
-# 🚀 바이브코딩 백엔드 템플릿 (EKS 버전)
+# 🚀 **BIOCOM API: AWS → GCP 한방배포 완전정복기**
 
-> NestJS + AWS EKS 기반의 확장 가능한 백엔드 템플릿
+# 📋 프로젝트 개요
 
-## 📋 개요
-
-이 프로젝트는 AWS EKS(Elastic Kubernetes Service)에서 실행되는 NestJS 백엔드 템플릿입니다.
-**완전 자동화된 배포 시스템**으로 인프라 지식 없이도 쉽게 사용할 수 있습니다.
-
-## 🌟 핵심 특징
-
-### 인프라
-- **AWS EKS** - 관리형 Kubernetes 서비스
-- **완전 자동화** - 단일 스크립트로 전체 인프라 구축
-- **Auto Scaling** - 부하에 따른 자동 확장 (HPA)
-- **Load Balancing** - AWS ALB를 통한 트래픽 분산
-- **무중단 배포** - Rolling Update 지원
-
-### 애플리케이션
-- **NestJS** - 엔터프라이즈급 Node.js 프레임워크
-- **Prisma ORM** - 타입 안전한 데이터베이스 접근
-- **JWT 인증** - 토큰 기반 인증 시스템
-- **Swagger** - 자동 API 문서화
-- **Health Check** - 상태 모니터링
-
-## 🚀 빠른 시작
-
-### 사전 요구사항
-- AWS 계정 및 CLI 설정
-- Docker Desktop 설치
-
-### 1. 환경 설정
-```bash
-# 개발 환경 설정
-cp .env.eks.example .env.eks.dev
-
-# 운영 환경 설정  
-cp .env.eks.example .env.eks.prod
-
-# 각 환경 파일을 편집하여 필요한 값 설정
-# 특히 DATABASE_URL, JWT_SECRET, CLUSTER_NAME 등 확인
-```
-
-### 2. EKS 클러스터 배포
-```bash
-# 개발 환경 배포 (약 20분 소요)
-./scripts/eks-deploy.sh dev
-
-# 운영 환경 배포
-./scripts/eks-deploy.sh prod
-```
-
-이 스크립트 하나로:
-- ✅ EKS 클러스터 생성
-- ✅ 노드 그룹 구성
-- ✅ 로드 밸런서 설정
-- ✅ 애플리케이션 배포
-- ✅ 모니터링 설정
-
-### 3. 배포 확인
-```bash
-# 모니터링 도구 실행
-./scripts/eks-monitor.sh
-
-# 옵션 1 선택하면 전체 상태 확인 가능
-```
-
-## 📁 프로젝트 구조
-
-```
-.
-├── src/                        # NestJS 소스 코드
-│   ├── auth/                  # 인증 모듈
-│   ├── users/                 # 사용자 모듈
-│   └── common/                # 공통 모듈
-├── infrastructure/            # 인프라 설정
-│   ├── helm/biocom-api/      # Helm 차트
-│   └── docs/                 # 인프라 문서
-├── scripts/                   # 자동화 스크립트
-│   ├── eks-deploy.sh         # 통합 배포 (환경별)
-│   ├── eks-monitor.sh        # 모니터링
-│   └── eks-cleanup.sh        # 리소스 정리
-├── prisma/                    # Prisma 스키마
-├── .env.eks                   # EKS 환경 변수
-└── Dockerfile                 # 컨테이너 이미지
-```
-
-## 🛠️ 주요 스크립트
-
-### eks-deploy.sh
-통합 배포 스크립트로 모든 것을 자동으로 처리합니다.
-```bash
-./scripts/eks-deploy.sh [dev|prod]
-```
-- 환경별 설정 자동 로드 (.env.eks.dev 또는 .env.eks.prod)
-- 클러스터가 없으면 생성
-- Docker 이미지 빌드 및 ECR 푸시
-- Helm 차트 배포
-- 타임스탬프 기반 이미지 태깅으로 항상 최신 버전 배포
-
-### eks-monitor.sh
-심플한 모니터링 인터페이스를 제공합니다.
-1. **전체 상태 보기** - 클러스터, Pod, 서비스 상태
-2. **실시간 로그** - Pod 로그 스트리밍
-3. **Pod 쉘 접속** - 디버깅용 직접 접속
-4. **앱 재시작** - Rolling restart
-5. **부하 테스트** - Artillery 기반 성능 테스트
-
-### eks-cleanup.sh
-개발 환경 정리용 (비용 절약).
-- 모든 리소스 삭제
-- ALB, EC2, NAT Gateway 등 과금 요소 제거
-
-## 📊 모니터링 및 디버깅
-
-### 기본 명령어
-```bash
-# Pod 상태 확인
-kubectl get pods -l app.kubernetes.io/name=backend-api
-
-# 로그 확인
-kubectl logs -f $(kubectl get pods -l app.kubernetes.io/name=backend-api -o jsonpath='{.items[0].metadata.name}')
-
-# ALB 주소 확인
-kubectl get ingress -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
-```
-
-### 접속 정보
-배포 완료 후 ALB 주소로 접속:
-- API 문서: `http://ALB주소/api/docs`
-- 헬스체크: `http://ALB주소/api/health`
-
-## 🔧 개발 워크플로우
-
-### 1. 로컬 개발
-```bash
-# 의존성 설치
-npm install
-
-# Prisma 설정
-npm run prisma:generate
-npm run prisma:migrate
-
-# 개발 서버 실행
-npm run start:dev
-```
-
-### 2. 배포
-```bash
-# 코드 수정 후 자동 배포
-./scripts/eks-deploy.sh
-```
-
-### 3. 모니터링
-```bash
-# 배포 상태 확인
-./scripts/eks-monitor.sh
-```
-
-## 🔐 환경 변수
-
-### 필수 설정 (.env.eks)
-```bash
-# AWS 설정
-AWS_ACCOUNT_ID=your-account-id
-AWS_REGION=ap-northeast-2
-CLUSTER_NAME=biocom-cluster
-
-# 애플리케이션 설정
-DATABASE_URL=postgresql://...
-JWT_SECRET=최소32자이상필수
-SESSION_SECRET=your-session-secret
-```
-
-## 💰 비용 관리
-
-### 개발 환경 사용 후
-```bash
-# 모든 리소스 삭제 (중요!)
-./scripts/eks-cleanup.sh
-```
-
-### 예상 비용
-- EKS 클러스터: $0.10/시간
-- EC2 노드 (t3.medium x2): ~$0.08/시간
-- ALB: ~$0.025/시간 + 트래픽
-- **일일 약 $5-10 (24시간 운영 시)**
-
-## 📚 추가 문서
-
-- [인프라 상세 가이드](./infrastructure/INFRA.md)
-- [Kubernetes 명령어 모음](./infrastructure/docs/k8s-commands.md)
-- [인수인계 문서](./HANDOVER.md)
-
-## 🤝 기여 방법
-
-1. 이 저장소를 Fork
-2. Feature 브랜치 생성 (`git checkout -b feature/AmazingFeature`)
-3. 변경사항 커밋 (`git commit -m 'Add: 놀라운 기능'`)
-4. 브랜치에 Push (`git push origin feature/AmazingFeature`)
-5. Pull Request 생성
-
-## 📞 지원
-
-문제가 있으신가요?
-- 이슈 등록: [GitHub Issues](https://github.com/your-repo/issues)
-- 내부 문서: Notion의 EKS 가이드 참조
-
-## 📄 라이센스
-
-ISC License - 자세한 내용은 [LICENSE](LICENSE) 파일 참조
+> 💡 프로젝트 핵심 정보
+> 
+> - **목표**: AWS EKS에서 GCP GKE로 완전 자동화 이관
+> - **핵심**: "한방배포" - 수동 개입 없는 완전 자동화 시스템
+> - **기간**: 2025.09.02 ~ 2025.09.03 (2일간)
+> - **최종 결과**: ✅ **완전 성공** (HTTP/HTTPS 모두 동작)
 
 ---
 
-**"쿠버네티스? 몰라도 됩니다. eks-deploy.sh 하나면 끝!"** 🚀
+## 🏗️ 1단계: GCP 프로젝트 생성 및 환경 설정
+
+### 1.1 프로젝트 생성
+
+```bash
+*# GCP 로그인
+gcloud auth login --account=*[서비스 계정]
+
+*# GCP 프로젝트 생성*
+gcloud projects create [프로젝트ID] --name="[프로젝트명]"
+
+# cli가 오류발생시 gcloud beta billing 으로 실행
+gcloud billing projects link [프로젝트ID] --billing-account=[결제계정ID]
+
+*# 기본 프로젝트 설정*
+gcloud config set project [프로젝트ID]
+```
+
+### 1.2 파라미터 설명
+
+- **서비스 계정**: `ai@biocom.kr`
+- **역할**: Project Owner, Editor
+- **활성화된 API**: 10개 핵심 API 자동 활성화
+- 결제계정ID : *01786D-B8BF25-BE8767*
+
+---
+
+## 🔧 2단계: 인프라 배포 (Terraform)
+
+### 2.1 인프라 스크립트 실행
+
+```bash
+./infra-gcp/scripts/01-deploy-infrastructure.sh --project-id api-dev-biocom --yes
+```
+
+### 2.2 주요 인프라 구성
+
+| **리소스** | **GCP** |
+| --- | --- |
+| 컨테이너 오케스트레이션 | GKE |
+| 데이터베이스 | Cloud SQL PostgreSQL |
+| 로드밸런서 | Google Cloud Load Balancer |
+| SSL 인증서 | Certificate Manager |
+| 네트워크 | VPC |
+| 스토리지 | Cloud Storage |
+
+---
+
+## 📦 3단계: 애플리케이션 배포
+
+### 3.1 앱 배포 스크립트 실행
+
+```bash
+./infra-gcp/scripts/02-deploy-app.sh --project-id api-dev-biocom --yes
+```
+
+### 3.2 배포 구성요소
+
+- **Docker 이미지**: Google Container Registry에 푸시
+- **Kubernetes 리소스**: Namespace, ConfigMap, Secret, Deployment, Service, Ingress
+
+---
+
+## 🧪 4단계: 테스트 및 검증
+
+### 4.1 HTTP 테스트 ✅
+
+```bash
+curl -I http://api-dev.biocom.ai.kr/api/health
+*# HTTP/1.1 200 OK ✅*
+```
+
+### 4.2 HTTPS 테스트 ✅
+
+```bash
+curl -I https://api-dev.biocom.ai.kr/api/health  
+*# HTTP/2 200 ✅ (HTTP/2 지원!)*
+```
+
+### 4.3 API 문서 접근 ✅
+
+- **HTTP**: `http://api-dev.biocom.ai.kr/api/docs`
+- **HTTPS**: `https://api-dev.biocom.ai.kr/api/docs`
+
+---
+
+## 🎯 최종 결과
+
+### ✅ 성공 지표
+
+| **항목** | **상태** | **성능** |
+| --- | --- | --- |
+| HTTP 접속 | ✅ 완료 | 1초 이내 응답 |
+| HTTPS 접속 | ✅ 완료 | HTTP/2 지원 |
+| API문서 | ✅ 접근 가능 | Swagger UI 정상 |
+| SSL 인증서 | ✅ Active | 자동 갱신 |
+| DNS 해상도 | ✅ 34.111.10.100 | A 레코드 정상 |
+
+## 🏆 한방배포 달성
+
+- **인프라 + 앱 배포** : 완전 자동화 (딸깍) ✅
+- 오류 자동 복구 : 스크립트 내장 ✅
+- 수동 처리 : 0 ✅
+- 배포 시간 : 30~2시간 (SSL활성화 대기시간 포함) ✅
+
+---
+
+## 🔒 추가: HTTPS-Only 보안 강화
+
+### ETC.1 보안 취약점 발견
+
+> ⚠️ 문제점 분석
+> 
+> - HTTP와 HTTPS 모두 접근 가능한 상태
+> - TLS를 사용하는 의미가 없어짐
+> - 보안상 HTTP 접근을 완전 차단해야 함
+
+### ETC.2 HTTPS-Only 구현
+
+```yaml
+*# FrontendConfig 설정으로 HTTP→HTTPS 강제 리다이렉트*
+spec:
+  *# SSL 정책 (Terraform에서 생성)*  
+  sslPolicy: "biocom-ssl-policy"
+  
+  *# HTTPS 강제 리다이렉트 설정*
+  redirectToHttps:
+    enabled: true
+    responseCodeName: "MOVED_PERMANENTLY_DEFAULT"
+```
+
+### ETC.3 SSL Policy 자동화
+
+- [ ]  **Terraform 설정**: certificate.tf에 SSL Policy 리소스 추가
+- [ ]  **배포 스크립트**: 01-deploy-infrastructure.sh에 SSL Policy 생성 단계 추가
+- [ ]  **설정값**: TLS 1.2 + MODERN 프로필로 보안 강화
+
+### ETC.4 테스트 결과
+
+```bash
+*# HTTP 요청 테스트*
+curl -v http://api-dev.biocom.ai.kr/api/health
+*# 결과: HTTP/1.1 301 Moved Permanently → HTTPS로 자동 리다이렉트# HTTPS 연결 확인# SSL connection using TLSv1.3 / AEAD-CHACHA20-POLY1305-SHA256# using HTTP/2 → 최신 프로토콜 지원 확인*
+```
+
+---
+
+## 🔗 최종 접속 정보
+
+### 🌐 서비스 주소
+
+> 🔒 모든 서비스 HTTPS-Only
+> 
+> - **API 문서**: `https://api-dev.biocom.ai.kr/api/docs` ✅
+> - **헬스체크**: `https://api-dev.biocom.ai.kr/api/health` ✅
+> - **모든 API**: `https://api-dev.biocom.ai.kr/api/*` ✅
+
+---
+
+## 🏁 결론
+
+> 🎯 프로젝트 성과
+> 
+> 
+> **2일간의 대장정을 통해 AWS에서 GCP로 완전 이관을 성공적으로 완료했습니다.**
+> 
+> **그리고 추가로 HTTPS-Only 보안 강화까지 완료했습니다.**
+> 
+
+가장 중요한 성과는 **"한방배포 + 보안 강화"** 시스템을 구축한 것입니다. 이제 누구든지 두 개의 명령어만으로 전체 인프라와 애플리케이션을 배포할 수 있고, 자동으로 HTTPS-Only 보안까지 적용됩니다:
+
+```bash
+./01-deploy-infrastructure.sh --project-id PROJECT_ID --yes  *# SSL Policy 자동 생성*
+./02-deploy-app.sh --project-id PROJECT_ID --yes             *# HTTPS-Only 적용*
+```
+
+### 🔒 보안 강화 달성사항
+
+- HTTP 접근 완전 차단 ✅
+- HTTPS-Only 강제 리다이렉트 ✅
+- TLS 1.2+ MODERN 암호화 ✅
+- 한방배포 시스템에 보안 자동화 통합 ✅
