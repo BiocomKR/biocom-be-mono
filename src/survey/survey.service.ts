@@ -411,11 +411,15 @@ export class SurveyService {
     for (const answer of answers) {
       const option = await tx.surveyOption.findUnique({
         where: { id: answer.optionId },
-        include: { question: true },
       });
 
-      if (option && option.category && option.score) {
-        const category = option.category as keyof typeof categoryScores;
+      // 질문 ID로 질문 정보를 가져와서 카테고리 확인
+      const question = await tx.surveyQuestion.findUnique({
+        where: { id: answer.questionId },
+      });
+
+      if (option && question && option.score) {
+        const category = question.categoryCode as keyof typeof categoryScores;
         if (categoryScores[category] !== undefined) {
           categoryScores[category] -= option.score;
         }
@@ -489,20 +493,21 @@ export class SurveyService {
       updateData.afterCompletedAt = new Date();
     }
 
-    if (existing) {
-      await tx.userChallengeSurveyResult.update({
-        where: { id: existing.id },
-        data: updateData,
-      });
-    } else {
-      await tx.userChallengeSurveyResult.create({
-        data: {
+    // upsert 방식으로 변경 (unique 제약 조건 문제 해결)
+    await tx.userChallengeSurveyResult.upsert({
+      where: {
+        userId_challengeId: {
           userId,
           challengeId,
-          ...updateData,
         },
-      });
-    }
+      },
+      update: updateData,
+      create: {
+        userId,
+        challengeId,
+        ...updateData,
+      } as any,
+    });
   }
 
   /**
@@ -876,4 +881,81 @@ export class SurveyService {
   }
 
   // 페이징 처리된 설문 목록 조회는 management로 이동
+
+  /**
+   * 카테고리별 설문 질문 조회
+   */
+  async findQuestions(categoryCode?: string) {
+    this.logger.log(`설문 질문 조회 - 카테고리: ${categoryCode || '전체'}`);
+
+    const questions = await this.prisma.surveyQuestion.findMany({
+      where: {
+        isActive: true,
+        ...(categoryCode && { categoryCode }),
+      },
+      include: {
+        options: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return questions;
+  }
+
+  /**
+   * 설문 질문 단건 조회
+   */
+  async findOneQuestion(id: number) {
+    this.logger.log(`설문 질문 단건 조회 - ID: ${id}`);
+
+    const question = await this.prisma.surveyQuestion.findUnique({
+      where: {
+        id,
+        isActive: true,
+      },
+      include: {
+        options: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!question) {
+      throw new NotFoundException(`설문 질문 ID ${id}를 찾을 수 없습니다.`);
+    }
+
+    return question;
+  }
+
+  /**
+   * 질문별 답변 조회
+   */
+  async findAnswersByQuestion(questionId: number, type?: 'before' | 'after') {
+    this.logger.log(`질문별 답변 조회 - 질문ID: ${questionId}, 타입: ${type || '전체'}`);
+
+    const answers = await this.prisma.surveyAnswer.findMany({
+      where: {
+        surveyQuestionId: questionId,
+        ...(type && { type }),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        surveyQuestion: true,
+        surveyOption: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return answers;
+  }
 }

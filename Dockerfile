@@ -61,8 +61,8 @@ RUN mkdir -p /var/log/nestjs-app && chown nestjs:nodejs /var/log/nestjs-app
 # 업로드 디렉토리 생성
 RUN mkdir -p /var/app/uploads && chown nestjs:nodejs /var/app/uploads
 
-# 포트 노출 (NestJS 기본 포트)
-EXPOSE 3000
+# 포트 노출 (biocom-api 포트)
+EXPOSE 10804
 
 # non-root 사용자로 전환 (보안 강화)
 # 이후 모든 명령은 nestjs 사용자 권한으로 실행
@@ -70,8 +70,8 @@ USER nestjs
 
 # 헬스체크 설정 (HTTP endpoint 사용)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => { process.exit(1); })"
+  CMD node -e "require('http').get('http://localhost:10804/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); }).on('error', () => { process.exit(1); })"
 
 # 애플리케이션 시작 (운영 모드)
 # 컴파일된 메인 파일 실행
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "dist/main.js"]

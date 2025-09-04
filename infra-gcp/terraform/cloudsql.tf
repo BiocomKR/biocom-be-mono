@@ -71,8 +71,8 @@ resource "google_sql_database_instance" "main" {
         value = "0.0.0.0/0"
       }
       
-      # SSL 필수 설정
-      require_ssl = true
+      # SSL 필수 설정 (새로운 방식)
+      ssl_mode = "ENCRYPTED_ONLY"
       
       # 승인된 네트워크 (Public IP 사용시에만 의미있음)
       # 현재는 Private IP만 사용하므로 불필요

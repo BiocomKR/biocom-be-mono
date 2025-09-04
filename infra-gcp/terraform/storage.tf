@@ -59,14 +59,14 @@ resource "google_storage_bucket" "uploads" {
 # 🔒 버킷 IAM 설정
 # ===========================================
 
-# 애플리케이션용 서비스 계정에 버킷 접근 권한 부여
-resource "google_storage_bucket_iam_member" "uploads_object_admin" {
-  bucket = google_storage_bucket.uploads.name
-  role   = "roles/storage.objectAdmin"  # 객체 생성/읽기/삭제 권한
-  member = "serviceAccount:biocom-api@${var.project_id}.iam.gserviceaccount.com"
-  
-  depends_on = [google_storage_bucket.uploads]
-}
+# 애플리케이션용 서비스 계정에 버킷 접근 권한 부여 (서비스 계정 생성 후 활성화)
+# resource "google_storage_bucket_iam_member" "uploads_object_admin" {
+#   bucket = google_storage_bucket.uploads.name
+#   role   = "roles/storage.objectAdmin"  # 객체 생성/읽기/삭제 권한
+#   member = "serviceAccount:biocom-api@${var.project_id}.iam.gserviceaccount.com"
+#   
+#   depends_on = [google_storage_bucket.uploads]
+# }
 
 # 퍼블릭 읽기 권한 (필요한 경우에만 활성화)
 # resource "google_storage_bucket_iam_member" "uploads_public_read" {

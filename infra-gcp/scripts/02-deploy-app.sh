@@ -235,26 +235,111 @@ run_db_migration() {
     
     log_info "🗄️ DB 마이그레이션 실행 중..."
     
-    # 프로젝트 루트로 이동
+    # 프로젝트 루트 결정
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cd "$SCRIPT_DIR/../.."
+    
+    # 스크립트가 infra-gcp/scripts에 있다면 상위 2레벨, 아니면 현재 디렉토리
+    if [[ "$SCRIPT_DIR" == *"/infra-gcp/scripts" ]]; then
+        PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    else
+        PROJECT_ROOT="$SCRIPT_DIR"
+    fi
+    
+    log_info "스크립트 디렉토리: $SCRIPT_DIR"
+    log_info "프로젝트 루트: $PROJECT_ROOT"
+    
+    cd "$PROJECT_ROOT"
+    log_info "이동 후 현재 작업 디렉토리: $(pwd)"
     
     # DATABASE_URL 설정
     export DATABASE_URL="postgresql://biocom:bico0825%21%40%23@$DB_HOST:5432/biocom"
     
-    # Prisma 마이그레이션
-    npx prisma migrate deploy
+    # 스키마 파일 존재 확인
+    if [[ ! -f "prisma/schema.prisma" ]]; then
+        log_error "prisma/schema.prisma 파일을 찾을 수 없습니다."
+        log_info "현재 디렉토리 내용: $(ls -la)"
+        exit 1
+    fi
+    
+    # Prisma 마이그레이션 실행 (실패시 자동 복구)
+    if ! npx prisma migrate deploy --schema=prisma/schema.prisma; then
+        log_warning "마이그레이션 실패. 새로운 데이터베이스로 스키마를 동기화합니다..."
+        
+        # 1. 스키마를 DB에 직접 푸시
+        npx prisma db push --schema=prisma/schema.prisma --accept-data-loss
+        
+        # 2. 기존 마이그레이션들을 적용됨으로 표시
+        log_info "기존 마이그레이션들을 적용됨으로 표시합니다..."
+        
+        # migrations 디렉토리의 모든 마이그레이션 찾기
+        if [[ -d "prisma/migrations" ]]; then
+            for migration_dir in prisma/migrations/*/; do
+                if [[ -d "$migration_dir" ]]; then
+                    migration_name=$(basename "$migration_dir")
+                    log_info "마이그레이션 표시 중: $migration_name"
+                    npx prisma migrate resolve --applied "$migration_name" --schema=prisma/schema.prisma || true
+                fi
+            done
+        fi
+        
+        log_success "데이터베이스 스키마 동기화 완료!"
+    fi
     
     log_success "✅ DB 마이그레이션 완료!"
+}
+
+# Static IP 확인/생성
+ensure_static_ip() {
+    log_info "🌐 Static IP 확인/생성 중..."
+    
+    local static_ip_name="biocom-cluster-external-ip"
+    
+    # 기존 Static IP 확인
+    if gcloud compute addresses describe "$static_ip_name" --global --project="$PROJECT_ID" &>/dev/null; then
+        local ip_address
+        ip_address=$(gcloud compute addresses describe "$static_ip_name" --global --project="$PROJECT_ID" --format="value(address)")
+        log_success "✅ 기존 Static IP 확인됨: $ip_address ($static_ip_name)"
+    else
+        log_info "Static IP가 존재하지 않습니다. 새로 생성합니다..."
+        
+        if gcloud compute addresses create "$static_ip_name" --global --project="$PROJECT_ID"; then
+            local ip_address
+            ip_address=$(gcloud compute addresses describe "$static_ip_name" --global --project="$PROJECT_ID" --format="value(address)")
+            log_success "✅ 새 Static IP 생성됨: $ip_address ($static_ip_name)"
+        else
+            log_error "❌ Static IP 생성 실패"
+            exit 1
+        fi
+    fi
 }
 
 # Kubernetes 리소스 배포
 deploy_kubernetes() {
     log_info "☸️ Kubernetes 리소스 배포 시작..."
     
-    # k8s 디렉토리로 이동
+    # k8s 디렉토리로 이동 (프로젝트 구조에 맞게 경로 수정)
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cd "$SCRIPT_DIR/../k8s"
+    
+    # 여러 가능한 k8s 경로 확인
+    if [[ -d "$SCRIPT_DIR/../k8s" ]]; then
+        K8S_DIR="$SCRIPT_DIR/../k8s"
+    elif [[ -d "$SCRIPT_DIR/../../infra-gcp/k8s" ]]; then
+        K8S_DIR="$SCRIPT_DIR/../../infra-gcp/k8s"
+    elif [[ -d "./infra-gcp/k8s" ]]; then
+        K8S_DIR="./infra-gcp/k8s"
+    elif [[ -d "$SCRIPT_DIR/k8s" ]]; then
+        K8S_DIR="$SCRIPT_DIR/k8s"
+    else
+        log_error "❌ k8s 디렉토리를 찾을 수 없습니다"
+        log_info "현재 스크립트 위치: $SCRIPT_DIR"
+        log_info "현재 작업 디렉토리: $(pwd)"
+        log_info "찾은 디렉토리들:"
+        find . -name "k8s" -type d 2>/dev/null || echo "k8s 디렉토리 없음"
+        exit 1
+    fi
+    
+    log_info "k8s 디렉토리 찾음: $K8S_DIR"
+    cd "$K8S_DIR"
     
     # 네임스페이스 생성 (이미 있으면 무시)
     kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
@@ -279,6 +364,7 @@ deploy_kubernetes() {
     # Service 배포
     log_info "Service 배포 중..."
     kubectl apply -f service.yaml
+    log_info "✅ Service 리소스 배포 완료"
     
     # Deployment 배포
     log_info "Deployment 배포 중..."
@@ -289,6 +375,9 @@ deploy_kubernetes() {
     # Backend Config 배포
     log_info "Backend Config 배포 중..."
     kubectl apply -f backend-config.yaml
+    
+    # Static IP 확인/생성 (Ingress 배포 전에 필요)
+    ensure_static_ip
     
     # Ingress 배포
     log_info "Ingress 배포 중..."

@@ -148,6 +148,146 @@ check_gcp_auth() {
     log_success "GCP 인증 완료. 프로젝트: $PROJECT_ID"
 }
 
+# 권한 확인 및 추가
+check_and_add_permissions() {
+    log_info "현재 계정 권한 확인 중..."
+    
+    local current_account=$(gcloud auth list --filter=status:ACTIVE --format="value(account)")
+    log_info "현재 계정: $current_account"
+    
+    # 현재 권한 확인 (더 안전한 방법)
+    local roles=""
+    if roles=$(gcloud projects get-iam-policy "$PROJECT_ID" --flatten="bindings[].members" --format="value(bindings.role)" --filter="bindings.members:user:$current_account" 2>/dev/null); then
+        log_info "현재 권한: $(echo "$roles" | tr '\n' ', ' | sed 's/,$//')"
+    else
+        log_warning "권한 조회 실패. 권한을 추가합니다."
+        roles=""
+    fi
+    
+    local required_roles=(
+        "roles/owner"
+        "roles/editor"  
+        "roles/serviceusage.serviceUsageAdmin"
+    )
+    
+    local has_required_role=false
+    
+    # 필수 권한 중 하나라도 있는지 확인
+    for required_role in "${required_roles[@]}"; do
+        if echo "$roles" | grep -q "$required_role"; then
+            log_success "✅ 필요한 권한 보유: $required_role"
+            has_required_role=true
+            break
+        fi
+    done
+    
+    if [[ "$has_required_role" == false ]]; then
+        log_warning "⚠️  충분한 권한이 없습니다. 권한을 추가합니다..."
+        
+        local permission_added=false
+        
+        # Owner 권한 시도 (가장 강력한 권한)
+        log_info "Owner 권한 추가 시도 중..."
+        if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+            --member="user:$current_account" \
+            --role="roles/owner" \
+            --quiet 2>/dev/null; then
+            log_success "✅ Owner 권한 추가 완료"
+            permission_added=true
+        else
+            log_warning "⚠️  Owner 권한 추가 실패. Editor 권한을 시도합니다..."
+            
+            # Editor 권한 시도
+            if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                --member="user:$current_account" \
+                --role="roles/editor" \
+                --quiet 2>/dev/null; then
+                log_success "✅ Editor 권한 추가 완료"
+                permission_added=true
+            else
+                log_warning "⚠️  Editor 권한 추가 실패. ServiceUsage Admin 권한을 시도합니다..."
+                
+                # ServiceUsage Admin 권한 시도
+                if gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                    --member="user:$current_account" \
+                    --role="roles/serviceusage.serviceUsageAdmin" \
+                    --quiet 2>/dev/null; then
+                    log_success "✅ ServiceUsage Admin 권한 추가 완료"
+                    permission_added=true
+                fi
+            fi
+        fi
+        
+        if [[ "$permission_added" == false ]]; then
+            log_error "❌ 모든 권한 추가 시도가 실패했습니다."
+            log_error "다음 중 하나의 명령어를 수동으로 실행하세요:"
+            log_error "gcloud projects add-iam-policy-binding $PROJECT_ID --member=\"user:$current_account\" --role=\"roles/owner\""
+            log_error "gcloud projects add-iam-policy-binding $PROJECT_ID --member=\"user:$current_account\" --role=\"roles/editor\""
+            
+            if [[ "$AUTO_APPROVE" != true ]]; then
+                read -p "수동으로 권한을 부여한 후 계속하시겠습니까? (y/n): " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    log_warning "취소되었습니다."
+                    exit 0
+                fi
+            else
+                log_error "자동 모드에서는 수동 권한 부여가 불가능합니다."
+                exit 1
+            fi
+        else
+            # 권한 전파 대기
+            log_info "권한 전파 대기 중... (30초)"
+            sleep 30
+            
+            # 권한 재확인
+            log_info "권한 재확인 중..."
+            local new_roles=$(gcloud projects get-iam-policy "$PROJECT_ID" --flatten="bindings[].members" --format="value(bindings.role)" --filter="bindings.members:user:$current_account" 2>/dev/null || echo "")
+            log_info "업데이트된 권한: $(echo "$new_roles" | tr '\n' ', ' | sed 's/,$//')"
+        fi
+    fi
+    
+    log_success "✅ 권한 확인 및 설정 완료!"
+}
+
+# 필수 GCP API 활성화
+enable_gcp_apis() {
+    log_info "필수 GCP API 활성화 중..."
+    
+    local apis=(
+        "compute.googleapis.com"
+        "container.googleapis.com"
+        "sqladmin.googleapis.com"
+        "sql-component.googleapis.com"
+        "storage.googleapis.com"
+        "certificatemanager.googleapis.com"
+        "dns.googleapis.com"
+        "artifactregistry.googleapis.com"
+        "cloudresourcemanager.googleapis.com"
+        "iam.googleapis.com"
+    )
+    
+    for api in "${apis[@]}"; do
+        log_info "   활성화 중: $api"
+        if gcloud services enable "$api" --project="$PROJECT_ID" --quiet; then
+            log_success "   ✅ $api 활성화 완료"
+        else
+            log_warning "   ⚠️  $api 활성화 실패: $api"
+            # 권한 오류인 경우 더 자세한 안내
+            if [[ "$api" == "sqladmin.googleapis.com" ]]; then
+                log_error "   Cloud SQL Admin API 활성화 실패. 다음 명령어로 수동 권한 부여가 필요할 수 있습니다:"
+                log_error "   gcloud projects add-iam-policy-binding $PROJECT_ID --member=\"user:$(gcloud auth list --filter=status:ACTIVE --format='value(account)')\" --role=\"roles/editor\""
+            fi
+        fi
+    done
+    
+    log_success "✅ GCP API 활성화 완료!"
+    
+    # API 활성화 대기 (전파 시간)
+    log_info "API 활성화 전파 대기 중... (10초)"
+    sleep 10
+}
+
 # 기존 인프라 확인
 check_existing_infrastructure() {
     log_info "기존 인프라 확인 중..."
@@ -250,6 +390,33 @@ setup_kubeconfig() {
     log_success "✅ Kubeconfig 설정 완료!"
 }
 
+# SSL Policy 생성 (보안 강화)
+create_ssl_policy() {
+    log_info "🔒 SSL Policy 생성 중... (HTTPS-Only 보안 강화)"
+    
+    # SSL Policy가 이미 존재하는지 확인
+    if gcloud compute ssl-policies describe biocom-ssl-policy --project="$PROJECT_ID" &>/dev/null; then
+        log_success "✅ SSL Policy가 이미 존재합니다: biocom-ssl-policy"
+        return 0
+    fi
+    
+    # SSL Policy 생성
+    if gcloud compute ssl-policies create biocom-ssl-policy \
+        --profile MODERN \
+        --min-tls-version 1.2 \
+        --project="$PROJECT_ID" \
+        --description="BIOCOM API SSL 보안 정책 - 현대적 암호화 방식만 허용"; then
+        log_success "✅ SSL Policy 생성 완료!"
+        log_info "   이름: biocom-ssl-policy"
+        log_info "   프로필: MODERN"
+        log_info "   최소 TLS 버전: 1.2"
+        log_info "   기능: HTTP→HTTPS 강제 리다이렉트 지원"
+    else
+        log_error "❌ SSL Policy 생성 실패"
+        return 1
+    fi
+}
+
 # Cloud SQL 설정
 setup_cloud_sql() {
     log_info "Cloud SQL 설정 중..."
@@ -307,9 +474,12 @@ main() {
     
     check_requirements
     check_gcp_auth
+    check_and_add_permissions
+    enable_gcp_apis
     check_existing_infrastructure
     deploy_infrastructure
     setup_kubeconfig
+    create_ssl_policy
     setup_cloud_sql
     
     log_success "🎉 인프라 구축이 완료되었습니다!"

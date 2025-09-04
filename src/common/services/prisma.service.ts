@@ -284,6 +284,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get pointHistory() { return this.prisma.pointHistory; }
   get mission() { return this.prisma.mission; }
   get missionSchedule() { return this.prisma.missionSchedule; }
+  get missionAttempt() { return this.prisma.missionAttempt; }
   get missionCompletion() { return this.prisma.missionCompletion; }
   get quiz() { return this.prisma.quiz; }
   get quizAnswer() { return this.prisma.quizAnswer; }

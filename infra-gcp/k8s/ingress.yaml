@@ -12,17 +12,20 @@ metadata:
     # GCP Load Balancer 클래스 지정
     kubernetes.io/ingress.class: "gce"  # GKE requires annotation, not ingressClassName!
     
-    # HTTPS 리다이렉트 설정
+    # HTTPS 리다이렉트 설정 - HTTP 트래픽 허용하지만 HTTPS로 리다이렉트
     kubernetes.io/ingress.allow-http: "true"
     
     # SSL 인증서 매핑 (Certificate Manager - Wildcard)
     # networking.gke.io/managed-certificates: "biocom-api-ssl-cert"  # 기존 방식 제거
     
-    # Certificate Map 사용 (와일드카드 지원)
-    networking.gke.io/certificate-map: "biocom-cert-map"
+    # ManagedCertificate 사용
+    networking.gke.io/managed-certificates: "biocom-api-ssl-cert"
     
     # 백엔드 설정 참조
     cloud.google.com/backend-config: '{"default": "biocom-api-backend-config"}'
+    
+    # FrontendConfig 참조 - HTTPS 강제 리다이렉트
+    networking.gke.io/v1beta1.FrontendConfig: "biocom-api-frontend-config"
     
     # 정적 IP 사용 (terraform에서 생성한 IP)
     kubernetes.io/ingress.global-static-ip-name: "biocom-cluster-external-ip"
@@ -78,7 +81,6 @@ spec:
             name: biocom-api-service
             port:
               number: 80
-  
 
 ---
 # 🔒 ManagedCertificate - Google Managed SSL 인증서
@@ -101,10 +103,10 @@ metadata:
   name: biocom-api-frontend-config
   namespace: biocom-api
 spec:
-  # SSL 정책
-  sslPolicy: "biocom-ssl-policy"  # terraform에서 생성 필요
+  # SSL 정책 (Terraform에서 생성)
+  sslPolicy: "biocom-ssl-policy"
   
-  # 리다이렉트 설정
+  # HTTPS 강제 리다이렉트 설정
   redirectToHttps:
     enabled: true
     responseCodeName: "MOVED_PERMANENTLY_DEFAULT"

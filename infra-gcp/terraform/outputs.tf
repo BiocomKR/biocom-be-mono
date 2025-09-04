@@ -90,7 +90,7 @@ output "cloud_sql_proxy_command" {
 
 output "certificate_id" {
   description = "SSL 인증서 ID"
-  value       = google_certificate_manager_certificate.api_certificate.id
+  value       = google_certificate_manager_certificate.wildcard_certificate.id
 }
 
 output "certificate_map_id" {
@@ -102,9 +102,9 @@ output "certificate_map_id" {
 output "dns_verification_record" {
   description = "⚠️ 가비아 DNS에 추가해야 할 인증서 검증 레코드"
   value = {
-    name = google_certificate_manager_dns_authorization.api_dns_auth.dns_resource_record[0].name
-    type = google_certificate_manager_dns_authorization.api_dns_auth.dns_resource_record[0].type
-    data = google_certificate_manager_dns_authorization.api_dns_auth.dns_resource_record[0].data
+    name = google_certificate_manager_dns_authorization.root_dns_auth.dns_resource_record[0].name
+    type = google_certificate_manager_dns_authorization.root_dns_auth.dns_resource_record[0].type
+    data = google_certificate_manager_dns_authorization.root_dns_auth.dns_resource_record[0].data
   }
 }
 
@@ -182,7 +182,7 @@ output "next_steps" {
   - TXT 레코드 (인증서 검증): 위의 dns_verification_record 참조
   
   🔐 3. SSL 인증서 상태 확인:
-  gcloud certificate-manager certificates describe ${google_certificate_manager_certificate.api_certificate.name} --global
+  gcloud certificate-manager certificates describe ${google_certificate_manager_certificate.wildcard_certificate.name} --global
   
   🗄️ 4. 데이터베이스 접속 (Cloud SQL Proxy):
   ${google_sql_database_instance.main.connection_name != "" ? "./cloud-sql-proxy ${google_sql_database_instance.main.connection_name}" : ""}

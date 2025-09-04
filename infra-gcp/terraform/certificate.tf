@@ -27,6 +27,7 @@ resource "google_certificate_manager_certificate" "wildcard_certificate" {
     ]
     
     # DNS 검증 방식 사용 (와일드카드는 DNS 검증만 가능)
+    # 와일드카드 *.biocom.ai.kr도 루트 도메인 DNS Authorization으로 처리됨
     dns_authorizations = [
       google_certificate_manager_dns_authorization.root_dns_auth.id
     ]
@@ -41,17 +42,8 @@ resource "google_certificate_manager_certificate" "wildcard_certificate" {
 # 🌐 DNS 검증 설정
 # ===========================================
 
-# 개별 도메인용 DNS Authorization (사용 안함 - 주석 처리)
-# resource "google_certificate_manager_dns_authorization" "api_dns_auth" {
-#   name   = "${var.cluster_name}-dns-auth"
-#   domain = "${var.api_subdomain}.${var.domain_name}"
-#   project = var.project_id
-#   location = "global"
-  
-  labels = local.common_labels
-  
-  description = "DNS 검증을 위한 인증서 권한 부여"
-}
+# 와일드카드 도메인용 DNS Authorization은 루트 도메인 authorization으로 처리됨
+# Google Certificate Manager에서는 *.example.com을 위해서는 example.com으로 DNS Authorization 생성 필요
 
 # 루트 도메인용 DNS Authorization 추가
 resource "google_certificate_manager_dns_authorization" "root_dns_auth" {
@@ -104,6 +96,22 @@ resource "google_certificate_manager_certificate_map_entry" "root_certificate_en
 }
 
 # ===========================================
+# 🔒 SSL Policy 생성 (보안 강화)
+# ===========================================
+
+# SSL 정책 생성 - TLS 버전 및 암호화 방식 제어
+resource "google_compute_ssl_policy" "biocom_ssl_policy" {
+  name    = "biocom-ssl-policy"
+  project = var.project_id
+  
+  # 최신 TLS 버전만 허용 (보안 강화) - GCP는 현재 TLS 1.2까지 지원
+  profile         = "MODERN"  
+  min_tls_version = "TLS_1_2"
+  
+  description = "BIOCOM API SSL 보안 정책 - 현대적 암호화 방식만 허용"
+}
+
+# ===========================================
 # 📤 출력값 (다른 리소스에서 참조용)
 # ===========================================
 
@@ -111,6 +119,12 @@ resource "google_certificate_manager_certificate_map_entry" "root_certificate_en
 output "ssl_certificate_id" {
   description = "SSL 인증서 ID"
   value       = google_certificate_manager_certificate.wildcard_certificate.id
+}
+
+# SSL Policy 이름 출력 (FrontendConfig에서 참조)
+output "ssl_policy_name" {
+  description = "SSL Policy 이름"
+  value       = google_compute_ssl_policy.biocom_ssl_policy.name
 }
 
 # 인증서 맵 ID 출력은 outputs.tf에서 관리

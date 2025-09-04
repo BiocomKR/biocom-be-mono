@@ -173,13 +173,32 @@ async function bootstrap() {
   
   logger.log(`Swagger API 문서화 설정 완료: http://localhost:${port}/api/docs`);
   
-  // 애플리케이션 시작
-  await app.listen(port);
+  // 애플리케이션 시작 - 모든 네트워크 인터페이스에서 수신
+  logger.log(`포트 ${port}에서 서버 시작을 시도합니다...`);
+  
+  try {
+    await app.listen(port, '0.0.0.0');
+    logger.log(`✅ 서버가 성공적으로 포트 ${port}에서 시작되었습니다!`);
+  } catch (error) {
+    logger.error(`❌ 서버 시작 실패:`, error);
+    throw error;
+  }
   
   logger.log(`🚀 애플리케이션이 포트 ${port}에서 시작되었습니다.`);
-  logger.log(`📚 API 문서: http://localhost:${port}/api/docs`);
-  logger.log(`🌐 API 베이스 URL: http://localhost:${port}/api`);
+  logger.log(`📚 API 문서: http://0.0.0.0:${port}/api/docs`);
+  logger.log(`🌐 API 베이스 URL: http://0.0.0.0:${port}/api`);
   logger.log(`🌍 환경: ${configService.app.env}`);
+  
+  // 프로세스 종료 신호 처리
+  process.on('SIGTERM', () => {
+    logger.log('SIGTERM 신호를 받았습니다. 서버를 종료합니다...');
+    process.exit(0);
+  });
+  
+  process.on('SIGINT', () => {
+    logger.log('SIGINT 신호를 받았습니다. 서버를 종료합니다...');
+    process.exit(0);
+  });
 }
 
 // 부트스트랩 실행 및 에러 처리

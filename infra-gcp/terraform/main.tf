@@ -168,7 +168,7 @@ resource "google_artifact_registry_repository" "main" {
 
 # GCS 버킷 생성 (AWS S3와 동일한 기능)
 resource "google_storage_bucket" "terraform_state" {
-  name          = "biocom-terraform-state"
+  name          = "${var.project_id}-terraform-state-bucket"
   location      = var.region
   project       = var.project_id
   force_destroy = false  # 실수로 삭제되는 것을 방지

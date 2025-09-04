@@ -46,6 +46,7 @@ provider "kubernetes" {
   cluster_ca_certificate = base64decode(google_container_cluster.main.master_auth.0.cluster_ca_certificate)
 }
 
+
 # 현재 GCP 클라이언트 설정 정보를 가져옴 (토큰 등)
 data "google_client_config" "default" {}
 

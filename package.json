@@ -47,7 +47,7 @@
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/terminus": "^10.2.0",
     "@nestjs/throttler": "^5.1.1",
-    "@prisma/client": "^6.13.0",
+    "@prisma/client": "^6.15.0",
     "@types/dompurify": "^3.0.5",
     "@types/uuid": "^10.0.0",
     "axios": "^1.11.0",
