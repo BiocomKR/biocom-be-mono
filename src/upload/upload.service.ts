@@ -17,23 +17,12 @@ export class UploadService {
   private readonly config = UploadSecurityConfig;
 
   constructor(private readonly prisma: PrismaService) {
-    // 환경 변수에서 업로드 경로 설정 (기본값: ./uploads)
-    this.uploadPath = process.env.UPLOAD_PATH || './uploads';
-    this.logger.log(`업로드 경로 설정: ${this.uploadPath}`);
-    this.ensureUploadDirectory();
+    // Google Cloud Storage 사용으로 로컬 업로드 경로 설정 불필요
+    this.uploadPath = ''; // 더 이상 사용하지 않음
+    this.logger.log('Google Cloud Storage 업로드 전용 서비스로 구성됨');
   }
 
-  /**
-   * 업로드 디렉토리 확인 및 생성
-   */
-  private async ensureUploadDirectory(): Promise<void> {
-    try {
-      await fs.access(this.uploadPath);
-    } catch {
-      await fs.mkdir(this.uploadPath, { recursive: true });
-      this.logger.log('업로드 디렉토리 생성 완료');
-    }
-  }
+  // Google Cloud Storage 사용으로 로컬 디렉토리 생성 함수 제거됨
 
   /**
    * 파일의 매직 바이트를 확인하여 실제 파일 타입 검증

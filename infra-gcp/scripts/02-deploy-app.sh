@@ -359,7 +359,34 @@ deploy_kubernetes() {
         --from-literal=JWT_SECRET='i7SXN6XAwMKjz!vMjSvY+ZJj10&d7l=2Wsy1Y1^Qw7u*L' \
         --from-literal=JWT_REFRESH_TOKEN_SECRET='r3Fr3$hT0k3n$ecReT!@#2025b10c0mK3y!' \
         --from-literal=SESSION_SECRET='C+HwoTESUErMHRg5GhL3Cd*SqEJe6B9q5&n#R7fq&jFvA' \
-        --from-literal=ENCRYPTION_KEY='b!@c@m2@25!@#$@creTkEy!2E45bT8@'
+        --from-literal=ENCRYPTION_KEY='b!@c@m2@25!@#$@creTkEy!2E45bT8@' \
+        --from-literal=OPENAI_API_KEY='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' \
+        --from-literal=GOOGLE_API_KEY='AIzaSyC_RxjEbJyHoV5oHtWky7pEJS5Iw5toqPU'
+    
+    # Google Service Account Key Secret 확인/생성
+    log_info "Google Service Account Key Secret 확인 중..."
+    
+    if kubectl get secret google-service-account-key -n "$NAMESPACE" &>/dev/null; then
+        log_success "✅ Google Service Account Key Secret이 이미 존재합니다. 건너뜁니다."
+    else
+        log_info "Google Service Account Key Secret이 없습니다. 생성합니다..."
+        
+        # 프로젝트 루트에서 서비스 계정 키 파일 확인
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+        SERVICE_ACCOUNT_KEY_FILE="$PROJECT_ROOT/google-service-account-key.json"
+        
+        if [[ ! -f "$SERVICE_ACCOUNT_KEY_FILE" ]]; then
+            log_error "Service Account Key 파일을 찾을 수 없습니다: $SERVICE_ACCOUNT_KEY_FILE"
+            exit 1
+        fi
+        
+        kubectl create secret generic google-service-account-key \
+            --namespace="$NAMESPACE" \
+            --from-file=key.json="$SERVICE_ACCOUNT_KEY_FILE"
+        
+        log_success "✅ Google Service Account Key Secret 생성 완료!"
+    fi
     
     # Service 배포
     log_info "Service 배포 중..."
@@ -368,7 +395,7 @@ deploy_kubernetes() {
     
     # Deployment 배포
     log_info "Deployment 배포 중..."
-    sed -i.bak "s|image: .*|image: $REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-api:latest|" deployment.yaml
+    sed -i.bak "s|image: .*|image: $REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-api:$IMAGE_TAG|" deployment.yaml
     sed -i.bak "s/PROJECT_ID/$PROJECT_ID/g" deployment.yaml
     kubectl apply -f deployment.yaml
     
@@ -436,7 +463,7 @@ check_deployment_status() {
         log_success "🎉 배포가 완료되었습니다!"
         log_info "접속 URL:"
         log_info "  HTTP:  http://api-dev.biocom.ai.kr/api/docs"
-        log_info "  HTTPS: https://api-dev.biocom.ai.kr/api/docs (SSL 인증서 발급 중)"
+        log_info "  HTTPS: https://api-dev.biocom.ai.kr/api/docs (SSL 인증서)"
         echo
         log_info "테스트 명령어:"
         echo "  curl http://api-dev.biocom.ai.kr/api/health"

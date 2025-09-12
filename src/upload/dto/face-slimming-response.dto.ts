@@ -6,10 +6,16 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class FaceSlimmingResponseDto {
   @ApiProperty({
-    description: '처리된 이미지의 Google Storage URL',
-    example: 'https://storage.googleapis.com/biocom-face-slimming/generated_20250910_123456.png'
+    description: '원본 이미지의 Google Storage URL',
+    example: 'https://storage.googleapis.com/api-dev-biocom-uploads/original_face.jpg'
   })
-  imageUrl: string;
+  beforeImageUrl: string;
+
+  @ApiProperty({
+    description: '처리된 이미지의 Google Storage URL',
+    example: 'https://storage.googleapis.com/api-dev-biocom-uploads/face-slimming_2025-09-12T06-16-46-014Z_face.jpg'
+  })
+  afterImageUrl: string;
 
   @ApiProperty({
     description: '적용된 체중 감량 효과 (kg)',
@@ -57,16 +63,3 @@ export class FaceSlimmingResponseDto {
   storageLocation?: 'google-storage' | 'local-fallback';
 }
 
-/**
- * 얼굴 슬리밍 요청 DTO
- */
-export class FaceSlimmingRequestDto {
-  @ApiProperty({
-    description: '체중 감량 효과 (kg)',
-    example: 5,
-    minimum: 1,
-    maximum: 30,
-    default: 5
-  })
-  weightLoss?: number = 5;
-}

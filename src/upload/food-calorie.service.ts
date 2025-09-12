@@ -20,14 +20,16 @@ export class FoodCalorieService {
     private readonly googleStorageService: GoogleStorageService
   ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-    this.model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-5';
+    this.model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o';
     
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY가 설정되지 않았습니다.');
     }
 
+    const timeout = this.configService.get<number>('AI_ANALYSIS_TIMEOUT') || 30000;
     this.openai = new OpenAI({
       apiKey: apiKey,
+      timeout: timeout, // 환경변수에서 가져온 타임아웃 값
     });
 
     this.logger.log(`음식 칼로리 계산 서비스 초기화 완료! 모델: ${this.model} 🍽️`);

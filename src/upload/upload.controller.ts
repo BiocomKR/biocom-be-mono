@@ -378,13 +378,6 @@ export class UploadController {
           type: 'string',
           format: 'binary',
           description: '슬리밍 처리할 얼굴 이미지 파일 (jpg, png)',
-        },
-        weightLoss: {
-          type: 'number',
-          description: '체중 감량 효과 (kg, 기본값: 5kg)',
-          example: 5,
-          minimum: 1,
-          maximum: 30
         }
       },
       required: ['file'],
@@ -405,9 +398,10 @@ export class UploadController {
   })
   async createSlimmedFace(
     @Req() req: any,
-    @UploadedFile() file: Express.Multer.File,
-    @Query('weightLoss', new ParseIntPipe({ optional: true })) weightLoss: number = 5
+    @UploadedFile() file: Express.Multer.File
   ): Promise<ApiResponseDto<FaceSlimmingResponseDto>> {
+    // weightLoss 기본값 5로 설정 (스웨거에서 제거됨)
+    const weightLoss = 5;
     console.log(`[UploadController] 🎨 얼굴 슬리밍 메서드 시작!`);
     console.log(`[UploadController] 📁 파일 정보:`, {
       hasFile: !!file,
@@ -473,7 +467,7 @@ export class UploadController {
       );
 
       if (slimmingResult.success) {
-        this.logger.log(`얼굴 슬리밍 완료 - 처리시간: ${slimmingResult.processingTime}초, 재시도: ${slimmingResult.retryCount}회, URL: ${slimmingResult.imageUrl}`);
+        this.logger.log(`얼굴 슬리밍 완료 - 처리시간: ${slimmingResult.processingTime}초, 재시도: ${slimmingResult.retryCount}회, 원본: ${slimmingResult.beforeImageUrl}, 처리본: ${slimmingResult.afterImageUrl}`);
 
         return {
           success: true,
@@ -497,7 +491,8 @@ export class UploadController {
       
       // 처리 실패 시에도 구조화된 응답 반환
       const failedResult: FaceSlimmingResponseDto = {
-        imageUrl: '',
+        beforeImageUrl: '',
+        afterImageUrl: '',
         weightLoss,
         processingTime: 0,
         originalFileName: file.originalname,

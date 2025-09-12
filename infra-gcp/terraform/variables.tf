@@ -93,7 +93,7 @@ variable "node_pool_name" {
 variable "node_machine_type" {
   description = "노드 머신 타입 (AWS t3.medium과 유사)"
   type        = string
-  default     = "e2-standard-2"  # 2 vCPU, 8GB RAM (t3.medium과 비슷)
+  default     = "n2-standard-2"  # 2 vCPU, 8GB RAM (t3.medium과 비슷, N2 타입으로 변경)
 }
 
 variable "node_disk_size" {

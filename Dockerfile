@@ -58,8 +58,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 # 로그 디렉토리 생성 (컨테이너 내부)
 RUN mkdir -p /var/log/nestjs-app && chown nestjs:nodejs /var/log/nestjs-app
 
-# 업로드 디렉토리 생성
-RUN mkdir -p /var/app/uploads && chown nestjs:nodejs /var/app/uploads
+# 업로드 디렉토리 제거 - Google Cloud Storage 사용으로 로컬 저장 불필요
 
 # 포트 노출 (biocom-api 포트)
 EXPOSE 10804
@@ -74,4 +73,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
 
 # 애플리케이션 시작 (운영 모드)
 # 컴파일된 메인 파일 실행
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

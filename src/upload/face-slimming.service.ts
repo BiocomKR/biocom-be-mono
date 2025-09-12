@@ -92,23 +92,35 @@ export class FaceSlimmingService {
 
       this.logger.log(`🎨 이미지 생성 완료! 버퍼 크기: ${generatedImageBuffer.length}bytes`);
       
-      // Google Cloud Storage에 업로드 (실패시 로컬 fallback)
-      this.logger.log(`📤 Google Storage 업로드 시작 - 파일: ${originalFileName}`);
+      // 원본 이미지 Google Cloud Storage에 업로드
+      this.logger.log(`📤 원본 이미지 Google Storage 업로드 시작 - 파일: ${originalFileName}`);
+      const originalUploadResult = await this.googleStorageService.uploadWithFallback(
+        processedImageBuffer, // 👈 이미 리사이징된 원본 이미지 (Gemini에 전송했던 것)
+        originalFileName,
+        'originals',
+        this.maxRetries
+      );
+      const beforeImageUrl = originalUploadResult.url;
+      this.logger.log(`📤 원본 이미지 Google Storage 업로드 완료 - URL: ${beforeImageUrl}`);
+
+      // 처리된 이미지 Google Cloud Storage에 업로드 (실패시 로컬 fallback)
+      this.logger.log(`📤 처리된 이미지 Google Storage 업로드 시작 - 파일: ${originalFileName}`);
       const uploadResult = await this.googleStorageService.uploadWithFallback(
         generatedImageBuffer, 
         originalFileName, 
         'face-slimming',
         this.maxRetries
       );
-      const imageUrl = uploadResult.url;
-      this.logger.log(`📤 Google Storage 업로드 완료 - 위치: ${uploadResult.location}, URL: ${imageUrl}`);
+      const afterImageUrl = uploadResult.url;
+      this.logger.log(`📤 처리된 이미지 Google Storage 업로드 완료 - 위치: ${uploadResult.location}, URL: ${afterImageUrl}`);
 
       const processingTime = (Date.now() - startTime) / 1000;
 
       this.logger.log(`얼굴 슬리밍 처리 완료: ${processingTime}초, 체중감량: ${weightLoss}kg, 저장위치: ${uploadResult.location}`);
 
       return {
-        imageUrl,
+        beforeImageUrl,
+        afterImageUrl,
         weightLoss,
         processingTime,
         originalFileName,
@@ -256,26 +268,29 @@ export class FaceSlimmingService {
     try {
       const model = this.genAI.getGenerativeModel({ model: this.model });
 
-      // 자연스러운 초상화 향상 프롬프트
+      // 3주 건강 챌린지 완주 후 모습 시뮬레이션 프롬프트
       const prompt = `
-Enhance the portrait with the following adjustments:
-- Brighten the skin tone to look clear, fresh, and natural.
-- Slim the jawline slightly for a more defined and elegant face shape.
-- Refine the nose to appear more lifted and straight, giving a delicate yet natural look.
-- Enlarge the eyes subtly while maintaining a natural balance, making them look brighter and more open.
-- Reduce facial asymmetry for a harmonious and balanced appearance.
+Improve this person's appearance after ${weightLoss}kg weight loss from a 3-week wellness challenge. Make MINIMAL but effective changes:
 
-The overall style should remain realistic and natural, avoiding an overly edited or artificial look.
+🔥 CRITICAL RULES - DO NOT CHANGE:
+- Keep the EXACT same facial expression, smile, and mouth position
+- Keep ALL moles, freckles, wrinkles, and facial marks exactly as they are
+- Keep the same eye expression, eyebrow position, and overall face shape
+- Keep the same hair, clothing, and background completely unchanged
+- This must look like the SAME PERSON in the SAME MOMENT, just healthier
 
-KEEP EXACTLY THE SAME:
-- Facial expression and smile
-- Hair style and color
-- Clothing
-- Background
-- Lighting
-- Head angle and position
+✨ ONLY MAKE THESE SUBTLE IMPROVEMENTS:
+- Slightly cleaner, more radiant skin tone (healthier glow from good nutrition)
+- Marginally slimmer jawline and reduced facial puffiness (from weight loss)
+- Slightly more defined cheekbones (from reduced facial fat)
+- Better skin texture and hydration appearance
+- More vibrant, healthy complexion
 
-IMPORTANT: All enhancements should look natural and realistic. Avoid artificial or overly processed appearance.
+🎯 THE GOAL: 
+Make viewers think "Wow, I want to try this 3-week challenge!" 
+The changes should be noticeable enough to be motivating, but subtle enough to look completely natural and achievable.
+
+IMPORTANT: This person should look like themselves having a really good day after getting healthier - NOT like a different person or heavily edited photo.
       `.trim();
 
       // 이미지를 base64로 변환 (Gemini AI 요구사항)
@@ -395,7 +410,8 @@ IMPORTANT: All enhancements should look natural and realistic. Avoid artificial 
     const processingTime = (Date.now() - startTime) / 1000;
 
     return {
-      imageUrl: '',
+      beforeImageUrl: '',
+      afterImageUrl: '',
       weightLoss: 0,
       processingTime,
       originalFileName,

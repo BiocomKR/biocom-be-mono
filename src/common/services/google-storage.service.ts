@@ -30,11 +30,13 @@ export class GoogleStorageService {
       this.storage = new Storage({
         projectId: this.projectId,
         keyFilename: serviceAccountKeyFile,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
       });
       this.logger.log(`Google Storage 서비스 초기화 완료! (Service Account Key 방식) 버킷: ${this.bucketName}, 프로젝트: ${this.projectId} 🔐`);
     } else {
       this.storage = new Storage({
         projectId: this.projectId,
+        scopes: ['https://www.googleapis.com/auth/cloud-platform'],
       });
       this.logger.warn(`Service Account Key 파일을 찾을 수 없어 Application Default Credentials 사용: ${serviceAccountKeyFile} 📦`);
       this.logger.log(`Google Storage 서비스 초기화 완료! (ADC 방식) 버킷: ${this.bucketName}, 프로젝트: ${this.projectId} 📦`);
@@ -45,14 +47,14 @@ export class GoogleStorageService {
    * 이미지 파일을 Google Cloud Storage에 업로드
    * @param imageBuffer 이미지 버퍼
    * @param originalFileName 원본 파일명
-   * @param serviceType 서비스 타입 ('face-slimming' | 'food-calorie')
+   * @param serviceType 서비스 타입 ('face-slimming' | 'food-calorie' | 'originals')
    * @param optimizeJpeg JPEG 최적화 여부 (기본값: true)
    * @returns 업로드된 파일의 공개 URL
    */
   async uploadImageFile(
     imageBuffer: Buffer,
     originalFileName: string,
-    serviceType: 'face-slimming' | 'food-calorie',
+    serviceType: 'face-slimming' | 'food-calorie' | 'originals',
     optimizeJpeg: boolean = true
   ): Promise<string> {
     try {
@@ -93,23 +95,10 @@ export class GoogleStorageService {
         }
       });
 
-      // Signed URL 생성 시도 (실패해도 Public URL 사용)
-      try {
-        const [signedUrl] = await file.getSignedUrl({
-          action: 'read',
-          expires: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7일
-        });
-        
-        this.logger.log(`✅ Google Storage 업로드 완료: Signed URL 생성 성공 (${serviceType}), 7일 유효`);
-        return signedUrl;
-        
-      } catch (urlError) {
-        // Signed URL 생성 실패 시 Public URL 사용
-        const publicUrl = `https://storage.googleapis.com/${this.bucketName}/${fileName}`;
-        this.logger.warn(`⚠️ Signed URL 생성 실패, Public URL 사용: ${publicUrl}`);
-        this.logger.warn(`⚠️ Signed URL 에러: ${urlError.message}`);
-        return publicUrl;
-      }
+      // 단순한 Public URL 반환 (Signed URL 대신)
+      const publicUrl = `https://storage.googleapis.com/${this.bucketName}/${fileName}`;
+      this.logger.log(`✅ Google Storage 업로드 완료: Public URL 생성 (${serviceType}) - ${publicUrl}`);
+      return publicUrl;
 
     } catch (error) {
       this.logger.error(`Google Storage 업로드 실패 (${serviceType}):`, error.message);
@@ -123,61 +112,9 @@ export class GoogleStorageService {
     }
   }
 
-  /**
-   * 로컬 fallback 저장 (Google Storage 실패 시 사용)
-   * @param imageBuffer 이미지 버퍼
-   * @param originalFileName 원본 파일명
-   * @param serviceType 서비스 타입
-   * @returns 로컬 파일 URL
-   */
-  async saveToLocalFallback(
-    imageBuffer: Buffer,
-    originalFileName: string,
-    serviceType: 'face-slimming' | 'food-calorie'
-  ): Promise<string> {
-    const fs = await import('fs');
-    const path = await import('path');
-
-    try {
-      // 유니크한 파일명 생성
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const cleanFileName = originalFileName.replace(/\.[^/.]+$/, '');
-      const fileName = `${serviceType}_${timestamp}_${cleanFileName}.jpg`;
-      const localPath = path.join(process.cwd(), 'uploads', fileName);
-
-      // uploads 디렉토리가 없으면 생성
-      const uploadsDir = path.join(process.cwd(), 'uploads');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      // JPEG로 재압축하여 용량 최적화
-      const optimizedBuffer = await sharp(imageBuffer)
-        .jpeg({ 
-          quality: 85,
-          mozjpeg: true
-        })
-        .toBuffer();
-
-      // 파일 저장
-      fs.writeFileSync(localPath, optimizedBuffer);
-
-      // 로컬 URL 반환
-      const localUrl = `http://localhost:10804/uploads/${fileName}`;
-      
-      const originalSize = (imageBuffer.length / 1024).toFixed(1);
-      const optimizedSize = (optimizedBuffer.length / 1024).toFixed(1);
-      this.logger.warn(`로컬 fallback 저장 완료: ${localUrl} (${originalSize}KB → ${optimizedSize}KB)`);
-      return localUrl;
-
-    } catch (error) {
-      this.logger.error('로컬 fallback 저장도 실패:', error.message);
-      throw new Error(`파일 저장 완전 실패: ${error.message}`);
-    }
-  }
 
   /**
-   * Google Storage에 업로드하고, 실패시 로컬에 저장 (재시도 로직 포함)
+   * Google Storage에 업로드 (재시도 로직 포함, 로컬 fallback 제거)
    * @param imageBuffer 이미지 버퍼
    * @param originalFileName 원본 파일명
    * @param serviceType 서비스 타입
@@ -187,12 +124,12 @@ export class GoogleStorageService {
   async uploadWithFallback(
     imageBuffer: Buffer,
     originalFileName: string,
-    serviceType: 'face-slimming' | 'food-calorie',
+    serviceType: 'face-slimming' | 'food-calorie' | 'originals',
     maxRetries: number = 2
-  ): Promise<{ url: string; location: 'google-storage' | 'local-fallback' }> {
-    this.logger.log(`🚀 업로드 시작 - 서비스: ${serviceType}, 파일: ${originalFileName}, 버퍼크기: ${imageBuffer.length}bytes`);
+  ): Promise<{ url: string; location: 'google-storage' }> {
+    this.logger.log(`🚀 Google Storage 업로드 시작 - 서비스: ${serviceType}, 파일: ${originalFileName}, 버퍼크기: ${imageBuffer.length}bytes`);
     
-    // 먼저 Google Storage 업로드 시도 (재시도 포함)
+    // Google Storage 업로드 시도 (재시도 포함)
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         this.logger.log(`📤 Google Storage 업로드 시도 ${attempt + 1}/${maxRetries + 1} (${serviceType})`);
@@ -207,8 +144,8 @@ export class GoogleStorageService {
         this.logger.error(`📋 에러 스택: ${error.stack}`);
         
         if (attempt === maxRetries) {
-          this.logger.error(`💀 Google Storage 모든 시도 실패! 로컬 fallback 사용 (${serviceType})`);
-          break;
+          this.logger.error(`💀 Google Storage 모든 시도 실패! (${serviceType})`);
+          throw new Error(`Google Storage 업로드 ${maxRetries + 1}회 시도 후 실패: ${error.message}`);
         }
 
         // 재시도 전 잠시 대기 (1초)
@@ -217,16 +154,8 @@ export class GoogleStorageService {
       }
     }
 
-    // Google Storage 실패시 로컬 fallback 사용
-    try {
-      this.logger.warn(`🏠 로컬 fallback 저장 시작 (${serviceType})`);
-      const url = await this.saveToLocalFallback(imageBuffer, originalFileName, serviceType);
-      this.logger.warn(`🏠 로컬 fallback 저장 완료: ${url}`);
-      return { url, location: 'local-fallback' };
-    } catch (error) {
-      this.logger.error(`💥 Google Storage와 로컬 저장 모두 실패: ${error.message}`);
-      throw new Error(`Google Storage와 로컬 저장 모두 실패: ${error.message}`);
-    }
+    // 여기 도달하면 안됨 (TypeScript 타입 안전성을 위해)
+    throw new Error(`Google Storage 업로드 예상치 못한 실패`);
   }
 
   /**

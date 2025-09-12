@@ -50,7 +50,7 @@ provider "kubernetes" {
 # 현재 GCP 클라이언트 설정 정보를 가져옴 (토큰 등)
 data "google_client_config" "default" {}
 
-# 현재 GCP 프로젝트 정보를 가져옴
-data "google_project" "project" {
-  project_id = var.project_id
-}
+# 현재 GCP 프로젝트 정보를 가져옴 (인증 문제로 일시적 주석)
+# data "google_project" "project" {
+#   project_id = var.project_id
+# }
