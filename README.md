@@ -16,16 +16,16 @@
 ### 1.1 프로젝트 생성
 
 ```bash
-*# GCP 로그인
+# GCP 로그인
 gcloud auth login --account=*[서비스 계정]
 
-*# GCP 프로젝트 생성*
+# GCP 프로젝트 생성
 gcloud projects create [프로젝트ID] --name="[프로젝트명]"
 
 # cli가 오류발생시 gcloud beta billing 으로 실행
 gcloud billing projects link [프로젝트ID] --billing-account=[결제계정ID]
 
-*# 기본 프로젝트 설정*
+# 기본 프로젝트 설정
 gcloud config set project [프로젝트ID]
 ```
 
@@ -80,14 +80,14 @@ gcloud config set project [프로젝트ID]
 
 ```bash
 curl -I http://api-dev.biocom.ai.kr/api/health
-*# HTTP/1.1 200 OK ✅*
+# HTTP/1.1 200 OK ✅
 ```
 
 ### 4.2 HTTPS 테스트 ✅
 
 ```bash
 curl -I https://api-dev.biocom.ai.kr/api/health  
-*# HTTP/2 200 ✅ (HTTP/2 지원!)*
+# HTTP/2 200 ✅ (HTTP/2 지원!)
 ```
 
 ### 4.3 API 문서 접근 ✅
@@ -131,12 +131,12 @@ curl -I https://api-dev.biocom.ai.kr/api/health
 ### ETC.2 HTTPS-Only 구현
 
 ```yaml
-*# FrontendConfig 설정으로 HTTP→HTTPS 강제 리다이렉트*
+# FrontendConfig 설정으로 HTTP→HTTPS 강제 리다이렉트
 spec:
-  *# SSL 정책 (Terraform에서 생성)*  
+  # SSL 정책 (Terraform에서 생성)  
   sslPolicy: "biocom-ssl-policy"
   
-  *# HTTPS 강제 리다이렉트 설정*
+  # HTTPS 강제 리다이렉트 설정
   redirectToHttps:
     enabled: true
     responseCodeName: "MOVED_PERMANENTLY_DEFAULT"
@@ -151,9 +151,9 @@ spec:
 ### ETC.4 테스트 결과
 
 ```bash
-*# HTTP 요청 테스트*
+# HTTP 요청 테스트
 curl -v http://api-dev.biocom.ai.kr/api/health
-*# 결과: HTTP/1.1 301 Moved Permanently → HTTPS로 자동 리다이렉트# HTTPS 연결 확인# SSL connection using TLSv1.3 / AEAD-CHACHA20-POLY1305-SHA256# using HTTP/2 → 최신 프로토콜 지원 확인*
+# 결과: HTTP/1.1 301 Moved Permanently → HTTPS로 자동 리다이렉트# HTTPS 연결 확인# SSL connection using TLSv1.3 / AEAD-CHACHA20-POLY1305-SHA256# using HTTP/2 → 최신 프로토콜 지원 확인
 ```
 
 ---
@@ -183,8 +183,8 @@ curl -v http://api-dev.biocom.ai.kr/api/health
 가장 중요한 성과는 **"한방배포 + 보안 강화"** 시스템을 구축한 것입니다. 이제 누구든지 두 개의 명령어만으로 전체 인프라와 애플리케이션을 배포할 수 있고, 자동으로 HTTPS-Only 보안까지 적용됩니다:
 
 ```bash
-./01-deploy-infrastructure.sh --project-id PROJECT_ID --yes  *# SSL Policy 자동 생성*
-./02-deploy-app.sh --project-id PROJECT_ID --yes             *# HTTPS-Only 적용*
+./01-deploy-infrastructure.sh --project-id PROJECT_ID --yes  # SSL Policy 자동 생성
+./02-deploy-app.sh --project-id PROJECT_ID --yes             # HTTPS-Only 적용
 ```
 
 ### 🔒 보안 강화 달성사항
