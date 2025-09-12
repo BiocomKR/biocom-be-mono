@@ -17,7 +17,7 @@ import { UsersService } from '../../users/users.service';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
 import { UpdateUserDto } from '../../users/dto/update-user.dto';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
-import { ApiSuccessResponse } from '../../common/dto/api-response.dto';
+import { ApiResponseDto } from '../../common/dto/api-response.dto';
 
 /**
  * Management 사용자 관리 컨트롤러
@@ -40,7 +40,7 @@ export class ManagementUsersController {
     @Query('search') search?: string,
     @Query('sortBy') sortBy: string = 'createdAt',
     @Query('sortOrder') sortOrder: 'asc' | 'desc' = 'desc',
-  ): Promise<ApiSuccessResponse<{ users: UserResponseDto[]; total: number; page: number; limit: number }>> {
+  ): Promise<ApiResponseDto<{ users: UserResponseDto[]; total: number; page: number; limit: number }>> {
     this.logger.log(`사용자 목록 조회 - 페이지: ${page}, 검색어: ${search}`);
 
     // offset 계산
@@ -83,7 +83,7 @@ export class ManagementUsersController {
    * 특정 사용자 조회
    */
   @Get(':id')
-        async findOne(@Param('id', ParseIntPipe) id: number): Promise<ApiSuccessResponse<UserResponseDto>> {
+        async findOne(@Param('id', ParseIntPipe) id: number): Promise<ApiResponseDto<UserResponseDto>> {
     this.logger.log(`특정 사용자 조회 - ID: ${id}`);
 
     const user = await this.usersService.findOne(id);
@@ -100,7 +100,7 @@ export class ManagementUsersController {
    * 사용자 생성
    */
   @Post()
-      async create(@Body() createUserDto: CreateUserDto): Promise<ApiSuccessResponse<UserResponseDto>> {
+      async create(@Body() createUserDto: CreateUserDto): Promise<ApiResponseDto<UserResponseDto>> {
     this.logger.log(`사용자 생성 - 이메일: ${createUserDto.email}`);
 
     const user = await this.usersService.create(createUserDto);
@@ -120,7 +120,7 @@ export class ManagementUsersController {
         async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUserDto: UpdateUserDto,
-  ): Promise<ApiSuccessResponse<UserResponseDto>> {
+  ): Promise<ApiResponseDto<UserResponseDto>> {
     this.logger.log(`사용자 수정 - ID: ${id}`);
 
     const user = await this.usersService.update(id, updateUserDto);
@@ -137,7 +137,7 @@ export class ManagementUsersController {
    * 사용자 삭제
    */
   @Delete(':id')
-        async remove(@Param('id', ParseIntPipe) id: number): Promise<ApiSuccessResponse<void>> {
+        async remove(@Param('id', ParseIntPipe) id: number): Promise<ApiResponseDto<void>> {
     this.logger.log(`사용자 삭제 - ID: ${id}`);
 
     await this.usersService.remove(id);

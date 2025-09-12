@@ -24,7 +24,7 @@ import {
   CheckStockResponseDto 
 } from './dto/product-response.dto';
 
-@ApiTags('쇼핑몰-Products')
+// 쇼핑몰 관련 API 임시 비활성화
 @Controller('api/products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}

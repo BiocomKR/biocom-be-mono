@@ -80,6 +80,98 @@ export class PointService {
   }
 
   /**
+   * 포인트 지급 (적립)
+   * 
+   * @param userId 사용자 ID
+   * @param amount 지급할 포인트
+   * @param description 지급 사유
+   * @param relatedType 관련 타입 (RECORD_COMPLETION, MISSION_COMPLETION 등)
+   * @param relatedId 관련 ID
+   */
+  async awardPoints(
+    userId: number,
+    amount: number,
+    description: string,
+    relatedType?: string,
+    relatedId?: number,
+  ): Promise<number> {
+    this.logger.log(`포인트 지급 - 사용자: ${userId}, 금액: ${amount}`);
+
+    if (amount <= 0) {
+      throw new BadRequestException('지급 금액은 0보다 커야 합니다.');
+    }
+
+    // 트랜잭션 내에서 모든 작업 처리
+    return await this.prisma.$transaction(async (tx) => {
+      // 사용자 포인트 증가
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { points: { increment: amount } },
+      });
+
+      // 포인트 히스토리 기록
+      await tx.pointHistory.create({
+        data: {
+          userId,
+          type: 'EARNED',
+          amount: amount,
+          balance: user.points,
+          description,
+          relatedType: relatedType || 'MANUAL',
+          relatedId,
+        },
+      });
+
+      this.logger.log(`포인트 지급 완료 - 사용자: ${userId}, 잔액: ${user.points}`);
+      return user.points;
+    });
+  }
+
+  /**
+   * 트랜잭션 내에서 포인트 지급 (다른 서비스에서 트랜잭션과 함께 사용)
+   * 
+   * @param tx 트랜잭션 객체
+   * @param userId 사용자 ID
+   * @param amount 지급할 포인트
+   * @param description 지급 사유
+   * @param relatedType 관련 타입
+   * @param relatedId 관련 ID
+   */
+  async awardPointsInTransaction(
+    tx: any,
+    userId: number,
+    amount: number,
+    description: string,
+    relatedType?: string,
+    relatedId?: number,
+  ): Promise<number> {
+    if (amount <= 0) {
+      throw new BadRequestException('지급 금액은 0보다 커야 합니다.');
+    }
+
+    // 사용자 포인트 증가
+    const user = await tx.user.update({
+      where: { id: userId },
+      data: { points: { increment: amount } },
+    });
+
+    // 포인트 히스토리 기록
+    await tx.pointHistory.create({
+      data: {
+        userId,
+        type: 'EARNED',
+        amount: amount,
+        balance: user.points,
+        description,
+        relatedType: relatedType || 'MANUAL',
+        relatedId,
+      },
+    });
+
+    return user.points;
+  }
+
+  /**
    * 아임웹으로 포인트 이관
    * 
    * @param userId 사용자 ID

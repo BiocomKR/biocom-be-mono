@@ -28,7 +28,7 @@ import {
   CartValidationResponseDto 
 } from './dto/cart-item.dto';
 
-@ApiTags('쇼핑몰-Cart')
+// 쇼핑몰 관련 API 임시 비활성화
 @Controller('api/cart')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

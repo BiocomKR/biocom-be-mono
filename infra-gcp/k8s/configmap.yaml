@@ -55,6 +55,12 @@ data:
   # 기타 설정
   TIMEZONE: "Asia/Seoul"
   
+  # Gemma 3 AI 모델 설정
+  GEMMA_MODEL_PATH: "/external/models/gemma-3"
+  GEMMA_DEVICE: "cpu"
+  GEMMA_DTYPE: "fp32"
+  AI_ANALYSIS_TIMEOUT: "30000"
+  
 ---
 # 📝 로깅 설정용 ConfigMap
 apiVersion: v1

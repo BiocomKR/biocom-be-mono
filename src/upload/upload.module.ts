@@ -4,6 +4,8 @@ import { diskStorage } from 'multer';
 import { extname, basename } from 'path';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+import { FoodCalorieService } from './food-calorie.service';
+import { FaceSlimmingService } from './face-slimming.service';
 import { BadRequestException } from '@nestjs/common';
 import { UploadSecurityConfig } from './upload.security.config';
 
@@ -99,7 +101,7 @@ import { UploadSecurityConfig } from './upload.security.config';
     }),
   ],
   controllers: [UploadController],
-  providers: [UploadService],
-  exports: [UploadService],
+  providers: [UploadService, FoodCalorieService, FaceSlimmingService],
+  exports: [UploadService, FoodCalorieService, FaceSlimmingService],
 })
 export class UploadModule {}

@@ -119,6 +119,9 @@ spec:
         - name: logging-config
           mountPath: /app/config/logging
           readOnly: true
+        - name: gemma-models
+          mountPath: /external/models
+          readOnly: true
       
       # Cloud SQL Proxy 사이드카 컨테이너 (Workload Identity 사용 시 제거)
       # GKE는 Private IP로 직접 연결 가능
@@ -136,6 +139,9 @@ spec:
       - name: logging-config
         configMap:
           name: biocom-api-logging
+      - name: gemma-models
+        persistentVolumeClaim:
+          claimName: gemma-model-pvc
       # Cloud SQL credentials (Workload Identity 사용 시 불필요)
       # - name: cloudsql-instance-credentials
       #   secret:

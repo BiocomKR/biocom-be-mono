@@ -9,7 +9,7 @@ import { PrismaHealthIndicator } from './indicators/prisma.health';
  * Health Check 컨트롤러
  * 시스템 상태를 확인하는 엔드포인트 제공
  */
-@ApiTags('health')
+@ApiTags('시스템-상태확인')
 @Controller('health')
 @SkipThrottle() // Health check는 Rate Limiting 제외
 export class HealthController {

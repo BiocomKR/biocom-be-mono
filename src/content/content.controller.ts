@@ -21,7 +21,7 @@ import { ContentCompletionResponseDto } from './dto/content-completion.dto';
  * 사용자용 컨텐츠 컨트롤러
  * 컨텐츠 조회 및 시청 완료 처리
  */
-@ApiTags('contents')
+@ApiTags('챌린지-컨텐츠')
 @Controller('contents')
 export class ContentController {
   private readonly logger = new Logger(ContentController.name);
@@ -173,6 +173,7 @@ export class ContentController {
   })
   async getContentDetail(
     @Param('id', ParseIntPipe) id: number,
+    @Request() req?: any,
   ): Promise<ApiResponseDto<any>> {
     this.logger.log(`사용자 컨텐츠 상세 조회 요청 - ID: ${id}`);
 
@@ -185,8 +186,9 @@ export class ContentController {
         throw new NotFoundException(`컨텐츠를 찾을 수 없습니다: ${id}`);
       }
 
-      // 조회수 증가 (익명 사용자도 조회수 증가하지만 중복 방지는 안됨)
-      await this.contentService.increaseViewCount(id);
+      // 조회수 증가 (로그인된 사용자의 경우 중복 방지)
+      const userId = req?.user?.userId;
+      await this.contentService.increaseViewCount(id, userId);
 
       this.logger.log(`컨텐츠 상세 조회 성공 - ID: ${id}`);
 

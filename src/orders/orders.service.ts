@@ -5,6 +5,7 @@ import {
   Logger 
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { PointService } from '../point/point.service';
 import { CreateOrderDto, OrderResponseDto } from './dto/create-order.dto';
 import { Prisma } from '@prisma/client';
 
@@ -12,7 +13,10 @@ import { Prisma } from '@prisma/client';
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pointService: PointService,
+  ) {}
 
   /**
    * 주문번호 생성
@@ -483,24 +487,15 @@ export class OrdersService {
       // 구매 확정 포인트 지급 (예: 구매금액의 1%)
       const pointAmount = Math.floor(Number(order.totalAmount) * 0.01);
       if (pointAmount > 0) {
-        await tx.user.update({
-          where: { id: userId },
-          data: {
-            points: { increment: pointAmount },
-          },
-        });
-
-        await tx.pointHistory.create({
-          data: {
-            userId,
-            type: 'EARN',
-            amount: pointAmount,
-            balance: 0, // 추후 계산
-            description: `구매 확정 포인트 (${order.orderNumber})`,
-            relatedType: 'ORDER',
-            relatedId: order.id,
-          },
-        });
+        // 공통 포인트 지급 서비스 사용
+        await this.pointService.awardPointsInTransaction(
+          tx,
+          userId,
+          pointAmount,
+          `구매 확정 포인트 (${order.orderNumber})`,
+          'ORDER',
+          order.id
+        );
       }
 
       return updated;

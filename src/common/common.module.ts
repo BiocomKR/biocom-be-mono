@@ -2,6 +2,7 @@ import { Module, Global } from '@nestjs/common';
 import { PrismaService } from './services/prisma.service';
 import { ConfigService } from './services/config.service';
 import { LoggerService } from './services/logger.service';
+import { GoogleStorageService } from './services/google-storage.service';
 
 /**
  * 공통 모듈
@@ -16,11 +17,13 @@ import { LoggerService } from './services/logger.service';
     PrismaService,
     ConfigService,
     LoggerService,
+    GoogleStorageService,
   ],
   exports: [
     PrismaService,
     ConfigService,
     LoggerService,
+    GoogleStorageService,
   ],
 })
 export class CommonModule {}

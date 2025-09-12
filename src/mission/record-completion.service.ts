@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { CompleteRecordDto } from './dto/record-completion.dto';
+import { PointService } from '../point/point.service';
 import { Logger } from '@nestjs/common';
 
 /**
@@ -8,10 +9,13 @@ import { Logger } from '@nestjs/common';
  * 사용자 기록 생성 및 연관 미션 자동 처리
  */
 @Injectable()
-export class RecordsService {
-  private readonly logger = new Logger(RecordsService.name);
+export class RecordCompletionService {
+  private readonly logger = new Logger(RecordCompletionService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pointService: PointService,
+  ) {}
 
   /**
    * 기록 완료 처리
@@ -149,25 +153,15 @@ export class RecordsService {
             }
           });
 
-          // 포인트 히스토리 기록
-          const user = await tx.user.update({
-            where: { id: userId },
-            data: {
-              points: { increment: missionCompletion.points }
-            }
-          });
-
-          await tx.pointHistory.create({
-            data: {
-              userId,
-              type: 'EARNED',
-              amount: missionCompletion.points,
-              balance: user.points,
-              description: `미션 완료: ${missionCompletion.missionName}`,
-              relatedType: 'CHALLENGE_MISSION',
-              relatedId: missionCompletion.challengeMissionId
-            }
-          });
+          // 공통 포인트 지급 서비스 사용
+          await this.pointService.awardPointsInTransaction(
+            tx,
+            userId,
+            missionCompletion.points,
+            `미션 완료: ${missionCompletion.missionName}`,
+            'CHALLENGE_MISSION',
+            missionCompletion.challengeMissionId
+          );
 
           finalMissionCompletion = {
             missionId: missionCompletion.challengeMissionId,

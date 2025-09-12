@@ -30,8 +30,8 @@
 ### 프로젝트 정보
 - **이름**: biocom-api (NestJS 백엔드 API)
 - **회사**: 바이오컴
-- **인프라**: AWS EKS (Kubernetes)
-- **상태**: 자동 배포 시스템 구축 완료 ✅
+- **인프라**: GCP GKE (Kubernetes) - AWS EKS에서 완전 이관 완료 ✅
+- **상태**: GCP 자동 배포 시스템 구축 완료 ✅
 
 ### 📚 필독 문서
 1. **[데이터베이스 설계 문서](./docs/database-design-document.md)** 🔥
@@ -40,17 +40,25 @@
    - 마이그레이션 히스토리
    - **반드시 읽고 이해할 것!**
 
+2. **[정책 정의서 vs 구현 현황 비교 문서](./docs/POLICY_VS_IMPLEMENTATION.md)** 🔥🔥
+   - 기획팀 정책 정의서와 현재 구현 상황 상세 비교
+   - 일치하는 부분, 수정 필요 부분, 신규 추가 기능 정리
+   - 개발 우선순위 및 완료율 현황 (실시간 업데이트)
+   - **개발 작업 전 반드시 확인하여 중복 작업 방지!**
+   - **이 문서는 지속적으로 업데이트되므로 항상 최신 버전 참조할 것**
+
 ### 핵심 성과
-1. **eks-deploy.sh로 완전 자동 배포**
-   - `./scripts/eks-deploy.sh`
-   - 클러스터 생성부터 배포까지 한방
+1. **GCP 자동 배포 시스템 완료**
+   - `./infra-gcp/scripts/01-deploy-infrastructure.sh` (인프라 구축)
+   - `./infra-gcp/scripts/02-deploy-app.sh` (앱 배포)
+   - Terraform + GKE 완전 자동화
    - 수동 개입 0%
 
 2. **주요 구성**
-   - EKS 클러스터: biocom-cluster
-   - Pod: 2개 (무중단 배포)
-   - ALB 로드밸런서
-   - 타임스탬프 기반 이미지 태깅
+   - GKE 클러스터: biocom-cluster-dev
+   - Cloud SQL PostgreSQL (Private IP)
+   - Global Load Balancer + SSL
+   - Artifact Registry 이미지 관리
 
 ---
 
@@ -59,15 +67,16 @@
 ### ⚠️⚠️⚠️ 설정 파일 수정 시 절대 금지사항 ⚠️⚠️⚠️
 
 #### 🔴 기존 설정값을 함부로 지우지 마라!
-- **helm-deploy.sh의 --set 옵션들 절대 삭제 금지**
-  - 특히 `ingress.hosts[0].paths` 설정은 필수!
-  - 이거 빼먹으면 배포 실패함
+- **Terraform 상태파일 (terraform.tfstate) 절대 삭제 금지**
+  - 인프라 현재 상태가 기록됨
+  - 이거 사라지면 전체 인프라 재구축 필요
+- **K8s 매니페스트 파일 수정 시 주의**
+  - 특히 ingress.yaml, service.yaml 설정 중요
 - **수정 전 반드시 백업하고, 기존 값이 왜 있었는지 확인**
-- **"왜 이게 있지?"하고 지우면 안됨!**
 
 #### 🔴 검증 없이 수정하지 마라!
-- `helm template`로 먼저 렌더링 확인
-- `--dry-run`으로 시뮬레이션
+- `terraform plan`으로 먼저 변경사항 확인
+- `kubectl apply --dry-run=client` 시뮬레이션
 - 기존 동작하던 설정은 절대 함부로 건드리지 말 것
 
 #### 🔴 이미 돌아가는 시스템은 신중하게!
@@ -94,15 +103,16 @@
 
 ### 기술적 함정들
 1. **JWT_SECRET**: 반드시 32자 이상!
-2. **EBS CSI Driver**: PVC 사용 시 필수
-3. **이미지 태그**: latest 쓰면 업데이트 안 됨
-4. **Readiness Probe**: 30초로 단축함 (기본 180초는 너무 김)
-5. **쿠버네티스 배포 미반영**: DB 연결 실패 시 새 Pod가 Ready 안 되고 이전 버전 유지
+2. **Cloud SQL 연결**: Private IP로만 접근 가능
+3. **이미지 태그**: latest 쓰면 업데이트 안 됨 (타임스탬프 태그 권장)
+4. **Readiness Probe**: 30초로 설정함
+5. **GKE 배포 미반영**: DB 연결 실패 시 새 Pod가 Ready 안 되고 이전 버전 유지
 6. **아임웹 OAuth 특이사항**:
    - refresh_token 지원 안 함 (문서와 다름)
    - 회원 목록 API: memberUid가 아니라 uid 필드 사용
    - 토큰 만료 시 무조건 신규 인증 필요
-7. **eks-deploy.sh Pod 레이블**: app.kubernetes.io/instance 사용
+7. **SSL 인증서**: Certificate Manager 자동 발급 (DNS 검증 필요)
+8. **Terraform 상태**: GCS 백엔드로 안전하게 보관됨
 
 ### 형님 화나게 하는 것들
 - "서버가 시작되었습니다" (확인 없이 주장)
@@ -114,51 +124,63 @@
 - **같은 작업을 여러 번 반복하기**
 - **처음부터 정확하게 분석하지 않고 추측으로 답변하기**
 
-### SSL/TLS 설정 가이드
-1. **ACM 인증서 확인**
-   - AWS Console > Certificate Manager > ap-northeast-2
-   - *.biocom.ai.kr 인증서 ARN 복사
+### SSL/TLS 설정 가이드 (GCP)
+1. **Certificate Manager 인증서 확인**
+   - GCP Console > Certificate Manager
+   - *.biocom.ai.kr 인증서 자동 생성됨
    
 2. **자동 설정 (이미 완료)**
-   - `.env.eks`에 ACM_CERTIFICATE_ARN 추가
-   - `INGRESS_HOST`에 도메인 설정
-   - eks-deploy.sh가 자동으로 SSL 적용
+   - Terraform이 Certificate Manager 자동 설정
+   - Global Load Balancer에 자동 연결
+   - HTTPS-Only 보안 정책 적용
    
 3. **DNS 설정**
-   - 가비아 DNS: CNAME 레코드 사용
+   - 가비아 DNS: A 레코드 사용
    - 호스트: api-dev
-   - 값: ALB 주소 + 마지막에 점(.) 필수!
+   - 값: Global Load Balancer IP 주소
 
 ---
 
 ## 📂 핵심 파일 구조
 
 ```
-/scripts/
-├── eks-deploy.sh            # EKS 클러스터 배포 (최종 완성본)
-├── eks-monitor.sh           # EKS 모니터링 (5가지 핵심 기능)
-├── eks-cleanup.sh           # EKS 클러스터 삭제 (비용 절약)
-├── docker-ecr-push.sh       # ECR 이미지 푸시
-└── helm-deploy.sh           # Helm 차트 배포
+/infra-gcp/                         # GCP 인프라 (현재 사용)
+├── README.md                       # GCP 인프라 가이드
+├── terraform/                      # Terraform 인프라 코드
+│   ├── main.tf                    # VPC, 방화벽, Storage
+│   ├── gke.tf                     # GKE 클러스터
+│   ├── certificate.tf             # SSL 인증서
+│   └── terraform.tfvars           # 환경 설정
+├── k8s/                           # Kubernetes 매니페스트
+│   ├── deployment.yaml            # 앱 배포 설정
+│   ├── ingress.yaml               # 로드밸런서 설정
+│   └── service.yaml               # 네트워크 설정
+└── scripts/
+    ├── 01-deploy-infrastructure.sh # 인프라 구축 (완성본)
+    └── 02-deploy-app.sh           # 앱 배포 (완성본)
 
-/infrastructure/
-├── INFRA.md                 # 인프라 문서
-├── helm/biocom-api/            # Helm 차트
-└── eks/configs/             # EKS 설정
-
-/.env.eks                    # 환경 변수 (중요!)
-/CLAUDE.md                   # AI 가이드라인
+/infrastructure/                    # AWS 인프라 (더이상 사용하지 않음)
+/CLAUDE.md                         # AI 가이드라인
 ```
 
 ---
 
 ## 📝 작업 히스토리
 
-### 2025-07-14~22
+### 2025-07-14~22 (AWS EKS 구축)
 - [✓] AWS EKS 자동 배포 시스템 구축 완료
 - [✓] eks-deploy.sh, eks-monitor.sh, eks-cleanup.sh 완성
 - [✓] SSL/TLS 자동 설정 통합
 - [✓] 프로젝트명 biocom-api로 통일
+
+### 2025-09-03 (GCP 이관 완료) 🎉
+- [✓] **AWS EKS → GCP GKE 완전 이관** (힘든 작업이었음...)
+- [✓] Terraform 기반 인프라 자동화 구축
+- [✓] Cloud SQL PostgreSQL 설정 완료
+- [✓] Certificate Manager SSL 자동 발급
+- [✓] Global Load Balancer + HTTPS-Only 보안 강화
+- [✓] 2단계 배포 스크립트 완성 (인프라 + 앱)
+- [✓] **개고생 끝에 드디어 완료!** 👏
 
 ### 2025-07-25 (아임웹 OAuth 및 API 연동)
 - [✓] 아임웹 OAuth 인증 플로우 구현 (브라우저 없이)
@@ -170,11 +192,9 @@
 - [✓] 아임웹 회원 검색 API 구현 (/api/users/imweb/search-by-phone/:phone)
   - 전화번호로 회원 검색 → 상세 정보 조회
   - memberUid가 아니라 uid 필드 사용 (API 문서와 실제 응답이 다름)
-- [✓] EKS 배포 문제 해결
-  - DB 연결 실패 시 쿠버네티스가 이전 버전 Pod 유지
-  - RDS → EC2 DB로 변경하여 해결
-- [✓] eks-deploy.sh Pod 확인 오류 수정
-  - `app=biocom-api` → `app.kubernetes.io/instance=biocom-api`로 레이블 변경
+- [✓] GKE 배포 안정화
+  - DB 연결 실패 시 쿠버네티스가 이전 버전 Pod 유지 특성 활용
+  - Cloud SQL Private IP로 보안 강화
 
 ### 향후 작업 예정
 - [ ] **환경별 배포 분리 (개발/운영)**
@@ -195,9 +215,9 @@
 - **타겟**: 헬스케어 앱 (MVP는 설문조사 + 컨텐츠 열람)
 - **인증**: JWT 기반 + 아임웹 OAuth 연동 완료
 - **API**: 20개+ 엔드포인트 구현 완료 (Users, Survey, Mission, Activity, Upload)
-- **인프라**: AWS EKS 자동 배포 시스템 완료
-- **DB**: PostgreSQL on EC2 (43.200.68.96:5432)
-- **상태**: 핵심 개발 완료, 배포 준비 완료
+- **인프라**: GCP GKE 자동 배포 시스템 완료
+- **DB**: Cloud SQL PostgreSQL (Private IP, 자동 백업)
+- **상태**: GCP 이관 완료, 운영 준비 완료
 
 ---
 
@@ -206,7 +226,7 @@
 ### 시작하기
 1. 이 문서 먼저 정독
 2. CLAUDE.md 확인
-3. infrastructure/INFRA.md 확인
+3. infra-gcp/README.md 확인 (GCP 인프라 가이드)
 4. 형님께 "인수인계 문서 확인했습니다" 보고
 
 ### 실수하지 않기
@@ -235,9 +255,10 @@
 
 ## 🎯 현재 상태 요약
 
-**인프라**: EKS 자동 배포 시스템 완료 ✅
+**인프라**: GCP GKE 자동 배포 시스템 완료 ✅
 **백엔드**: 모든 핵심 API 개발 완료 ✅
 **인증**: JWT + 아임웹 OAuth 완료 ✅
-**다음 단계**: 환경별 배포 분리 (dev/prod)
+**보안**: HTTPS-Only + SSL 인증서 자동 발급 ✅
+**다음 단계**: 운영환경 배포 분리 (dev/prod)
 
 형님, 화이팅! 💪

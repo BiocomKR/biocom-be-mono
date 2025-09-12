@@ -1,6 +1,20 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { Logger } from '@nestjs/common';
+import { 
+  calculateDeliveryDate, 
+  calculateEndDate, 
+  calculateMaxStartDate, 
+  isValidStartDate,
+  formatDateToString,
+  parseStringToDate
+} from './utils/challenge-date.util';
+import { 
+  SetStartDateDto, 
+  UpdateStartDateDto, 
+  ConfirmStartDateDto,
+  ChallengeScheduleResponseDto 
+} from './dto/challenge-schedule.dto';
 
 /**
  * 챌린지 서비스
@@ -1057,6 +1071,298 @@ export class ChallengeService {
       },
       timestamp: new Date()
     };
+  }
+
+  // ==================== 시작일 설정 시스템 ====================
+
+  /**
+   * 챌린지 일정 조회
+   * @description 사용자의 챌린지 일정 정보를 조회합니다
+   * @param userId 사용자 ID
+   * @param challengeId 챌린지 ID
+   */
+  async getChallengeSchedule(userId: number, challengeId: number): Promise<{ success: boolean; data: ChallengeScheduleResponseDto }> {
+    try {
+      this.logger.log(`챌린지 일정 조회 시작 - 사용자: ${userId}, 챌린지: ${challengeId}`);
+
+      // 사용자 챌린지 확인
+      const userChallenge = await this.prisma.userChallenge.findFirst({
+        where: { userId, challengeId },
+        include: {
+          challengeSchedule: true,
+          ticket: {
+            include: {
+              challenge: true
+            }
+          }
+        }
+      });
+
+      if (!userChallenge) {
+        throw new NotFoundException('해당 챌린지를 찾을 수 없습니다');
+      }
+
+      const schedule = userChallenge.challengeSchedule;
+      const ticket = userChallenge.ticket;
+
+      if (!schedule) {
+        throw new NotFoundException('챌린지 일정 정보를 찾을 수 없습니다');
+      }
+
+      // 시작일 수정 가능 여부 확인 (확정되지 않은 상태에서만 수정 가능)
+      const canModify = !schedule.isConfirmed;
+
+      // 최대 설정 가능한 시작일 계산
+      const maxStartDate = calculateMaxStartDate(ticket.purchaseDate);
+
+      const responseData: ChallengeScheduleResponseDto = {
+        id: schedule.id,
+        startDate: schedule.startDate ? formatDateToString(schedule.startDate) : null,
+        deliveryDate: schedule.deliveryDate ? formatDateToString(schedule.deliveryDate) : null,
+        endDate: schedule.endDate ? formatDateToString(schedule.endDate) : null,
+        isConfirmed: schedule.isConfirmed,
+        canModify,
+        purchasedAt: ticket.purchaseDate,
+        maxStartDate: formatDateToString(maxStartDate),
+        createdAt: schedule.createdAt
+      };
+
+      this.logger.log(`챌린지 일정 조회 완료 - 시작일: ${responseData.startDate}, 확정여부: ${responseData.isConfirmed}`);
+      return { success: true, data: responseData };
+    } catch (error) {
+      this.logger.error('챌린지 일정 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 챌린지 시작일 설정
+   * @description 처음으로 시작일을 설정합니다 (아직 설정되지 않은 경우)
+   * @param userId 사용자 ID
+   * @param challengeId 챌린지 ID
+   * @param setStartDateDto 시작일 설정 데이터
+   */
+  async setStartDate(userId: number, challengeId: number, setStartDateDto: SetStartDateDto): Promise<{ success: boolean; data: ChallengeScheduleResponseDto }> {
+    try {
+      this.logger.log(`챌린지 시작일 설정 시작 - 사용자: ${userId}, 챌린지: ${challengeId}, 시작일: ${setStartDateDto.startDate}`);
+
+      return await this.prisma.$transaction(async (tx) => {
+        // 사용자 챌린지 확인
+        const userChallenge = await tx.userChallenge.findFirst({
+          where: { userId, challengeId },
+          include: {
+            challengeSchedule: true,
+            ticket: true
+          }
+        });
+
+        if (!userChallenge) {
+          throw new NotFoundException('해당 챌린지를 찾을 수 없습니다');
+        }
+
+        const schedule = userChallenge.challengeSchedule;
+        if (!schedule) {
+          throw new NotFoundException('챌린지 일정 정보를 찾을 수 없습니다');
+        }
+
+        // 이미 시작일이 설정된 경우 확인
+        if (schedule.startDate) {
+          throw new ConflictException('시작일이 이미 설정되었습니다. 수정을 원하면 updateStartDate를 사용하세요');
+        }
+
+        // 날짜 유효성 검증
+        const startDate = parseStringToDate(setStartDateDto.startDate);
+        if (!isValidStartDate(startDate, userChallenge.ticket.purchaseDate)) {
+          const maxStartDate = calculateMaxStartDate(userChallenge.ticket.purchaseDate);
+          throw new BadRequestException(`시작일은 오늘 이후이고 구매일로부터 30일 이내(${formatDateToString(maxStartDate)})여야 합니다`);
+        }
+
+        // 배송일과 종료일 계산
+        const deliveryDate = calculateDeliveryDate(startDate);
+        const endDate = calculateEndDate(startDate);
+
+        // 일정 업데이트
+        const updatedSchedule = await tx.challengeSchedule.update({
+          where: { id: schedule.id },
+          data: {
+            startDate,
+            deliveryDate,
+            endDate,
+            canModify: true // 처음 설정할 때는 수정 가능
+          }
+        });
+
+        const responseData: ChallengeScheduleResponseDto = {
+          id: updatedSchedule.id,
+          startDate: formatDateToString(updatedSchedule.startDate!),
+          deliveryDate: formatDateToString(updatedSchedule.deliveryDate!),
+          endDate: formatDateToString(updatedSchedule.endDate!),
+          isConfirmed: updatedSchedule.isConfirmed,
+          canModify: updatedSchedule.canModify,
+          purchasedAt: userChallenge.ticket.purchaseDate,
+          maxStartDate: formatDateToString(calculateMaxStartDate(userChallenge.ticket.purchaseDate)),
+          createdAt: updatedSchedule.createdAt
+        };
+
+        this.logger.log(`챌린지 시작일 설정 완료 - 시작일: ${responseData.startDate}, 배송일: ${responseData.deliveryDate}, 종료일: ${responseData.endDate}`);
+        return { success: true, data: responseData };
+      });
+    } catch (error) {
+      this.logger.error('챌린지 시작일 설정 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 챌린지 시작일 수정
+   * @description 기존 시작일을 수정합니다 (아직 확정되지 않은 경우에만)
+   * @param userId 사용자 ID
+   * @param challengeId 챌린지 ID
+   * @param updateStartDateDto 시작일 수정 데이터
+   */
+  async updateStartDate(userId: number, challengeId: number, updateStartDateDto: UpdateStartDateDto): Promise<{ success: boolean; data: ChallengeScheduleResponseDto }> {
+    try {
+      this.logger.log(`챌린지 시작일 수정 시작 - 사용자: ${userId}, 챌린지: ${challengeId}, 새 시작일: ${updateStartDateDto.startDate}`);
+
+      return await this.prisma.$transaction(async (tx) => {
+        // 사용자 챌린지 확인
+        const userChallenge = await tx.userChallenge.findFirst({
+          where: { userId, challengeId },
+          include: {
+            challengeSchedule: true,
+            ticket: true
+          }
+        });
+
+        if (!userChallenge) {
+          throw new NotFoundException('해당 챌린지를 찾을 수 없습니다');
+        }
+
+        const schedule = userChallenge.challengeSchedule;
+        if (!schedule) {
+          throw new NotFoundException('챌린지 일정 정보를 찾을 수 없습니다');
+        }
+
+        // 시작일이 설정되지 않은 경우
+        if (!schedule.startDate) {
+          throw new BadRequestException('시작일이 설정되지 않았습니다. 먼저 setStartDate를 사용하세요');
+        }
+
+        // 수정 불가능한 상태 확인
+        if (schedule.isConfirmed || !schedule.canModify) {
+          throw new ConflictException('시작일이 확정되어 더 이상 수정할 수 없습니다');
+        }
+
+        // 날짜 유효성 검증
+        const newStartDate = parseStringToDate(updateStartDateDto.startDate);
+        if (!isValidStartDate(newStartDate, userChallenge.ticket.purchaseDate)) {
+          const maxStartDate = calculateMaxStartDate(userChallenge.ticket.purchaseDate);
+          throw new BadRequestException(`시작일은 오늘 이후이고 구매일로부터 30일 이내(${formatDateToString(maxStartDate)})여야 합니다`);
+        }
+
+        // 배송일과 종료일 재계산
+        const newDeliveryDate = calculateDeliveryDate(newStartDate);
+        const newEndDate = calculateEndDate(newStartDate);
+
+        // 일정 업데이트
+        const updatedSchedule = await tx.challengeSchedule.update({
+          where: { id: schedule.id },
+          data: {
+            startDate: newStartDate,
+            deliveryDate: newDeliveryDate,
+            endDate: newEndDate
+          }
+        });
+
+        const responseData: ChallengeScheduleResponseDto = {
+          id: updatedSchedule.id,
+          startDate: formatDateToString(updatedSchedule.startDate!),
+          deliveryDate: formatDateToString(updatedSchedule.deliveryDate!),
+          endDate: formatDateToString(updatedSchedule.endDate!),
+          isConfirmed: updatedSchedule.isConfirmed,
+          canModify: updatedSchedule.canModify,
+          purchasedAt: userChallenge.ticket.purchaseDate,
+          maxStartDate: formatDateToString(calculateMaxStartDate(userChallenge.ticket.purchaseDate)),
+          createdAt: updatedSchedule.createdAt
+        };
+
+        this.logger.log(`챌린지 시작일 수정 완료 - 기존: ${formatDateToString(schedule.startDate)}, 새로운: ${responseData.startDate}`);
+        return { success: true, data: responseData };
+      });
+    } catch (error) {
+      this.logger.error('챌린지 시작일 수정 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 챌린지 시작일 확정
+   * @description 시작일을 확정하여 더 이상 수정할 수 없도록 만듭니다
+   * @param userId 사용자 ID
+   * @param challengeId 챌린지 ID
+   * @param confirmStartDateDto 시작일 확정 데이터
+   */
+  async confirmStartDate(userId: number, challengeId: number, confirmStartDateDto: ConfirmStartDateDto): Promise<{ success: boolean; data: ChallengeScheduleResponseDto }> {
+    try {
+      this.logger.log(`챌린지 시작일 확정 시작 - 사용자: ${userId}, 챌린지: ${challengeId}, 확정: ${confirmStartDateDto.confirm}`);
+
+      return await this.prisma.$transaction(async (tx) => {
+        // 사용자 챌린지 확인
+        const userChallenge = await tx.userChallenge.findFirst({
+          where: { userId, challengeId },
+          include: {
+            challengeSchedule: true,
+            ticket: true
+          }
+        });
+
+        if (!userChallenge) {
+          throw new NotFoundException('해당 챌린지를 찾을 수 없습니다');
+        }
+
+        const schedule = userChallenge.challengeSchedule;
+        if (!schedule) {
+          throw new NotFoundException('챌린지 일정 정보를 찾을 수 없습니다');
+        }
+
+        // 시작일이 설정되지 않은 경우
+        if (!schedule.startDate) {
+          throw new BadRequestException('시작일이 설정되지 않았습니다. 먼저 setStartDate를 사용하세요');
+        }
+
+        // 이미 확정된 경우
+        if (schedule.isConfirmed) {
+          throw new ConflictException('시작일이 이미 확정되었습니다');
+        }
+
+        // 확정 처리
+        const updatedSchedule = await tx.challengeSchedule.update({
+          where: { id: schedule.id },
+          data: {
+            isConfirmed: confirmStartDateDto.confirm,
+            canModify: !confirmStartDateDto.confirm // 확정되면 수정 불가
+          }
+        });
+
+        const responseData: ChallengeScheduleResponseDto = {
+          id: updatedSchedule.id,
+          startDate: formatDateToString(updatedSchedule.startDate!),
+          deliveryDate: formatDateToString(updatedSchedule.deliveryDate!),
+          endDate: formatDateToString(updatedSchedule.endDate!),
+          isConfirmed: updatedSchedule.isConfirmed,
+          canModify: updatedSchedule.canModify,
+          purchasedAt: userChallenge.ticket.purchaseDate,
+          maxStartDate: formatDateToString(calculateMaxStartDate(userChallenge.ticket.purchaseDate)),
+          createdAt: updatedSchedule.createdAt
+        };
+
+        this.logger.log(`챌린지 시작일 확정 완료 - 확정여부: ${responseData.isConfirmed}, 수정가능: ${responseData.canModify}`);
+        return { success: true, data: responseData };
+      });
+    } catch (error) {
+      this.logger.error('챌린지 시작일 확정 실패:', error);
+      throw error;
+    }
   }
 
 }

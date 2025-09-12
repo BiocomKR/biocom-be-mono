@@ -8,7 +8,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
  * 기록 완료 컨트롤러
  * 사용자의 기록 생성 및 연관 미션 처리
  */
-@ApiTags('records')
+@ApiTags('챌린지-미션')
 @Controller('records')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

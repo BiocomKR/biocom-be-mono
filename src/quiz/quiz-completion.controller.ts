@@ -8,7 +8,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
  * 퀴즈 완료 컨트롤러
  * 퀴즈 답변 제출 및 채점 처리
  */
-@ApiTags('quizzes')
+@ApiTags('챌린지-퀴즈')
 @Controller('quizzes')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

@@ -153,6 +153,70 @@ export class SurveyService {
   }
 
   /**
+   * 챌린지별 사용자 설문 답변 조회
+   */
+  async getUserAnswersByChallenge(
+    userId: number,
+    challengeId: number,
+    type?: 'before' | 'after'
+  ): Promise<(SurveyAnswer & { 
+    surveyQuestion: SurveyQuestion; 
+    surveyOption: SurveyOption; 
+  })[]> {
+    // 챌린지와 연결된 설문 ID들 조회
+    const challengeSurveys = await this.prisma.challengeSurvey.findMany({
+      where: { 
+        challengeId,
+        isActive: true 
+      },
+      select: {
+        surveyId: true
+      }
+    });
+
+    if (challengeSurveys.length === 0) {
+      return [];
+    }
+
+    const surveyIds = challengeSurveys.map(cs => cs.surveyId);
+
+    // 해당 설문들의 질문 ID들 조회
+    const surveyQuestions = await this.prisma.surveyQuestion.findMany({
+      where: {
+        surveyId: {
+          in: surveyIds
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    const questionIds = surveyQuestions.map(sq => sq.id);
+
+    const where: Prisma.SurveyAnswerWhereInput = { 
+      userId,
+      surveyQuestionId: {
+        in: questionIds
+      }
+    };
+    if (type) where.type = type;
+
+    return await this.prisma.surveyAnswer.findMany({
+      where,
+      include: {
+        surveyQuestion: true,
+        surveyOption: true,
+      },
+      orderBy: {
+        surveyQuestion: {
+          sortOrder: 'asc',
+        },
+      },
+    });
+  }
+
+  /**
    * 설문 결과 분석
    */
   async analyzeSurveyResult(
@@ -213,7 +277,7 @@ export class SurveyService {
   /**
    * 설문 진행 상태 조회 (간단버전)
    */
-  async getSurveyStatus(userId: number): Promise<{
+  async getSurveyStatus(userId: number, challengeId: number): Promise<{
     beforeSurvey: {
       enabled: boolean;
       completed: boolean;
@@ -232,10 +296,31 @@ export class SurveyService {
     canTakeAfterSurvey: boolean;
     nextAction: 'TAKE_BEFORE_SURVEY' | 'WAIT_FOR_AFTER_SURVEY' | 'TAKE_AFTER_SURVEY' | 'COMPLETED';
   }> {
-    const totalQuestions = await this.prisma.surveyQuestion.count();
+    // 챌린지와 연결된 설문 정보 조회
+    const challengeSurveys = await this.prisma.challengeSurvey.findMany({
+      where: { 
+        challengeId,
+        isActive: true 
+      },
+      include: {
+        survey: {
+          include: {
+            surveyQuestions: true
+          }
+        }
+      }
+    });
+
+    if (challengeSurveys.length === 0) {
+      throw new NotFoundException(`챌린지 ID ${challengeId}와 연결된 설문을 찾을 수 없습니다.`);
+    }
+
+    // 첫 번째 설문의 총 질문 수 (모든 설문이 동일한 질문 세트를 사용한다고 가정)
+    const totalQuestions = challengeSurveys[0].survey.surveyQuestions.length;
+    
     const [beforeAnswers, afterAnswers] = await Promise.all([
-      this.getUserAnswers(userId, 'before'),
-      this.getUserAnswers(userId, 'after'),
+      this.getUserAnswersByChallenge(userId, challengeId, 'before'),
+      this.getUserAnswersByChallenge(userId, challengeId, 'after'),
     ]);
 
     const beforeCompleted = beforeAnswers.length === totalQuestions;
@@ -782,15 +867,8 @@ export class SurveyService {
         isActive: true,
       },
       include: {
-        questions: {
-          where: { isActive: true },
+        surveyQuestions: {
           orderBy: { sortOrder: 'asc' },
-          include: {
-            options: {
-              where: { isActive: true },
-              orderBy: { sortOrder: 'asc' },
-            },
-          },
         },
       },
     });
@@ -814,15 +892,8 @@ export class SurveyService {
         isActive: true,
       },
       include: {
-        questions: {
-          where: { isActive: true },
+        surveyQuestions: {
           orderBy: { sortOrder: 'asc' },
-          include: {
-            options: {
-              where: { isActive: true },
-              orderBy: { sortOrder: 'asc' },
-            },
-          },
         },
       },
     });

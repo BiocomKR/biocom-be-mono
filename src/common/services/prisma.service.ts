@@ -291,6 +291,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get apiKey() { return this.prisma.apiKey; }
   get content() { return this.prisma.content; }
   get contentFile() { return this.prisma.contentFile; }
+  get contentView() { return this.prisma.contentView; }
+  get lectureQuiz() { return this.prisma.lectureQuiz; }
+  get lectureProduct() { return this.prisma.lectureProduct; }
   
   // 챌린지 도메인 테이블
   get challenge() { return this.prisma.challenge; }

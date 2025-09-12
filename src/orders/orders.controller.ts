@@ -22,7 +22,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, OrderResponseDto } from './dto/create-order.dto';
 
-@ApiTags('쇼핑몰-Orders')
+// 쇼핑몰 관련 API 임시 비활성화
 @Controller('api/orders')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

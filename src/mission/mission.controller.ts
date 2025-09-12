@@ -17,7 +17,7 @@ import { CompleteMissionDto } from './dto/mission-completion.dto';
  * 미션 컨트롤러
  * 사용자의 미션 수행 관련 API
  */
-@ApiTags('missions')
+@ApiTags('챌린지-미션')
 @Controller('missions')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

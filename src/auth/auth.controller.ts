@@ -24,7 +24,7 @@ import {
  * 인증 컨트롤러
  * 회원가입, 로그인, 프로필 조회 등 인증 관련 엔드포인트 제공
  */
-@ApiTags('auth')
+@ApiTags('시스템-인증')
 @Controller('auth')
 export class AuthController {
   constructor(

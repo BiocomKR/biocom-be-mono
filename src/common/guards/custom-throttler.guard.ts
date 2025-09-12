@@ -32,21 +32,27 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
     const response = context.switchToHttp().getResponse();
     
     // 디버깅 로그 추가
-    console.log(`[CustomThrottlerGuard] Checking ${request.method} ${request.url}`);
+    console.log(`[CustomThrottlerGuard] 🔍 Checking ${request.method} ${request.url}`);
+    console.log(`[CustomThrottlerGuard] 🏠 Client IP: ${this.getClientIP(request)}`);
     
     // 화이트리스트 IP 확인
     if (this.isWhitelisted(request)) {
+      console.log(`[CustomThrottlerGuard] ✅ IP는 화이트리스트에 있어서 통과`);
       return true;
     }
 
     try {
+      console.log(`[CustomThrottlerGuard] ⏳ 부모 ThrottlerGuard 체크 시작...`);
       const result = await super.canActivate(context);
+      console.log(`[CustomThrottlerGuard] ✅ ThrottlerGuard 체크 결과: ${result}`);
       
       // Rate limit 정보를 응답 헤더에 추가
       this.addRateLimitHeaders(response);
       
       return result;
     } catch (error) {
+      console.log(`[CustomThrottlerGuard] ❌ ThrottlerGuard 에러:`, error.message);
+      
       if (error instanceof ThrottlerException) {
         // Rate limit 초과 로깅
         this.logRateLimitExceeded(request);

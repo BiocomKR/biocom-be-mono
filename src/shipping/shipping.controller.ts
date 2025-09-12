@@ -23,7 +23,7 @@ import {
   TrackingResponseDto
 } from './dto/shipping.dto';
 
-@ApiTags('쇼핑몰-Shipping')
+// 쇼핑몰 관련 API 임시 비활성화
 @Controller('api/shipping')
 export class ShippingController {
   constructor(private readonly shippingService: ShippingService) {}

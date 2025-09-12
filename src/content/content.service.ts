@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { PointService } from '../point/point.service';
 import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.util';
 import { CreateContentDto, UpdateContentDto, ContentFileDto } from './content.types';
 import * as DOMPurify from 'isomorphic-dompurify';
@@ -11,7 +12,10 @@ import * as DOMPurify from 'isomorphic-dompurify';
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pointService: PointService,
+  ) {}
 
   /**
    * HTML 컨텐츠 sanitize
@@ -258,51 +262,48 @@ export class ContentService {
     this.logger.log(`컨텐츠 조회수 증가 요청 - 컨텐츠: ${contentId}, 사용자: ${userId}`);
 
     try {
-      // TODO: ContentView 테이블과 viewCount 필드 추가 후 활성화
-      // 현재는 로그만 남김
-      
       // 오늘 날짜 (YYYY-MM-DD 형식)
-      // const today = new Date();
-      // const todayStr = today.toISOString().split('T')[0];
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
 
       // 1️⃣ 로그인된 사용자인 경우 중복 방지 체크
-      // if (userId) {
-      //   const existingView = await this.prisma.contentView.findFirst({
-      //     where: {
-      //       userId,
-      //       contentId,
-      //       viewedAt: {
-      //         gte: new Date(todayStr), // 오늘 00:00:00부터
-      //         lt: new Date(new Date(todayStr).getTime() + 24 * 60 * 60 * 1000) // 내일 00:00:00 전까지
-      //       }
-      //     }
-      //   });
+      if (userId) {
+        const existingView = await this.prisma.contentView.findFirst({
+          where: {
+            userId,
+            contentId,
+            viewedAt: {
+              gte: new Date(todayStr), // 오늘 00:00:00부터
+              lt: new Date(new Date(todayStr).getTime() + 24 * 60 * 60 * 1000) // 내일 00:00:00 전까지
+            }
+          }
+        });
 
-      //   // 이미 오늘 조회한 적이 있으면 조회수 증가하지 않음
-      //   if (existingView) {
-      //     this.logger.log(`이미 오늘 조회한 컨텐츠 - 컨텐츠: ${contentId}, 사용자: ${userId}`);
-      //     return;
-      //   }
-      // }
+        // 이미 오늘 조회한 적이 있으면 조회수 증가하지 않음
+        if (existingView) {
+          this.logger.log(`이미 오늘 조회한 컨텐츠 - 컨텐츠: ${contentId}, 사용자: ${userId}`);
+          return;
+        }
+      }
 
-      // await this.prisma.$transaction(async (tx) => {
-      //   // 2️⃣ 컨텐츠 조회수 증가 (viewCount 필드가 있다면)
-      //   await tx.content.update({
-      //     where: { id: contentId },
-      //     data: { viewCount: { increment: 1 } }
-      //   });
+      await this.prisma.$transaction(async (tx) => {
+        // 2️⃣ 컨텐츠 조회수 증가
+        await tx.content.update({
+          where: { id: contentId },
+          data: { viewCount: { increment: 1 } }
+        });
 
-      //   // 3️⃣ 로그인된 사용자인 경우 조회 기록 생성
-      //   if (userId) {
-      //     await tx.contentView.create({
-      //       data: {
-      //         userId,
-      //         contentId,
-      //         viewedAt: new Date()
-      //       }
-      //     });
-      //   }
-      // });
+        // 3️⃣ 로그인된 사용자인 경우 조회 기록 생성
+        if (userId) {
+          await tx.contentView.create({
+            data: {
+              userId,
+              contentId,
+              viewedAt: new Date()
+            }
+          });
+        }
+      });
 
       this.logger.log(`컨텐츠 조회수 증가 완료 - 컨텐츠: ${contentId}`);
 
@@ -411,25 +412,15 @@ export class ContentService {
               }
             });
 
-            // 포인트 히스토리 기록
-            const user = await tx.user.update({
-              where: { id: userId },
-              data: {
-                points: { increment: pointsEarned }
-              }
-            });
-
-            await tx.pointHistory.create({
-              data: {
-                userId,
-                type: 'EARNED',
-                amount: pointsEarned,
-                balance: user.points,
-                description: `컨텐츠 시청: ${content.title}`,
-                relatedType: 'CONTENT',
-                relatedId: contentId
-              }
-            });
+            // 공통 포인트 지급 서비스 사용
+            await this.pointService.awardPointsInTransaction(
+              tx,
+              userId,
+              pointsEarned,
+              `컨텐츠 시청: ${content.title}`,
+              'CONTENT',
+              contentId
+            );
 
             this.logger.log(`최초 시청 보상 지급 - ${content.title}, 획득 포인트: ${pointsEarned}`);
           } else {
@@ -474,12 +465,15 @@ export class ContentService {
 
   /**
    * 인기 컨텐츠 조회
-   * Note: viewCount 필드가 없으므로 최근 생성된 컨텐츠를 반환
+   * 조회수 기준으로 인기 컨텐츠를 반환
    */
   async getPopularContents(limit: number): Promise<any[]> {
     const contents = await this.prisma.content.findMany({
       where: { isActive: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { viewCount: 'desc' },
+        { createdAt: 'desc' }
+      ],
       take: limit,
       include: {
         contentFiles: {
@@ -488,6 +482,7 @@ export class ContentService {
         _count: {
           select: {
             challengeContents: true,
+            contentViews: true,
           },
         },
       },
@@ -680,8 +675,16 @@ export class ContentService {
         ];
       }
 
-      // TODO: 정렬 조건 (viewCount 필드 추가 후 popular 정렬 구현)
-      // 현재는 모두 최신순으로 정렬
+      // 정렬 조건 설정
+      let orderBy: any = { createdAt: 'desc' }; // 기본값: 최신순
+
+      if (params.sort === 'popular') {
+        // 인기순: 조회수 높은 순 → 최신순
+        orderBy = [
+          { viewCount: 'desc' },
+          { createdAt: 'desc' }
+        ];
+      }
 
       // 페이징 처리
       const result = await PaginationHelper.paginate<any>(
@@ -698,9 +701,9 @@ export class ContentService {
                 contentViews: true
               }
             }
-          }
-        },
-        { sortBy: 'createdAt', sortOrder: 'desc' }
+          },
+          orderBy
+        }
       );
 
       this.logger.log(`칼럼 목록 조회 완료 - 총 ${result.total}개`);

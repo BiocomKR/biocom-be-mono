@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/
 import { CategoriesService } from './categories.service';
 import { CategoryResponseDto, CategoryWithCountDto } from './dto/category-response.dto';
 
-@ApiTags('쇼핑몰-Categories')
+// 쇼핑몰 관련 API 임시 비활성화
 @Controller('api/categories')
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}

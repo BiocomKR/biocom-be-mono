@@ -26,21 +26,30 @@ import {
   ApiBearerAuth
 } from '@nestjs/swagger';
 import { Express } from 'express';
+import * as fs from 'fs';
 import { UploadService } from './upload.service';
 import { FileUploadResponseDto } from './dto/file-upload-response.dto';
-import { ApiSuccessResponse } from '../common/dto/api-response.dto';
+import { FoodAnalysisResponseDto } from './dto/food-analysis-response.dto';
+import { FaceSlimmingResponseDto } from './dto/face-slimming-response.dto';
+import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FoodCalorieService } from './food-calorie.service';
+import { FaceSlimmingService } from './face-slimming.service';
 
 /**
  * 파일 업로드 컨트롤러
  * 활동 기록과 연관된 이미지 파일 업로드 API
  */
-@ApiTags('upload')
+@ApiTags('헬스케어-이미지 분석')
 @Controller('upload')
 export class UploadController {
   private readonly logger = new Logger(UploadController.name);
 
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(
+    private readonly uploadService: UploadService,
+    private readonly foodCalorieService: FoodCalorieService,
+    private readonly faceSlimmingService: FaceSlimmingService
+  ) {}
 
   /**
    * 이미지 파일 업로드
@@ -70,7 +79,7 @@ export class UploadController {
   @ApiResponse({ 
     status: HttpStatus.CREATED, 
     description: '파일 업로드 성공',
-    type: ApiSuccessResponse
+    type: ApiResponseDto
   })
   @ApiResponse({ 
     status: HttpStatus.BAD_REQUEST, 
@@ -86,7 +95,7 @@ export class UploadController {
     @Req() req: any,
     @UploadedFile() file: Express.Multer.File,
     @Query('relatedType') relatedType: string
-  ): Promise<ApiSuccessResponse<FileUploadResponseDto>> {
+  ): Promise<ApiResponseDto<FileUploadResponseDto>> {
     if (!file) {
       throw new BadRequestException('파일이 업로드되지 않았습니다.');
     }
@@ -129,7 +138,7 @@ export class UploadController {
   @ApiResponse({ 
     status: HttpStatus.OK, 
     description: '파일 정보 조회 성공',
-    type: ApiSuccessResponse
+    type: ApiResponseDto
   })
   @ApiResponse({ 
     status: HttpStatus.NOT_FOUND, 
@@ -137,7 +146,7 @@ export class UploadController {
   })
   async getFileInfo(
     @Param('id', ParseIntPipe) id: number
-  ): Promise<ApiSuccessResponse<FileUploadResponseDto>> {
+  ): Promise<ApiResponseDto<FileUploadResponseDto>> {
     this.logger.log(`파일 정보 조회 요청 - ID: ${id}`);
 
     const file = await this.uploadService.getFileInfo(id);
@@ -169,12 +178,12 @@ export class UploadController {
   @ApiResponse({ 
     status: HttpStatus.OK, 
     description: '파일 목록 조회 성공',
-    type: ApiSuccessResponse
+    type: ApiResponseDto
   })
   async getUserFiles(
     @Req() req: any,
     @Query('relatedType') relatedType?: string
-  ): Promise<ApiSuccessResponse<FileUploadResponseDto[]>> {
+  ): Promise<ApiResponseDto<FileUploadResponseDto[]>> {
     this.logger.log(`사용자 파일 목록 조회 요청 - 사용자: ${req.user.sub}, 타입: ${relatedType || '전체'}`);
 
     const files = await this.uploadService.getUserFiles(
@@ -208,7 +217,7 @@ export class UploadController {
   @ApiResponse({ 
     status: HttpStatus.OK, 
     description: '파일 삭제 성공',
-    type: ApiSuccessResponse
+    type: ApiResponseDto
   })
   @ApiResponse({ 
     status: HttpStatus.NOT_FOUND, 
@@ -217,7 +226,7 @@ export class UploadController {
   async deleteFile(
     @Req() req: any,
     @Param('id', ParseIntPipe) id: number
-  ): Promise<ApiSuccessResponse<void>> {
+  ): Promise<ApiResponseDto<void>> {
     this.logger.log(`파일 삭제 요청 - 사용자: ${req.user.sub}, ID: ${id}`);
 
     await this.uploadService.deleteFile(id, req.user.sub);
@@ -227,5 +236,282 @@ export class UploadController {
       message: '파일이 성공적으로 삭제되었습니다.',
       timestamp: new Date(),
     };
+  }
+
+  /**
+   * 음식 이미지 분석 (GPT-4 AI 활용)
+   */
+  @Post('food-analysis')
+  // @UseGuards(JwtAuthGuard)  // 테스트를 위해 임시 제거
+  // @ApiBearerAuth('access-token')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ 
+    summary: '음식 이미지 AI 분석', 
+    description: 'GPT-5 모델을 활용하여 음식 이미지를 분석하고 칼로리 및 재료 정보를 제공합니다.' 
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: '분석할 음식 이미지 파일',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({ 
+    status: HttpStatus.CREATED, 
+    description: '음식 이미지 분석 완료',
+    type: ApiResponseDto
+  })
+  @ApiResponse({ 
+    status: HttpStatus.BAD_REQUEST, 
+    description: '잘못된 파일 형식 또는 AI 분석 실패' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.SERVICE_UNAVAILABLE, 
+    description: 'AI 모델이 로드되지 않음' 
+  })
+  async analyzeFoodImage(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File
+  ): Promise<ApiResponseDto<FoodAnalysisResponseDto>> {
+    if (!file) {
+      throw new BadRequestException('분석할 이미지 파일이 업로드되지 않았습니다.');
+    }
+
+    // AI 모델 준비 상태 확인
+    if (!this.foodCalorieService.isReady()) {
+      this.logger.error('음식 칼로리 계산 모델이 준비되지 않았습니다');
+      throw new BadRequestException('AI 분석 서비스가 현재 사용 불가능합니다. 잠시 후 다시 시도해주세요.');
+    }
+
+    this.logger.log(`음식 이미지 분석 요청 - 사용자: ${req.user ? req.user.sub : '테스트'}, 파일: ${file.originalname}, 크기: ${file.size}bytes`);
+
+    try {
+      // Multer diskStorage를 사용하므로 file.path에서 파일을 읽어 Buffer로 변환
+      let imageBuffer: Buffer;
+      
+      if (file.buffer) {
+        // memoryStorage를 사용한 경우 (buffer가 있는 경우)
+        imageBuffer = file.buffer;
+        this.logger.debug(`메모리에서 파일 버퍼 사용 - 크기: ${imageBuffer.length}bytes`);
+      } else if (file.path) {
+        // diskStorage를 사용한 경우 (path에서 파일 읽기)
+        imageBuffer = fs.readFileSync(file.path);
+        this.logger.debug(`디스크에서 파일 읽기 완료 - 경로: ${file.path}, 크기: ${imageBuffer.length}bytes`);
+        
+        // 분석 후 임시 파일 삭제
+        setTimeout(() => {
+          try {
+            fs.unlinkSync(file.path);
+            this.logger.debug(`임시 파일 삭제 완료: ${file.path}`);
+          } catch (error) {
+            this.logger.warn(`임시 파일 삭제 실패: ${file.path}, 에러: ${error.message}`);
+          }
+        }, 1000);
+      } else {
+        throw new Error('파일 데이터가 없습니다. buffer와 path 모두 undefined입니다.');
+      }
+
+      // 음식 칼로리 계산 서비스로 음식 이미지 분석 (이미지 리사이징 포함, Google Storage 업로드)
+      const analysisResult = await this.foodCalorieService.analyzeFoodImage(imageBuffer, file.originalname);
+
+      // 음식 항목이 있는지 확인
+      const hasFood = analysisResult.food_items && analysisResult.food_items.length > 0;
+      const foodNames = hasFood 
+        ? analysisResult.food_items.map(item => item.name).join(', ')
+        : '음식 없음';
+
+      this.logger.log(`음식 분석 완료 - 항목: ${analysisResult.food_items.length}개, 음식명: ${foodNames}`);
+
+      return {
+        success: true,
+        message: hasFood 
+          ? `${foodNames} 분석이 완료되었습니다.`
+          : '음식이 감지되지 않았습니다.',
+        data: analysisResult,
+        timestamp: new Date(),
+      };
+
+    } catch (error) {
+      this.logger.error(`음식 이미지 분석 실패 - 사용자: ${req.user ? req.user.sub : '테스트'}, 에러: ${error.message}`);
+      
+      // 분석 실패 시에도 구조화된 응답 반환
+      const failedResult: FoodAnalysisResponseDto = {
+        food_items: [],
+        total: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+        errorMessage: `AI 분석 중 오류가 발생했습니다: ${error.message}`
+      };
+
+      return {
+        success: false,
+        message: 'AI 분석에 실패했습니다.',
+        data: failedResult,
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
+   * 얼굴 슬리밍 이미지 생성 (Google Gemini AI 활용)
+   * FastAPI 포팅 버전 - 재시도 로직 및 구글 스토리지 업로드 포함
+   */
+  @Post('face-slimming')
+  // @UseGuards(JwtAuthGuard)  // 테스트를 위해 임시 제거
+  // @ApiBearerAuth('access-token')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ 
+    summary: '얼굴 슬리밍 이미지 생성', 
+    description: 'Google Gemini AI를 활용하여 얼굴을 5-30kg 홀쭉하게 만든 이미지를 생성합니다. 생성된 이미지는 구글 스토리지에 저장됩니다.' 
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: '슬리밍 처리할 얼굴 이미지 파일 (jpg, png)',
+        },
+        weightLoss: {
+          type: 'number',
+          description: '체중 감량 효과 (kg, 기본값: 5kg)',
+          example: 5,
+          minimum: 1,
+          maximum: 30
+        }
+      },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({ 
+    status: HttpStatus.CREATED, 
+    description: '얼굴 슬리밍 이미지 생성 완료',
+    type: ApiResponseDto
+  })
+  @ApiResponse({ 
+    status: HttpStatus.BAD_REQUEST, 
+    description: '잘못된 파일 형식 또는 AI 생성 실패' 
+  })
+  @ApiResponse({ 
+    status: HttpStatus.SERVICE_UNAVAILABLE, 
+    description: 'AI 모델이 로드되지 않음' 
+  })
+  async createSlimmedFace(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Query('weightLoss', new ParseIntPipe({ optional: true })) weightLoss: number = 5
+  ): Promise<ApiResponseDto<FaceSlimmingResponseDto>> {
+    console.log(`[UploadController] 🎨 얼굴 슬리밍 메서드 시작!`);
+    console.log(`[UploadController] 📁 파일 정보:`, {
+      hasFile: !!file,
+      originalname: file?.originalname,
+      size: file?.size,
+      mimetype: file?.mimetype
+    });
+    console.log(`[UploadController] ⚖️ 체중감량 값: ${weightLoss}kg`);
+    
+    if (!file) {
+      console.log(`[UploadController] ❌ 파일이 없어서 BadRequest 에러 발생`);
+      throw new BadRequestException('슬리밍 처리할 얼굴 이미지 파일이 업로드되지 않았습니다.');
+    }
+
+    // 체중 감량 값 검증
+    if (weightLoss < 1 || weightLoss > 30) {
+      console.log(`[UploadController] ❌ 체중감량 값이 범위를 벗어남: ${weightLoss}kg`);
+      throw new BadRequestException('체중 감량 값은 1kg에서 30kg 사이여야 합니다.');
+    }
+
+    // AI 모델 준비 상태 확인
+    console.log(`[UploadController] 🤖 AI 모델 준비 상태 확인 중...`);
+    if (!this.faceSlimmingService.isReady()) {
+      console.log(`[UploadController] ❌ AI 모델이 준비되지 않음`);
+      this.logger.error('Google Gemini AI 모델이 준비되지 않았습니다');
+      throw new BadRequestException('얼굴 슬리밍 서비스가 현재 사용 불가능합니다. 잠시 후 다시 시도해주세요.');
+    }
+    console.log(`[UploadController] ✅ AI 모델 준비 상태 OK`);
+
+    this.logger.log(`얼굴 슬리밍 요청 - 사용자: ${req.user ? req.user.sub : '테스트'}, 파일: ${file.originalname}, 크기: ${file.size}bytes, 체중감량: ${weightLoss}kg`);
+
+    try {
+      // Multer diskStorage를 사용하므로 file.path에서 파일을 읽어 Buffer로 변환
+      let imageBuffer: Buffer;
+      
+      if (file.buffer) {
+        // memoryStorage를 사용한 경우 (buffer가 있는 경우)
+        imageBuffer = file.buffer;
+        this.logger.debug(`메모리에서 파일 버퍼 사용 - 크기: ${imageBuffer.length}bytes`);
+      } else if (file.path) {
+        // diskStorage를 사용한 경우 (path에서 파일 읽기)
+        imageBuffer = fs.readFileSync(file.path);
+        this.logger.debug(`디스크에서 파일 읽기 완료 - 경로: ${file.path}, 크기: ${imageBuffer.length}bytes`);
+        
+        // 처리 후 임시 파일 삭제
+        setTimeout(() => {
+          try {
+            fs.unlinkSync(file.path);
+            this.logger.debug(`임시 파일 삭제 완료: ${file.path}`);
+          } catch (error) {
+            this.logger.warn(`임시 파일 삭제 실패: ${file.path}, 에러: ${error.message}`);
+          }
+        }, 1000);
+      } else {
+        throw new Error('파일 데이터가 없습니다. buffer와 path 모두 undefined입니다.');
+      }
+
+      // 얼굴 슬리밍 처리 (재시도 로직 포함)
+      const slimmingResult = await this.faceSlimmingService.processImageSlimming(
+        imageBuffer,
+        weightLoss,
+        file.originalname
+      );
+
+      if (slimmingResult.success) {
+        this.logger.log(`얼굴 슬리밍 완료 - 처리시간: ${slimmingResult.processingTime}초, 재시도: ${slimmingResult.retryCount}회, URL: ${slimmingResult.imageUrl}`);
+
+        return {
+          success: true,
+          message: `${weightLoss}kg 체중 감량 효과의 얼굴 슬리밍 이미지가 생성되었습니다.`,
+          data: slimmingResult,
+          timestamp: new Date(),
+        };
+      } else {
+        this.logger.error(`얼굴 슬리밍 실패 - 에러: ${slimmingResult.errorMessage}`);
+
+        return {
+          success: false,
+          message: '얼굴 슬리밍 처리에 실패했습니다.',
+          data: slimmingResult,
+          timestamp: new Date(),
+        };
+      }
+
+    } catch (error) {
+      this.logger.error(`얼굴 슬리밍 처리 중 예외 발생 - 사용자: ${req.user ? req.user.sub : '테스트'}, 에러: ${error.message}`);
+      
+      // 처리 실패 시에도 구조화된 응답 반환
+      const failedResult: FaceSlimmingResponseDto = {
+        imageUrl: '',
+        weightLoss,
+        processingTime: 0,
+        originalFileName: file.originalname,
+        success: false,
+        errorMessage: `얼굴 슬리밍 처리 중 오류가 발생했습니다: ${error.message}`,
+        retryCount: 0
+      };
+
+      return {
+        success: false,
+        message: '얼굴 슬리밍 처리에 실패했습니다.',
+        data: failedResult,
+        timestamp: new Date(),
+      };
+    }
   }
 }

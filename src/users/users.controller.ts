@@ -28,7 +28,7 @@ import { ApiErrorResponseDto } from '../common/dto/api-response.dto';
  * 사용자 컨트롤러
  * 일반 사용자용 API
  */
-@ApiTags('users')
+@ApiTags('헬스케어-사용자')
 @Controller('users')
 export class UsersController {
   constructor(
@@ -72,11 +72,6 @@ export class UsersController {
         success: true,
         message: '아임웹 회원 검색이 완료되었습니다.',
         data: members,
-        meta: {
-          version: 'v2',
-          timestamp: new Date(),
-          count: members.length,
-        },
         timestamp: new Date(),
       };
     } catch (error) {
@@ -133,10 +128,6 @@ export class UsersController {
       success: true,
       message: '사용자 정보를 조회했습니다.',
       data: user,
-      meta: {
-        version: 'v2',
-        timestamp: new Date(),
-      },
       timestamp: new Date(),
     };
   }

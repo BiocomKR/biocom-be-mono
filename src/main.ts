@@ -103,22 +103,17 @@ async function bootstrap() {
       },
       'access-token',
     )
-    .addTag('health', '서버 상태 확인')
-    .addTag('auth', '인증')
-    .addTag('upload', '파일 업로드')
-    .addTag('users', '사용자 관리')
-    .addTag('챌린지-event', '이벤트')
-    .addTag('챌린지-mission', '미션')
-    .addTag('챌린지-survey', '설문')
-    .addTag('챌린지-content', '컨텐츠')
-    .addTag('points', '포인트')
-    .addTag('쇼핑몰-Categories', '카테고리')
-    .addTag('쇼핑몰-Products', '상품')
-    .addTag('쇼핑몰-Cart', '장바구니')
-    .addTag('쇼핑몰-Orders', '주문')
-    .addTag('쇼핑몰-Payment', '결제')
-    .addTag('쇼핑몰-Shipping', '배송')
-    .addTag('쇼핑몰-Refund', '환불')
+    .addTag('시스템-상태확인', '서버 상태 확인')
+    .addTag('시스템-인증', '인증 관리')
+    .addTag('헬스케어-이미지 분석', '이미지 분석 및 업로드')
+    .addTag('헬스케어-사용자', '사용자 관리')
+    .addTag('헬스케어-포인트', '포인트 관리')
+    .addTag('헬스케어-기록관리', '6가지 기록 관리')
+    .addTag('챌린지-관리', '챌린지 구매 및 활성화')
+    .addTag('챌린지-미션', '미션 수행')
+    .addTag('챌린지-설문', '설문조사')
+    .addTag('챌린지-컨텐츠', '교육 컨텐츠')
+    .addTag('챌린지-퀴즈', '퀴즈 완료')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -140,31 +135,18 @@ async function bootstrap() {
       defaultModelExpandDepth: 0, // 개별 모델도 접힌 상태로
     },
     customCss: `
-      /* 쇼핑몰 관련 태그 스타일 */
-      .opblock-tag[data-tag*="쇼핑몰"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        color: white !important;
-        font-weight: bold !important;
+      /* 기본 태그 스타일 (밝은 회색) */
+      .opblock-tag {
+        background: #f8f9fa !important;
+        color: #495057 !important;
+        border: 1px solid #dee2e6 !important;
+        font-weight: 500 !important;
       }
       
-      /* 챌린지 관련 태그 스타일 */
-      .opblock-tag[data-tag*="챌린지"] {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
-        color: white !important;
-        font-weight: bold !important;
-      }
-      
-      /* 태그 그룹 헤더 스타일 */
-      .opblock-tag-section h3.opblock-tag[data-tag*="쇼핑몰"] {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        padding: 10px !important;
-        border-radius: 4px !important;
-      }
-      
-      .opblock-tag-section h3.opblock-tag[data-tag*="챌린지"] {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
-        padding: 10px !important;
-        border-radius: 4px !important;
+      /* 태그 hover 효과 */
+      .opblock-tag:hover {
+        background: #e9ecef !important;
+        color: #343a40 !important;
       }
     `,
   });

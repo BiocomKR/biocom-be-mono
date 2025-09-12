@@ -7,7 +7,7 @@ import { PointService } from './point.service';
  * 포인트 관리 컨트롤러
  * 포인트 조회, 차감, 이관 등 포인트 관련 API 엔드포인트 제공
  */
-@ApiTags('points')
+@ApiTags('헬스케어-포인트')
 @Controller('points')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()

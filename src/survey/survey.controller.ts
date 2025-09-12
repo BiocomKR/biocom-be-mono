@@ -49,7 +49,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
  * - GET /survey/results/me: 내 설문 결과 조회  
  * - GET /survey/results/compare: 전후 비교 결과 조회
  */
-@ApiTags('surveys')
+@ApiTags('챌린지-설문')
 @Controller('surveys')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access-token')
@@ -64,16 +64,22 @@ export class SurveyController {
   // ==================== 설문 상태 확인 엔드포인트 ====================
 
   /**
-   * 사용자 설문 상태 확인
+   * 챌린지별 사용자 설문 상태 확인
    * 서비스 진입시 호출하여 어떤 화면을 보여줄지 결정
    * 
+   * @param challengeId 챌린지 ID
    * @param req Express Request 객체 (미들웨어에서 userId 추가됨)
    * @returns 사용자의 설문 상태 정보
    */
-  @Get('status')
+  @Get('challenges/:challengeId/status')
   @ApiOperation({
-    summary: '사용자 설문 상태 확인',
-    description: '사용자의 설문 완료 여부와 다음 필요한 액션을 확인합니다. 서비스 진입시 이 API를 호출하여 적절한 화면으로 라우팅하세요.',
+    summary: '챌린지별 사용자 설문 상태 확인',
+    description: '특정 챌린지에서 사용자의 설문 완료 여부와 다음 필요한 액션을 확인합니다. 서비스 진입시 이 API를 호출하여 적절한 화면으로 라우팅하세요.',
+  })
+  @ApiParam({
+    name: 'challengeId',
+    description: '챌린지 ID',
+    example: 1,
   })
   @ApiResponse({
     status: HttpStatus.OK,
@@ -81,14 +87,15 @@ export class SurveyController {
     type: SurveyStatusResponseDto,
   })
   async getSurveyStatus(
+    @Param('challengeId', ParseIntPipe) challengeId: number,
     @Req() req: Request,
       ): Promise<ApiResponseDto<SurveyStatusResponseDto>> {
-    this.logger.log(`사용자 설문 상태 확인 요청 - 사용자: ${req.user.sub}`);
+    this.logger.log(`챌린지별 설문 상태 확인 요청 - 사용자: ${req.user.sub}, 챌린지: ${challengeId}`);
 
     try {
-      const status = await this.surveyService.getSurveyStatus(req.user.sub);
+      const status = await this.surveyService.getSurveyStatus(req.user.sub, challengeId);
       
-      this.logger.log(`사용자 설문 상태 확인 완료 - 사용자: ${req.user.sub}, 다음 액션: ${status.nextAction}`);
+      this.logger.log(`챌린지별 설문 상태 확인 완료 - 사용자: ${req.user.sub}, 챌린지: ${challengeId}, 다음 액션: ${status.nextAction}`);
       
       return {
         success: true,
@@ -97,7 +104,7 @@ export class SurveyController {
         timestamp: new Date(),
       };
     } catch (error) {
-      this.logger.error(`사용자 설문 상태 확인 실패 - 사용자: ${req.user.sub}`, error);
+      this.logger.error(`챌린지별 설문 상태 확인 실패 - 사용자: ${req.user.sub}, 챌린지: ${challengeId}`, error);
       throw error;
     }
   }

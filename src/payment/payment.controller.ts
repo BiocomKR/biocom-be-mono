@@ -27,7 +27,7 @@ import {
   PaymentWebhookDto
 } from './dto/payment.dto';
 
-@ApiTags('쇼핑몰-Payment')
+// 쇼핑몰 관련 API 임시 비활성화
 @Controller('api/payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}

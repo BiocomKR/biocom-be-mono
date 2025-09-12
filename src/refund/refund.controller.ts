@@ -28,7 +28,7 @@ import {
   RefundListResponseDto
 } from './dto/refund.dto';
 
-@ApiTags('쇼핑몰-Refund')
+// 쇼핑몰 관련 API 임시 비활성화
 @Controller('api/refund')
 export class RefundController {
   constructor(private readonly refundService: RefundService) {}

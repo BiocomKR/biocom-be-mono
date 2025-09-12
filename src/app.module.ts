@@ -30,6 +30,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentModule } from './payment/payment.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { RefundModule } from './refund/refund.module';
+import { RecordsModule } from './records/records.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -103,6 +104,7 @@ import { RefundModule } from './refund/refund.module';
     PaymentModule,    // 결제 연동 모듈
     ShippingModule,   // 배송 관리 모듈
     RefundModule,     // 환불 처리 모듈
+    RecordsModule,    // 기록 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [
