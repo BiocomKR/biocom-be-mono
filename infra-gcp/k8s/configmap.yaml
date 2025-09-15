@@ -43,7 +43,6 @@ data:
   GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
   GOOGLE_SERVICE_ACCOUNT_KEY_FILE: "/app/secrets/key.json"
   GCS_BUCKET_NAME: "api-dev-biocom-biocom-uploads"
-  GCS_TEMP_BUCKET_NAME: "api-dev-biocom-biocom-temp"
   
   # 파일 업로드 설정 (Google Cloud Storage 사용)
   MAX_FILE_SIZE: "10485760"  # 10MB
