@@ -24,21 +24,23 @@ model User {
   subscriptionStatus     String                      @default("newcomer") @map("subscription_status") @db.VarChar(20)
   cart                   Cart?
   challengeTickets       ChallengeTicket[]
+  contentViews           ContentView[]
   fileUploads            FileUpload[]
   missionAttempts        MissionAttempt[]
   orders                 Order[]
   pointHistories         PointHistory[]
-  productQuestions       ProductQuestion[]
-  productReviews         ProductReview[]
+  productFeedback        ProductFeedback[]
   recentlyViewed         RecentlyViewed[]
   refreshTokens          RefreshToken[]
   surveyAnswers          SurveyAnswer[]
   challengeSurveyResults UserChallengeSurveyResult[]
   userChallenges         UserChallenge[]
+  customSupplements      UserCustomSupplement[]
   userRecords            UserRecord[]
-  contentViews           ContentView[]
   aiCharacter            AiCharacter?                @relation(fields: [characterId], references: [id])
   wishlist               Wishlist[]
+  balanceGameHistories   UserBalanceGameHistory[]
+  userCoupons            UserCoupon[]
 
   @@map("users")
 }
@@ -95,8 +97,8 @@ model Content {
   challengeContents ChallengeContent[]
   contentFiles      ContentFile[]
   contentViews      ContentView[]
-  lectureQuizzes    LectureQuiz[]
   lectureProducts   LectureProduct[]
+  lectureQuizzes    LectureQuiz[]
 
   @@index([type, isActive])
   @@index([weekNumber, dayNumber])
@@ -467,26 +469,26 @@ model ChallengeTicket {
 /// 사용자별 활성 챌린지
 /// 활성화된 챌린지 진행 상황 관리
 model UserChallenge {
-  id              Int              @id @default(autoincrement())
-  userId          Int              @map("user_id")
-  challengeId     Int              @map("challenge_id")
-  ticketId        Int              @map("ticket_id")
-  activatedAt     DateTime         @map("activated_at")
-  expiresAt       DateTime         @map("expires_at")
-  currentDay      Int              @default(1) @map("current_day")
-  totalPoints     Int              @default(0) @map("total_points")
-  status          String           @default("ACTIVE") @db.VarChar(20)
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime?        @updatedAt @map("updated_at")
-  dailyProgress   DailyProgress[]
-  missionAttempts MissionAttempt[]
-  surveyAnswers   SurveyAnswer[]
-  contentViews    ContentView[]
-  challenge       Challenge        @relation(fields: [challengeId], references: [id])
-  ticket          ChallengeTicket  @relation(fields: [ticketId], references: [id])
-  user            User             @relation(fields: [userId], references: [id])
-  userRecords     UserRecord[]
+  id                Int                @id @default(autoincrement())
+  userId            Int                @map("user_id")
+  challengeId       Int                @map("challenge_id")
+  ticketId          Int                @map("ticket_id")
+  activatedAt       DateTime           @map("activated_at")
+  expiresAt         DateTime           @map("expires_at")
+  currentDay        Int                @default(1) @map("current_day")
+  totalPoints       Int                @default(0) @map("total_points")
+  status            String             @default("ACTIVE") @db.VarChar(20)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime?          @updatedAt @map("updated_at")
   challengeSchedule ChallengeSchedule?
+  contentViews      ContentView[]
+  dailyProgress     DailyProgress[]
+  missionAttempts   MissionAttempt[]
+  surveyAnswers     SurveyAnswer[]
+  challenge         Challenge          @relation(fields: [challengeId], references: [id])
+  ticket            ChallengeTicket    @relation(fields: [ticketId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
+  userRecords       UserRecord[]
 
   @@unique([userId, status])
   @@index([userId, status])
@@ -496,18 +498,18 @@ model UserChallenge {
 /// 챌린지 일정 테이블
 /// 챌린지 시작일, 배송일, 종료일 관리
 model ChallengeSchedule {
-  id               Int           @id @default(autoincrement())
-  userChallengeId  Int           @unique @map("user_challenge_id")
-  startDate        DateTime?     @map("start_date") @db.Date
-  deliveryDate     DateTime?     @map("delivery_date") @db.Date
-  endDate          DateTime?     @map("end_date") @db.Date
-  isConfirmed      Boolean       @default(false) @map("is_confirmed")
-  canModify        Boolean       @default(true) @map("can_modify")
-  purchasedAt      DateTime      @map("purchased_at")
-  maxStartDate     DateTime      @map("max_start_date") @db.Date
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime?     @updatedAt @map("updated_at")
-  userChallenge    UserChallenge @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
+  id              Int           @id @default(autoincrement())
+  userChallengeId Int           @unique @map("user_challenge_id")
+  startDate       DateTime?     @map("start_date") @db.Date
+  deliveryDate    DateTime?     @map("delivery_date") @db.Date
+  endDate         DateTime?     @map("end_date") @db.Date
+  isConfirmed     Boolean       @default(false) @map("is_confirmed")
+  canModify       Boolean       @default(true) @map("can_modify")
+  purchasedAt     DateTime      @map("purchased_at")
+  maxStartDate    DateTime      @map("max_start_date") @db.Date
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime?     @updatedAt @map("updated_at")
+  userChallenge   UserChallenge @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
 
   @@index([userChallengeId])
   @@map("challenge_schedules")
@@ -559,23 +561,23 @@ model RecordItem {
 /// 운동 종목 마스터 테이블
 /// 활동 기록에서 사용할 운동 종목들
 model ExerciseType {
-  id        Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   /// 운동 종목명
-  name      String   @db.VarChar(50)
+  name        String    @db.VarChar(50)
   /// 운동 종목 코드 (WALKING, RUNNING, WEIGHT_TRAINING 등)
-  code      String   @unique @db.VarChar(50)
+  code        String    @unique @db.VarChar(50)
   /// 카테고리 (유산소, 무산소, 스트레칭 등)
-  category  String   @db.VarChar(30)
+  category    String    @db.VarChar(30)
   /// 칼로리 계수 (시간당 소모 칼로리 추정용)
-  calorieRate Float? @map("calorie_rate")
+  calorieRate Float?    @map("calorie_rate")
   /// 정렬 순서
-  sortOrder Int      @default(0) @map("sort_order")
+  sortOrder   Int       @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive  Boolean  @default(true) @map("is_active")
+  isActive    Boolean   @default(true) @map("is_active")
   /// 생성일시
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt DateTime? @updatedAt @map("updated_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
 
   @@index([category, isActive])
   @@index([sortOrder])
@@ -589,7 +591,7 @@ model UserRecord {
   userId          Int              @map("user_id")
   userChallengeId Int?             @map("user_challenge_id")
   recordCode      String           @map("record_code") @db.VarChar(50)
-  date            DateTime         @db.Date
+  date            String           @db.VarChar(10)
   value           String?
   unit            String?          @db.VarChar(20)
   metadata        Json?
@@ -600,9 +602,9 @@ model UserRecord {
   userChallenge   UserChallenge?   @relation(fields: [userChallengeId], references: [id])
   user            User             @relation(fields: [userId], references: [id])
 
-  @@unique([userId, recordCode, date])
   @@index([userId, date])
   @@index([userChallengeId])
+  @@index([userId, recordCode, date])
   @@map("user_records")
 }
 
@@ -645,7 +647,6 @@ model Category {
   updatedAt DateTime?  @updatedAt @map("updated_at")
   parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children  Category[] @relation("CategoryHierarchy")
-  products  Product[]
 
   @@index([parentId])
   @@index([slug])
@@ -656,79 +657,97 @@ model Category {
 /// 상품 마스터 테이블
 /// 판매 상품의 기본 정보 관리
 model Product {
-  id                Int                @id @default(autoincrement())
+  id                 Int                @id @default(autoincrement())
   /// 재고 관리 코드 (재고 API 연동용)
-  sku               String             @unique @db.VarChar(100)
-  /// 카테고리 ID
-  categoryId        Int                @map("category_id")
+  sku                String             @unique @db.VarChar(100)
   /// 상품명
-  name              String             @db.VarChar(255)
-  /// URL용 슬러그
-  slug              String             @unique @db.VarChar(255)
+  name               String             @db.VarChar(255)
   /// 상품 설명
-  description       String?
+  description        String?
   /// 상품 타입 (SINGLE: 단품, SET: 세트)
-  productType       String             @default("SINGLE") @map("product_type") @db.VarChar(20)
+  productType        String             @default("SINGLE") @map("product_type") @db.VarChar(20)
   /// 세트 구성 정보 [{"sku": "P001", "name": "상품1", "qty": 2}]
-  setItems          Json?              @map("set_items")
+  setItems           Json?              @map("set_items")
   /// 상품 상세 정보 (성분, 사용법, 주의사항 등)
-  productInfo       Json?              @map("product_info")
+  productInfo        Json?              @map("product_info")
   /// 상태 (ACTIVE: 활성, INACTIVE: 비활성, SOLD_OUT: 품절)
-  status            String             @default("ACTIVE") @db.VarChar(20)
+  status             String             @default("ACTIVE") @db.VarChar(20)
   /// 추천 상품 여부
-  isFeatured        Boolean            @default(false) @map("is_featured")
+  isFeatured         Boolean            @default(false) @map("is_featured")
   /// 조회수
-  viewCount         Int                @default(0) @map("view_count")
+  viewCount          Int                @default(0) @map("view_count")
   /// 생성일시
-  createdAt         DateTime           @default(now()) @map("created_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt         DateTime?          @updatedAt @map("updated_at")
-  cartItems         CartItem[]
-  challengeProducts ChallengeProduct[]
-  lectureProducts   LectureProduct[]
-  orderItems        OrderItem[]
-  images            ProductImage[]
-  options           ProductOption[]
-  questions         ProductQuestion[]
-  reviews           ProductReview[]
-  category          Category           @relation(fields: [categoryId], references: [id])
-  recentlyViewed    RecentlyViewed[]
-  wishlistItems     Wishlist[]
+  updatedAt          DateTime?          @updatedAt @map("updated_at")
+  /// 카테고리 코드 (SUPPLEMENT, HEALTH_FOOD 등)
+  categoryCode       String             @map("category_code") @db.VarChar(50)
+  /// 카테고리명 (영양제, 건강 보조 식품 등)
+  categoryName       String             @map("category_name") @db.VarChar(100)
+  /// 할인율 (%)
+  discountRate       Int?               @default(0) @map("discount_rate")
+  /// 무료배송 기준 금액
+  freeShippingAmount Decimal?           @map("free_shipping_amount") @db.Decimal(10, 0)
+  /// 1인당 최대 주문 수량
+  maxOrderQty        Int                @default(10) @map("max_order_qty")
+  /// 정가 (할인 전 가격)
+  originalPrice      Decimal?           @map("original_price") @db.Decimal(10, 0)
+  /// 적립 포인트율 (%)
+  pointRate          Int                @default(1) @map("point_rate")
+  /// 기본 판매 가격 (옵션 없는 경우)
+  price              Decimal?           @db.Decimal(10, 0)
+  /// 배송비
+  shippingFee        Decimal            @default(3000) @map("shipping_fee") @db.Decimal(10, 0)
+  /// 배송비 정책 (FREE: 무료, PAID: 유료, CONDITIONAL: 조건부)
+  shippingPolicy     String             @default("CONDITIONAL") @map("shipping_policy") @db.VarChar(20)
+  /// 상품 무게 (배송비 계산용, g)
+  weight             Int?               @default(0)
+  /// 상품 태그 (검색용, 쉼표 구분)
+  tags               String?
+  cartItems          CartItem[]
+  challengeProducts  ChallengeProduct[]
+  lectureProducts    LectureProduct[]
+  orderItems         OrderItem[]
+  feedback           ProductFeedback[]
+  images             ProductImage[]
+  options            ProductOption[]
+  recentlyViewed     RecentlyViewed[]
+  wishlistItems      Wishlist[]
+  coupons            Coupon[]
 
   @@index([sku])
-  @@index([categoryId, status])
-  @@index([slug])
+  @@index([categoryCode, status])
   @@map("products")
 }
 
 /// 상품 옵션 테이블
 /// 상품의 옵션별 가격 관리 (재고는 외부 API)
 model ProductOption {
-  id          Int             @id @default(autoincrement())
+  id          Int               @id @default(autoincrement())
   /// 상품 ID
-  productId   Int             @map("product_id")
+  productId   Int               @map("product_id")
   /// 옵션별 재고 관리 코드
-  sku         String          @unique @db.VarChar(100)
+  sku         String            @unique @db.VarChar(100)
   /// 옵션명 (예: 30정, 60정)
-  optionName  String          @map("option_name") @db.VarChar(100)
+  optionName  String            @map("option_name") @db.VarChar(100)
   /// 옵션값
-  optionValue String?         @map("option_value") @db.VarChar(100)
+  optionValue String?           @map("option_value") @db.VarChar(100)
   /// 판매가격
-  price       Decimal         @db.Decimal(10, 0)
+  price       Decimal           @db.Decimal(10, 0)
   /// 1인당 최대 주문 수량
-  maxOrderQty Int             @default(10) @map("max_order_qty")
+  maxOrderQty Int               @default(10) @map("max_order_qty")
   /// 활성화 여부
-  isActive    Boolean         @default(true) @map("is_active")
+  isActive    Boolean           @default(true) @map("is_active")
   /// 정렬 순서
-  sortOrder   Int             @default(0) @map("sort_order")
+  sortOrder   Int               @default(0) @map("sort_order")
   /// 생성일시
-  createdAt   DateTime        @default(now()) @map("created_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt   DateTime?       @updatedAt @map("updated_at")
+  updatedAt   DateTime?         @updatedAt @map("updated_at")
   cartItems   CartItem[]
   orderItems  OrderItem[]
-  product     Product         @relation(fields: [productId], references: [id])
-  reviews     ProductReview[]
+  feedback    ProductFeedback[]
+  product     Product           @relation(fields: [productId], references: [id])
 
   @@unique([productId, optionName])
   @@index([sku])
@@ -857,7 +876,7 @@ model Order {
   user              User            @relation(fields: [userId], references: [id])
   payment           Payment?
   refund            Refund?
-  shipping          Shipping?
+  usedCoupons       UserCoupon[]
 
   @@index([userId, status])
   @@index([inventoryStatus])
@@ -894,7 +913,7 @@ model OrderItem {
   order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product          Product           @relation(fields: [productId], references: [id])
   productOption    ProductOption     @relation(fields: [productOptionId], references: [id])
-  reviews          ProductReview?
+  feedback         ProductFeedback?
 
   @@index([orderId])
   @@map("order_items")
@@ -1030,104 +1049,6 @@ model RefundPolicy {
   @@map("refund_policies")
 }
 
-/// 배송 정보 테이블
-/// 주문 배송 정보 관리
-model Shipping {
-  id               Int             @id @default(autoincrement())
-  /// 주문 ID
-  orderId          Int             @unique @map("order_id")
-  /// 택배사 코드
-  courierCode      String?         @map("courier_code") @db.VarChar(20)
-  /// 택배사명
-  courierName      String?         @map("courier_name") @db.VarChar(50)
-  /// 송장번호
-  trackingNumber   String?         @map("tracking_number") @db.VarChar(100)
-  /// 배송 상태
-  status           String          @default("PREPARING") @db.VarChar(30)
-  /// 배송비
-  shippingFee      Decimal         @default(0) @map("shipping_fee") @db.Decimal(10, 0)
-  /// 적용된 배송 정책 ID
-  shippingPolicyId Int?            @map("shipping_policy_id")
-  /// 배송 메시지
-  deliveryMessage  String?         @map("delivery_message")
-  /// 관리자 메모
-  adminMemo        String?         @map("admin_memo")
-  /// 발송준비완료일시
-  readyAt          DateTime?       @map("ready_at")
-  /// 발송일시
-  shippedAt        DateTime?       @map("shipped_at")
-  /// 배송완료일시
-  deliveredAt      DateTime?       @map("delivered_at")
-  /// 생성일시
-  createdAt        DateTime        @default(now()) @map("created_at")
-  /// 수정일시
-  updatedAt        DateTime?       @updatedAt @map("updated_at")
-  tracks           ShippingTrack[]
-  order            Order           @relation(fields: [orderId], references: [id])
-  shippingPolicy   ShippingPolicy? @relation(fields: [shippingPolicyId], references: [id])
-
-  @@index([trackingNumber])
-  @@index([status])
-  @@map("shippings")
-}
-
-/// 배송 추적 테이블
-/// 택배 배송 추적 정보
-model ShippingTrack {
-  id          Int      @id @default(autoincrement())
-  /// 배송 ID
-  shippingId  Int      @map("shipping_id")
-  /// 현재 위치
-  location    String?  @db.VarChar(200)
-  /// 상태
-  status      String?  @db.VarChar(100)
-  /// 상세 설명
-  description String?
-  /// 추적 시각
-  trackedAt   DateTime @map("tracked_at")
-  /// 택배사 API 원본 데이터
-  rawData     Json?    @map("raw_data")
-  /// 생성일시
-  createdAt   DateTime @default(now()) @map("created_at")
-  shipping    Shipping @relation(fields: [shippingId], references: [id])
-
-  @@index([shippingId, trackedAt])
-  @@map("shipping_tracks")
-}
-
-/// 배송비 정책 테이블
-/// 배송비 계산 정책 관리
-model ShippingPolicy {
-  id                 Int        @id @default(autoincrement())
-  /// 정책명
-  name               String     @db.VarChar(100)
-  /// 기본 배송비
-  baseFee            Decimal    @default(3000) @map("base_fee") @db.Decimal(10, 0)
-  /// 무료배송 기준 금액
-  freeShippingAmount Decimal?   @map("free_shipping_amount") @db.Decimal(10, 0)
-  /// 제주 추가비
-  jejuExtraFee       Decimal    @default(3000) @map("jeju_extra_fee") @db.Decimal(10, 0)
-  /// 도서산간 추가비
-  islandExtraFee     Decimal    @default(5000) @map("island_extra_fee") @db.Decimal(10, 0)
-  /// 우선순위
-  priority           Int        @default(0)
-  /// 적용 시작일
-  validFrom          DateTime   @map("valid_from") @db.Date
-  /// 적용 종료일
-  validUntil         DateTime?  @map("valid_until") @db.Date
-  /// 활성화 여부
-  isActive           Boolean    @default(true) @map("is_active")
-  /// 기본 정책 여부
-  isDefault          Boolean    @default(false) @map("is_default")
-  /// 생성일시
-  createdAt          DateTime   @default(now()) @map("created_at")
-  shippings          Shipping[]
-
-  @@index([isActive, isDefault])
-  @@index([validFrom, validUntil])
-  @@map("shipping_policies")
-}
-
 /// 재고 캐시 테이블
 /// 외부 재고 API 응답 캐싱
 model InventoryCache {
@@ -1194,91 +1115,70 @@ model InventorySyncQueue {
   @@map("inventory_sync_queue")
 }
 
-/// 상품 리뷰 테이블
-/// 구매 상품에 대한 리뷰
-model ProductReview {
-  id              Int            @id @default(autoincrement())
+/// 상품 피드백 통합 테이블 (리뷰 + 문의)
+/// 상품에 대한 고객 피드백을 통합 관리
+model ProductFeedback {
+  id              Int               @id @default(autoincrement())
   /// 상품 ID
-  productId       Int            @map("product_id")
+  productId       Int               @map("product_id")
   /// 상품 옵션 ID
-  productOptionId Int?           @map("product_option_id")
+  productOptionId Int?              @map("product_option_id")
   /// 사용자 ID
-  userId          Int            @map("user_id")
-  /// 주문 상품 ID (구매 확인)
-  orderItemId     Int            @unique @map("order_item_id")
-  /// 별점 (1~5)
-  rating          Int
-  /// 리뷰 제목
-  title           String?        @db.VarChar(200)
-  /// 리뷰 내용
-  content         String
-  /// 리뷰 타입 (TEXT, PHOTO, VIDEO)
-  reviewType      String         @default("TEXT") @map("review_type") @db.VarChar(20)
-  /// 미디어 URL 배열
-  mediaUrls       Json?          @map("media_urls")
-  /// 베스트 리뷰 여부
-  isBest          Boolean        @default(false) @map("is_best")
-  /// 베스트 선정일시
-  bestSelectedAt  DateTime?      @map("best_selected_at")
-  /// 도움됨 수
-  helpfulCount    Int            @default(0) @map("helpful_count")
-  /// 상태 (ACTIVE, HIDDEN, DELETED)
-  status          String         @default("ACTIVE") @db.VarChar(20)
-  /// 숨김 사유
-  hiddenReason    String?        @map("hidden_reason") @db.VarChar(200)
-  /// 생성일시
-  createdAt       DateTime       @default(now()) @map("created_at")
-  /// 수정일시
-  updatedAt       DateTime?      @updatedAt @map("updated_at")
-  orderItem       OrderItem      @relation(fields: [orderItemId], references: [id])
-  product         Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productOption   ProductOption? @relation(fields: [productOptionId], references: [id])
-  user            User           @relation(fields: [userId], references: [id])
-
-  @@index([productId, status])
-  @@index([userId])
-  @@index([rating])
-  @@index([isBest])
-  @@map("product_reviews")
-}
-
-/// 상품 문의 테이블
-/// 상품에 대한 Q&A
-model ProductQuestion {
-  id           Int               @id @default(autoincrement())
-  /// 상품 ID
-  productId    Int               @map("product_id")
-  /// 사용자 ID
-  userId       Int               @map("user_id")
+  userId          Int               @map("user_id")
+  /// 피드백 타입 (REVIEW: 리뷰, QUESTION: 문의)
+  feedbackType    String            @map("feedback_type") @db.VarChar(20)
   /// 원글 ID (답글인 경우)
-  parentId     Int?              @map("parent_id")
-  /// 문의 타입 (PRODUCT, DELIVERY, STOCK, SIZE, OTHER)
-  questionType String            @map("question_type") @db.VarChar(20)
-  /// 문의 제목
-  title        String            @db.VarChar(200)
-  /// 문의 내용
-  content      String
-  /// 비밀글 여부
-  isSecret     Boolean           @default(false) @map("is_secret")
-  /// 답변 여부
-  hasAnswer    Boolean           @default(false) @map("has_answer")
-  /// 답변한 관리자 ID
-  answeredBy   Int?              @map("answered_by")
-  /// 답변일시
-  answeredAt   DateTime?         @map("answered_at")
+  parentId        Int?              @map("parent_id")
+  /// 주문 상품 ID (리뷰인 경우 구매 확인용)
+  orderItemId     Int?              @unique @map("order_item_id")
+  /// 제목
+  title           String?           @db.VarChar(200)
+  /// 내용
+  content         String
   /// 상태 (ACTIVE, HIDDEN, DELETED)
-  status       String            @default("ACTIVE") @db.VarChar(20)
+  status          String            @default("ACTIVE") @db.VarChar(20)
   /// 생성일시
-  createdAt    DateTime          @default(now()) @map("created_at")
-  parent       ProductQuestion?  @relation("QuestionReply", fields: [parentId], references: [id])
-  replies      ProductQuestion[] @relation("QuestionReply")
-  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user         User              @relation(fields: [userId], references: [id])
+  createdAt       DateTime          @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt       DateTime?         @updatedAt @map("updated_at")
+  /// 별점 (1~5, 리뷰인 경우만)
+  rating          Int?
+  /// 리뷰 타입 (TEXT, PHOTO, VIDEO)
+  reviewType      String?           @map("review_type") @db.VarChar(20)
+  /// 미디어 URL 배열
+  mediaUrls       Json?             @map("media_urls")
+  /// 베스트 리뷰 여부
+  isBest          Boolean           @default(false) @map("is_best")
+  /// 베스트 선정일시
+  bestSelectedAt  DateTime?         @map("best_selected_at")
+  /// 도움됨 수
+  helpfulCount    Int               @default(0) @map("helpful_count")
+  /// 문의 타입 (PRODUCT, DELIVERY, STOCK, SIZE, OTHER)
+  questionType    String?           @map("question_type") @db.VarChar(20)
+  /// 비밀글 여부
+  isSecret        Boolean           @default(false) @map("is_secret")
+  /// 답변 여부
+  hasAnswer       Boolean           @default(false) @map("has_answer")
+  /// 답변한 관리자 ID
+  answeredBy      Int?              @map("answered_by")
+  /// 답변일시
+  answeredAt      DateTime?         @map("answered_at")
+  /// 숨김 사유
+  hiddenReason    String?           @map("hidden_reason") @db.VarChar(200)
+  orderItem       OrderItem?        @relation(fields: [orderItemId], references: [id])
+  parent          ProductFeedback?  @relation("FeedbackReply", fields: [parentId], references: [id])
+  replies         ProductFeedback[] @relation("FeedbackReply")
+  product         Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productOption   ProductOption?    @relation(fields: [productOptionId], references: [id])
+  user            User              @relation(fields: [userId], references: [id])
 
-  @@index([productId, status])
+  @@index([productId, feedbackType, status])
+  @@index([userId])
   @@index([parentId])
-  @@index([hasAnswer])
-  @@map("product_questions")
+  @@index([feedbackType, rating])
+  @@index([feedbackType, hasAnswer])
+  @@index([isBest])
+  @@map("product_feedback")
 }
 
 /// 찜하기 테이블
@@ -1338,6 +1238,7 @@ model AiCharacter {
   /// 수정일시
   updatedAt   DateTime? @updatedAt @map("updated_at")
   users       User[]
+  balanceGameSteps BalanceGameStep[]
 
   @@index([isActive, sortOrder])
   @@map("ai_characters")
@@ -1436,18 +1337,18 @@ model MissionAttempt {
 /// 컨텐츠 시청 기록 테이블
 /// 사용자의 컨텐츠 시청 기록 및 중복 방지
 model ContentView {
-  id              Int           @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   /// 사용자 ID
-  userId          Int           @map("user_id")
+  userId          Int            @map("user_id")
   /// 컨텐츠 ID
-  contentId       Int           @map("content_id")
+  contentId       Int            @map("content_id")
   /// 사용자 챌린지 ID (챌린지 참여자인 경우)
-  userChallengeId Int?          @map("user_challenge_id")
+  userChallengeId Int?           @map("user_challenge_id")
   /// 시청 일시
-  viewedAt        DateTime      @default(now()) @map("viewed_at")
-  content         Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  viewedAt        DateTime       @default(now()) @map("viewed_at")
+  content         Content        @relation(fields: [contentId], references: [id], onDelete: Cascade)
   userChallenge   UserChallenge? @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, contentId])
   @@index([userId, viewedAt])
@@ -1496,4 +1397,189 @@ model LectureProduct {
   @@index([contentId])
   @@index([productId])
   @@map("lecture_products")
+}
+
+/// 사용자 커스텀 영양제 테이블
+/// 사용자가 직접 추가한 영양제 정보
+model UserCustomSupplement {
+  id        Int       @id @default(autoincrement())
+  /// 사용자 ID
+  userId    Int       @map("user_id")
+  /// 영양제명
+  name      String    @db.VarChar(100)
+  /// 용량/함량
+  dosage    String?   @db.VarChar(50)
+  /// 메모
+  memo      String?   @db.VarChar(255)
+  /// 활성화 여부
+  isActive  Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt DateTime? @updatedAt @map("updated_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isActive])
+  @@map("user_custom_supplements")
+}
+
+/// 밸런스게임 마스터 테이블
+/// 밸런스게임 기본 정보 관리
+model BalanceGame {
+  id          Int                         @id @default(autoincrement())
+  /// 게임명
+  title       String                      @db.VarChar(200)
+  /// 게임 설명
+  description String?
+  /// 챌린지 일차 (1~21일차)
+  challengeDay Int                        @map("challenge_day")
+  /// 대표 이미지 URL
+  thumbnailUrl String?                    @map("thumbnail_url") @db.VarChar(500)
+  /// 배경 이미지 URL
+  backgroundUrl String?                   @map("background_url") @db.VarChar(500)
+  /// 활성화 여부
+  isActive    Boolean                     @default(true) @map("is_active")
+  /// 생성일시
+  createdAt   DateTime                    @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt   DateTime?                   @updatedAt @map("updated_at")
+  steps       BalanceGameStep[]
+  userHistories UserBalanceGameHistory[]
+
+  @@unique([challengeDay])
+  @@index([isActive, challengeDay])
+  @@map("balance_games")
+}
+
+/// 밸런스게임 단계별 대본 테이블
+/// 각 게임의 단계별 질문과 선택지, 대화 내용 관리
+model BalanceGameStep {
+  id            Int           @id @default(autoincrement())
+  /// 밸런스게임 ID
+  gameId        Int           @map("game_id")
+  /// AI 캐릭터 ID (캐릭터별 대사 구분용)
+  characterId   Int           @map("character_id")
+  /// 단계 번호 (1: 선택 단계, 2~N: 대화 단계)
+  stepNumber    Int           @map("step_number")
+  /// 부모 단계 ID (선택지별 분기용)
+  parentStepId  Int?          @map("parent_step_id")
+  /// 선택한 옵션 값 (부모 단계에서 선택한 값, 1 또는 2)
+  selectedOption Int?         @map("selected_option")
+  /// 단계 타입 (QUESTION: 질문, DIALOGUE: 대화, RESULT: 결과)
+  stepType      String        @map("step_type") @db.VarChar(20)
+  /// 제목
+  title         String?       @db.VarChar(200)
+  /// 내용/질문
+  content       String
+  /// 선택지 (JSON) [{"value": 1, "text": "장원영 얼굴"}, {"value": 2, "text": "권은비 몸매"}]
+  options       Json?
+  /// 획득할 쿠폰 ID (결과 단계인 경우)
+  couponId      Int?          @map("coupon_id")
+  /// 정렬 순서
+  sortOrder     Int           @default(0) @map("sort_order")
+  /// 활성화 여부
+  isActive      Boolean       @default(true) @map("is_active")
+  /// 생성일시
+  createdAt     DateTime      @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt     DateTime?     @updatedAt @map("updated_at")
+  game          BalanceGame   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  character     AiCharacter   @relation(fields: [characterId], references: [id])
+  parentStep    BalanceGameStep? @relation("StepHierarchy", fields: [parentStepId], references: [id])
+  childSteps    BalanceGameStep[] @relation("StepHierarchy")
+  coupon        Coupon?       @relation(fields: [couponId], references: [id])
+
+  @@index([gameId, characterId, stepType])
+  @@index([parentStepId])
+  @@map("balance_game_steps")
+}
+
+
+
+/// 사용자 밸런스게임 완료 이력 테이블
+/// 사용자의 밸런스게임 완료 기록 관리
+model UserBalanceGameHistory {
+  id              Int         @id @default(autoincrement())
+  /// 사용자 ID
+  userId          Int         @map("user_id")
+  /// 밸런스게임 ID
+  gameId          Int         @map("game_id")
+  /// 플레이 날짜 (YYYY-MM-DD)
+  playDate        String      @map("play_date") @db.VarChar(10)
+  /// 선택한 옵션들 JSON [{"step": 1, "option": 1}]
+  selectedOptions Json        @map("selected_options")
+  /// 획득 쿠폰 ID
+  earnedCouponId  Int?        @map("earned_coupon_id")
+  /// 완료일시
+  completedAt     DateTime    @default(now()) @map("completed_at")
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game            BalanceGame @relation(fields: [gameId], references: [id])
+  earnedCoupon    Coupon?     @relation(fields: [earnedCouponId], references: [id])
+
+  @@unique([userId, playDate])
+  @@index([userId])
+  @@index([gameId])
+  @@map("user_balance_game_histories")
+}
+
+/// 쿠폰 마스터 테이블
+/// 할인 쿠폰 정보 관리
+model Coupon {
+  id                Int                        @id @default(autoincrement())
+  /// 쿠폰명
+  name              String                     @db.VarChar(200)
+  /// 쿠폰 설명
+  description       String?
+  /// 할인 타입 (PERCENTAGE: 퍼센트, AMOUNT: 고정금액)
+  discountType      String                     @map("discount_type") @db.VarChar(20)
+  /// 할인값 (퍼센트인 경우 %, 고정금액인 경우 원)
+  discountValue     Int                        @map("discount_value")
+  /// 최대 할인 금액 (퍼센트 할인인 경우)
+  maxDiscountAmount Int?                       @map("max_discount_amount")
+  /// 적용 상품 ID (특정 상품에만 적용)
+  productId         Int                        @map("product_id")
+  /// 유효시간 (시간 단위, 48시간 = 48)
+  validHours        Int                        @default(48) @map("valid_hours")
+  /// 활성화 여부
+  isActive          Boolean                    @default(true) @map("is_active")
+  /// 생성일시
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt         DateTime?                  @updatedAt @map("updated_at")
+  product           Product                    @relation(fields: [productId], references: [id])
+  gameSteps         BalanceGameStep[]
+  userCoupons       UserCoupon[]
+  earnedInGames     UserBalanceGameHistory[]
+
+  @@index([productId, isActive])
+  @@map("coupons")
+}
+
+/// 사용자 쿠폰 테이블
+/// 사용자가 보유한 쿠폰 관리
+model UserCoupon {
+  id            Int       @id @default(autoincrement())
+  /// 사용자 ID
+  userId        Int       @map("user_id")
+  /// 쿠폰 ID
+  couponId      Int       @map("coupon_id")
+  /// 쿠폰 상태 (ACTIVE: 사용가능, USED: 사용완료, EXPIRED: 만료)
+  status        String    @default("ACTIVE") @db.VarChar(20)
+  /// 발급일시
+  issuedAt      DateTime  @default(now()) @map("issued_at")
+  /// 만료일시
+  expiresAt     DateTime  @map("expires_at")
+  /// 사용일시
+  usedAt        DateTime? @map("used_at")
+  /// 사용한 주문 ID
+  usedOrderId   Int?      @map("used_order_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon        Coupon    @relation(fields: [couponId], references: [id])
+  usedOrder     Order?    @relation(fields: [usedOrderId], references: [id])
+
+  @@index([userId, status])
+  @@index([couponId])
+  @@index([expiresAt])
+  @@map("user_coupons")
 }

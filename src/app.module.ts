@@ -24,13 +24,17 @@ import { ChallengeModule } from './challenge/challenge.module';
 import { ManagementModule } from './management/management.module';
 import { PointModule } from './point/point.module';
 import { CategoriesModule } from './categories/categories.module';
-import { ProductsModule } from './products/products.module';
-import { CartModule } from './cart/cart.module';
-import { OrdersModule } from './orders/orders.module';
-import { PaymentModule } from './payment/payment.module';
-import { ShippingModule } from './shipping/shipping.module';
-import { RefundModule } from './refund/refund.module';
-import { RecordsModule } from './records/records.module';
+import { ProductsModule } from './shop/products.module';
+import { CartModule } from './shop/cart.module';
+import { OrdersModule } from './shop/orders.module';
+import { PaymentModule } from './shop/payment.module';
+import { ReviewsModule } from './shop/reviews.module';
+import { RecordsModule } from './tracking/records.module';
+import { StatisticsModule } from './tracking/statistics.module';
+import { HomeModule } from './home/home.module';
+import { BalanceGameModule } from './balance-game/balance-game.module';
+import { CouponsModule } from './coupons/coupons.module';
+import { AiCharacterModule } from './ai-character/ai-character.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -102,9 +106,13 @@ import { RecordsModule } from './records/records.module';
     CartModule,       // 장바구니 모듈
     OrdersModule,     // 주문 관리 모듈
     PaymentModule,    // 결제 연동 모듈
-    ShippingModule,   // 배송 관리 모듈
-    RefundModule,     // 환불 처리 모듈
+    ReviewsModule,    // 상품 리뷰 모듈
     RecordsModule,    // 기록 관리 모듈
+    StatisticsModule, // 통계 분석 모듈
+    HomeModule,       // 홈 화면 모듈
+    BalanceGameModule, // 밸런스게임 모듈
+    CouponsModule,    // 쿠폰 관리 모듈
+    AiCharacterModule, // AI 캐릭터 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [
