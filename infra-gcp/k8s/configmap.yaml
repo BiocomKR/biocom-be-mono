@@ -31,7 +31,7 @@ data:
   
   # ImWeb API 설정
   IMWEB_API_BASE_URL: "https://api.imweb.me"
-  IMWEB_REDIRECT_URI: "https://api-gcp.biocom.ai.kr/auth/redirect"
+  IMWEB_REDIRECT_URI: "https://api-dev.biocom.ai.kr/auth/redirect"
   
   # CORS 설정
   # CORS 설정 - 개발 환경에서는 모든 origin 허용
@@ -40,6 +40,7 @@ data:
   
   # Google Cloud Storage 설정
   GOOGLE_CLOUD_PROJECT_ID: "api-dev-biocom"
+  GOOGLE_CLOUD_api-dev-biocom: "api-dev-biocom"
   GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
   GOOGLE_SERVICE_ACCOUNT_KEY_FILE: "/app/secrets/key.json"
   GCS_BUCKET_NAME: "api-dev-biocom-biocom-uploads"
