@@ -40,7 +40,6 @@ data:
   
   # Google Cloud Storage 설정
   GOOGLE_CLOUD_PROJECT_ID: "api-dev-biocom"
-  GOOGLE_CLOUD_api-dev-biocom: "api-dev-biocom"
   GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
   GOOGLE_SERVICE_ACCOUNT_KEY_FILE: "/app/secrets/key.json"
   GCS_BUCKET_NAME: "api-dev-biocom-biocom-uploads"
