@@ -7,19 +7,19 @@ export enum UserSubscriptionStatus {
    * 신규회원 - 결제를 하지 않은 일반 회원
    * 제한적 기능 접근 가능
    */
-  NEWCOMER = 'newcomer',
-  
+  NEWCOMER = 'NEWCOMER',
+
   /**
-   * 챌린지 활성화 회원 - 21일 챌린지 진행 중인 회원
+   * 챌린저 - 21일 챌린지 진행 중인 회원
    * 모든 챌린지 기능 + 일반 기능 접근 가능
    */
-  CHALLENGE_ACTIVE = 'challenge_active',
-  
+  CHALLENGER = 'CHALLENGER',
+
   /**
    * 구독 회원 - 월구독 중인 회원
    * 대부분 기능 해금 (단, 설문조사 등 챌린지 전용 기능 제외)
    */
-  SUBSCRIBER = 'subscriber'
+  SUBSCRIBER = 'SUBSCRIBER'
 }
 
 /**
@@ -39,8 +39,8 @@ export const USER_PERMISSION_MATRIX = {
     쇼핑_전체: true,
     마이페이지_기본: true,
   },
-  
-  [UserSubscriptionStatus.CHALLENGE_ACTIVE]: {
+
+  [UserSubscriptionStatus.CHALLENGER]: {
     // 모든 기능 접근 가능
     홈_전체: true,
     컨텐츠_전체: true,
@@ -50,7 +50,7 @@ export const USER_PERMISSION_MATRIX = {
     마이페이지_전체: true,
     설문조사: true, // 챌린지 전용
   },
-  
+
   [UserSubscriptionStatus.SUBSCRIBER]: {
     // 대부분 기능 해금 (챌린지 전용 제외)
     홈_전체: true,
@@ -72,18 +72,18 @@ export const canTransitionTo = (
 ): boolean => {
   const transitions = {
     [UserSubscriptionStatus.NEWCOMER]: [
-      UserSubscriptionStatus.CHALLENGE_ACTIVE,
+      UserSubscriptionStatus.CHALLENGER,
       UserSubscriptionStatus.SUBSCRIBER
     ],
-    [UserSubscriptionStatus.CHALLENGE_ACTIVE]: [
+    [UserSubscriptionStatus.CHALLENGER]: [
       UserSubscriptionStatus.NEWCOMER, // 챌린지 완료 후
       UserSubscriptionStatus.SUBSCRIBER // 병행 가능
     ],
     [UserSubscriptionStatus.SUBSCRIBER]: [
       UserSubscriptionStatus.NEWCOMER, // 구독 만료
-      UserSubscriptionStatus.CHALLENGE_ACTIVE // 챌린지 구매 시
+      UserSubscriptionStatus.CHALLENGER // 챌린지 구매 시
     ]
   };
-  
+
   return transitions[from]?.includes(to) ?? false;
 };

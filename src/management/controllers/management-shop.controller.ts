@@ -14,7 +14,7 @@ import {
 import { ApiKeyGuard } from '../guards/api-key.guard';
 import { ManagementShopService } from '../services/management-shop.service';
 
-@Controller('management/shop')
+@Controller('api/shop/management')
 @UseGuards(ApiKeyGuard)
 export class ManagementShopController {
   constructor(private readonly shopService: ManagementShopService) {}

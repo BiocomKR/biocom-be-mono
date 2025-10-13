@@ -30,11 +30,17 @@ export class TodayBalanceGameResponseDto {
   @ApiPropertyOptional({ description: '게임 설명' })
   description?: string;
 
-  @ApiPropertyOptional({ description: '대표 이미지 URL' })
-  thumbnailUrl?: string;
+  // @ApiPropertyOptional({ description: '대표 이미지 URL' })
+  // thumbnailUrl?: string;
 
-  @ApiPropertyOptional({ description: '배경 이미지 URL' })
-  backgroundUrl?: string;
+  // @ApiPropertyOptional({ description: '배경 이미지 URL' })
+  // backgroundUrl?: string;
+
+  @ApiPropertyOptional({ description: '페르소나 이미지 URL' })
+  personaUrl?: string;
+
+  @ApiPropertyOptional({ description: '페르소나 이름', example: '뽀로로' })
+  personaName?: string;
 
   @ApiProperty({ description: '오늘 이미 플레이했는지 여부', example: false })
   hasPlayedToday: boolean;
@@ -87,10 +93,16 @@ export class BalanceGameStepResponseDto {
  * 밸런스게임 선택 요청 DTO
  */
 export class BalanceGameChoiceDto {
-  @ApiProperty({ description: '선택한 옵션 값', example: 1, minimum: 1, maximum: 2 })
+  @ApiPropertyOptional({ description: '부모 단계 ID (2단계부터 필요)', example: 1 })
+  @IsOptional()
+  @IsNumber()
+  parentStepId?: number;
+
+  @ApiPropertyOptional({ description: '선택한 옵션 값 (2단계부터 필요)', example: 1, minimum: 1, maximum: 2 })
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  selectedOption: number;
+  selectedOption?: number;
 }
 
 /**
@@ -124,12 +136,6 @@ export class BalanceGameProgressResponseDto {
   @ApiProperty({ description: '게임 ID', example: 1 })
   gameId: number;
 
-  @ApiProperty({ description: '현재 단계 번호', example: 2 })
-  currentStep: number;
-
-  @ApiProperty({ description: '선택 기록' })
-  selectedOptions: Array<{ step: number; option: number }>;
-
-  @ApiProperty({ description: '다음 단계 정보' })
-  nextStep: BalanceGameStepResponseDto;
+  @ApiProperty({ description: '현재 단계 정보' })
+  step: BalanceGameStepResponseDto;
 }

@@ -37,9 +37,12 @@ data:
   # CORS 설정 - 개발 환경에서는 모든 origin 허용
   # 운영 환경에서는 특정 도메인만 허용하도록 변경 필요
   CORS_ORIGIN: "*"
+
+  # JWT 설정
+  JWT_ACCESS_TOKEN_EXPIRES_IN: "3h"  # Access Token 만료 시간: 3시간
   
   # Google Cloud Storage 설정
-  GOOGLE_CLOUD_PROJECT_ID: "api-dev-biocom"
+  GOOGLE_CLOUD_api-dev-biocom: "api-dev-biocom"
   GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
   GOOGLE_SERVICE_ACCOUNT_KEY_FILE: "/app/secrets/key.json"
   GCS_BUCKET_NAME: "api-dev-biocom-biocom-uploads"

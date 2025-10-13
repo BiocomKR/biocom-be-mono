@@ -21,7 +21,6 @@ import { BalanceGameService } from '../services/balance-game.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
   TodayBalanceGameResponseDto,
-  BalanceGameStepResponseDto,
   BalanceGameChoiceDto,
   BalanceGameCompleteResponseDto,
   BalanceGameProgressResponseDto
@@ -49,47 +48,28 @@ export class BalanceGameController {
     return this.balanceGameService.getTodayBalanceGame(userId);
   }
 
-  /**
-   * 밸런스게임 시작
-   */
-  @Post(':gameId/start')
-  @ApiOperation({
-    summary: '밸런스게임 시작',
-    description: '밸런스게임을 시작하고 첫 번째 질문 단계를 반환합니다.'
-  })
-  @ApiParam({ name: 'gameId', description: '게임 ID' })
-  @ApiResponse({ status: 200, description: '게임 시작 성공', type: BalanceGameStepResponseDto })
-  @ApiResponse({ status: 404, description: '게임을 찾을 수 없음' })
-  @ApiResponse({ status: 409, description: '오늘 이미 완료한 게임' })
-  async startBalanceGame(
-    @Req() req: any,
-    @Param('gameId', ParseIntPipe) gameId: number
-  ): Promise<BalanceGameStepResponseDto> {
-    const userId = req.user.id;
-    return this.balanceGameService.startBalanceGame(userId, gameId);
-  }
 
   /**
-   * 밸런스게임 선택 처리
+   * 밸런스게임 질문 조회
    */
-  @Post(':gameId/steps/:stepId/choice')
+  @Post(':gameId/steps/:stepNumber')
   @ApiOperation({
-    summary: '밸런스게임 선택 처리',
-    description: '현재 단계에서 선택을 하고 다음 단계를 받습니다.'
+    summary: '밸런스게임 질문 조회',
+    description: '해당 stepNumber의 밸런스게임 질문 정보를 조회합니다.'
   })
   @ApiParam({ name: 'gameId', description: '게임 ID' })
-  @ApiParam({ name: 'stepId', description: '현재 단계 ID' })
-  @ApiBody({ type: BalanceGameChoiceDto })
-  @ApiResponse({ status: 200, description: '선택 처리 성공', type: BalanceGameProgressResponseDto })
+  @ApiParam({ name: 'stepNumber', description: '조회할 단계 번호' })
+  @ApiBody({ type: BalanceGameChoiceDto, required: false })
+  @ApiResponse({ status: 200, description: '질문 조회 성공', type: BalanceGameProgressResponseDto })
   @ApiResponse({ status: 404, description: '게임 단계를 찾을 수 없음' })
-  async makeChoice(
+  async getGameStep(
     @Req() req: any,
     @Param('gameId', ParseIntPipe) gameId: number,
-    @Param('stepId', ParseIntPipe) stepId: number,
-    @Body(ValidationPipe) dto: BalanceGameChoiceDto
+    @Param('stepNumber', ParseIntPipe) stepNumber: number,
+    @Body() dto?: BalanceGameChoiceDto
   ): Promise<BalanceGameProgressResponseDto> {
     const userId = req.user.id;
-    return this.balanceGameService.makeChoice(userId, gameId, stepId, dto);
+    return this.balanceGameService.getGameStep(userId, gameId, stepNumber, dto);
   }
 
   /**

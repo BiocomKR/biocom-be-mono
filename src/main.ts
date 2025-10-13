@@ -100,15 +100,14 @@ async function bootstrap() {
         name: 'JWT',
         description: 'JWT 토큰을 입력하세요',
         in: 'header',
-      },
-      'access-token',
+      }
     )
     .addTag('시스템-상태확인', '서버 상태 확인')
     .addTag('시스템-인증', '인증 관리')
     .addTag('헬스케어-이미지 분석', '이미지 분석 및 업로드')
     .addTag('헬스케어-사용자', '사용자 관리')
     .addTag('헬스케어-포인트', '포인트 관리')
-    .addTag('헬스케어-기록관리', '6가지 기록 관리')
+    .addTag('헬스케어-기록', '6가지 기록 관리 및 통계')
     .addTag('챌린지-관리', '챌린지 구매 및 활성화')
     .addTag('챌린지-미션', '미션 수행')
     .addTag('챌린지-설문', '설문조사')

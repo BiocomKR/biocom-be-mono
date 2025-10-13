@@ -1,0 +1,79 @@
+{
+    "success": true,
+    "data": [
+        {
+            "id": 50,
+            "recordType": "ACTIVITY",
+            "date": "2025-09-16",
+            "metadata": {
+                "averageCalories": 480,
+                "targetCalories": 800
+            }
+        },
+        {
+            "id": 42,
+            "recordType": "SLEEP",
+            "date": "2025-09-16",
+            "metadata": {
+                "sleepHours": 7,
+                "sleepMinutes": 30,
+                "targetTime": 8
+            }
+        },
+        {
+            "id": 34,
+            "recordType": "FASTING",
+            "date": "2025-09-16",
+            "metadata": {
+                "fastingHours": 8,
+                "fastingMinutes": 30,
+                "targetTime": 16
+            }
+        },
+        {
+            "id": 26,
+            "recordType": "SUPPLEMENT",
+            "date": "2025-09-16",
+            "metadata": {
+                "takenCount": 2,
+                "targetCount": 3,
+                "complianceRate": 25
+            }
+        },
+        {
+            "id": 18,
+            "recordType": "DIET",
+            "date": "2025-09-16",
+            "metadata": {
+                "breakfast": {
+                    "name": "프로틴 쉐이크",
+                    "이미지URL": "프로틴쉐이크URL(없으면 공란)"
+                },
+                "lunch": {
+                    "name": "도시락",
+                    "이미지URL": "도시락URL(없으면 공란)"
+                },
+                "dinner": {
+                    "name": "회덮밥",
+                    "이미지URL": "회덮밥URL(없으면 공란)"
+                },
+                "간식": {
+                    "name": "사과",
+                    "이미지URL": "사과URL(없으면 공란)"
+                },
+                "dietScore": 40
+            }
+        },
+        {
+            "id": 8,
+            "recordType": "BEAUTY",
+            "date": "2025-09-16",
+            "metadata": {
+                "totalScore": 35,
+                "targetScore": 100,
+                "이전점수대비": -10
+            }
+        }
+    ],
+    "total": 6
+}

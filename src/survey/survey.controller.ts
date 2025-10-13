@@ -52,7 +52,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
 @ApiTags('챌린지-설문')
 @Controller('surveys')
 @UseGuards(JwtAuthGuard)
-@ApiBearerAuth('access-token')
+@ApiBearerAuth()
 export class SurveyController {
   private readonly logger = new Logger(SurveyController.name);
 

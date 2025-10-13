@@ -26,7 +26,7 @@ export class ManagementShippingService {
     const { status, startDate, endDate, page, limit } = params;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ShippingWhereInput = {};
+    const where: any = {}; // TODO: Shipping 테이블 생성 후 Prisma.ShippingWhereInput로 변경
     
     if (status) {
       where.status = status;
@@ -324,7 +324,7 @@ export class ManagementShippingService {
   }) {
     const { startDate, endDate } = params;
     
-    const where: Prisma.ShippingWhereInput = {};
+    const where: any = {}; // TODO: Shipping 테이블 생성 후 Prisma.ShippingWhereInput로 변경
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) where.createdAt.gte = startDate;

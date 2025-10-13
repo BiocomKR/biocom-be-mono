@@ -56,7 +56,7 @@ export class UploadController {
    */
   @Post('image')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ 
     summary: '이미지 파일 업로드', 
@@ -125,7 +125,7 @@ export class UploadController {
    */
   @Get(':id')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: '파일 정보 조회', 
     description: '특정 파일의 정보를 조회합니다.' 
@@ -164,7 +164,7 @@ export class UploadController {
    */
   @Get()
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: '업로드 파일 목록 조회', 
     description: '현재 사용자의 업로드된 파일 목록을 조회합니다.' 
@@ -204,7 +204,7 @@ export class UploadController {
    */
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: '파일 삭제', 
     description: '업로드된 파일을 삭제합니다.' 
@@ -243,7 +243,7 @@ export class UploadController {
    */
   @Post('food-analysis')
   // @UseGuards(JwtAuthGuard)  // 테스트를 위해 임시 제거
-  // @ApiBearerAuth('access-token')
+  // @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ 
     summary: '음식 이미지 AI 분석', 
@@ -363,7 +363,7 @@ export class UploadController {
    */
   @Post('face-slimming')
   // @UseGuards(JwtAuthGuard)  // 테스트를 위해 임시 제거
-  // @ApiBearerAuth('access-token')
+  // @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ 
     summary: '얼굴 슬리밍 이미지 생성', 

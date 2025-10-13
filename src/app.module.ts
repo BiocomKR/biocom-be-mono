@@ -29,12 +29,15 @@ import { CartModule } from './shop/cart.module';
 import { OrdersModule } from './shop/orders.module';
 import { PaymentModule } from './shop/payment.module';
 import { ReviewsModule } from './shop/reviews.module';
+import { QnaModule } from './shop/qna.module';
 import { RecordsModule } from './tracking/records.module';
 import { StatisticsModule } from './tracking/statistics.module';
 import { HomeModule } from './home/home.module';
 import { BalanceGameModule } from './balance-game/balance-game.module';
 import { CouponsModule } from './coupons/coupons.module';
-import { AiCharacterModule } from './ai-character/ai-character.module';
+import { AiPersonaModule } from './ai-persona/ai-persona.module';
+import { BannersModule } from './shop/banners.module';
+// import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -103,16 +106,19 @@ import { AiCharacterModule } from './ai-character/ai-character.module';
     PointModule,      // 포인트 관리 모듈
     CategoriesModule, // 카테고리 관리 모듈
     ProductsModule,   // 상품 관리 모듈
+    BannersModule,    // 쇼핑몰 배너 모듈
     CartModule,       // 장바구니 모듈
     OrdersModule,     // 주문 관리 모듈
     PaymentModule,    // 결제 연동 모듈
     ReviewsModule,    // 상품 리뷰 모듈
+    QnaModule,        // 상품 Q&A 모듈
     RecordsModule,    // 기록 관리 모듈
     StatisticsModule, // 통계 분석 모듈
     HomeModule,       // 홈 화면 모듈
     BalanceGameModule, // 밸런스게임 모듈
     CouponsModule,    // 쿠폰 관리 모듈
-    AiCharacterModule, // AI 캐릭터 관리 모듈
+    AiPersonaModule, // AI 페르소나 관리 모듈
+    // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [

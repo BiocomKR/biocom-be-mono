@@ -28,7 +28,19 @@ export class ManagementShopService {
 
     const where: Prisma.ProductWhereInput = {};
     if (status) where.status = status;
-    if (categoryId) where.categoryId = categoryId;
+    if (categoryId) {
+      // categoryId를 categoryCode로 매핑
+      const categoryMapping: { [key: number]: string } = {
+        1: 'SUPPLEMENT', // 영양제
+        2: 'HEALTH_FOOD', // 건강식품
+        3: 'VITAMIN', // 비타민
+        4: 'PROBIOTICS', // 프로바이오틱스
+      };
+      const categoryCode = categoryMapping[categoryId];
+      if (categoryCode) {
+        where.categoryCode = categoryCode;
+      }
+    }
 
     const [products, total] = await Promise.all([
       this.prisma.product.findMany({
@@ -38,7 +50,6 @@ export class ManagementShopService {
         orderBy: { createdAt: 'desc' },
         include: {
           category: true,
-          options: true,
           images: { orderBy: { sortOrder: 'asc' } },
           _count: {
             select: { orderItems: true }
@@ -51,11 +62,7 @@ export class ManagementShopService {
     return {
       items: products.map(p => ({
         ...p,
-        orderCount: p._count.orderItems,
-        options: p.options.map(opt => ({
-          ...opt,
-          price: Number(opt.price)
-        }))
+        orderCount: p._count.orderItems
       })),
       total,
       page,
@@ -68,36 +75,18 @@ export class ManagementShopService {
    * 상품 생성
    */
   async createProduct(dto: any) {
-    const { options, ...productData } = dto;
+    const product = await this.prisma.product.create({
+      data: dto
+    });
 
-    return await this.prisma.$transaction(async (tx) => {
-      // 상품 생성
-      const product = await tx.product.create({
-        data: productData
-      });
+    this.logger.log(`상품 생성: ${product.name} (ID: ${product.id})`);
 
-      // 옵션 생성
-      if (options && options.length > 0) {
-        await tx.productOption.createMany({
-          data: options.map((opt: any, index: number) => ({
-            ...opt,
-            productId: product.id,
-            sortOrder: index + 1,
-            isActive: true
-          }))
-        });
+    return await this.prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        category: true,
+        images: true
       }
-
-      this.logger.log(`상품 생성: ${product.name} (ID: ${product.id})`);
-
-      return await tx.product.findUnique({
-        where: { id: product.id },
-        include: {
-          category: true,
-          options: true,
-          images: true
-        }
-      });
     });
   }
 
@@ -105,8 +94,6 @@ export class ManagementShopService {
    * 상품 수정
    */
   async updateProduct(id: number, dto: any) {
-    const { options, ...productData } = dto;
-
     const existing = await this.prisma.product.findUnique({
       where: { id }
     });
@@ -115,41 +102,19 @@ export class ManagementShopService {
       throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
-    return await this.prisma.$transaction(async (tx) => {
-      // 상품 정보 업데이트
-      const product = await tx.product.update({
-        where: { id },
-        data: productData
-      });
+    const product = await this.prisma.product.update({
+      where: { id },
+      data: dto
+    });
 
-      // 옵션 업데이트 (있는 경우)
-      if (options) {
-        // 기존 옵션 삭제
-        await tx.productOption.deleteMany({
-          where: { productId: id }
-        });
+    this.logger.log(`상품 수정: ${product.name} (ID: ${id})`);
 
-        // 새 옵션 생성
-        await tx.productOption.createMany({
-          data: options.map((opt: any, index: number) => ({
-            ...opt,
-            productId: id,
-            sortOrder: index + 1,
-            isActive: true
-          }))
-        });
+    return await this.prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        images: true
       }
-
-      this.logger.log(`상품 수정: ${product.name} (ID: ${id})`);
-
-      return await tx.product.findUnique({
-        where: { id },
-        include: {
-          category: true,
-          options: true,
-          images: true
-        }
-      });
     });
   }
 

@@ -15,7 +15,7 @@ data:
   DB_PORT: "5432"
   DB_NAME: "biocom"
   DB_USERNAME: "biocom"
-  DATABASE_URL: "postgresql://biocom:biocom2025dev@34.47.106.104:5432/biocom"
+  DATABASE_URL: "postgresql://biocom:bico0825%21%40%23@34.47.124.132:5432/biocom?connection_limit=5&pool_timeout=30&connect_timeout=10"
   
   # 애플리케이션 설정
   NODE_ENV: "production"
@@ -31,22 +31,25 @@ data:
   
   # ImWeb API 설정
   IMWEB_API_BASE_URL: "https://api.imweb.me"
-  IMWEB_REDIRECT_URI: "https://api-gcp.biocom.ai.kr/auth/redirect"
+  IMWEB_REDIRECT_URI: "https://api-dev.biocom.ai.kr/auth/redirect"
   
   # CORS 설정
   # CORS 설정 - 개발 환경에서는 모든 origin 허용
   # 운영 환경에서는 특정 도메인만 허용하도록 변경 필요
   CORS_ORIGIN: "*"
+
+  # JWT 설정
+  JWT_ACCESS_TOKEN_EXPIRES_IN: "3h"  # Access Token 만료 시간: 3시간
   
   # Google Cloud Storage 설정
+  GOOGLE_CLOUD_api-dev-biocom: "api-dev-biocom"
+  GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
+  GOOGLE_SERVICE_ACCOUNT_KEY_FILE: "/app/secrets/key.json"
   GCS_BUCKET_NAME: "api-dev-biocom-biocom-uploads"
-  GCS_api-dev-biocom: "api-dev-biocom"
-  GCS_TEMP_BUCKET_NAME: "api-dev-biocom-biocom-temp"
   
-  # 파일 업로드 설정
+  # 파일 업로드 설정 (Google Cloud Storage 사용)
   MAX_FILE_SIZE: "10485760"  # 10MB
   ALLOWED_FILE_TYPES: "image/jpeg,image/png,image/gif,application/pdf"
-  UPLOAD_PATH: "/var/app/uploads"  # Dockerfile에서 생성한 경로 사용
   
   # Rate Limiting 설정
   RATE_LIMIT_TTL: "60"  # 60초
@@ -54,6 +57,12 @@ data:
   
   # 기타 설정
   TIMEZONE: "Asia/Seoul"
+  
+  # AI 모델 설정
+  OPENAI_MODEL: "gpt-4o"
+  AI_ANALYSIS_TIMEOUT: "30000"
+  GEMINI_MODEL: "gemini-2.5-flash-image-preview"
+  FACE_SLIMMING_TIMEOUT: "60000"
   
 ---
 # 📝 로깅 설정용 ConfigMap

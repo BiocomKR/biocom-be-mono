@@ -69,19 +69,22 @@ export const isValidStartDate = (startDate: Date, purchaseDate: Date): boolean =
 };
 
 /**
- * Date를 YYYY-MM-DD 문자열로 변환
+ * Date를 YYYY-MM-DD 문자열로 변환 (KST 기준)
  * @param date - 변환할 날짜
  * @returns YYYY-MM-DD 형식의 문자열
  */
 export const formatDateToString = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  // 한국 시간으로 변환 후 날짜 부분만 추출
+  const koreanTime = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+  return koreanTime.toISOString().split('T')[0];
 };
 
 /**
- * YYYY-MM-DD 문자열을 Date 객체로 변환
+ * YYYY-MM-DD 문자열을 Date 객체로 변환 (KST 기준)
  * @param dateString - YYYY-MM-DD 형식의 문자열
- * @returns Date 객체
+ * @returns Date 객체 (한국 시간 00:00:00)
  */
 export const parseStringToDate = (dateString: string): Date => {
-  return new Date(dateString + 'T00:00:00Z');
+  // 한국 시간 기준으로 해석
+  return new Date(dateString + 'T00:00:00+09:00');
 };

@@ -111,13 +111,14 @@ function createExtendedPrismaClient() {
     query: {
       // 모든 모델에 대한 시간대 변환
       $allModels: {
-        // 생성 시 KST → UTC 변환
+        // 생성 시 KST → UTC 변환 (한국 서비스이므로 비활성화)
         async create({ args, query, model }) {
-          if (args.data) {
-            args.data = convertDatesToUTC(args.data);
-          }
+          // if (args.data) {
+          //   args.data = convertDatesToUTC(args.data);
+          // }
           const result = await query(args);
-          return convertDatesToKST(result);
+          // return convertDatesToKST(result);
+          return result;
         },
         
         // 다중 생성 시 KST → UTC 변환
@@ -132,13 +133,14 @@ function createExtendedPrismaClient() {
           return query(args);
         },
         
-        // 업데이트 시 KST → UTC 변환
+        // 업데이트 시 KST → UTC 변환 (한국 서비스이므로 비활성화)
         async update({ args, query, model }) {
-          if (args.data) {
-            args.data = convertDatesToUTC(args.data);
-          }
+          // if (args.data) {
+          //   args.data = convertDatesToUTC(args.data);
+          // }
           const result = await query(args);
-          return convertDatesToKST(result);
+          // return convertDatesToKST(result);
+          return result;
         },
         
         // 다중 업데이트 시 KST → UTC 변환
@@ -149,19 +151,19 @@ function createExtendedPrismaClient() {
           return query(args);
         },
         
-        // 조회 시 UTC → KST 변환
+        // 조회 시 UTC → KST 변환 (시스템 타임스탬프용)
         async findUnique({ args, query, model }) {
           const result = await query(args);
           return result ? convertDatesToKST(result) : result;
         },
-        
-        // 첫 번째 조회 시 UTC → KST 변환
+
+        // 첫 번째 조회 시 UTC → KST 변환 (시스템 타임스탬프용)
         async findFirst({ args, query, model }) {
           const result = await query(args);
           return result ? convertDatesToKST(result) : result;
         },
-        
-        // 다중 조회 시 UTC → KST 변환
+
+        // 다중 조회 시 UTC → KST 변환 (시스템 타임스탬프용)
         async findMany({ args, query, model }) {
           const results = await query(args);
           return results.map(result => convertDatesToKST(result));
@@ -328,12 +330,31 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get inventorySyncQueue() { return this.prisma.inventorySyncQueue; }
   get productReview() { return this.prisma.productReview; }
   get productQuestion() { return this.prisma.productQuestion; }
+  get productFeedback() { return this.prisma.productFeedback; }
   get wishlist() { return this.prisma.wishlist; }
   get recentlyViewed() { return this.prisma.recentlyViewed; }
+  get banner() { return this.prisma.banner; }
   
   // 온보딩 관련 테이블
-  get aiCharacter() { return this.prisma.aiCharacter; }
+  get aiPersona() { return this.prisma.aiPersona; }
   get userChallengeSurveyResult() { return this.prisma.userChallengeSurveyResult; }
+
+  // 운동 관련 테이블
+  get exerciseType() { return this.prisma.exerciseType; }
+
+  // 커스텀 영양제 테이블
+  get userCustomSupplement() { return this.prisma.userCustomSupplement; }
+
+  // 밸런스게임 관련 테이블
+  get balanceGame() { return this.prisma.balanceGame; }
+  get balanceGameStep() { return this.prisma.balanceGameStep; }
+  get badge() { return this.prisma.badge; }
+  get userBadge() { return this.prisma.userBadge; }
+  get userBalanceGameHistory() { return this.prisma.userBalanceGameHistory; }
+
+  // 쿠폰 관련 테이블
+  get coupon() { return this.prisma.coupon; }
+  get userCoupon() { return this.prisma.userCoupon; }
 
   // 메서드 바인딩
   $transaction(arg: any) {
