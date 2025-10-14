@@ -153,6 +153,7 @@ export class ReviewQueryDto {
     example: true
   })
   @IsOptional()
+  @Type(() => Boolean)
   isBest?: boolean;
 
   @ApiPropertyOptional({
