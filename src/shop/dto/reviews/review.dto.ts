@@ -181,6 +181,38 @@ export class ReviewQueryDto {
 }
 
 /**
+ * 리뷰 댓글 응답 DTO
+ */
+export class ReviewCommentResponseDto {
+  @ApiProperty({ description: '댓글 ID', example: 1 })
+  id: number;
+
+  @ApiProperty({ description: '리뷰 ID', example: 1 })
+  reviewId: number;
+
+  @ApiProperty({ description: '사용자 ID', example: 1 })
+  userId: number;
+
+  @ApiProperty({ description: '사용자 이름 (마스킹)', example: '홍*동' })
+  userName: string;
+
+  @ApiProperty({ description: '댓글 내용', example: '저도 이 제품 좋았어요!' })
+  content: string;
+
+  @ApiPropertyOptional({
+    description: '미디어 URL 배열',
+    example: ['https://example.com/image1.jpg']
+  })
+  mediaUrls?: string[];
+
+  @ApiProperty({ description: '생성일시', example: '2024-01-15T10:00:00Z' })
+  createdAt: string;
+
+  @ApiPropertyOptional({ description: '수정일시', example: '2024-01-15T11:00:00Z' })
+  updatedAt?: string;
+}
+
+/**
  * 리뷰 응답 DTO
  */
 export class ReviewResponseDto {
@@ -245,6 +277,12 @@ export class ReviewResponseDto {
     optionName: string;
     price: number;
   };
+
+  @ApiPropertyOptional({ description: '댓글 목록', type: [ReviewCommentResponseDto] })
+  comments?: ReviewCommentResponseDto[];
+
+  @ApiPropertyOptional({ description: '댓글 수', example: 5 })
+  commentCount?: number;
 }
 
 /**
@@ -290,4 +328,66 @@ export class ReviewHelpfulResponseDto {
 
   @ApiProperty({ description: '사용자가 도움됨을 눌렀는지', example: true })
   isHelpful: boolean;
+}
+
+/**
+ * 리뷰 댓글 작성 요청 DTO
+ */
+export class CreateReviewCommentDto {
+  @ApiProperty({ description: '댓글 내용', example: '저도 이 제품 좋았어요!' })
+  @IsString()
+  @IsNotEmpty()
+  content: string;
+
+  @ApiPropertyOptional({
+    description: '댓글 이미지 URL 배열 (최대 3장)',
+    example: ['https://example.com/image1.jpg'],
+    maxItems: 3
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsUrl({}, { each: true })
+  mediaUrls?: string[];
+}
+
+/**
+ * 리뷰 댓글 수정 요청 DTO
+ */
+export class UpdateReviewCommentDto {
+  @ApiPropertyOptional({ description: '댓글 내용', example: '저도 이 제품 좋았어요!' })
+  @IsOptional()
+  @IsString()
+  content?: string;
+
+  @ApiPropertyOptional({
+    description: '댓글 이미지 URL 배열 (최대 3장)',
+    example: ['https://example.com/image1.jpg'],
+    maxItems: 3
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsUrl({}, { each: true })
+  mediaUrls?: string[];
+}
+
+/**
+ * 리뷰 댓글 목록 응답 DTO (페이지네이션)
+ */
+export class ReviewCommentPaginatedResponseDto {
+  @ApiProperty({ description: '댓글 목록', type: [ReviewCommentResponseDto] })
+  items: ReviewCommentResponseDto[];
+
+  @ApiProperty({ description: '총 개수', example: 25 })
+  total: number;
+
+  @ApiProperty({ description: '현재 페이지', example: 1 })
+  page: number;
+
+  @ApiProperty({ description: '페이지당 항목 수', example: 20 })
+  limit: number;
+
+  @ApiProperty({ description: '총 페이지 수', example: 2 })
+  totalPages: number;
 }

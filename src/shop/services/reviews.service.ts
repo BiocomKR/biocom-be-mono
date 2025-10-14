@@ -13,7 +13,11 @@ import {
   ReviewResponseDto,
   ReviewPaginatedResponseDto,
   ReviewSortType,
-  ReviewHelpfulResponseDto
+  ReviewHelpfulResponseDto,
+  CreateReviewCommentDto,
+  UpdateReviewCommentDto,
+  ReviewCommentResponseDto,
+  ReviewCommentPaginatedResponseDto
 } from '../dto/reviews/review.dto';
 import { Prisma } from '@prisma/client';
 
@@ -167,7 +171,8 @@ export class ReviewsService {
     // WHERE 조건 구성
     const where: Prisma.ProductFeedbackWhereInput = {
       feedbackType: 'REVIEW',
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      parentId: null  // 댓글 제외, 리뷰만 조회
     };
 
     if (query.productId) {
@@ -240,6 +245,21 @@ export class ReviewsService {
               optionName: true,
               price: true
             }
+          },
+          replies: {
+            where: {
+              status: 'ACTIVE'
+            },
+            orderBy: {
+              createdAt: 'asc'
+            },
+            include: {
+              user: {
+                select: {
+                  name: true
+                }
+              }
+            }
           }
         }
       }),
@@ -263,53 +283,13 @@ export class ReviewsService {
     }
 
     return {
-      items: reviews.map(review => this.formatReviewResponse(review)),
+      items: reviews.map(review => this.formatReviewResponse(review, true)),
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
       ratingStats
     };
-  }
-
-  /**
-   * 리뷰 상세 조회
-   */
-  async findReviewById(id: number): Promise<ReviewResponseDto> {
-    const review = await this.prisma.productFeedback.findFirst({
-      where: {
-        id,
-        feedbackType: 'REVIEW',
-        status: 'ACTIVE'
-      },
-      include: {
-        user: {
-          select: {
-            name: true
-          }
-        },
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
-          }
-        }
-      }
-    });
-
-    if (!review) {
-      throw new NotFoundException('리뷰를 찾을 수 없습니다');
-    }
-
-    return this.formatReviewResponse(review);
   }
 
   /**
@@ -563,9 +543,11 @@ export class ReviewsService {
 
   /**
    * 리뷰 응답 데이터 포맷팅
+   * @param review 리뷰 데이터
+   * @param includeComments 댓글 포함 여부 (기본값: false)
    */
-  private formatReviewResponse(review: any): ReviewResponseDto {
-    return {
+  private formatReviewResponse(review: any, includeComments: boolean = false): ReviewResponseDto {
+    const response: ReviewResponseDto = {
       id: review.id,
       productId: review.productId,
       productOptionId: review.productOptionId,
@@ -592,6 +574,14 @@ export class ReviewsService {
         price: Number(review.productOption.price)
       } : undefined
     };
+
+    // 댓글 포함 (상세 조회 시에만)
+    if (includeComments && review.replies) {
+      response.comments = review.replies.map((comment: any) => this.formatCommentResponse(comment));
+      response.commentCount = review.replies.length;
+    }
+
+    return response;
   }
 
   /**
@@ -602,5 +592,206 @@ export class ReviewsService {
       return name.charAt(0) + '*';
     }
     return name.charAt(0) + '*' + name.charAt(name.length - 1);
+  }
+
+  /**
+   * 리뷰 댓글 작성
+   * 로그인한 사용자라면 누구나 댓글 작성 가능
+   */
+  async createReviewComment(userId: number, reviewId: number, dto: CreateReviewCommentDto): Promise<ReviewCommentResponseDto> {
+    this.logger.log(`사용자 ${userId}가 리뷰 ${reviewId}에 댓글 작성 시도`);
+
+    // 리뷰 존재 확인
+    const review = await this.prisma.productFeedback.findFirst({
+      where: {
+        id: reviewId,
+        feedbackType: 'REVIEW',
+        status: 'ACTIVE'
+      }
+    });
+
+    if (!review) {
+      throw new NotFoundException('리뷰를 찾을 수 없습니다');
+    }
+
+    // 댓글 작성
+    const comment = await this.prisma.productFeedback.create({
+      data: {
+        userId,
+        productId: review.productId,
+        productOptionId: review.productOptionId,
+        feedbackType: 'REVIEW',
+        parentId: reviewId,
+        content: dto.content,
+        mediaUrls: dto.mediaUrls || []
+      },
+      include: {
+        user: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+
+    this.logger.log(`리뷰 댓글 작성 완료: ${comment.id}`);
+
+    return this.formatCommentResponse(comment);
+  }
+
+  /**
+   * 리뷰 댓글 목록 조회 (페이지네이션)
+   */
+  async findReviewComments(reviewId: number, page: number = 1, limit: number = 20): Promise<ReviewCommentPaginatedResponseDto> {
+    const skip = (page - 1) * limit;
+
+    // 리뷰 존재 확인
+    const review = await this.prisma.productFeedback.findFirst({
+      where: {
+        id: reviewId,
+        feedbackType: 'REVIEW',
+        status: 'ACTIVE'
+      }
+    });
+
+    if (!review) {
+      throw new NotFoundException('리뷰를 찾을 수 없습니다');
+    }
+
+    // WHERE 조건 구성
+    const where: Prisma.ProductFeedbackWhereInput = {
+      parentId: reviewId,
+      feedbackType: 'REVIEW',
+      status: 'ACTIVE'
+    };
+
+    // 데이터 조회
+    const [comments, total] = await Promise.all([
+      this.prisma.productFeedback.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'asc' },
+        include: {
+          user: {
+            select: {
+              name: true
+            }
+          }
+        }
+      }),
+      this.prisma.productFeedback.count({ where })
+    ]);
+
+    return {
+      items: comments.map(comment => this.formatCommentResponse(comment)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
+
+  /**
+   * 리뷰 댓글 수정
+   * 작성자만 수정 가능
+   */
+  async updateReviewComment(userId: number, commentId: number, dto: UpdateReviewCommentDto): Promise<ReviewCommentResponseDto> {
+    this.logger.log(`사용자 ${userId}가 댓글 ${commentId} 수정 시도`);
+
+    // 댓글 존재 확인 및 권한 검증
+    const existingComment = await this.prisma.productFeedback.findFirst({
+      where: {
+        id: commentId,
+        feedbackType: 'REVIEW',
+        status: 'ACTIVE',
+        parentId: { not: null } // 댓글인지 확인
+      }
+    });
+
+    if (!existingComment) {
+      throw new NotFoundException('댓글을 찾을 수 없습니다');
+    }
+
+    if (existingComment.userId !== userId) {
+      throw new ForbiddenException('본인이 작성한 댓글만 수정할 수 있습니다');
+    }
+
+    // 댓글 수정
+    const updatedComment = await this.prisma.productFeedback.update({
+      where: { id: commentId },
+      data: {
+        content: dto.content,
+        mediaUrls: dto.mediaUrls
+      },
+      include: {
+        user: {
+          select: {
+            name: true
+          }
+        }
+      }
+    });
+
+    this.logger.log(`댓글 수정 완료: ${commentId}`);
+
+    return this.formatCommentResponse(updatedComment);
+  }
+
+  /**
+   * 리뷰 댓글 삭제
+   * 작성자만 삭제 가능 (소프트 삭제)
+   */
+  async deleteReviewComment(userId: number, commentId: number): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`사용자 ${userId}가 댓글 ${commentId} 삭제 시도`);
+
+    // 댓글 존재 확인 및 권한 검증
+    const existingComment = await this.prisma.productFeedback.findFirst({
+      where: {
+        id: commentId,
+        feedbackType: 'REVIEW',
+        status: 'ACTIVE',
+        parentId: { not: null } // 댓글인지 확인
+      }
+    });
+
+    if (!existingComment) {
+      throw new NotFoundException('댓글을 찾을 수 없습니다');
+    }
+
+    if (existingComment.userId !== userId) {
+      throw new ForbiddenException('본인이 작성한 댓글만 삭제할 수 있습니다');
+    }
+
+    // 소프트 삭제
+    await this.prisma.productFeedback.update({
+      where: { id: commentId },
+      data: {
+        status: 'DELETED'
+      }
+    });
+
+    this.logger.log(`댓글 삭제 완료: ${commentId}`);
+
+    return {
+      success: true,
+      message: '댓글이 삭제되었습니다'
+    };
+  }
+
+  /**
+   * 댓글 응답 데이터 포맷팅
+   */
+  private formatCommentResponse(comment: any): ReviewCommentResponseDto {
+    return {
+      id: comment.id,
+      reviewId: comment.parentId!,
+      userId: comment.userId,
+      userName: this.maskUserName(comment.user.name),
+      content: comment.content,
+      mediaUrls: comment.mediaUrls || [],
+      createdAt: comment.createdAt.toISOString(),
+      updatedAt: comment.updatedAt?.toISOString()
+    };
   }
 }
