@@ -86,14 +86,6 @@ export class ChallengeScheduleResponseDto {
   purchasedAt: Date;
 
   @ApiProperty({
-    description: '최대 설정 가능한 시작일 (구매일 +30일)',
-    example: '2024-10-01',
-    type: 'string',
-    format: 'date'
-  })
-  maxStartDate: string;
-
-  @ApiProperty({
     description: '생성일시',
     example: '2024-09-01T10:30:00Z'
   })

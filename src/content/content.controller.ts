@@ -16,6 +16,7 @@ import { ContentService } from './content.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { ContentCompletionResponseDto } from './dto/content-completion.dto';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 사용자용 컨텐츠 컨트롤러
@@ -41,7 +42,7 @@ export class ContentController {
     description: '사용자 상태(챌린지/구독)에 따라 강의 목록을 조회합니다.',
   })
   @ApiQuery({ name: 'week', required: false, description: '주차 (1,2,3)', example: 1 })
-  @ApiQuery({ name: 'challengeId', required: false, description: '챌린지 ID' })
+  @ApiQuery({ name: 'productId', required: false, description: '챌린지 상품 ID' })
   @ApiResponse({
     status: HttpStatus.OK,
     description: '강의 목록 조회 성공',
@@ -49,15 +50,15 @@ export class ContentController {
   async getLectures(
     @Request() req: any,
     @Query('week') week?: string,
-    @Query('challengeId') challengeId?: string
+    @Query('productId') productId?: string
   ): Promise<ApiResponseDto<any>> {
-    this.logger.log(`강의 목록 조회 요청 - 사용자: ${req.user.userId}, 주차: ${week}`);
+    this.logger.log(`강의 목록 조회 요청 - 사용자: ${req.user.userId}, 주차: ${week}, 상품: ${productId}`);
 
     try {
       const weekNum = week ? parseInt(week, 10) : undefined;
-      const challengeIdNum = challengeId ? parseInt(challengeId, 10) : undefined;
+      const productIdNum = productId ? parseInt(productId, 10) : undefined;
 
-      const result = await this.contentService.getLectures(req.user.userId, weekNum, challengeIdNum);
+      const result = await this.contentService.getLectures(req.user.userId, weekNum, productIdNum);
 
       this.logger.log(`강의 목록 조회 성공 - ${result.lectures.length}개`);
 
@@ -65,7 +66,7 @@ export class ContentController {
         success: true,
         message: '강의 목록이 성공적으로 조회되었습니다.',
         data: result,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('강의 목록 조회 실패', error);
@@ -114,7 +115,7 @@ export class ContentController {
         success: true,
         message: '칼럼 목록이 성공적으로 조회되었습니다.',
         data: result,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('칼럼 목록 조회 실패', error);
@@ -146,7 +147,7 @@ export class ContentController {
         success: true,
         message: '오늘의 칼럼이 성공적으로 조회되었습니다.',
         data: columns,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('오늘의 칼럼 조회 실패', error);
@@ -196,7 +197,7 @@ export class ContentController {
         success: true,
         message: '컨텐츠가 성공적으로 조회되었습니다.',
         data: content,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`컨텐츠 상세 조회 실패 - ID: ${id}`, error);
@@ -234,7 +235,7 @@ export class ContentController {
         success: true,
         message: '인기 컨텐츠가 성공적으로 조회되었습니다.',
         data: contents,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('인기 컨텐츠 조회 실패', error);

@@ -18,6 +18,7 @@ import { CreateUserDto } from '../../users/dto/create-user.dto';
 import { UpdateUserDto } from '../../users/dto/update-user.dto';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management 사용자 관리 컨트롤러
@@ -75,7 +76,7 @@ export class ManagementUsersController {
         page,
         limit,
       },
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -92,7 +93,7 @@ export class ManagementUsersController {
       success: true,
       message: '사용자 정보가 성공적으로 조회되었습니다.',
       data: user,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -109,7 +110,7 @@ export class ManagementUsersController {
       success: true,
       message: '사용자가 성공적으로 생성되었습니다.',
       data: user,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -129,7 +130,7 @@ export class ManagementUsersController {
       success: true,
       message: '사용자 정보가 성공적으로 수정되었습니다.',
       data: user,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -146,7 +147,7 @@ export class ManagementUsersController {
       success: true,
       message: '사용자가 성공적으로 삭제되었습니다.',
       data: undefined,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 }

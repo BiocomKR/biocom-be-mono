@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiKeyGuard } from '../guards/api-key.guard';
 import { ManagementMissionService } from '../services/management-mission.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management 미션 관리 컨트롤러
@@ -53,7 +54,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 목록 조회 성공',
       data: missions,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -71,7 +72,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 상세 조회 성공',
       data: mission,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -104,7 +105,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 생성 성공',
       data: mission,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -138,7 +139,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 수정 성공',
       data: mission,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -156,7 +157,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 삭제 성공',
       data: null,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -174,7 +175,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 상태 전환 성공',
       data: mission,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -193,7 +194,7 @@ export class ManagementMissionController {
         success: false,
         message: 'dailyLimit은 1 이상이어야 합니다',
         data: null,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     }
     
@@ -202,7 +203,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 dailyLimit 업데이트 성공',
       data: mission,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -220,7 +221,7 @@ export class ManagementMissionController {
       success: true,
       message: '미션 통계 조회 성공',
       data: stats,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 }

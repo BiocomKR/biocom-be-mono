@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiKeyGuard } from '../guards/api-key.guard';
 import { ChallengeService } from '../../challenge/challenge.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management 챌린지 관리 컨트롤러
@@ -51,7 +52,7 @@ export class ManagementChallengeController {
       success: true,
       message: '챌린지 목록 조회 성공',
       data: challenges,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -69,7 +70,7 @@ export class ManagementChallengeController {
       success: true,
       message: '챌린지 상세 조회 성공',
       data: challenge,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -81,22 +82,21 @@ export class ManagementChallengeController {
     @Body() createChallengeDto: {
       name: string;
       description?: string;
-      startDate: string;
-      endDate: string;
       totalDays: number;
-      maxParticipants?: number;
-      entryFee?: number;
+      price: number;
+      categoryCode?: string;
+      categoryName?: string;
       isActive?: boolean;
     }
   ) {
     this.logger.log(`챌린지 생성 - 이름: ${createChallengeDto.name}`);
-    
+
     const challenge = await this.challengeService.createChallenge(createChallengeDto);
     return {
       success: true,
       message: '챌린지 생성 성공',
       data: challenge,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -124,7 +124,7 @@ export class ManagementChallengeController {
       success: true,
       message: '챌린지 수정 성공',
       data: challenge,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -142,7 +142,7 @@ export class ManagementChallengeController {
       success: true,
       message: '챌린지 삭제 성공',
       data: null,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -151,15 +151,15 @@ export class ManagementChallengeController {
    */
   @Get(':id/participants')
   async getChallengeParticipants(
-    @Param('id', ParseIntPipe) challengeId: number,
+    @Param('id', ParseIntPipe) productId: number,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('status') status?: string,
   ) {
-    this.logger.log(`챌린지 참여자 목록 조회 - 챌린지 ID: ${challengeId}`);
-    
+    this.logger.log(`챌린지 참여자 목록 조회 - 상품 ID: ${productId}`);
+
     const participants = await this.challengeService.getChallengeParticipants({
-      challengeId,
+      productId,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 10,
       status,
@@ -169,7 +169,7 @@ export class ManagementChallengeController {
       success: true,
       message: '챌린지 참여자 목록 조회 성공',
       data: participants,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -178,7 +178,7 @@ export class ManagementChallengeController {
    */
   @Post(':id/missions')
   async addMissionToChallenge(
-    @Param('id', ParseIntPipe) challengeId: number,
+    @Param('id', ParseIntPipe) productId: number,
     @Body() missionData: {
       missionId: number;
       day: number;
@@ -187,14 +187,14 @@ export class ManagementChallengeController {
       isActive?: boolean;
     }
   ) {
-    this.logger.log(`챌린지에 미션 추가 - 챌린지 ID: ${challengeId}, 미션 ID: ${missionData.missionId}`);
-    
-    const challengeMission = await this.challengeService.addMissionToChallenge(challengeId, missionData);
+    this.logger.log(`챌린지에 미션 추가 - 상품 ID: ${productId}, 미션 ID: ${missionData.missionId}`);
+
+    const challengeMission = await this.challengeService.addMissionToChallenge(productId, missionData);
     return {
       success: true,
       message: '챌린지 미션 추가 성공',
       data: challengeMission,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -203,7 +203,7 @@ export class ManagementChallengeController {
    */
   @Post(':id/surveys')
   async addSurveyToChallenge(
-    @Param('id', ParseIntPipe) challengeId: number,
+    @Param('id', ParseIntPipe) productId: number,
     @Body() surveyData: {
       surveyId: number;
       day: number;
@@ -211,14 +211,14 @@ export class ManagementChallengeController {
       isActive?: boolean;
     }
   ) {
-    this.logger.log(`챌린지에 설문 추가 - 챌린지 ID: ${challengeId}, 설문 ID: ${surveyData.surveyId}`);
-    
-    const challengeSurvey = await this.challengeService.addSurveyToChallenge(challengeId, surveyData);
+    this.logger.log(`챌린지에 설문 추가 - 상품 ID: ${productId}, 설문 ID: ${surveyData.surveyId}`);
+
+    const challengeSurvey = await this.challengeService.addSurveyToChallenge(productId, surveyData);
     return {
       success: true,
       message: '챌린지 설문 추가 성공',
       data: challengeSurvey,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -227,7 +227,7 @@ export class ManagementChallengeController {
    */
   @Post(':id/quizzes')
   async addQuizToChallenge(
-    @Param('id', ParseIntPipe) challengeId: number,
+    @Param('id', ParseIntPipe) productId: number,
     @Body() quizData: {
       quizId: number;
       day: number;
@@ -235,14 +235,14 @@ export class ManagementChallengeController {
       isActive?: boolean;
     }
   ) {
-    this.logger.log(`챌린지에 퀴즈 추가 - 챌린지 ID: ${challengeId}, 퀴즈 ID: ${quizData.quizId}`);
-    
-    const challengeQuiz = await this.challengeService.addQuizToChallenge(challengeId, quizData);
+    this.logger.log(`챌린지에 퀴즈 추가 - 상품 ID: ${productId}, 퀴즈 ID: ${quizData.quizId}`);
+
+    const challengeQuiz = await this.challengeService.addQuizToChallenge(productId, quizData);
     return {
       success: true,
       message: '챌린지 퀴즈 추가 성공',
       data: challengeQuiz,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -251,22 +251,21 @@ export class ManagementChallengeController {
    */
   @Post(':id/contents')
   async addContentToChallenge(
-    @Param('id', ParseIntPipe) challengeId: number,
+    @Param('id', ParseIntPipe) productId: number,
     @Body() contentData: {
       contentId: number;
-      day: number;
-      points?: number;
+      weekNumber: number;
       isActive?: boolean;
     }
   ) {
-    this.logger.log(`챌린지에 컨텐츠 추가 - 챌린지 ID: ${challengeId}, 컨텐츠 ID: ${contentData.contentId}`);
-    
-    const challengeContent = await this.challengeService.addContentToChallenge(challengeId, contentData);
+    this.logger.log(`챌린지에 컨텐츠 추가 - 상품 ID: ${productId}, 컨텐츠 ID: ${contentData.contentId}`);
+
+    const challengeContent = await this.challengeService.addContentToChallenge(productId, contentData);
     return {
       success: true,
       message: '챌린지 컨텐츠 추가 성공',
       data: challengeContent,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -275,16 +274,16 @@ export class ManagementChallengeController {
    */
   @Get(':id/stats')
   async getChallengeStats(
-    @Param('id', ParseIntPipe) challengeId: number,
+    @Param('id', ParseIntPipe) productId: number,
   ) {
-    this.logger.log(`챌린지 통계 조회 - 챌린지 ID: ${challengeId}`);
-    
-    const stats = await this.challengeService.getChallengeStats(challengeId);
+    this.logger.log(`챌린지 통계 조회 - 상품 ID: ${productId}`);
+
+    const stats = await this.challengeService.getChallengeStats(productId);
     return {
       success: true,
       message: '챌린지 통계 조회 성공',
       data: stats,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -293,16 +292,16 @@ export class ManagementChallengeController {
    */
   @Put(':id/toggle-status')
   async toggleChallengeStatus(
-    @Param('id', ParseIntPipe) challengeId: number,
+    @Param('id', ParseIntPipe) productId: number,
   ) {
-    this.logger.log(`챌린지 상태 전환 - 챌린지 ID: ${challengeId}`);
-    
-    const challenge = await this.challengeService.toggleChallengeStatus(challengeId);
+    this.logger.log(`챌린지 상태 전환 - 상품 ID: ${productId}`);
+
+    const challenge = await this.challengeService.toggleChallengeStatus(productId);
     return {
       success: true,
       message: '챌린지 상태 전환 성공',
       data: challenge,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 }

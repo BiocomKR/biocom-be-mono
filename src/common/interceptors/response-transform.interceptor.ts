@@ -7,6 +7,7 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { Request } from 'express';
+import { getNowKST } from '../utils/kst-date.util';
 
 /**
  * API 응답 형식 인터페이스
@@ -64,7 +65,7 @@ export class ResponseTransformInterceptor<T>
           success: true,
           statusCode: response.statusCode || 200,
           data,
-          timestamp: new Date().toISOString(),
+          timestamp: getNowKST().toISOString(),
           path: request.path,
         };
 

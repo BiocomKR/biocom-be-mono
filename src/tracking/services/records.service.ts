@@ -311,6 +311,17 @@ export class RecordsService {
           select: { imageUrl: true },
           take: 1,
         },
+        nutrients: {
+          select: {
+            name: true,
+            amount: true,
+            unit: true,
+            rda: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
       },
       orderBy: {
         name: 'asc',
@@ -329,6 +340,7 @@ export class RecordsService {
           name: product.name,
           description: product.description,
           imageUrl: product.images[0]?.imageUrl,
+          nutrients: product.nutrients,
         })),
         customSupplements: customSupplements.map(supplement => ({
           id: supplement.id,

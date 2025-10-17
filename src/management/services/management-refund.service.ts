@@ -1,11 +1,12 @@
-import { 
-  Injectable, 
+import {
+  Injectable,
   Logger,
   NotFoundException,
   BadRequestException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class ManagementRefundService {
@@ -108,8 +109,7 @@ export class ManagementRefundService {
             user: true,
             items: {
               include: {
-                product: true,
-                productOption: true
+                product: true
               }
             }
           }
@@ -130,7 +130,6 @@ export class ManagementRefundService {
         totalAmount: Number(refund.order.totalAmount),
         items: refund.order.items.map(item => ({
           productName: item.productName,
-          optionName: item.optionName,
           quantity: item.quantity,
           price: Number(item.productPrice),
           subtotal: Number(item.subtotal)
@@ -222,7 +221,7 @@ export class ManagementRefundService {
       where: { id },
       data: {
         status: 'REJECTED',
-        rejectedAt: new Date(),
+        rejectedAt: getNowKST(),
         reasonDetail: reason,
         adminMemo: adminMemo || refund.adminMemo
       }
@@ -249,7 +248,7 @@ export class ManagementRefundService {
           include: {
             items: {
               include: {
-                productOption: true
+                product: true
               }
             }
           }
@@ -271,7 +270,7 @@ export class ManagementRefundService {
         where: { id },
         data: {
           status: 'COMPLETED',
-          completedAt: new Date(),
+          completedAt: getNowKST(),
           tossCancelId: transactionId,
           adminMemo: adminMemo || refund.adminMemo
         }
@@ -288,17 +287,17 @@ export class ManagementRefundService {
       // 재고 복구
       for (const item of refund.order.items) {
         await tx.inventoryCache.upsert({
-          where: { sku: item.productOption.sku },
+          where: { sku: item.product.sku },
           create: {
-            sku: item.productOption.sku,
+            sku: item.product.sku,
             availableQty: item.quantity,
-            lastUpdated: new Date()
+            lastUpdated: getNowKST()
           },
           update: {
             availableQty: {
               increment: item.quantity
             },
-            lastUpdated: new Date()
+            lastUpdated: getNowKST()
           }
         });
 
@@ -306,7 +305,7 @@ export class ManagementRefundService {
         await tx.inventorySyncQueue.create({
           data: {
             orderId: refund.orderId,
-            sku: item.productOption.sku,
+            sku: item.product.sku,
             quantity: item.quantity,
             action: 'RESTORE',
             status: 'PENDING'
@@ -497,7 +496,7 @@ export class ManagementRefundService {
         reason: item.reason,
         requestedAt: item.requestedAt,
         waitingHours: Math.floor(
-          (new Date().getTime() - new Date(item.requestedAt).getTime()) / (1000 * 60 * 60)
+          (getNowKST().getTime() - new Date(item.requestedAt).getTime()) / (1000 * 60 * 60)
         )
       }))
     };

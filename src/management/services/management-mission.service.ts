@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 관리자 미션 관리 서비스
@@ -41,7 +42,7 @@ export class ManagementMissionService {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
-        { code: { contains: search, mode: 'insensitive' } }
+        { recordType: { contains: search, mode: 'insensitive' } }
       ];
     }
 
@@ -58,12 +59,13 @@ export class ManagementMissionService {
           challengeMissions: {
             select: {
               id: true,
-              challengeId: true,
+              productId: true,
               day: true,
               points: true,
-              challenge: {
+              product: {
                 select: {
-                  name: true
+                  name: true,
+                  metadata: true
                 }
               }
             }
@@ -99,11 +101,12 @@ export class ManagementMissionService {
       include: {
         challengeMissions: {
           include: {
-            challenge: {
+            product: {
               select: {
                 id: true,
                 name: true,
-                isActive: true
+                status: true,
+                metadata: true
               }
             }
           }
@@ -241,7 +244,7 @@ export class ManagementMissionService {
         where: { id },
         data: {
           ...data,
-          updatedAt: new Date()
+          updatedAt: getNowKST()
         }
       });
 
@@ -307,7 +310,7 @@ export class ManagementMissionService {
         where: { id },
         data: {
           isActive: !existingMission.isActive,
-          updatedAt: new Date()
+          updatedAt: getNowKST()
         }
       });
 
@@ -343,7 +346,7 @@ export class ManagementMissionService {
         where: { id },
         data: {
           dailyLimit,
-          updatedAt: new Date()
+          updatedAt: getNowKST()
         }
       });
 
@@ -384,7 +387,7 @@ export class ManagementMissionService {
       });
 
       // 일별 완료 통계 (최근 30일)
-      const thirtyDaysAgo = new Date();
+      const thirtyDaysAgo = getNowKST();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       const dailyStats = await this.prisma.missionAttempt.groupBy({
@@ -412,10 +415,12 @@ export class ManagementMissionService {
           missionId: id
         },
         include: {
-          challenge: {
+          product: {
             select: {
+              id: true,
               name: true,
-              isActive: true
+              status: true,
+              metadata: true
             }
           }
         }
@@ -440,13 +445,16 @@ export class ManagementMissionService {
           completionRate: totalAttempts > 0 ? (completedAttempts / totalAttempts * 100).toFixed(1) : '0'
         },
         dailyStats,
-        challengeUsage: challengeUsage.map(cu => ({
-          challengeId: cu.challengeId,
-          challengeName: cu.challenge.name,
-          day: cu.day,
-          points: cu.points,
-          isActive: cu.challenge.isActive
-        }))
+        challengeUsage: challengeUsage.map(cu => {
+          const metadata = cu.product.metadata as any;
+          return {
+            productId: cu.productId,
+            challengeName: metadata?.challengeName || cu.product.name,
+            day: cu.day,
+            points: cu.points,
+            isActive: cu.product.status === 'ACTIVE'
+          };
+        })
       };
 
     } catch (error) {

@@ -10,6 +10,7 @@ import { LoginRateLimit, SignupRateLimit } from '../common/decorators/throttle.d
 import { Public } from '../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ImwebAuthService } from '@/imweb/imweb-auth.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 import {
   SignUpResponseDto,
   SignInResponseDto,
@@ -66,7 +67,7 @@ export class AuthController {
       success: true,
       message: '회원가입이 완료되었습니다.',
       data: result,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -101,7 +102,7 @@ export class AuthController {
       success: true,
       message: '로그인되었습니다.',
       data: result,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -131,7 +132,7 @@ export class AuthController {
       success: true,
       message: '토큰이 갱신되었습니다.',
       data: result,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -162,7 +163,7 @@ export class AuthController {
       success: true,
       message: '로그아웃되었습니다.',
       data: result,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -192,7 +193,7 @@ export class AuthController {
           success: false,
           message: 'OAuth 인증 실패',
           data: { errorCode, error },
-          timestamp: new Date(),
+          timestamp: getNowKST(),
         };
       }
 
@@ -203,7 +204,7 @@ export class AuthController {
           success: false,
           message: 'authorization code가 필요합니다.',
           data: null,
-          timestamp: new Date(),
+          timestamp: getNowKST(),
         };
       }
 
@@ -220,7 +221,7 @@ export class AuthController {
           accessToken,
           code
         },
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
 
     } catch (error) {
@@ -230,7 +231,7 @@ export class AuthController {
         success: false,
         message: 'OAuth 콜백 처리 중 오류가 발생했습니다.',
         data: { error: error.message },
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     }
   }

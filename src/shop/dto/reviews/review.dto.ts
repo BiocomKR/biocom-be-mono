@@ -37,11 +37,6 @@ export class CreateReviewDto {
   @IsNotEmpty()
   productId: number;
 
-  @ApiPropertyOptional({ description: '상품 옵션 ID (옵션이 있는 경우)', example: 1 })
-  @IsOptional()
-  @IsNumber()
-  productOptionId?: number;
-
   @ApiPropertyOptional({ description: '리뷰 제목', example: '정말 좋은 제품입니다!' })
   @IsOptional()
   @IsString()
@@ -223,9 +218,6 @@ export class ReviewResponseDto {
   @ApiProperty({ description: '상품 ID', example: 1 })
   productId: number;
 
-  @ApiPropertyOptional({ description: '상품 옵션 ID', example: 1 })
-  productOptionId?: number;
-
   @ApiProperty({ description: '사용자 ID', example: 1 })
   userId: number;
 
@@ -270,13 +262,6 @@ export class ReviewResponseDto {
     id: number;
     name: string;
     sku: string;
-  };
-
-  @ApiProperty({ description: '상품 옵션 정보' })
-  productOption: {
-    id: number;
-    optionName: string;
-    price: number;
   };
 
   @ApiPropertyOptional({ description: '댓글 목록', type: [ReviewCommentResponseDto] })

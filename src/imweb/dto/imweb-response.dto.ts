@@ -1,6 +1,7 @@
 /**
  * 아임웹 API 응답 DTO
  */
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 export class ImwebSuccessResponse<T = any> {
   success: true;
@@ -10,7 +11,7 @@ export class ImwebSuccessResponse<T = any> {
   constructor(data: T) {
     this.success = true;
     this.data = data;
-    this.timestamp = new Date();
+    this.timestamp = getNowKST();
   }
 }
 
@@ -30,7 +31,7 @@ export class ImwebErrorResponse {
       message,
       details,
     };
-    this.timestamp = new Date();
+    this.timestamp = getNowKST();
   }
 }
 

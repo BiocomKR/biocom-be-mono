@@ -3,7 +3,9 @@ import { PrismaService } from '../common/services/prisma.service';
 import { PointService } from '../point/point.service';
 import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.util';
 import { CreateContentDto, UpdateContentDto, ContentFileDto } from './content.types';
+import { ContentAccessLevel } from '../common/enums/content-access-level.enum';
 import * as DOMPurify from 'isomorphic-dompurify';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 컨텐츠 관리 서비스
@@ -93,12 +95,11 @@ export class ContentService {
         },
         challengeContents: {
           include: {
-            challenge: {
+            product: {
               select: {
                 id: true,
                 name: true,
-                startDate: true,
-                endDate: true,
+                metadata: true,
               },
             },
           },
@@ -263,7 +264,7 @@ export class ContentService {
 
     try {
       // 오늘 날짜 (YYYY-MM-DD 형식)
-      const today = new Date();
+      const today = getNowKST();
       const todayStr = today.toISOString().split('T')[0];
 
       // 1️⃣ 로그인된 사용자인 경우 중복 방지 체크
@@ -299,7 +300,7 @@ export class ContentService {
             data: {
               userId,
               contentId,
-              viewedAt: new Date()
+              viewedAt: getNowKST()
             }
           });
         }
@@ -351,16 +352,17 @@ export class ContentService {
             userId,
             status: 'ACTIVE'
           },
-          include: { challenge: true }
+          include: { product: true }
         });
 
         let challengeInfo = null;
         let pointsEarned = 0;
 
         if (activeChallenge) {
+          const metadata = activeChallenge.product.metadata as any;
           challengeInfo = {
-            challengeId: activeChallenge.challengeId,
-            challengeName: activeChallenge.challenge.name,
+            productId: activeChallenge.productId,
+            challengeName: metadata?.challengeName || activeChallenge.product.name,
             currentDay: activeChallenge.currentDay
           };
 
@@ -370,7 +372,7 @@ export class ContentService {
             pointsEarned = content.points || 50;
 
             // DailyProgress 조회/생성
-            const today = new Date();
+            const today = getNowKST();
             const todayStr = today.toISOString().split('T')[0];
 
             let dailyProgress = await tx.dailyProgress.findFirst({
@@ -435,7 +437,7 @@ export class ContentService {
               userId,
               contentId,
               userChallengeId: activeChallenge?.id || null,
-              viewedAt: new Date()
+              viewedAt: getNowKST()
             }
           });
         }
@@ -446,7 +448,7 @@ export class ContentService {
             title: content.title,
             type: content.type
           },
-          viewedAt: new Date(),
+          viewedAt: getNowKST(),
           isFirstView,
           pointsEarned: isFirstView ? pointsEarned : undefined,
           challengeInfo
@@ -569,10 +571,24 @@ export class ContentService {
       // 1️⃣ 사용자 상태 조회 (챌린지/구독 상태)
       const userStatus = await this.getUserStatus(userId);
 
-      // 2️⃣ 기본 WHERE 조건
+      // 2️⃣ 접근 가능한 accessLevel 결정
+      const accessLevels: ContentAccessLevel[] = [ContentAccessLevel.ALL]; // 기본: 모두 접근 가능한 컨텐츠
+
+      if (userStatus.isInChallenge) {
+        accessLevels.push(ContentAccessLevel.CHALLENGE_ONLY, ContentAccessLevel.CHALLENGE_OR_SUB);
+      }
+
+      if (userStatus.isSubscribed) {
+        accessLevels.push(ContentAccessLevel.SUBSCRIPTION_ONLY, ContentAccessLevel.CHALLENGE_OR_SUB);
+      }
+
+      this.logger.log(`접근 가능한 레벨: ${accessLevels.join(', ')}`);
+
+      // 3️⃣ 기본 WHERE 조건
       const where: any = {
         type: 'LECTURE',
-        isActive: true
+        isActive: true,
+        accessLevel: { in: accessLevels } // accessLevel 기반 필터링
       };
 
       // 주차 필터가 있으면 추가
@@ -580,16 +596,7 @@ export class ContentService {
         where.weekNumber = week;
       }
 
-      // 챌린지 ID 필터가 있으면 추가
-      if (challengeId) {
-        where.challengeContents = {
-          some: {
-            challengeId: challengeId
-          }
-        };
-      }
-
-      // 3️⃣ 강의 목록 조회
+      // 4️⃣ 강의 목록 조회
       const lectures = await this.prisma.content.findMany({
         where,
         include: {
@@ -632,10 +639,10 @@ export class ContentService {
         ]
       });
 
-      // 4️⃣ 사용자 상태에 따른 필터링 적용
+      // 5️⃣ 사용자 상태에 따른 퀴즈 필터링 적용
       const filteredLectures = await this.filterLecturesByUserStatus(lectures, userStatus);
 
-      this.logger.log(`강의 목록 조회 완료 - 총 ${filteredLectures.length}개`);
+      this.logger.log(`강의 목록 조회 완료 - 총 ${filteredLectures.length}개 (접근 레벨 필터 적용됨)`);
 
       return {
         lectures: filteredLectures,
@@ -765,7 +772,13 @@ export class ContentService {
           status: 'ACTIVE'
         },
         include: {
-          challenge: true
+          product: {
+            select: {
+              id: true,
+              name: true,
+              metadata: true
+            }
+          }
         }
       });
 
@@ -775,21 +788,22 @@ export class ContentService {
       //     userId,
       //     status: 'ACTIVE',
       //     endDate: {
-      //       gte: new Date()
+      //       gte: getNowKST()
       //     }
       //   }
       // });
       const subscription = null; // 임시로 null 처리
 
+      const metadata = activeChallenge?.product.metadata as any;
+
       return {
         isInChallenge: !!activeChallenge,
         isSubscribed: !!subscription,
         challengeInfo: activeChallenge ? {
-          id: activeChallenge.challengeId,
-          name: activeChallenge.challenge.name,
+          id: activeChallenge.productId,
+          name: metadata?.challengeName || activeChallenge.product.name,
           currentDay: activeChallenge.currentDay,
-          startDate: activeChallenge.challenge.startDate,
-          endDate: activeChallenge.challenge.endDate
+          totalDays: metadata?.totalDays || 21
         } : null,
         subscriptionInfo: subscription ? {
           id: subscription.id,

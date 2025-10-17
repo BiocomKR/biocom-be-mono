@@ -49,11 +49,6 @@ export class CreateQnaDto {
   @IsNotEmpty()
   productId: number;
 
-  @ApiPropertyOptional({ description: '상품 옵션 ID (옵션이 있는 경우)', example: 1 })
-  @IsOptional()
-  @IsNumber()
-  productOptionId?: number;
-
   @ApiPropertyOptional({ description: '문의 제목', example: '재고 문의드립니다.' })
   @IsOptional()
   @IsString()
@@ -178,9 +173,6 @@ export class QnaResponseDto {
   @ApiProperty({ description: '상품 ID', example: 1 })
   productId: number;
 
-  @ApiPropertyOptional({ description: '상품 옵션 ID', example: 1 })
-  productOptionId?: number;
-
   @ApiProperty({ description: '사용자 ID', example: 1 })
   userId: number;
 
@@ -229,13 +221,6 @@ export class QnaResponseDto {
     id: number;
     name: string;
     sku: string;
-  };
-
-  @ApiPropertyOptional({ description: '상품 옵션 정보' })
-  productOption?: {
-    id: number;
-    optionName: string;
-    price: number;
   };
 }
 

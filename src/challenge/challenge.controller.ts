@@ -1,12 +1,10 @@
-import { Controller, Get, Post, Put, Body, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ChallengeService } from './challenge.service';
 import { ActivateChallengeDto, ChallengeResponseDto } from './dto/challenge.dto';
-import { 
-  SetStartDateDto, 
-  UpdateStartDateDto, 
-  ConfirmStartDateDto,
-  ChallengeScheduleResponseDto 
+import {
+  SetStartDateDto,
+  ChallengeScheduleResponseDto
 } from './dto/challenge-schedule.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -98,7 +96,7 @@ export class ChallengeController {
    * 챌린지 설문 전후 비교 조회
    * @description 특정 챌린지의 사전/사후 설문 결과를 비교합니다
    */
-  @Get(':challengeId/survey-comparison')
+  @Get(':productId/survey-comparison')
   @ApiOperation({
     summary: '챌린지 설문 전후 비교',
     description: '특정 챌린지의 사전/사후 설문 결과를 비교하여 개선 정도를 확인합니다.',
@@ -108,10 +106,10 @@ export class ChallengeController {
     description: '챌린지 설문 비교 조회 성공'
   })
   async getChallengeSurveyComparison(
-    @Param('challengeId', ParseIntPipe) challengeId: number,
+    @Param('productId', ParseIntPipe) productId: number,
     @Request() req: any
   ) {
-    return this.challengeService.getChallengeSurveyComparison(req.user.userId, challengeId);
+    return this.challengeService.getChallengeSurveyComparison(req.user.userId, productId);
   }
 
   // ==================== 시작일 설정 API ====================
@@ -120,7 +118,7 @@ export class ChallengeController {
    * 챌린지 일정 조회
    * @description 특정 챌린지의 일정 정보를 조회합니다
    */
-  @Get(':challengeId/schedule')
+  @Get(':productId/schedule')
   @ApiOperation({
     summary: '챌린지 일정 조회',
     description: '특정 챌린지의 시작일, 배송일, 종료일 등 일정 정보를 조회합니다'
@@ -135,17 +133,17 @@ export class ChallengeController {
     description: '챌린지를 찾을 수 없음'
   })
   async getChallengeSchedule(
-    @Param('challengeId', ParseIntPipe) challengeId: number,
+    @Param('productId', ParseIntPipe) productId: number,
     @Request() req: any
   ) {
-    return this.challengeService.getChallengeSchedule(req.user.userId, challengeId);
+    return this.challengeService.getChallengeSchedule(req.user.userId, productId);
   }
 
   /**
    * 챌린지 시작일 설정
    * @description 처음으로 챌린지 시작일을 설정합니다
    */
-  @Post(':challengeId/schedule/start-date')
+  @Post(':productId/schedule/start-date')
   @ApiOperation({
     summary: '챌린지 시작일 설정',
     description: '처음으로 챌린지 시작일을 설정합니다. 시작일 기준으로 배송일(-1일, 평일)과 종료일(+20일)이 자동 계산됩니다.'
@@ -164,71 +162,18 @@ export class ChallengeController {
     description: '시작일이 이미 설정됨'
   })
   async setStartDate(
-    @Param('challengeId', ParseIntPipe) challengeId: number,
+    @Param('productId', ParseIntPipe) productId: number,
     @Body() setStartDateDto: SetStartDateDto,
     @Request() req: any
   ) {
-    return this.challengeService.setStartDate(req.user.userId, challengeId, setStartDateDto);
+    console.log('req.user:', req.user);
+    const userId = req.user?.userId || req.user?.sub;
+    console.log('userId:', userId);
+    return this.challengeService.setStartDate(userId, productId, setStartDateDto);
   }
 
-  /**
-   * 챌린지 시작일 수정
-   * @description 기존 시작일을 수정합니다 (확정되지 않은 경우에만)
-   */
-  @Put(':challengeId/schedule/start-date')
-  @ApiOperation({
-    summary: '챌린지 시작일 수정',
-    description: '기존 시작일을 수정합니다. 시작일이 확정된 경우에는 수정할 수 없습니다.'
-  })
-  @ApiResponse({
-    status: 200,
-    description: '시작일 수정 성공',
-    type: ChallengeScheduleResponseDto
-  })
-  @ApiResponse({
-    status: 400,
-    description: '시작일이 설정되지 않았거나 잘못된 날짜'
-  })
-  @ApiResponse({
-    status: 409,
-    description: '시작일이 확정되어 수정 불가'
-  })
-  async updateStartDate(
-    @Param('challengeId', ParseIntPipe) challengeId: number,
-    @Body() updateStartDateDto: UpdateStartDateDto,
-    @Request() req: any
-  ) {
-    return this.challengeService.updateStartDate(req.user.userId, challengeId, updateStartDateDto);
-  }
-
-  /**
-   * 챌린지 시작일 확정
-   * @description 시작일을 확정하여 더 이상 수정할 수 없도록 만듭니다
-   */
-  @Post(':challengeId/schedule/confirm')
-  @ApiOperation({
-    summary: '챌린지 시작일 확정',
-    description: '시작일을 확정합니다. 확정된 후에는 더 이상 수정할 수 없습니다.'
-  })
-  @ApiResponse({
-    status: 201,
-    description: '시작일 확정 성공',
-    type: ChallengeScheduleResponseDto
-  })
-  @ApiResponse({
-    status: 400,
-    description: '시작일이 설정되지 않음'
-  })
-  @ApiResponse({
-    status: 409,
-    description: '시작일이 이미 확정됨'
-  })
-  async confirmStartDate(
-    @Param('challengeId', ParseIntPipe) challengeId: number,
-    @Body() confirmStartDateDto: ConfirmStartDateDto,
-    @Request() req: any
-  ) {
-    return this.challengeService.confirmStartDate(req.user.userId, challengeId, confirmStartDateDto);
-  }
+  // ⚠️ 시작일 수정 및 확정 API 제거됨
+  // - 시작일은 한번 설정하면 수정 불가
+  // - 시작일 설정 시 바로 확정 및 ACTIVE 상태로 변경됨
 
 }

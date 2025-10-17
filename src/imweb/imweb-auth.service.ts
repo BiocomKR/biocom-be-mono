@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import * as jwt from 'jsonwebtoken';
 import { ImwebErrorCode, ImwebErrorResponse } from './dto/imweb-response.dto';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 아임웹 인증 관리 서비스
@@ -257,7 +258,7 @@ export class ImwebAuthService {
         data: {
           accessToken: access_token,
           refreshToken: refresh_token,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 

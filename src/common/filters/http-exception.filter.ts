@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { getNowKST } from '../utils/kst-date.util';
 
 /**
  * HTTP 예외 필터
@@ -75,7 +76,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message,
       error,
       details,
-      timestamp: new Date().toISOString(),
+      timestamp: getNowKST().toISOString(),
       path: request.url,
     });
   }

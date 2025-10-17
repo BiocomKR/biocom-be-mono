@@ -5,10 +5,10 @@ import { IsInt, IsPositive, Min, Max } from 'class-validator';
  * 장바구니 추가 요청 DTO
  */
 export class AddCartItemDto {
-  @ApiProperty({ description: '상품 옵션 ID' })
+  @ApiProperty({ description: '상품 ID' })
   @IsInt()
   @IsPositive()
-  productOptionId: number;
+  productId: number;
 
   @ApiProperty({ description: '수량', minimum: 1, maximum: 100 })
   @IsInt()
@@ -41,9 +41,6 @@ export class CartItemResponseDto {
   @ApiProperty({ description: '상품 ID' })
   productId: number;
 
-  @ApiProperty({ description: '상품 옵션 ID' })
-  productOptionId: number;
-
   @ApiProperty({ description: '수량' })
   quantity: number;
 
@@ -61,9 +58,6 @@ export class CartItemResponseDto {
 
   @ApiProperty({ description: '상품 정보', required: false })
   product?: any;
-
-  @ApiProperty({ description: '상품 옵션 정보', required: false })
-  productOption?: any;
 
   @ApiProperty({ description: '소계 금액', required: false })
   subtotal?: number;

@@ -5,6 +5,7 @@ import {
   ConflictException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 import {
   TodayBalanceGameResponseDto,
   BalanceGameStepResponseDto,
@@ -62,7 +63,7 @@ export class BalanceGameService {
     }
 
     // 오늘 이미 플레이했는지 확인
-    const today = new Date();
+    const today = getNowKST();
     const todayStr = today.toISOString().split('T')[0];
     const hasPlayedToday = await this.prisma.userBalanceGameHistory.findFirst({
       where: {
@@ -171,7 +172,7 @@ export class BalanceGameService {
   ): Promise<BalanceGameCompleteResponseDto> {
     this.logger.log(`사용자 ${userId}가 게임 ${gameId} 완료`);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getNowKST().toISOString().split('T')[0];
 
     // 오늘 이미 완료했는지 확인 (최초 완료 여부 체크용)
     const existingHistory = await this.prisma.userBalanceGameHistory.findFirst({
@@ -217,7 +218,7 @@ export class BalanceGameService {
 
       // 쿠폰 지급 (최초 완료시에만)
       if (isFirstCompletion && resultStep?.coupon) {
-        const expiresAt = new Date();
+        const expiresAt = getNowKST();
         expiresAt.setHours(expiresAt.getHours() + resultStep.coupon.validHours);
 
         await tx.userCoupon.create({

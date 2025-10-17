@@ -19,6 +19,7 @@ import { ApiKeyGuard } from '../guards/api-key.guard';
 import { ContentService } from '../../content/content.service';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 import { ContentType, ContentFileDto } from '../../content/content.types';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management 컨텐츠 관리 컨트롤러
@@ -74,7 +75,7 @@ export class ManagementContentController {
         success: true,
         message: '컨텐츠 목록이 성공적으로 조회되었습니다.',
         data: result,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('컨텐츠 목록 조회 실패', error);
@@ -111,7 +112,7 @@ export class ManagementContentController {
         success: true,
         message: '컨텐츠가 성공적으로 생성되었습니다.',
         data: content,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`컨텐츠 생성 실패 - 제목: ${createDto.title}`, error);
@@ -135,7 +136,7 @@ export class ManagementContentController {
         success: true,
         message: '컨텐츠가 성공적으로 조회되었습니다.',
         data: content,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`컨텐츠 상세 조회 실패 - ID: ${id}`, error);
@@ -173,7 +174,7 @@ export class ManagementContentController {
         success: true,
         message: '컨텐츠가 성공적으로 수정되었습니다.',
         data: content,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`컨텐츠 수정 실패 - ID: ${id}`, error);
@@ -197,7 +198,7 @@ export class ManagementContentController {
         success: true,
         message: '컨텐츠가 성공적으로 삭제되었습니다.',
         data: null,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`컨텐츠 삭제 실패 - ID: ${id}`, error);

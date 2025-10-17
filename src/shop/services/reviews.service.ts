@@ -20,6 +20,7 @@ import {
   ReviewCommentPaginatedResponseDto
 } from '../dto/reviews/review.dto';
 import { Prisma } from '@prisma/client';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class ReviewsService {
@@ -37,20 +38,11 @@ export class ReviewsService {
 
     // 상품 존재 확인
     const product = await this.prisma.product.findUnique({
-      where: { id: dto.productId },
-      include: {
-        options: {
-          where: { id: dto.productOptionId }
-        }
-      }
+      where: { id: dto.productId }
     });
 
     if (!product) {
       throw new NotFoundException('상품을 찾을 수 없습니다');
-    }
-
-    if (dto.productOptionId && product.options.length === 0) {
-      throw new NotFoundException('상품 옵션을 찾을 수 없습니다');
     }
 
     // 해당 상품에 대한 사용자의 기존 리뷰 확인 (최초 리뷰인지 체크)
@@ -91,7 +83,6 @@ export class ReviewsService {
         data: {
           userId,
           productId: dto.productId,
-          productOptionId: dto.productOptionId,
           feedbackType: 'REVIEW',
           title: dto.title,
           content: dto.content,
@@ -100,7 +91,7 @@ export class ReviewsService {
           mediaUrls: dto.mediaUrls || [],
           rewardGiven: isFirstReview && rewardAmount > 0,
           rewardAmount: isFirstReview ? rewardAmount : null,
-          rewardedAt: isFirstReview && rewardAmount > 0 ? new Date() : null
+          rewardedAt: isFirstReview && rewardAmount > 0 ? getNowKST() : null
         },
         include: {
           user: {
@@ -114,13 +105,6 @@ export class ReviewsService {
               id: true,
               name: true,
               sku: true
-            }
-          },
-          productOption: {
-            select: {
-              id: true,
-              optionName: true,
-              price: true
             }
           }
         }
@@ -239,13 +223,6 @@ export class ReviewsService {
               sku: true
             }
           },
-          productOption: {
-            select: {
-              id: true,
-              optionName: true,
-              price: true
-            }
-          },
           replies: {
             where: {
               status: 'ACTIVE'
@@ -337,13 +314,6 @@ export class ReviewsService {
             id: true,
             name: true,
             sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
           }
         }
       }
@@ -462,7 +432,7 @@ export class ReviewsService {
       where: { id: reviewId },
       data: {
         isBest,
-        bestSelectedAt: isBest ? new Date() : null
+        bestSelectedAt: isBest ? getNowKST() : null
       },
       include: {
         user: {
@@ -475,13 +445,6 @@ export class ReviewsService {
             id: true,
             name: true,
             sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
           }
         }
       }
@@ -550,7 +513,6 @@ export class ReviewsService {
     const response: ReviewResponseDto = {
       id: review.id,
       productId: review.productId,
-      productOptionId: review.productOptionId,
       userId: review.userId,
       userName: this.maskUserName(review.user.name),
       title: review.title,
@@ -567,12 +529,7 @@ export class ReviewsService {
         id: review.product.id,
         name: review.product.name,
         sku: review.product.sku
-      },
-      productOption: review.productOption ? {
-        id: review.productOption.id,
-        optionName: review.productOption.optionName,
-        price: Number(review.productOption.price)
-      } : undefined
+      }
     };
 
     // 댓글 포함 (상세 조회 시에만)
@@ -619,7 +576,6 @@ export class ReviewsService {
       data: {
         userId,
         productId: review.productId,
-        productOptionId: review.productOptionId,
         feedbackType: 'REVIEW',
         parentId: reviewId,
         content: dto.content,

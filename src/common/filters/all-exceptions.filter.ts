@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { getNowKST } from '../utils/kst-date.util';
 
 /**
  * 전역 예외 필터
@@ -105,7 +106,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message,
       error,
       details,
-      timestamp: new Date().toISOString(),
+      timestamp: getNowKST().toISOString(),
       path: request.url,
     };
 

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Storage } from '@google-cloud/storage';
 import * as sharp from 'sharp';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 구글 클라우드 스토리지 공통 서비스
@@ -59,7 +60,7 @@ export class GoogleStorageService {
   ): Promise<string> {
     try {
       // 유니크한 파일명 생성
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const timestamp = getNowKST().toISOString().replace(/[:.]/g, '-');
       const cleanFileName = originalFileName.replace(/\.[^/.]+$/, ''); // 확장자 제거
       const fileName = `${serviceType}_${timestamp}_${cleanFileName}.jpg`; // JPEG로 통일
       
@@ -88,7 +89,7 @@ export class GoogleStorageService {
           contentType: 'image/jpeg',
           metadata: {
             originalName: originalFileName,
-            processedAt: new Date().toISOString(),
+            processedAt: getNowKST().toISOString(),
             service: serviceType,
             optimized: optimizeJpeg.toString()
           }

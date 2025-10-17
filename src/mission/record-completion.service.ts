@@ -3,6 +3,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { CompleteRecordDto } from './dto/record-completion.dto';
 import { PointService } from '../point/point.service';
 import { Logger } from '@nestjs/common';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 기록 서비스
@@ -38,7 +39,7 @@ export class RecordCompletionService {
         }
 
         // 2️⃣ 오늘 날짜 확인
-        const today = new Date();
+        const today = getNowKST();
         const todayStr = today.toISOString().split('T')[0];
 
         // 3️⃣ 이미 오늘 기록했는지 확인
@@ -71,7 +72,7 @@ export class RecordCompletionService {
           // 오늘의 해당 기록타입 미션 찾기
           const relatedMission = await tx.challengeMission.findFirst({
             where: {
-              challengeId: activeChallenge.challengeId,
+              productId: activeChallenge.productId,
               day: activeChallenge.currentDay,
               isActive: true,
               mission: {

@@ -1,13 +1,16 @@
-import { 
-  Injectable, 
-  NotFoundException, 
+import {
+  Injectable,
+  NotFoundException,
   BadRequestException,
-  Logger 
+  Logger
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { CreateOrderDto, OrderResponseDto } from '../dto/orders/create-order.dto';
 import { Prisma } from '@prisma/client';
+import { convertDecimalToNumber } from '../../common/utils/decimal.util';
+import { CryptoUtil } from '../../common/utils/crypto.util';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class OrdersService {
@@ -23,7 +26,7 @@ export class OrdersService {
    * 형식: O + YYYYMMDDHHMISS + 3자리 랜덤
    */
   private generateOrderNumber(): string {
-    const now = new Date();
+    const now = getNowKST();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
@@ -31,7 +34,7 @@ export class OrdersService {
     const minute = String(now.getMinutes()).padStart(2, '0');
     const second = String(now.getSeconds()).padStart(2, '0');
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    
+
     return `O${year}${month}${day}${hour}${minute}${second}${random}`;
   }
 
@@ -46,7 +49,6 @@ export class OrdersService {
     const policy = await this.prisma.shippingPolicy.findFirst({
       where: {
         isActive: true,
-        isDefault: true,
       },
     });
 
@@ -68,13 +70,16 @@ export class OrdersService {
 
     // 정책 적용
     const isJeju = postalCode.startsWith('63');
-    const extraFee = isJeju ? Number(policy.jejuExtraFee) : 0;
-    
-    if (policy.freeShippingAmount && totalAmount >= Number(policy.freeShippingAmount)) {
+    const jejuAreaFee = convertDecimalToNumber(policy.jejuAreaFee) || 0;
+    const extraFee = isJeju ? jejuAreaFee : 0;
+
+    const freeShippingThreshold = convertDecimalToNumber(policy.freeShippingThreshold) || 0;
+    if (freeShippingThreshold > 0 && totalAmount >= freeShippingThreshold) {
       return extraFee;
     }
-    
-    return Number(policy.baseFee) + extraFee;
+
+    const baseShippingFee = convertDecimalToNumber(policy.baseShippingFee) || 0;
+    return baseShippingFee + extraFee;
   }
 
   /**
@@ -83,42 +88,59 @@ export class OrdersService {
   async createOrder(userId: number, dto: CreateOrderDto): Promise<OrderResponseDto> {
     // 트랜잭션으로 처리
     return await this.prisma.$transaction(async (tx) => {
-      // 1. 장바구니 아이템 조회
-      const cartItems = await tx.cartItem.findMany({
-        where: {
-          id: { in: dto.cartItemIds },
-          cart: { userId },
-        },
-        include: {
-          product: true,
-          productOption: true,
-        },
-      });
+      // 1. 상품 정보 조회
+      const orderItemsData = await Promise.all(
+        dto.items.map(async (item) => {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+          });
 
-      if (cartItems.length === 0) {
-        throw new BadRequestException('장바구니 아이템을 찾을 수 없습니다');
+          if (!product) {
+            throw new BadRequestException(`상품 ID ${item.productId}를 찾을 수 없습니다`);
+          }
+
+          return {
+            product,
+            productId: item.productId,
+            quantity: item.quantity,
+          };
+        })
+      );
+
+      // 2. 챌린지/구독 상품 중복 구매 체크
+      for (const item of orderItemsData) {
+        if (['CHALLENGE', 'SUBSCRIPTION'].includes(item.product.categoryCode || '')) {
+          const existingTicket = await tx.challengeTicket.findFirst({
+            where: {
+              userId,
+              productId: item.productId,
+              status: { in: ['PURCHASED', 'ACTIVATED'] }
+            }
+          });
+
+          if (existingTicket) {
+            throw new BadRequestException(`${item.product.name}은(는) 이미 사용 가능한 이용권이 있어 추가 구매할 수 없습니다`);
+          }
+        }
       }
 
-      if (cartItems.length !== dto.cartItemIds.length) {
-        throw new BadRequestException('일부 장바구니 아이템을 찾을 수 없습니다');
-      }
-
-      // 2. 상품 상태 검증
-      for (const item of cartItems) {
+      // 3. 상품 상태 검증
+      for (const item of orderItemsData) {
         if (item.product.status !== 'ACTIVE') {
           throw new BadRequestException(`${item.product.name}은(는) 판매 중인 상품이 아닙니다`);
         }
-        if (!item.productOption.isActive) {
-          throw new BadRequestException(`${item.product.name}의 선택한 옵션은 판매 중지되었습니다`);
+        if (item.quantity > item.product.maxOrderQty) {
+          throw new BadRequestException(`${item.product.name}의 최대 주문 수량은 ${item.product.maxOrderQty}개입니다`);
         }
       }
 
-      // 3. 금액 계산
-      const totalProductPrice = cartItems.reduce((sum, item) => {
-        return sum + (Number(item.productOption.price) * item.quantity);
+      // 4. 금액 계산
+      const totalProductPrice = orderItemsData.reduce((sum, item) => {
+        const price = convertDecimalToNumber(item.product.price) || 0;
+        return sum + (price * item.quantity);
       }, 0);
 
-      // 4. 포인트 검증
+      // 5. 포인트 검증
       const pointUsed = dto.pointUsed || 0;
       if (pointUsed > 0) {
         const user = await tx.user.findUnique({
@@ -131,26 +153,25 @@ export class OrdersService {
         }
       }
 
-      // 5. 배송비 계산
+      // 6. 배송비 계산
       const shippingFee = await this.calculateShippingFee(
         totalProductPrice,
         dto.shippingAddress.postalCode
       );
 
-      // 6. 최종 결제액 계산
+      // 7. 최종 결제액 계산
       const totalAmount = totalProductPrice + shippingFee - pointUsed;
 
       if (totalAmount < 0) {
         throw new BadRequestException('결제 금액이 0원 미만일 수 없습니다');
       }
 
-      // 7. 주문 생성
+      // 8. 주문 생성
       const orderNumber = this.generateOrderNumber();
       
       const order = await tx.order.create({
         data: {
           orderNumber,
-          userId,
           status: 'PENDING_PAYMENT',
           inventoryStatus: 'NOT_PROCESSED',
           totalProductPrice,
@@ -158,35 +179,66 @@ export class OrdersService {
           shippingFee,
           pointUsed,
           totalAmount,
-          recipientName: dto.shippingAddress.recipientName,
-          recipientPhone: dto.shippingAddress.recipientPhone,
+          recipientName: CryptoUtil.encrypt(dto.shippingAddress.recipientName),
+          recipientMobile: CryptoUtil.encrypt(dto.shippingAddress.recipientPhone),
           postalCode: dto.shippingAddress.postalCode,
-          address: dto.shippingAddress.address,
-          addressDetail: dto.shippingAddress.addressDetail || null,
+          address: CryptoUtil.encrypt(dto.shippingAddress.address),
+          addressDetail: dto.shippingAddress.addressDetail ? CryptoUtil.encrypt(dto.shippingAddress.addressDetail) : null,
           deliveryMessage: dto.shippingAddress.deliveryMessage || null,
-          orderedAt: new Date(),
+          orderedAt: getNowKST(),
+          user: {
+            connect: { id: userId }
+          }
         },
       });
 
-      // 8. 주문 아이템 생성
+      // 9. 주문 아이템 생성
       const orderItems = await Promise.all(
-        cartItems.map(item => 
-          tx.orderItem.create({
+        orderItemsData.map(item => {
+          const price = convertDecimalToNumber(item.product.price) || 0;
+          return tx.orderItem.create({
             data: {
               orderId: order.id,
               productId: item.productId,
-              productOptionId: item.productOptionId,
               productName: item.product.name,
-              optionName: item.productOption.optionName,
-              productPrice: item.productOption.price,
+              productPrice: new Prisma.Decimal(price),
               quantity: item.quantity,
-              subtotal: new Prisma.Decimal(Number(item.productOption.price) * item.quantity),
+              subtotal: new Prisma.Decimal(price * item.quantity),
             },
-          })
-        )
+          });
+        })
       );
 
-      // 9. 배송 정보 생성
+      // 10. 챌린지/구독 상품인 경우 티켓 자동 생성
+      const challengeTickets = await Promise.all(
+        orderItems
+          .filter((orderItem, idx) => {
+            const originalItem = orderItemsData[idx];
+            return ['CHALLENGE', 'SUBSCRIPTION'].includes(originalItem.product.categoryCode || '');
+          })
+          .map((orderItem, idx) => {
+            const originalItem = orderItemsData[idx];
+            const ticketType = originalItem.product.categoryCode === 'SUBSCRIPTION' ? 'SUBSCRIPTION' : 'CHALLENGE';
+            this.logger.log(`챌린지 티켓 생성: 상품 ${orderItem.productId}, 타입 ${ticketType}, orderItemId ${orderItem.id}`);
+
+            return tx.challengeTicket.create({
+              data: {
+                userId,
+                productId: orderItem.productId,
+                orderItemId: orderItem.id,
+                status: 'PURCHASED',
+                ticketType,
+                purchaseDate: getNowKST(),
+              },
+            });
+          })
+      );
+
+      if (challengeTickets.length > 0) {
+        this.logger.log(`챌린지 티켓 ${challengeTickets.length}개 생성 완료`);
+      }
+
+      // 11. 배송 정보 생성
       await tx.shipping.create({
         data: {
           orderId: order.id,
@@ -195,7 +247,7 @@ export class OrdersService {
         },
       });
 
-      // 10. 주문 상태 로그
+      // 12. 주문 상태 로그
       await tx.orderStateLog.create({
         data: {
           orderId: order.id,
@@ -205,22 +257,23 @@ export class OrdersService {
         },
       });
 
-      // 11. 재고 차감 큐 등록 (실제 차감은 결제 완료 후)
-      await Promise.all(
-        cartItems.map(item =>
-          tx.inventorySyncQueue.create({
-            data: {
-              orderId: order.id,
-              sku: item.productOption.sku,
-              quantity: item.quantity,
-              action: 'DEDUCT',
-              status: 'PENDING',
-            },
-          })
-        )
-      );
+      // 13. 재고 차감 큐 등록 (실제 차감은 결제 완료 후)
+      // TODO: InventorySyncQueue 테이블이 없어서 주석 처리
+      // await Promise.all(
+      //   orderItemsData.map(item =>
+      //     tx.inventorySyncQueue.create({
+      //       data: {
+      //         orderId: order.id,
+      //         sku: item.product.sku,
+      //         quantity: item.quantity,
+      //         action: 'DEDUCT',
+      //         status: 'PENDING',
+      //       },
+      //     })
+      //   )
+      // );
 
-      // 12. 포인트 사용 처리
+      // 14. 포인트 사용 처리
       if (pointUsed > 0) {
         // 포인트 차감
         await tx.user.update({
@@ -244,17 +297,25 @@ export class OrdersService {
         });
       }
 
-      // 13. 장바구니 아이템 삭제
-      await tx.cartItem.deleteMany({
-        where: {
-          id: { in: dto.cartItemIds },
-        },
-      });
+      // 15. 장바구니 아이템 삭제 (cartItemIds가 제공된 경우에만)
+      if (dto.cartItemIds && dto.cartItemIds.length > 0) {
+        await tx.cartItem.deleteMany({
+          where: {
+            id: { in: dto.cartItemIds },
+          },
+        });
+      }
 
       this.logger.log(`주문 생성 완료: ${orderNumber}`);
 
       return {
         ...order,
+        // 개인정보 복호화
+        recipientName: CryptoUtil.decrypt(order.recipientName),
+        recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
+        address: CryptoUtil.decrypt(order.address),
+        addressDetail: order.addressDetail ? CryptoUtil.decrypt(order.addressDetail) : null,
+        // 금액 변환
         totalProductPrice: Number(order.totalProductPrice),
         totalDiscount: Number(order.totalDiscount),
         shippingFee: Number(order.shippingFee),
@@ -306,6 +367,12 @@ export class OrdersService {
     return {
       items: orders.map(order => ({
         ...order,
+        // 개인정보 복호화
+        recipientName: CryptoUtil.decrypt(order.recipientName),
+        recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
+        address: CryptoUtil.decrypt(order.address),
+        addressDetail: order.addressDetail ? CryptoUtil.decrypt(order.addressDetail) : null,
+        // 금액 변환
         totalProductPrice: Number(order.totalProductPrice),
         totalDiscount: Number(order.totalDiscount),
         shippingFee: Number(order.shippingFee),
@@ -335,7 +402,7 @@ export class OrdersService {
         include: {
           items: {
             include: {
-              productOption: true,
+              product: true,
             },
           },
         },
@@ -355,7 +422,7 @@ export class OrdersService {
         where: { id: order.id },
         data: {
           status: 'CANCELLED',
-          cancelledAt: new Date(),
+          cancelledAt: getNowKST(),
         },
       });
 
@@ -369,36 +436,64 @@ export class OrdersService {
         },
       });
 
-      // 재고 복구 (결제 완료 상태였던 경우만)
-      if (['PAID', 'PREPARING'].includes(order.status)) {
-        for (const item of order.items) {
-          // 재고 캐시 업데이트
-          await tx.inventoryCache.upsert({
-            where: { sku: item.productOption.sku },
-            create: {
-              sku: item.productOption.sku,
-              availableQty: item.quantity,
-              lastUpdated: new Date(),
-            },
-            update: {
-              availableQty: {
-                increment: item.quantity,
-              },
-              lastUpdated: new Date(),
-            },
-          });
+      // TODO: 재고 복구 처리 필요
+      // 재고 관련 테이블(inventoryCache, inventorySyncQueue)이 삭제되어 주석 처리
+      // 추후 재고 시스템 재구축 시 다음 로직 적용:
+      // 1. 주문 취소 시 차감했던 재고를 복구
+      // 2. inventoryCache 테이블의 availableQty 증가
+      // 3. inventorySyncQueue에 RESTORE 액션 등록
+      // if (['PAID', 'PREPARING'].includes(order.status)) {
+      //   for (const item of order.items) {
+      //     await tx.inventoryCache.upsert({
+      //       where: { sku: item.product.sku },
+      //       create: {
+      //         sku: item.product.sku,
+      //         availableQty: item.quantity,
+      //         lastUpdated: getNowKST(),
+      //       },
+      //       update: {
+      //         availableQty: { increment: item.quantity },
+      //         lastUpdated: getNowKST(),
+      //       },
+      //     });
+      //     await tx.inventorySyncQueue.create({
+      //       data: {
+      //         orderId: order.id,
+      //         sku: item.product.sku,
+      //         quantity: item.quantity,
+      //         action: 'RESTORE',
+      //         status: 'PENDING',
+      //       },
+      //     });
+      //   }
+      // }
 
-          // 재고 동기화 큐
-          await tx.inventorySyncQueue.create({
-            data: {
-              orderId: order.id,
-              sku: item.productOption.sku,
-              quantity: item.quantity,
-              action: 'RESTORE',
-              status: 'PENDING',
-            },
-          });
-        }
+      // 챌린지/구독 티켓 취소 처리
+      const cancelledTickets = await tx.challengeTicket.updateMany({
+        where: {
+          orderItemId: { in: order.items.map(item => item.id) },
+          status: 'PURCHASED', // 구매만 된 상태만 취소 가능
+        },
+        data: {
+          status: 'CANCELLED',
+        },
+      });
+
+      if (cancelledTickets.count > 0) {
+        this.logger.log(`챌린지 티켓 ${cancelledTickets.count}개 취소 완료`);
+      }
+
+      // 이미 활성화된 티켓 확인 (환불 불가 경고)
+      const activatedTickets = await tx.challengeTicket.findMany({
+        where: {
+          orderItemId: { in: order.items.map(item => item.id) },
+          status: { in: ['ACTIVATED', 'USED'] },
+        },
+      });
+
+      if (activatedTickets.length > 0) {
+        this.logger.warn(`이미 활성화된 티켓 ${activatedTickets.length}개 존재 - 특별 처리 필요`);
+        // TODO: 이미 사용 중인 챌린지가 있는 경우 환불 정책에 따라 처리
       }
 
       // 포인트 복구
@@ -470,7 +565,7 @@ export class OrdersService {
         where: { id: order.id },
         data: {
           status: 'COMPLETED',
-          completedAt: new Date(),
+          completedAt: getNowKST(),
         },
       });
 
@@ -541,8 +636,8 @@ export class OrdersService {
         where: { id: order.id },
         data: {
           status: newStatus,
-          ...(newStatus === 'SHIPPED' && { shippedAt: new Date() }),
-          ...(newStatus === 'DELIVERED' && { deliveredAt: new Date() }),
+          ...(newStatus === 'SHIPPED' && { shippedAt: getNowKST() }),
+          ...(newStatus === 'DELIVERED' && { deliveredAt: getNowKST() }),
         },
       });
 
@@ -562,8 +657,8 @@ export class OrdersService {
           where: { orderId: order.id },
           data: {
             status: newStatus === 'SHIPPED' ? 'IN_TRANSIT' : 'DELIVERED',
-            ...(newStatus === 'SHIPPED' && { shippedAt: new Date() }),
-            ...(newStatus === 'DELIVERED' && { deliveredAt: new Date() }),
+            ...(newStatus === 'SHIPPED' && { shippedAt: getNowKST() }),
+            ...(newStatus === 'DELIVERED' && { deliveredAt: getNowKST() }),
           },
         });
       }
@@ -601,7 +696,6 @@ export class OrdersService {
         items: {
           include: {
             product: true,
-            productOption: true,
           },
         },
         payment: true,
@@ -615,6 +709,12 @@ export class OrdersService {
 
     return {
       ...order,
+      // 개인정보 복호화
+      recipientName: CryptoUtil.decrypt(order.recipientName),
+      recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
+      address: CryptoUtil.decrypt(order.address),
+      addressDetail: order.addressDetail ? CryptoUtil.decrypt(order.addressDetail) : null,
+      // 금액 변환
       totalProductPrice: Number(order.totalProductPrice),
       totalDiscount: Number(order.totalDiscount),
       shippingFee: Number(order.shippingFee),

@@ -2,6 +2,7 @@ import { Injectable, Logger, ConflictException, NotFoundException } from '@nestj
 import { PrismaService } from '../common/services/prisma.service';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
 import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption, User } from '@prisma/client';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 설문 서비스
@@ -153,21 +154,21 @@ export class SurveyService {
   }
 
   /**
-   * 챌린지별 사용자 설문 답변 조회
+   * 챌린지별 사용자 설문 답변 조회 (Product 기반)
    */
   async getUserAnswersByChallenge(
     userId: number,
-    challengeId: number,
+    productId: number,
     type?: 'before' | 'after'
-  ): Promise<(SurveyAnswer & { 
-    surveyQuestion: SurveyQuestion; 
-    surveyOption: SurveyOption; 
+  ): Promise<(SurveyAnswer & {
+    surveyQuestion: SurveyQuestion;
+    surveyOption: SurveyOption;
   })[]> {
-    // 챌린지와 연결된 설문 ID들 조회
+    // 챌린지 상품과 연결된 설문 ID들 조회
     const challengeSurveys = await this.prisma.challengeSurvey.findMany({
-      where: { 
-        challengeId,
-        isActive: true 
+      where: {
+        productId,
+        isActive: true
       },
       select: {
         surveyId: true
@@ -194,7 +195,7 @@ export class SurveyService {
 
     const questionIds = surveyQuestions.map(sq => sq.id);
 
-    const where: Prisma.SurveyAnswerWhereInput = { 
+    const where: Prisma.SurveyAnswerWhereInput = {
       userId,
       surveyQuestionId: {
         in: questionIds
@@ -275,9 +276,9 @@ export class SurveyService {
   }
 
   /**
-   * 설문 진행 상태 조회 (간단버전)
+   * 설문 진행 상태 조회 (간단버전) - Product 기반
    */
-  async getSurveyStatus(userId: number, challengeId: number): Promise<{
+  async getSurveyStatus(userId: number, productId: number): Promise<{
     beforeSurvey: {
       enabled: boolean;
       completed: boolean;
@@ -296,11 +297,11 @@ export class SurveyService {
     canTakeAfterSurvey: boolean;
     nextAction: 'TAKE_BEFORE_SURVEY' | 'WAIT_FOR_AFTER_SURVEY' | 'TAKE_AFTER_SURVEY' | 'COMPLETED';
   }> {
-    // 챌린지와 연결된 설문 정보 조회
+    // 챌린지 상품과 연결된 설문 정보 조회
     const challengeSurveys = await this.prisma.challengeSurvey.findMany({
-      where: { 
-        challengeId,
-        isActive: true 
+      where: {
+        productId,
+        isActive: true
       },
       include: {
         survey: {
@@ -312,15 +313,15 @@ export class SurveyService {
     });
 
     if (challengeSurveys.length === 0) {
-      throw new NotFoundException(`챌린지 ID ${challengeId}와 연결된 설문을 찾을 수 없습니다.`);
+      throw new NotFoundException(`상품 ID ${productId}와 연결된 설문을 찾을 수 없습니다.`);
     }
 
     // 첫 번째 설문의 총 질문 수 (모든 설문이 동일한 질문 세트를 사용한다고 가정)
     const totalQuestions = challengeSurveys[0].survey.surveyQuestions.length;
-    
+
     const [beforeAnswers, afterAnswers] = await Promise.all([
-      this.getUserAnswersByChallenge(userId, challengeId, 'before'),
-      this.getUserAnswersByChallenge(userId, challengeId, 'after'),
+      this.getUserAnswersByChallenge(userId, productId, 'before'),
+      this.getUserAnswersByChallenge(userId, productId, 'after'),
     ]);
 
     const beforeCompleted = beforeAnswers.length === totalQuestions;
@@ -384,16 +385,16 @@ export class SurveyService {
   // 질문별 답변 조회는 management로 이동
 
   /**
-   * 챌린지별 설문 완료 처리 (새로운 로직)
+   * 챌린지별 설문 완료 처리 (Product 기반)
    * CategoryDetail 기반 동물 배정 및 Before/After 결과 저장
    */
   async completeChallengeSurvey(
     userId: number,
-    challengeId: number,
+    productId: number,
     type: 'before' | 'after',
     answers: Array<{ questionId: number; optionId: number }>
   ) {
-    this.logger.log(`챌린지 설문 완료 처리 - 사용자: ${userId}, 챌린지: ${challengeId}, 타입: ${type}`);
+    this.logger.log(`챌린지 설문 완료 처리 - 사용자: ${userId}, 상품: ${productId}, 타입: ${type}`);
 
     return await this.prisma.$transaction(async (tx) => {
       // 1. 설문 답변 저장
@@ -417,7 +418,7 @@ export class SurveyService {
       this.logger.log(`최저점수 카테고리: ${lowestCategory}`);
 
       // 4. UserChallengeSurveyResult 저장/업데이트
-      await this.saveOrUpdateSurveyResult(userId, challengeId, type, categoryScores, lowestCategory, tx);
+      await this.saveOrUpdateSurveyResult(userId, productId, type, categoryScores, lowestCategory, tx);
 
       // 5. CategoryDetail에서 동물 캐릭터 정보 조회
       const categoryDetail = await tx.categoryDetail.findFirst({
@@ -425,7 +426,7 @@ export class SurveyService {
       });
 
       // 6. 챌린지 진행 상황 업데이트
-      await this.processChallengeIntegration(tx, userId, challengeId);
+      await this.processChallengeIntegration(tx, userId, productId);
 
       return {
         scores: categoryScores,
@@ -541,11 +542,11 @@ export class SurveyService {
   }
 
   /**
-   * 사용자별 챌린지별 설문 결과 저장/업데이트
+   * 사용자별 챌린지별 설문 결과 저장/업데이트 (Product 기반)
    */
   private async saveOrUpdateSurveyResult(
     userId: number,
-    challengeId: number,
+    productId: number,
     surveyType: 'before' | 'after',
     categoryScores: Record<string, number>,
     lowestCategory: string,
@@ -553,56 +554,56 @@ export class SurveyService {
   ): Promise<void> {
     const existing = await tx.userChallengeSurveyResult.findUnique({
       where: {
-        userId_challengeId: {
+        userId_productId: {
           userId,
-          challengeId,
+          productId,
         },
       },
     });
 
     const updateData: Prisma.UserChallengeSurveyResultUpdateInput = {};
-    
+
     if (surveyType === 'before') {
       updateData.beforeCategory = lowestCategory;
       updateData.beforeSkinHealthScore = categoryScores.SKIN_HEALTH;
       updateData.beforeMetabolismScore = categoryScores.METABOLISM;
       updateData.beforeImmuneScore = categoryScores.IMMUNE_BALANCE;
       updateData.beforeGutHealthScore = categoryScores.GUT_HEALTH;
-      updateData.beforeCompletedAt = new Date();
+      updateData.beforeCompletedAt = getNowKST();
     } else {
       updateData.afterCategory = lowestCategory;
       updateData.afterSkinHealthScore = categoryScores.SKIN_HEALTH;
       updateData.afterMetabolismScore = categoryScores.METABOLISM;
       updateData.afterImmuneScore = categoryScores.IMMUNE_BALANCE;
       updateData.afterGutHealthScore = categoryScores.GUT_HEALTH;
-      updateData.afterCompletedAt = new Date();
+      updateData.afterCompletedAt = getNowKST();
     }
 
     // upsert 방식으로 변경 (unique 제약 조건 문제 해결)
     await tx.userChallengeSurveyResult.upsert({
       where: {
-        userId_challengeId: {
+        userId_productId: {
           userId,
-          challengeId,
+          productId,
         },
       },
       update: updateData,
       create: {
         userId,
-        challengeId,
+        productId,
         ...updateData,
       } as any,
     });
   }
 
   /**
-   * 챌린지 연동 처리
+   * 챌린지 연동 처리 (Product 기반)
    * 설문 완료 시 활성 챌린지가 있으면 포인트 적립 및 진행상황 업데이트
    */
   private async processChallengeIntegration(
-    tx: Prisma.TransactionClient, 
-    userId: number, 
-    challengeIdOrSurveyId: number
+    tx: Prisma.TransactionClient,
+    userId: number,
+    productIdOrSurveyId: number
   ): Promise<void> {
     try {
       // 1️⃣ 활성 챌린지 조회
@@ -611,7 +612,7 @@ export class SurveyService {
           userId,
           status: 'ACTIVE'
         },
-        include: { challenge: true }
+        include: { product: true }
       });
 
       if (!activeChallenge) {
@@ -620,22 +621,22 @@ export class SurveyService {
       }
 
       // 2️⃣ 특정 설문이 오늘의 챌린지 설문인지 확인
-      const today = new Date();
+      const today = getNowKST();
       const todayStr = today.toISOString().split('T')[0];
       const currentDay = activeChallenge.currentDay;
 
       const todaySurvey = await tx.challengeSurvey.findFirst({
         where: {
-          challengeId: activeChallenge.challengeId,
+          productId: activeChallenge.productId,
           day: currentDay,
-          surveyId: challengeIdOrSurveyId,  // 완료한 설문이 오늘의 설문과 일치하는지 확인
+          surveyId: productIdOrSurveyId,  // 완료한 설문이 오늘의 설문과 일치하는지 확인
           isActive: true
         },
         include: { survey: true }
       });
 
       if (!todaySurvey) {
-        this.logger.log(`설문 완료 - 완료한 설문(${challengeIdOrSurveyId})이 오늘(${currentDay}일차) 챌린지 설문이 아님`);
+        this.logger.log(`설문 완료 - 완료한 설문(${productIdOrSurveyId})이 오늘(${currentDay}일차) 챌린지 설문이 아님`);
         return;
       }
 
@@ -722,7 +723,7 @@ export class SurveyService {
         results.push({
           type: 'before' as const,
           ...beforeResult,
-          createdAt: new Date(),
+          createdAt: getNowKST(),
         });
       } catch (error) {
         // 결과가 없으면 무시
@@ -735,7 +736,7 @@ export class SurveyService {
         results.push({
           type: 'after' as const,
           ...afterResult,
-          createdAt: new Date(),
+          createdAt: getNowKST(),
         });
       } catch (error) {
         // 결과가 없으면 무시
@@ -746,12 +747,12 @@ export class SurveyService {
   }
 
   /**
-   * 설문 ID 기반 설문 전후 비교
+   * 설문 ID 기반 설문 전후 비교 (Product 기반)
    */
   async getSurveyComparison(userId: number, surveyId: number) {
     this.logger.log(`사용자 ${userId}의 설문 ${surveyId} 결과 비교를 조회합니다.`);
 
-    // 설문에서 연결된 챌린지 찾기
+    // 설문에서 연결된 챌린지 상품 찾기
     const challengeSurvey = await this.prisma.challengeSurvey.findFirst({
       where: {
         surveyId,
@@ -760,14 +761,14 @@ export class SurveyService {
     });
 
     if (!challengeSurvey) {
-      throw new NotFoundException('설문과 연결된 챌린지를 찾을 수 없습니다.');
+      throw new NotFoundException('설문과 연결된 챌린지 상품을 찾을 수 없습니다.');
     }
 
     const result = await this.prisma.userChallengeSurveyResult.findUnique({
       where: {
-        userId_challengeId: {
+        userId_productId: {
           userId,
-          challengeId: challengeSurvey.challengeId,
+          productId: challengeSurvey.productId,
         },
       },
     });
@@ -777,7 +778,7 @@ export class SurveyService {
     }
 
     // Before 동물 캐릭터 정보
-    const beforeCategoryDetail = result.beforeCategory 
+    const beforeCategoryDetail = result.beforeCategory
       ? await this.prisma.categoryDetail.findFirst({
           where: { categoryCode: result.beforeCategory },
         })
@@ -793,7 +794,7 @@ export class SurveyService {
     return {
       userId,
       surveyId,
-      challengeId: challengeSurvey.challengeId,
+      productId: challengeSurvey.productId,
       before: {
         category: result.beforeCategory,
         animalCharacter: beforeCategoryDetail?.animalCharacter,
@@ -933,9 +934,9 @@ export class SurveyService {
       dominantCategory: result.dominantCategory,
       animalCharacter: result.animalCharacter,
       animal: result.animalCharacter, // animal 필드 추가
-      calculatedAt: new Date(), // calculatedAt 필드 추가
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      calculatedAt: getNowKST(), // calculatedAt 필드 추가
+      createdAt: getNowKST(),
+      updatedAt: getNowKST(),
     });
 
     return {

@@ -151,34 +151,38 @@ function createExtendedPrismaClient() {
           return query(args);
         },
         
-        // 조회 시 UTC → KST 변환 (시스템 타임스탬프용)
+        // 조회 시 UTC → KST 변환 (비활성화)
         async findUnique({ args, query, model }) {
           const result = await query(args);
-          return result ? convertDatesToKST(result) : result;
+          // return result ? convertDatesToKST(result) : result;
+          return result;
         },
 
-        // 첫 번째 조회 시 UTC → KST 변환 (시스템 타임스탬프용)
+        // 첫 번째 조회 시 UTC → KST 변환 (비활성화)
         async findFirst({ args, query, model }) {
           const result = await query(args);
-          return result ? convertDatesToKST(result) : result;
+          // return result ? convertDatesToKST(result) : result;
+          return result;
         },
 
-        // 다중 조회 시 UTC → KST 변환 (시스템 타임스탬프용)
+        // 다중 조회 시 UTC → KST 변환 (비활성화)
         async findMany({ args, query, model }) {
           const results = await query(args);
-          return results.map(result => convertDatesToKST(result));
+          // return results.map(result => convertDatesToKST(result));
+          return results;
         },
         
-        // Upsert 시 KST → UTC 변환
+        // Upsert 시 KST → UTC 변환 (비활성화)
         async upsert({ args, query, model }) {
-          if (args.create) {
-            args.create = convertDatesToUTC(args.create);
-          }
-          if (args.update) {
-            args.update = convertDatesToUTC(args.update);
-          }
+          // if (args.create) {
+          //   args.create = convertDatesToUTC(args.create);
+          // }
+          // if (args.update) {
+          //   args.update = convertDatesToUTC(args.update);
+          // }
           const result = await query(args);
-          return convertDatesToKST(result);
+          // return convertDatesToKST(result);
+          return result;
         },
       },
       
@@ -312,7 +316,6 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 쇼핑몰 도메인 테이블
   get category() { return this.prisma.category; }
   get product() { return this.prisma.product; }
-  get productOption() { return this.prisma.productOption; }
   get productImage() { return this.prisma.productImage; }
   get cart() { return this.prisma.cart; }
   get cartItem() { return this.prisma.cartItem; }

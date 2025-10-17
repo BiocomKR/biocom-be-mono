@@ -105,25 +105,27 @@ export class ManagementShopController {
   }
 
   /**
-   * 카테고리 관리
+   * ⚠️ 카테고리 관리 API 제거됨
+   * - Categories 테이블 제거 (소규모 쇼핑몰)
+   * - Products.categoryCode, categoryName으로 관리
    */
-  @Post('categories')
-      async createCategory(@Body() dto: any) {
-    return this.shopService.createCategory(dto);
-  }
+  // @Post('categories')
+  // async createCategory(@Body() dto: any) {
+  //   return this.shopService.createCategory(dto);
+  // }
 
-  @Put('categories/:id')
-      async updateCategory(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: any
-  ) {
-    return this.shopService.updateCategory(id, dto);
-  }
+  // @Put('categories/:id')
+  // async updateCategory(
+  //   @Param('id', ParseIntPipe) id: number,
+  //   @Body() dto: any
+  // ) {
+  //   return this.shopService.updateCategory(id, dto);
+  // }
 
-  @Delete('categories/:id')
-      async deleteCategory(@Param('id', ParseIntPipe) id: number) {
-    return this.shopService.deleteCategory(id);
-  }
+  // @Delete('categories/:id')
+  // async deleteCategory(@Param('id', ParseIntPipe) id: number) {
+  //   return this.shopService.deleteCategory(id);
+  // }
 
   /**
    * 배송비 정책 관리
@@ -147,29 +149,30 @@ export class ManagementShopController {
   }
 
   /**
-   * 재고 관리
+   * ⚠️ 재고 관리 API 제거됨
+   * - 외부 재고 시스템 연동 기능은 나중에 기획안 확정 후 재구현 예정
    */
-  @Get('inventory')
-        async getInventory(
-    @Query('sku') sku?: string,
-    @Query('lowStock') lowStock?: string
-  ) {
-    return this.shopService.getInventory({
-      sku,
-      lowStock: lowStock === 'true'
-    });
-  }
+  // @Get('inventory')
+  // async getInventory(
+  //   @Query('sku') sku?: string,
+  //   @Query('lowStock') lowStock?: string
+  // ) {
+  //   return this.shopService.getInventory({
+  //     sku,
+  //     lowStock: lowStock === 'true'
+  //   });
+  // }
 
-  @Post('inventory/sync')
-    async syncInventory() {
-    return this.shopService.syncInventory();
-  }
+  // @Post('inventory/sync')
+  // async syncInventory() {
+  //   return this.shopService.syncInventory();
+  // }
 
-  @Patch('inventory/:sku')
-        async adjustInventory(
-    @Param('sku') sku: string,
-    @Body() dto: { quantity: number; reason: string }
-  ) {
-    return this.shopService.adjustInventory(sku, dto.quantity, dto.reason);
-  }
+  // @Patch('inventory/:sku')
+  // async adjustInventory(
+  //   @Param('sku') sku: string,
+  //   @Body() dto: { quantity: number; reason: string }
+  // ) {
+  //   return this.shopService.adjustInventory(sku, dto.quantity, dto.reason);
+  // }
 }

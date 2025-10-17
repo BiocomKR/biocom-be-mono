@@ -7,6 +7,8 @@ import * as crypto from 'crypto';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 인증 서비스
@@ -53,6 +55,8 @@ export class AuthService {
         password: hashedPassword,
         name,
         mobile,
+        subscriptionStatus: UserSubscriptionStatus.NEWCOMER,
+        createdAt: getNowKST(), // KST 시간으로 저장
       },
       select: {
         id: true,
@@ -209,7 +213,7 @@ export class AuthService {
     const token = crypto.randomBytes(64).toString('hex');
     
     // 만료 시간 계산 (180일)
-    const expiresAt = new Date();
+    const expiresAt = getNowKST();
     expiresAt.setDate(expiresAt.getDate() + 180);
     
     // 기존 Refresh Token 삭제 (사용자당 1개만 유지)
@@ -251,7 +255,7 @@ export class AuthService {
     }
     
     // 만료 확인
-    if (storedToken.expiresAt < new Date()) {
+    if (storedToken.expiresAt < getNowKST()) {
       this.logger.warn(`만료된 Refresh Token: 사용자 ID ${storedToken.userId}`);
       await this.prisma.refreshToken.delete({
         where: { id: storedToken.id },

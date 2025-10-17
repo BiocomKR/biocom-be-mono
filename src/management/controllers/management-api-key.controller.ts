@@ -16,6 +16,7 @@ import { ApiKeyService } from '../services/api-key.service';
 import { CreateApiKeyDto } from '../dto/create-api-key.dto';
 import { ApiKeyResponseDto, ApiKeyListResponseDto } from '../dto/api-key-response.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management API Key 관리 컨트롤러
@@ -57,7 +58,7 @@ export class ManagementApiKeyController {
         success: true,
         message: 'API Key 목록이 성공적으로 조회되었습니다.',
         data: responseData,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('API Key 목록 조회 실패', error);
@@ -84,7 +85,7 @@ export class ManagementApiKeyController {
         success: true,
         message: 'API Key가 성공적으로 조회되었습니다.',
         data: apiKey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`API Key 상세 조회 실패 - ID: ${id}`, error);
@@ -113,7 +114,7 @@ export class ManagementApiKeyController {
         success: true,
         message: 'API Key가 성공적으로 생성되었습니다. key 값을 안전한 곳에 보관하세요.',
         data: apiKey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`API Key 생성 실패 - 이름: ${createApiKeyDto.name}`, error);
@@ -139,7 +140,7 @@ export class ManagementApiKeyController {
         success: true,
         message: 'API Key가 성공적으로 활성화되었습니다.',
         data: apiKey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`API Key 활성화 실패 - ID: ${id}`, error);
@@ -165,7 +166,7 @@ export class ManagementApiKeyController {
         success: true,
         message: 'API Key가 성공적으로 비활성화되었습니다.',
         data: apiKey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`API Key 비활성화 실패 - ID: ${id}`, error);
@@ -191,7 +192,7 @@ export class ManagementApiKeyController {
         success: true,
         message: 'API Key가 성공적으로 재생성되었습니다. 새로운 key 값을 안전한 곳에 보관하세요.',
         data: apiKey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`API Key 재생성 실패 - ID: ${id}`, error);
@@ -217,7 +218,7 @@ export class ManagementApiKeyController {
         success: true,
         message: 'API Key가 성공적으로 삭제되었습니다.',
         data: null,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`API Key 삭제 실패 - ID: ${id}`, error);

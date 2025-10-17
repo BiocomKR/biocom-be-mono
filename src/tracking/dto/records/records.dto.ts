@@ -250,6 +250,23 @@ export class CreateCustomSupplementDto {
 }
 
 /**
+ * 영양소 정보 DTO
+ */
+export class NutrientDto {
+  @ApiProperty({ description: '영양소명', example: '비타민A' })
+  name: string;
+
+  @ApiProperty({ description: '함량', example: 700 })
+  amount: number;
+
+  @ApiProperty({ description: '단위', example: 'mg' })
+  unit: string;
+
+  @ApiProperty({ description: 'RDA 비율 (%)', example: 100, required: false })
+  rda?: number;
+}
+
+/**
  * 커스텀 영양제 응답 DTO
  */
 export class CustomSupplementDto {

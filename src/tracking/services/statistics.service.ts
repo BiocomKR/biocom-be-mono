@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 import {
   BeautyStatisticsDto,
   DietStatisticsDto,
@@ -36,7 +37,7 @@ export class StatisticsService {
    * @returns 시작일, 종료일 정보 (String 형식)
    */
   private getWeekDateRange() {
-    const today = new Date();
+    const today = getNowKST();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1); // 어제를 종료일로
 
@@ -54,7 +55,7 @@ export class StatisticsService {
    * @returns 이전 주 시작일, 종료일 정보 (String 형식)
    */
   private getPreviousWeekDateRange() {
-    const today = new Date();
+    const today = getNowKST();
     const currentWeekEnd = new Date(today);
     currentWeekEnd.setDate(today.getDate() - 1); // 전일
 

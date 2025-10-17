@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { BannerDto } from '../dto/banner.dto';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 배너 서비스
@@ -22,7 +23,7 @@ export class BannersService {
   async getActiveBanners(bannerType?: string): Promise<BannerDto[]> {
     this.logger.log(`활성 배너 조회 시작 (타입: ${bannerType || '전체'})`);
 
-    const now = new Date();
+    const now = getNowKST();
 
     const banners = await this.prisma.banner.findMany({
       where: {

@@ -6,6 +6,7 @@ import {
   ForbiddenException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 import {
   UserCouponListResponseDto,
   AvailableCouponsForProductResponseDto,
@@ -41,7 +42,7 @@ export class CouponService {
       orderBy: { issuedAt: 'desc' }
     });
 
-    const now = new Date();
+    const now = getNowKST();
     const coupons = userCoupons.map(uc => {
       // 만료 시간 계산
       const remainingMs = uc.expiresAt.getTime() - now.getTime();
@@ -98,7 +99,7 @@ export class CouponService {
     }
 
     // 해당 상품에 적용 가능한 활성 쿠폰 조회
-    const now = new Date();
+    const now = getNowKST();
     const availableUserCoupons = await this.prisma.userCoupon.findMany({
       where: {
         userId,
@@ -185,7 +186,7 @@ export class CouponService {
     }
 
     // 만료 확인
-    const now = new Date();
+    const now = getNowKST();
     if (userCoupon.expiresAt <= now) {
       return {
         isValid: false,
@@ -259,7 +260,7 @@ export class CouponService {
       throw new NotFoundException('유효하지 않은 쿠폰입니다');
     }
 
-    const now = new Date();
+    const now = getNowKST();
     if (userCoupon.expiresAt <= now) {
       throw new BadRequestException('만료된 쿠폰입니다');
     }
@@ -352,7 +353,7 @@ export class CouponService {
       throw new NotFoundException('쿠폰을 찾을 수 없습니다');
     }
 
-    const now = new Date();
+    const now = getNowKST();
     const remainingMs = userCoupon.expiresAt.getTime() - now.getTime();
     const remainingHours = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60)));
 
@@ -389,7 +390,7 @@ export class CouponService {
   async cleanupExpiredCoupons(): Promise<{ cleanedCount: number }> {
     this.logger.log('만료된 쿠폰 정리 작업 시작');
 
-    const now = new Date();
+    const now = getNowKST();
     const result = await this.prisma.userCoupon.updateMany({
       where: {
         status: 'ACTIVE',

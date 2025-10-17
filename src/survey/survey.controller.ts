@@ -25,6 +25,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SurveyService } from './survey.service';
 import { PrismaService } from '../common/services/prisma.service';
 import { CompleteSurveyDto } from './dto/complete-survey.dto';
+import { getNowKST } from '../common/utils/kst-date.util';
 import {
   SurveyQuestionResponseDto,
   SurveyOptionResponseDto,
@@ -64,21 +65,21 @@ export class SurveyController {
   // ==================== 설문 상태 확인 엔드포인트 ====================
 
   /**
-   * 챌린지별 사용자 설문 상태 확인
+   * 챌린지별 사용자 설문 상태 확인 (Product 기반)
    * 서비스 진입시 호출하여 어떤 화면을 보여줄지 결정
-   * 
-   * @param challengeId 챌린지 ID
+   *
+   * @param productId 챌린지 상품 ID
    * @param req Express Request 객체 (미들웨어에서 userId 추가됨)
    * @returns 사용자의 설문 상태 정보
    */
-  @Get('challenges/:challengeId/status')
+  @Get('challenges/:productId/status')
   @ApiOperation({
     summary: '챌린지별 사용자 설문 상태 확인',
-    description: '특정 챌린지에서 사용자의 설문 완료 여부와 다음 필요한 액션을 확인합니다. 서비스 진입시 이 API를 호출하여 적절한 화면으로 라우팅하세요.',
+    description: '특정 챌린지 상품에서 사용자의 설문 완료 여부와 다음 필요한 액션을 확인합니다. 서비스 진입시 이 API를 호출하여 적절한 화면으로 라우팅하세요.',
   })
   @ApiParam({
-    name: 'challengeId',
-    description: '챌린지 ID',
+    name: 'productId',
+    description: '챌린지 상품 ID',
     example: 1,
   })
   @ApiResponse({
@@ -87,24 +88,24 @@ export class SurveyController {
     type: SurveyStatusResponseDto,
   })
   async getSurveyStatus(
-    @Param('challengeId', ParseIntPipe) challengeId: number,
+    @Param('productId', ParseIntPipe) productId: number,
     @Req() req: Request,
       ): Promise<ApiResponseDto<SurveyStatusResponseDto>> {
-    this.logger.log(`챌린지별 설문 상태 확인 요청 - 사용자: ${req.user.sub}, 챌린지: ${challengeId}`);
+    this.logger.log(`챌린지별 설문 상태 확인 요청 - 사용자: ${req.user.sub}, 상품: ${productId}`);
 
     try {
-      const status = await this.surveyService.getSurveyStatus(req.user.sub, challengeId);
-      
-      this.logger.log(`챌린지별 설문 상태 확인 완료 - 사용자: ${req.user.sub}, 챌린지: ${challengeId}, 다음 액션: ${status.nextAction}`);
-      
+      const status = await this.surveyService.getSurveyStatus(req.user.sub, productId);
+
+      this.logger.log(`챌린지별 설문 상태 확인 완료 - 사용자: ${req.user.sub}, 상품: ${productId}, 다음 액션: ${status.nextAction}`);
+
       return {
         success: true,
         message: '사용자 설문 상태가 성공적으로 조회되었습니다.',
         data: status,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
-      this.logger.error(`챌린지별 설문 상태 확인 실패 - 사용자: ${req.user.sub}, 챌린지: ${challengeId}`, error);
+      this.logger.error(`챌린지별 설문 상태 확인 실패 - 사용자: ${req.user.sub}, 상품: ${productId}`, error);
       throw error;
     }
   }
@@ -153,7 +154,7 @@ export class SurveyController {
           ? `${categoryCode} 카테고리 설문 질문이 성공적으로 조회되었습니다.`
           : '모든 설문 질문이 성공적으로 조회되었습니다.',
         data: questions,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 질문 조회 응답 실패 - 사용자: ${req.user.sub}, 카테고리: ${categoryCode}`, error);
@@ -202,7 +203,7 @@ export class SurveyController {
         success: true,
         message: '설문 질문 정보가 성공적으로 조회되었습니다.',
         data: question,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`특정 설문 질문 조회 응답 실패 - 사용자: ${req.user.sub}, ID: ${id}`, error);
@@ -261,7 +262,7 @@ export class SurveyController {
         success: true,
         message: '설문 선택지 목록이 성공적으로 조회되었습니다.',
         data: formattedOptions,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 선택지 조회 응답 실패 - 사용자: ${req.user.sub}`, error);
@@ -320,7 +321,7 @@ export class SurveyController {
         success: true,
         message: '사용자의 설문 답변이 성공적으로 조회되었습니다.',
         data: answers,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`내 설문 답변 조회 응답 실패 - 사용자: ${req.user.sub}`, error);
@@ -374,7 +375,7 @@ export class SurveyController {
         success: true,
         message: '질문에 대한 모든 답변이 성공적으로 조회되었습니다.',
         data: answers,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`질문별 설문 답변 조회 응답 실패 - 사용자: ${req.user.sub}, 질문 ID: ${questionId}`, error);
@@ -425,7 +426,7 @@ export class SurveyController {
         success: true,
         message: '설문 결과가 성공적으로 조회되었습니다.',
         data: results,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`내 설문 결과 조회 실패 - 사용자: ${req.user.sub}`, error);
@@ -477,7 +478,7 @@ export class SurveyController {
         success: true,
         message: `설문 ${type === 'before' ? '사전' : '사후'} 질문이 성공적으로 조회되었습니다.`,
         data: survey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 질문 조회 실패 - 설문ID: ${surveyId}, 타입: ${type}`, error);
@@ -527,7 +528,7 @@ export class SurveyController {
         success: true,
         message: '설문이 성공적으로 완료되었습니다.',
         data: result,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 완료 실패 - 사용자: ${req.user.sub}, 설문ID: ${surveyId}`, error);
@@ -567,7 +568,7 @@ export class SurveyController {
         success: true,
         message: '설문 결과 비교가 성공적으로 조회되었습니다.',
         data: comparison,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 결과 비교 조회 실패 - 사용자: ${req.user.sub}, 설문ID: ${surveyId}`, error);

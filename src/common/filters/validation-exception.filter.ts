@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { getNowKST } from '../utils/kst-date.util';
 
 /**
  * Validation 예외 필터
@@ -75,7 +76,7 @@ export class ValidationExceptionFilter implements ExceptionFilter {
       message,
       error: 'Validation Error',
       errors,
-      timestamp: new Date().toISOString(),
+      timestamp: getNowKST().toISOString(),
       path: request.url,
     });
   }

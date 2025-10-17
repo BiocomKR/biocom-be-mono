@@ -5,6 +5,7 @@ import { Storage } from '@google-cloud/storage';
 import { extname, basename } from 'path';
 import * as crypto from 'crypto';
 import { UploadSecurityConfig } from './upload.security.config';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * GCS 기반 파일 업로드 서비스
@@ -176,7 +177,7 @@ export class UploadServiceGCS {
           metadata: {
             originalName: file.originalname,
             userId: userId.toString(),
-            uploadedAt: new Date().toISOString(),
+            uploadedAt: getNowKST().toISOString(),
           },
         },
       });
@@ -351,7 +352,7 @@ export class UploadServiceGCS {
         contentType: file.mimetype,
         metadata: {
           userId: userId.toString(),
-          uploadedAt: new Date().toISOString(),
+          uploadedAt: getNowKST().toISOString(),
           autoDelete: '24h',
         },
       },
@@ -366,7 +367,7 @@ export class UploadServiceGCS {
       mimeType: file.mimetype,
       size: file.size,
       path: publicUrl,
-      uploadedAt: new Date(),
+      uploadedAt: getNowKST(),
     };
   }
 }

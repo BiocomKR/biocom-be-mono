@@ -1,11 +1,12 @@
-import { 
-  Injectable, 
+import {
+  Injectable,
   Logger,
   NotFoundException,
   BadRequestException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class ManagementShippingService {
@@ -126,7 +127,7 @@ export class ManagementShippingService {
           courierName: dto.courierName,
           trackingNumber: dto.trackingNumber,
           status: 'READY_FOR_SHIPMENT',
-          readyAt: new Date()
+          readyAt: getNowKST()
         }
       });
 
@@ -187,7 +188,7 @@ export class ManagementShippingService {
         where: { id: order.shipping!.id },
         data: {
           status: 'IN_TRANSIT',
-          shippedAt: new Date()
+          shippedAt: getNowKST()
         }
       });
 
@@ -196,7 +197,7 @@ export class ManagementShippingService {
         where: { id: order.id },
         data: {
           status: 'SHIPPED',
-          shippedAt: new Date()
+          shippedAt: getNowKST()
         }
       });
 
@@ -243,7 +244,7 @@ export class ManagementShippingService {
         where: { id: order.shipping!.id },
         data: {
           status: 'DELIVERED',
-          deliveredAt: new Date()
+          deliveredAt: getNowKST()
         }
       });
 
@@ -252,7 +253,7 @@ export class ManagementShippingService {
         where: { id: order.id },
         data: {
           status: 'DELIVERED',
-          deliveredAt: new Date()
+          deliveredAt: getNowKST()
         }
       });
 
@@ -375,7 +376,7 @@ export class ManagementShippingService {
       : 0;
 
     // 오늘 배송 현황
-    const today = new Date();
+    const today = getNowKST();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);

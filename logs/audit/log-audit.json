@@ -6,106 +6,6 @@
     "auditLog": "logs/audit/log-audit.json",
     "files": [
         {
-            "date": 1757383949390,
-            "name": "logs/application-2025-09-09.log",
-            "hash": "d1cafdb02ae542cad1edeb61f3a9c892e7c28ead66df6636b640295399c656bc"
-        },
-        {
-            "date": 1757383949392,
-            "name": "logs/error-2025-09-09.log",
-            "hash": "80bd5b5f00e7f6fca07f8149b85278dd15dbb729bccbb7f5df2f236de7a74c01"
-        },
-        {
-            "date": 1757383949392,
-            "name": "logs/exceptions-2025-09-09.log",
-            "hash": "d3522b8e0c93cbd0b4192defa6a5f568e19c7491dd8c43e5e2e92ac837ebea43"
-        },
-        {
-            "date": 1757383949392,
-            "name": "logs/rejections-2025-09-09.log",
-            "hash": "d6aed95b902f6b4cf704782e9c85bd04ba8a0213c7c71635ddb3788460d9224e"
-        },
-        {
-            "date": 1757466619872,
-            "name": "logs/application-2025-09-10.log",
-            "hash": "d5f397a75878175f849c1407857f1e61d727a9e96115af08cec34b8dddf13c7f"
-        },
-        {
-            "date": 1757466619873,
-            "name": "logs/error-2025-09-10.log",
-            "hash": "d98fe610d6b204c2aaba3096ec93abe5bfbe5eaa962e9612b44245136c37d10e"
-        },
-        {
-            "date": 1757466619873,
-            "name": "logs/exceptions-2025-09-10.log",
-            "hash": "84d5b99ae6900615d7abb7a470bacb3ff80decc8469f48a77dea0972d8ce4221"
-        },
-        {
-            "date": 1757466619873,
-            "name": "logs/rejections-2025-09-10.log",
-            "hash": "fbbe17bcbc6f1c8f5c74df917f9ff376ca4141ba5e6fbf86ae66a5acd8407f45"
-        },
-        {
-            "date": 1757557624233,
-            "name": "logs/application-2025-09-11.log",
-            "hash": "78dfe49b3b495f0496a97f972895f0fc29201aa6f4fbbef47c6d915a4efdced4"
-        },
-        {
-            "date": 1757557624234,
-            "name": "logs/error-2025-09-11.log",
-            "hash": "6e86b26e91a7647248dcc74ead426b6325aaac3f0ca8b5b03c147825ac0dcf44"
-        },
-        {
-            "date": 1757557624235,
-            "name": "logs/exceptions-2025-09-11.log",
-            "hash": "b02e4e065da41a0379faecb60793690a38239c5d91ca8af081ae8ade55b888d9"
-        },
-        {
-            "date": 1757557624235,
-            "name": "logs/rejections-2025-09-11.log",
-            "hash": "e3c283ac75b64b6a71dae915cbd7e48f2d46f8b20b1b4c4b7f8dce3d4be6ddb6"
-        },
-        {
-            "date": 1757921705982,
-            "name": "logs/application-2025-09-15.log",
-            "hash": "35fac4afc2a308fdc918b8a4880a0797e070df4398c3412967e84adfda68a534"
-        },
-        {
-            "date": 1757921705984,
-            "name": "logs/error-2025-09-15.log",
-            "hash": "2dd54c67ea3ecaa8edc223c06a7dd1900263a13d40de6e0e03aef6a3679f871a"
-        },
-        {
-            "date": 1757921705984,
-            "name": "logs/exceptions-2025-09-15.log",
-            "hash": "a6d2058b0bb080a9335b58248637666efd155b033a88ad8314d4ee78660fe9a9"
-        },
-        {
-            "date": 1757921705984,
-            "name": "logs/rejections-2025-09-15.log",
-            "hash": "e6ff6a9169fd07e76d7d8b3f1f1ba77a2ee97b8dad5684827e0158f73924ea86"
-        },
-        {
-            "date": 1757985171145,
-            "name": "logs/exceptions-2025-09-16.log",
-            "hash": "0c4e4c2a98c931239b6c7b782b192f79016ba2b386065a71146ddf494cbb2a7d"
-        },
-        {
-            "date": 1757985233769,
-            "name": "logs/application-2025-09-16.log",
-            "hash": "aebe70c460e1b28df9bd7dc70995ad25641f3aab3f8288695e1bf3ef7e258e00"
-        },
-        {
-            "date": 1757985233770,
-            "name": "logs/error-2025-09-16.log",
-            "hash": "950793c95173f7316c0f00a13e5c19ff728706d99d3ef415af325219a21eed1f"
-        },
-        {
-            "date": 1757985233770,
-            "name": "logs/rejections-2025-09-16.log",
-            "hash": "5b40c88903b98cacacc7fc1ac378e5241b445766c285a06e6fc48f9a327aa020"
-        },
-        {
             "date": 1758078736824,
             "name": "logs/application-2025-09-17.log",
             "hash": "252bbd48e88d46b71492f4c9edeef003c3601a5dbf9016106f19d8d7c0a81b0f"
@@ -329,6 +229,86 @@
             "date": 1759963985779,
             "name": "logs/exceptions-2025-10-09.log",
             "hash": "80a32fcd71d2c067d84ebe7795bf764dfb751118617223475ec49c3515b54f4f"
+        },
+        {
+            "date": 1760339927804,
+            "name": "logs/application-2025-10-13.log",
+            "hash": "e567a3530ff0fdbac785379528e395ac4801d33b9f6385fdd00cf0d530291570"
+        },
+        {
+            "date": 1760339927806,
+            "name": "logs/error-2025-10-13.log",
+            "hash": "e4587c514b8c0d12d82a47d997ecbf63b1eba6aac1820142bb7c7032038a433e"
+        },
+        {
+            "date": 1760339927806,
+            "name": "logs/exceptions-2025-10-13.log",
+            "hash": "8e7701ac83803b2279f22d964042367e872f24d11d8e847668fef4f8da198b1e"
+        },
+        {
+            "date": 1760339927807,
+            "name": "logs/rejections-2025-10-13.log",
+            "hash": "909bf96a0ae7e6be58da61440d4c06723a1477f50596bf5c50292859ef164467"
+        },
+        {
+            "date": 1760405827214,
+            "name": "logs/application-2025-10-14.log",
+            "hash": "66c4c7702c988dbd0edc0004cb6845cf97de8261d980af17699dd351d8d8db2a"
+        },
+        {
+            "date": 1760405827215,
+            "name": "logs/error-2025-10-14.log",
+            "hash": "cde4e5d98fb39aa7587b414a0756335c9984b7c8b859b399b9268f9369f5bee7"
+        },
+        {
+            "date": 1760405827215,
+            "name": "logs/exceptions-2025-10-14.log",
+            "hash": "8f02b7a55dd5af4a05536ee2f93426fdfef11d195f4a5e55d31f30a36e73422a"
+        },
+        {
+            "date": 1760405827215,
+            "name": "logs/rejections-2025-10-14.log",
+            "hash": "6adc808839c2cc43c9cd747ec43f43ef02150b53896271cf2db8d2334a8b0042"
+        },
+        {
+            "date": 1760584827191,
+            "name": "logs/application-2025-10-16.log",
+            "hash": "2f805e78925ebd83a28238c2c4be6d76500f83b0c923658bbd8929c0f58e6232"
+        },
+        {
+            "date": 1760584827193,
+            "name": "logs/error-2025-10-16.log",
+            "hash": "08dbecf196b126b7798b75f067febb3ffeb7a692cd055784e88c872471b6fe38"
+        },
+        {
+            "date": 1760584827194,
+            "name": "logs/exceptions-2025-10-16.log",
+            "hash": "200e438248888769521bcdb52f57f45d3730123fc1ca2e047d5fa2f060fe2b41"
+        },
+        {
+            "date": 1760584827194,
+            "name": "logs/rejections-2025-10-16.log",
+            "hash": "83142000fe588101b730e05cf5bb893f93875f1e25bb9522bd8581ad3998096f"
+        },
+        {
+            "date": 1760662354905,
+            "name": "logs/application-2025-10-17.log",
+            "hash": "85b8a50167dc1625fb3e8ef1e4204d073a271d895c72bb7d929336bb7650cbe5"
+        },
+        {
+            "date": 1760662354906,
+            "name": "logs/error-2025-10-17.log",
+            "hash": "d21fd2a71c049d3ec8eb63a331c3298a058e0d231c749d898b74cf589d1d79f9"
+        },
+        {
+            "date": 1760662354906,
+            "name": "logs/exceptions-2025-10-17.log",
+            "hash": "df237109d27adc0052faa042053dd0bfd5c2b4cba47bb69d6699a7e8e30f64b3"
+        },
+        {
+            "date": 1760662354907,
+            "name": "logs/rejections-2025-10-17.log",
+            "hash": "9cf8cdb984e5bc5e1f7c4b3936027dcff456eab5ef7ce23cd1c4c2287fccc2bb"
         }
     ],
     "hashType": "sha256"

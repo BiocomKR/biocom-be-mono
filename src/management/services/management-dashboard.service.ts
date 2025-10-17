@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class ManagementDashboardService {
@@ -11,7 +12,7 @@ export class ManagementDashboardService {
    * 대시보드 요약
    */
   async getSummary() {
-    const today = new Date();
+    const today = getNowKST();
     today.setHours(0, 0, 0, 0);
     
     const tomorrow = new Date(today);
@@ -119,7 +120,7 @@ export class ManagementDashboardService {
     const { startDate, endDate, groupBy } = params;
 
     // 기본값: 최근 30일
-    const end = endDate || new Date();
+    const end = endDate || getNowKST();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const orders = await this.prisma.order.findMany({
@@ -198,7 +199,7 @@ export class ManagementDashboardService {
     const { startDate, endDate, limit } = params;
 
     // 기본값: 최근 30일
-    const end = endDate || new Date();
+    const end = endDate || getNowKST();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const productSales = await this.prisma.orderItem.groupBy({
@@ -259,6 +260,7 @@ export class ManagementDashboardService {
 
   /**
    * 카테고리별 매출
+   * ⚠️ Categories 테이블 제거로 인해 Products.categoryCode 기반으로 변경
    */
   async getCategorySales(params: {
     startDate?: Date;
@@ -267,38 +269,37 @@ export class ManagementDashboardService {
     const { startDate, endDate } = params;
 
     // 기본값: 최근 30일
-    const end = endDate || new Date();
+    const end = endDate || getNowKST();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const categorySales = await this.prisma.$queryRaw`
-      SELECT 
-        c.id,
-        c.name,
+      SELECT
+        p.category_code as category_code,
+        p.category_name as category_name,
         COUNT(DISTINCT o.id) as order_count,
         SUM(oi.quantity) as total_quantity,
         SUM(oi.subtotal) as total_sales
-      FROM categories c
-      LEFT JOIN products p ON p.category_id = c.id
+      FROM products p
       LEFT JOIN order_items oi ON oi.product_id = p.id
       LEFT JOIN orders o ON o.id = oi.order_id
       WHERE o.status NOT IN ('PENDING_PAYMENT', 'CANCELLED')
         AND o.paid_at >= ${start}
         AND o.paid_at <= ${end}
-      GROUP BY c.id, c.name
+      GROUP BY p.category_code, p.category_name
       ORDER BY total_sales DESC
     ` as any[];
 
-    const totalSales = categorySales.reduce((sum, item) => 
+    const totalSales = categorySales.reduce((sum, item) =>
       sum + Number(item.total_sales || 0), 0
     );
 
     return categorySales.map(item => ({
-      categoryId: item.id,
-      categoryName: item.name,
+      categoryCode: item.category_code,
+      categoryName: item.category_name,
       orderCount: Number(item.order_count || 0),
       quantity: Number(item.total_quantity || 0),
       sales: Number(item.total_sales || 0),
-      percentage: totalSales > 0 
+      percentage: totalSales > 0
         ? ((Number(item.total_sales || 0) / totalSales) * 100).toFixed(2)
         : '0.00'
     }));
@@ -314,7 +315,7 @@ export class ManagementDashboardService {
     const { startDate, endDate } = params;
 
     // 기본값: 최근 30일
-    const end = endDate || new Date();
+    const end = endDate || getNowKST();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // 상태별 주문 수
@@ -385,7 +386,7 @@ export class ManagementDashboardService {
     const { startDate, endDate } = params;
 
     // 기본값: 최근 30일
-    const end = endDate || new Date();
+    const end = endDate || getNowKST();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // 신규 고객
@@ -478,35 +479,30 @@ export class ManagementDashboardService {
       }
     });
 
-    // SKU로 ProductOption 조회
+    // SKU로 Product 직접 조회
     const skus = lowStockItems.map(item => item.sku);
-    const productOptions = await this.prisma.productOption.findMany({
+    const products = await this.prisma.product.findMany({
       where: { sku: { in: skus } },
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sku: true,
-            status: true
-          }
-        }
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        status: true
       }
     });
 
-    const optionMap = new Map(productOptions.map(opt => [opt.sku, opt]));
+    const productMap = new Map(products.map(p => [p.sku, p]));
 
     return lowStockItems.map(item => {
-      const option = optionMap.get(item.sku);
+      const product = productMap.get(item.sku) as { id: number; name: string; sku: string; status: string } | undefined;
       return {
         sku: item.sku,
         availableQty: item.availableQty,
-        productId: (option as any)?.product?.id,
-        productName: (option as any)?.product?.name || 'Unknown',
-        productSku: (option as any)?.product?.sku,
-        optionName: (option as any)?.optionName,
-        status: (option as any)?.product?.status,
-        alertLevel: item.availableQty === 0 ? 'OUT_OF_STOCK' : 
+        productId: product?.id ?? undefined,
+        productName: product?.name ?? 'Unknown',
+        productSku: product?.sku ?? undefined,
+        status: product?.status ?? undefined,
+        alertLevel: item.availableQty === 0 ? 'OUT_OF_STOCK' :
                     item.availableQty < 5 ? 'CRITICAL' : 'LOW'
       };
     });
@@ -522,7 +518,7 @@ export class ManagementDashboardService {
     const { startDate, endDate } = params;
 
     // 기본값: 최근 30일
-    const end = endDate || new Date();
+    const end = endDate || getNowKST();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // 상태별 환불 수
@@ -607,7 +603,7 @@ export class ManagementDashboardService {
    * 실시간 현황
    */
   async getRealtimeStatus() {
-    const now = new Date();
+    const now = getNowKST();
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
 

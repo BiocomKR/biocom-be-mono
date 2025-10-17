@@ -40,7 +40,8 @@ export class MissionController {
     description: '일일 미션 진행도 조회 성공'
   })
   async getDailyProgress(@Request() req: any) {
-    return this.missionCompletionService.getDailyProgress(req.user.userId);
+    const userId = req.user?.userId || req.user?.sub;
+    return this.missionCompletionService.getDailyProgress(userId);
   }
 
   /**
@@ -69,8 +70,9 @@ export class MissionController {
     @Body() dto: CompleteMissionDto,
     @Request() req: any
   ) {
+    const userId = req.user?.userId || req.user?.sub;
     return this.missionCompletionService.completeMission(
-      req.user.userId,
+      userId,
       challengeMissionId,
       dto
     );

@@ -3,6 +3,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { PointService } from '../point/point.service';
 import { CompleteMissionDto } from './dto/mission-completion.dto';
 import { Logger } from '@nestjs/common';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 챌린지 미션 서비스
@@ -30,22 +31,13 @@ export class MissionCompletionService {
       return await this.prisma.$transaction(async (tx) => {
         // 1️⃣ 챌린지 미션 및 관련 정보 조회
         const challengeMission = await tx.challengeMission.findFirst({
-          where: { 
+          where: {
             id: challengeMissionId,
             isActive: true
           },
           include: {
             mission: true,
-            challenge: {
-              include: {
-                userChallenges: {
-                  where: {
-                    userId,
-                    status: 'ACTIVE'
-                  }
-                }
-              }
-            }
+            product: true
           }
         });
 
@@ -53,15 +45,23 @@ export class MissionCompletionService {
           throw new NotFoundException('챌린지 미션을 찾을 수 없습니다');
         }
 
-        if (challengeMission.challenge.userChallenges.length === 0) {
+        // 활성화된 사용자 챌린지 조회
+        const userChallenge = await tx.userChallenge.findFirst({
+          where: {
+            userId,
+            productId: challengeMission.productId,
+            status: 'ACTIVE'
+          }
+        });
+
+        if (!userChallenge) {
           throw new BadRequestException('활성화된 챌린지가 없습니다');
         }
 
-        const userChallenge = challengeMission.challenge.userChallenges[0];
         const mission = challengeMission.mission;
 
         // 2️⃣ 오늘 날짜와 현재 일차 확인
-        const today = new Date();
+        const today = getNowKST();
         const todayStr = today.toISOString().split('T')[0];
         const currentDay = userChallenge.currentDay;
 
@@ -245,7 +245,7 @@ export class MissionCompletionService {
             isCompleted
           },
           pointsEarned,
-          attemptedAt: new Date(),
+          attemptedAt: getNowKST(),
           trackingRecordId,
           todayProgress: {
             missionsCompleted: updatedProgress.missionsCompleted,
@@ -278,7 +278,7 @@ export class MissionCompletionService {
           status: 'ACTIVE'
         },
         include: {
-          challenge: true
+          product: true
         }
       });
 
@@ -357,7 +357,7 @@ export class MissionCompletionService {
           totalMissionAvg,
           mission: missionsWithProgress
         },
-        timestamp: new Date()
+        timestamp: getNowKST()
       };
 
     } catch (error) {

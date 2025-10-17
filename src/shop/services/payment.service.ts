@@ -1,5 +1,5 @@
-import { 
-  Injectable, 
+import {
+  Injectable,
   Logger,
   NotFoundException,
   BadRequestException,
@@ -7,14 +7,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { TossPaymentsService } from './toss-payments.service';
-import { 
-  PreparePaymentDto, 
+import {
+  PreparePaymentDto,
   ConfirmPaymentDto,
   CancelPaymentDto,
   PaymentResponseDto,
   PaymentWebhookDto
 } from '../dto/payment/payment.dto';
 import { Prisma } from '@prisma/client';
+import { convertDecimalToNumber } from '../../common/utils/decimal.util';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class PaymentService {
@@ -60,7 +62,7 @@ export class PaymentService {
         data: {
           orderId: order.id,
           paymentMethod: 'CARD', // 기본값, 실제 결제 시 업데이트
-          amount: order.totalAmount,
+          amount: convertDecimalToNumber(order.totalAmount) || 0,
           status: 'PENDING',
           pgProvider: 'TOSS_PAYMENTS'
         }
@@ -72,7 +74,7 @@ export class PaymentService {
     return {
       orderId: order.id,
       orderNumber: order.orderNumber,
-      amount: Number(order.totalAmount),
+      amount: convertDecimalToNumber(order.totalAmount) || 0,
       orderName: `주문번호: ${order.orderNumber}`,
       customerName: order.recipientName,
       customerEmail: '', // 사용자 이메일 추가 필요
@@ -95,7 +97,7 @@ export class PaymentService {
         include: {
           items: {
             include: {
-              productOption: true
+              product: true
             }
           }
         }
@@ -118,17 +120,25 @@ export class PaymentService {
       }
 
       // 금액 검증
-      if (Number(order.totalAmount) !== dto.amount) {
+      if (convertDecimalToNumber(order.totalAmount) !== dto.amount) {
         throw new BadRequestException('결제 금액이 일치하지 않습니다');
       }
 
       try {
-        // 토스페이먼츠 결제 승인
-        const tossResult = await this.tossPayments.confirmPayment(
-          dto.paymentKey,
-          dto.orderId,
-          dto.amount
-        );
+        // 토스페이먼츠 결제 승인 (Mock - 실제 운영 시 주석 해제)
+        // const tossResult = await this.tossPayments.confirmPayment(
+        //   dto.paymentKey,
+        //   dto.orderId,
+        //   dto.amount
+        // );
+
+        // Mock 결제 결과
+        const tossResult = {
+          paymentKey: dto.paymentKey,
+          orderId: dto.orderId,
+          method: '카드',
+          approvedAt: getNowKST().toISOString()
+        };
 
         // 결제 정보 업데이트
         await tx.payment.update({
@@ -161,36 +171,56 @@ export class PaymentService {
           }
         });
 
-        // 재고 차감 처리
-        for (const item of order.items) {
-          // 재고 캐시 업데이트 (실제 재고는 큐로 처리)
-          await tx.inventoryCache.upsert({
-            where: { sku: item.productOption.sku },
-            create: {
-              sku: item.productOption.sku,
-              quantity: -item.quantity,
-              lastUpdated: new Date()
-            },
-            update: {
-              quantity: {
-                decrement: item.quantity
-              },
-              lastUpdated: new Date()
-            }
-          });
+        // 재고 차감 처리 (재고 테이블 제거됨 - 추후 구현 예정)
+        // for (const item of order.items) {
+        //   // 재고 캐시 업데이트 (실제 재고는 큐로 처리)
+        //   await tx.inventoryCache.upsert({
+        //     where: { sku: item.product.sku },
+        //     create: {
+        //       sku: item.product.sku,
+        //       quantity: -item.quantity,
+        //       lastUpdated: new Date()
+        //     },
+        //     update: {
+        //       quantity: {
+        //         decrement: item.quantity
+        //       },
+        //       lastUpdated: new Date()
+        //     }
+        //   });
+        //
+        //   // 재고 동기화 큐 상태 업데이트
+        //   await tx.inventorySyncQueue.updateMany({
+        //     where: {
+        //       orderId: order.id,
+        //       sku: item.product.sku,
+        //       status: 'PENDING'
+        //     },
+        //     data: {
+        //       status: 'PROCESSING',
+        //       processedAt: new Date()
+        //     }
+        //   });
+        // }
 
-          // 재고 동기화 큐 상태 업데이트
-          await tx.inventorySyncQueue.updateMany({
-            where: {
-              orderId: order.id,
-              sku: item.productOption.sku,
-              status: 'PENDING'
-            },
-            data: {
-              status: 'PROCESSING',
-              processedAt: new Date()
+        // 챌린지 상품 티켓 발급
+        for (const item of order.items) {
+          if (item.product.categoryCode === 'CHALLENGE') {
+            // 구매 수량만큼 티켓 발급
+            for (let i = 0; i < item.quantity; i++) {
+              await tx.challengeTicket.create({
+                data: {
+                  userId: order.userId,
+                  productId: item.productId,
+                  orderItemId: item.id,
+                  purchaseDate: getNowKST(),
+                  status: 'ACTIVE',
+                  ticketType: 'CHALLENGE'
+                }
+              });
             }
-          });
+            this.logger.log(`챌린지 티켓 발급 완료: productId=${item.productId}, quantity=${item.quantity}`);
+          }
         }
 
         this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
@@ -211,8 +241,8 @@ export class PaymentService {
           where: { id: payment.id },
           data: {
             status: 'FAILED',
-            failedAt: new Date(),
-            failReason: error.message
+            failedAt: getNowKST(),
+            failReason: error.message?.substring(0, 500) || 'Unknown error'
           }
         });
 
@@ -245,7 +275,7 @@ export class PaymentService {
         include: {
           items: {
             include: {
-              productOption: true
+              product: true
             }
           }
         }
@@ -273,7 +303,7 @@ export class PaymentService {
       }
 
       // 부분 취소 금액 검증
-      if (dto.cancelAmount && dto.cancelAmount > Number(payment.amount)) {
+      if (dto.cancelAmount && dto.cancelAmount > (convertDecimalToNumber(payment.amount) || 0)) {
         throw new BadRequestException('취소 금액이 결제 금액보다 큽니다');
       }
 
@@ -291,22 +321,22 @@ export class PaymentService {
           data: {
             orderId: order.id,
             paymentId: payment.id,
-            amount: new Prisma.Decimal(dto.cancelAmount || Number(payment.amount)),
+            amount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
             reason: dto.cancelReason,
             status: 'COMPLETED',
             method: dto.refundAccount ? 'BANK_TRANSFER' : 'ORIGINAL_METHOD',
-            refundedAt: new Date(tossResult.cancels[0].canceledAt),
+            refundedAt: getNowKST(),
             transactionId: tossResult.cancels[0].transactionKey
           }
         });
 
         // 결제 상태 업데이트
-        const isPartialCancel = dto.cancelAmount && dto.cancelAmount < Number(payment.amount);
+        const isPartialCancel = dto.cancelAmount && dto.cancelAmount < (convertDecimalToNumber(payment.amount) || 0);
         await tx.payment.update({
           where: { id: payment.id },
           data: {
             status: isPartialCancel ? 'PARTIAL_CANCELLED' : 'CANCELLED',
-            cancelledAt: new Date()
+            cancelledAt: getNowKST()
           }
         });
 
@@ -316,7 +346,7 @@ export class PaymentService {
             where: { id: order.id },
             data: {
               status: 'CANCELLED',
-              cancelledAt: new Date()
+              cancelledAt: getNowKST()
             }
           });
 
@@ -330,42 +360,42 @@ export class PaymentService {
             }
           });
 
-          // 재고 복구
-          for (const item of order.items) {
-            // 재고 캐시 업데이트
-            await tx.inventoryCache.upsert({
-              where: { sku: item.productOption.sku },
-              create: {
-                sku: item.productOption.sku,
-                quantity: item.quantity,
-                lastUpdated: new Date()
-              },
-              update: {
-                quantity: {
-                  increment: item.quantity
-                },
-                lastUpdated: new Date()
-              }
-            });
-
-            // 재고 동기화 큐
-            await tx.inventorySyncQueue.create({
-              data: {
-                orderId: order.id,
-                sku: item.productOption.sku,
-                quantity: item.quantity,
-                action: 'RESTORE',
-                status: 'PENDING'
-              }
-            });
-          }
+          // 재고 복구 (재고 테이블 제거됨 - 추후 구현 예정)
+          // for (const item of order.items) {
+          //   // 재고 캐시 업데이트
+          //   await tx.inventoryCache.upsert({
+          //     where: { sku: item.product.sku },
+          //     create: {
+          //       sku: item.product.sku,
+          //       quantity: item.quantity,
+          //       lastUpdated: getNowKST()
+          //     },
+          //     update: {
+          //       quantity: {
+          //         increment: item.quantity
+          //       },
+          //       lastUpdated: getNowKST()
+          //     }
+          //   });
+          //
+          //   // 재고 동기화 큐
+          //   await tx.inventorySyncQueue.create({
+          //     data: {
+          //       orderId: order.id,
+          //       sku: item.product.sku,
+          //       quantity: item.quantity,
+          //       action: 'RESTORE',
+          //       status: 'PENDING'
+          //     }
+          //   });
+          // }
 
           // 포인트 복구
-          if (order.pointUsed > 0) {
+          if (convertDecimalToNumber(order.pointUsed) || 0 > 0) {
             await tx.user.update({
               where: { id: userId },
               data: {
-                points: { increment: Number(order.pointUsed) }
+                points: { increment: convertDecimalToNumber(order.pointUsed) || 0 }
               }
             });
 
@@ -373,7 +403,7 @@ export class PaymentService {
               data: {
                 userId,
                 type: 'REFUND',
-                amount: Number(order.pointUsed),
+                amount: convertDecimalToNumber(order.pointUsed) || 0,
                 balance: 0, // 추후 계산
                 description: `주문 취소 환불 (${order.orderNumber})`,
                 relatedType: 'ORDER',
@@ -388,7 +418,7 @@ export class PaymentService {
         return {
           orderId: order.id,
           orderNumber: order.orderNumber,
-          amount: Number(refund.amount),
+          amount: convertDecimalToNumber(refund.amount) || 0,
           orderName: `주문번호: ${order.orderNumber}`,
           customerName: order.recipientName,
           customerEmail: '',
@@ -401,7 +431,7 @@ export class PaymentService {
           data: {
             orderId: order.id,
             paymentId: payment.id,
-            amount: new Prisma.Decimal(dto.cancelAmount || Number(payment.amount)),
+            amount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
             reason: dto.cancelReason,
             status: 'FAILED',
             method: dto.refundAccount ? 'BANK_TRANSFER' : 'ORIGINAL_METHOD',
@@ -449,7 +479,7 @@ export class PaymentService {
               where: { id: payment.id },
               data: {
                 status: 'CANCELLED',
-                cancelledAt: new Date()
+                cancelledAt: getNowKST()
               }
             });
 
@@ -457,7 +487,7 @@ export class PaymentService {
               where: { id: payment.orderId },
               data: {
                 status: 'CANCELLED',
-                cancelledAt: new Date()
+                cancelledAt: getNowKST()
               }
             });
 
@@ -479,7 +509,7 @@ export class PaymentService {
           where: { id: payment.id },
           data: {
             status: 'FAILED',
-            failedAt: new Date(),
+            failedAt: getNowKST(),
             failReason: dto.data.failure?.message
           }
         });

@@ -35,6 +35,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FoodCalorieService } from './food-calorie.service';
 import { FaceSlimmingService } from './face-slimming.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 파일 업로드 컨트롤러
@@ -116,7 +117,7 @@ export class UploadController {
       success: true,
       message: '이미지가 성공적으로 업로드되었습니다.',
       data: uploadedFile,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -155,7 +156,7 @@ export class UploadController {
       success: true,
       message: '파일 정보가 성공적으로 조회되었습니다.',
       data: file,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -195,7 +196,7 @@ export class UploadController {
       success: true,
       message: '파일 목록이 성공적으로 조회되었습니다.',
       data: files,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -234,7 +235,7 @@ export class UploadController {
     return {
       success: true,
       message: '파일이 성공적으로 삭제되었습니다.',
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 
@@ -335,7 +336,7 @@ export class UploadController {
           ? `${foodNames} 분석이 완료되었습니다.`
           : '음식이 감지되지 않았습니다.',
         data: analysisResult,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
 
     } catch (error) {
@@ -352,7 +353,7 @@ export class UploadController {
         success: false,
         message: 'AI 분석에 실패했습니다.',
         data: failedResult,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     }
   }
@@ -473,7 +474,7 @@ export class UploadController {
           success: true,
           message: `${weightLoss}kg 체중 감량 효과의 얼굴 슬리밍 이미지가 생성되었습니다.`,
           data: slimmingResult,
-          timestamp: new Date(),
+          timestamp: getNowKST(),
         };
       } else {
         this.logger.error(`얼굴 슬리밍 실패 - 에러: ${slimmingResult.errorMessage}`);
@@ -482,7 +483,7 @@ export class UploadController {
           success: false,
           message: '얼굴 슬리밍 처리에 실패했습니다.',
           data: slimmingResult,
-          timestamp: new Date(),
+          timestamp: getNowKST(),
         };
       }
 
@@ -505,7 +506,7 @@ export class UploadController {
         success: false,
         message: '얼굴 슬리밍 처리에 실패했습니다.',
         data: failedResult,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     }
   }

@@ -1,5 +1,5 @@
-import { 
-  Injectable, 
+import {
+  Injectable,
   Logger,
   NotFoundException,
   BadRequestException,
@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class ManagementShopService {
@@ -204,8 +205,7 @@ export class ManagementShopService {
           },
           items: {
             include: {
-              product: true,
-              productOption: true
+              product: true
             }
           },
           payment: true,
@@ -254,8 +254,7 @@ export class ManagementShopService {
         },
         items: {
           include: {
-            product: true,
-            productOption: true
+            product: true
           }
         },
         payment: true,
@@ -308,10 +307,10 @@ export class ManagementShopService {
         where: { id: order.id },
         data: {
           status,
-          ...(status === 'SHIPPED' && { shippedAt: new Date() }),
-          ...(status === 'DELIVERED' && { deliveredAt: new Date() }),
-          ...(status === 'CANCELLED' && { cancelledAt: new Date() }),
-          ...(status === 'COMPLETED' && { completedAt: new Date() })
+          ...(status === 'SHIPPED' && { shippedAt: getNowKST() }),
+          ...(status === 'DELIVERED' && { deliveredAt: getNowKST() }),
+          ...(status === 'CANCELLED' && { cancelledAt: getNowKST() }),
+          ...(status === 'COMPLETED' && { completedAt: getNowKST() })
         }
       });
 
@@ -482,133 +481,18 @@ export class ManagementShopService {
   }
 
   /**
-   * 재고 현황 조회
+   * ⚠️ 재고 관리 기능 제거됨
+   * - 외부 재고 시스템 연동 기능은 나중에 기획안 확정 후 재구현 예정
    */
-  async getInventory(params: { sku?: string; lowStock?: boolean }) {
-    const where: Prisma.InventoryCacheWhereInput = {};
-    
-    if (params.sku) {
-      where.sku = params.sku;
-    }
-    
-    if (params.lowStock) {
-      where.availableQty = { lt: 10 }; // 10개 미만을 재고 부족으로 정의
-    }
+  // async getInventory(params: { sku?: string; lowStock?: boolean }) {
+  //   throw new Error('재고 관리 기능이 제거되었습니다.');
+  // }
 
-    const inventory = await this.prisma.inventoryCache.findMany({
-      where,
-      orderBy: { availableQty: 'asc' }
-    });
+  // async syncInventory() {
+  //   throw new Error('재고 관리 기능이 제거되었습니다.');
+  // }
 
-    // ProductOption을 별도로 조회
-    const skus = inventory.map(item => item.sku);
-    const productOptions = await this.prisma.productOption.findMany({
-      where: { sku: { in: skus } },
-      include: { product: true }
-    });
-    const optionMap = new Map(productOptions.map(opt => [opt.sku, opt]));
-
-    return inventory.map(item => {
-      const option = optionMap.get(item.sku);
-      return {
-        sku: item.sku,
-        availableQty: item.availableQty,
-        lastUpdated: item.lastUpdated,
-        product: (option as any)?.product?.name,
-        option: (option as any)?.optionName,
-        isLowStock: item.availableQty < 10
-      };
-    });
-  }
-
-  /**
-   * 재고 동기화
-   */
-  async syncInventory() {
-    // 펜딩 중인 동기화 큐 처리
-    const pendingQueues = await this.prisma.inventorySyncQueue.findMany({
-      where: { status: 'PENDING' },
-      orderBy: { createdAt: 'asc' },
-      take: 100
-    });
-
-    let processed = 0;
-    let failed = 0;
-
-    for (const queue of pendingQueues) {
-      try {
-        // TODO: 실제 외부 API 호출
-        // 현재는 모의 처리
-        
-        await this.prisma.inventorySyncQueue.update({
-          where: { id: queue.id },
-          data: {
-            status: 'COMPLETED',
-            processedAt: new Date()
-          }
-        });
-        
-        processed++;
-      } catch (error) {
-        await this.prisma.inventorySyncQueue.update({
-          where: { id: queue.id },
-          data: {
-            status: 'FAILED',
-            processedAt: new Date(),
-            errorMessage: error.message
-          }
-        });
-        
-        failed++;
-      }
-    }
-
-    this.logger.log(`재고 동기화 완료: 성공 ${processed}, 실패 ${failed}`);
-
-    return {
-      total: pendingQueues.length,
-      processed,
-      failed
-    };
-  }
-
-  /**
-   * 재고 수동 조정
-   */
-  async adjustInventory(sku: string, quantity: number, reason: string) {
-    const inventory = await this.prisma.inventoryCache.upsert({
-      where: { sku },
-      create: {
-        sku,
-        availableQty: quantity,
-        lastUpdated: new Date()
-      },
-      update: {
-        availableQty: {
-          increment: quantity
-        },
-        lastUpdated: new Date()
-      }
-    });
-
-    // 조정 로그 생성
-    await this.prisma.inventoryApiLog.create({
-      data: {
-        apiMethod: 'MANUAL_ADJUST',
-        sku,
-        requestData: { quantity, reason },
-        responseData: { newQuantity: inventory.availableQty },
-        responseStatus: 200
-      }
-    });
-
-    this.logger.log(`재고 수동 조정: ${sku} / ${quantity > 0 ? '+' : ''}${quantity} (사유: ${reason})`);
-
-    return {
-      sku,
-      newQuantity: inventory.availableQty,
-      adjusted: quantity,
-      reason
-    };
-  }
+  // async adjustInventory(sku: string, quantity: number, reason: string) {
+  //   throw new Error('재고 관리 기능이 제거되었습니다.');
+  // }
 }

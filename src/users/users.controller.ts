@@ -23,6 +23,7 @@ import {
   GetMyPointsResponseDto,
 } from './dto/user-response.dto';
 import { ApiErrorResponseDto } from '../common/dto/api-response.dto';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 사용자 컨트롤러
@@ -72,7 +73,7 @@ export class UsersController {
         success: true,
         message: '아임웹 회원 검색이 완료되었습니다.',
         data: members,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       console.error('아임웹 회원 검색 에러:', error);
@@ -128,7 +129,7 @@ export class UsersController {
       success: true,
       message: '사용자 정보를 조회했습니다.',
       data: user,
-      timestamp: new Date(),
+      timestamp: getNowKST(),
     };
   }
 }

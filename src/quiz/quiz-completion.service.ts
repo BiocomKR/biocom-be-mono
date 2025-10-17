@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { PrismaService } from '../common/services/prisma.service';
 import { CompleteQuizDto } from './dto/quiz-completion.dto';
 import { Logger } from '@nestjs/common';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 퀴즈 서비스
@@ -47,7 +48,15 @@ export class QuizzesService {
             userId,
             status: 'ACTIVE'
           },
-          include: { challenge: true }
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                metadata: true
+              }
+            }
+          }
         });
 
         let challengeInfo = null;
@@ -56,16 +65,17 @@ export class QuizzesService {
 
         if (activeChallenge) {
           userChallengeId = activeChallenge.id;
+          const metadata = activeChallenge.product.metadata as any;
           challengeInfo = {
-            challengeId: activeChallenge.challengeId,
-            challengeName: activeChallenge.challenge.name,
+            productId: activeChallenge.productId,
+            challengeName: metadata?.challengeName || activeChallenge.product.name,
             currentDay: activeChallenge.currentDay
           };
 
           // 오늘의 챌린지 퀴즈인지 확인
           const todayQuiz = await tx.challengeQuiz.findFirst({
             where: {
-              challengeId: activeChallenge.challengeId,
+              productId: activeChallenge.productId,
               day: activeChallenge.currentDay,
               quizId: quizId,
               isActive: true
@@ -102,14 +112,14 @@ export class QuizzesService {
           pointsEarned,
           timeSpent: dto.timeSpent || null,
           note: dto.note || null,
-          answeredAt: new Date()
+          answeredAt: getNowKST()
         };
 
         if (isFromChallenge) {
           // 챌린지 퀴즈 답변
           const challengeQuiz = await tx.challengeQuiz.findFirst({
             where: {
-              challengeId: activeChallenge!.challengeId,
+              productId: activeChallenge!.productId,
               day: activeChallenge!.currentDay,
               quizId: quizId
             }
@@ -163,7 +173,7 @@ export class QuizzesService {
   ) {
     try {
       // 1️⃣ DailyProgress 조회/생성
-      const today = new Date();
+      const today = getNowKST();
       const todayStr = today.toISOString().split('T')[0];
 
       let dailyProgress = await tx.dailyProgress.findFirst({

@@ -1,8 +1,8 @@
-import { 
-  Injectable, 
-  NotFoundException, 
+import {
+  Injectable,
+  NotFoundException,
   BadRequestException,
-  Logger 
+  Logger
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import {
@@ -12,6 +12,7 @@ import {
   CartResponseDto,
   CartValidationResponseDto
 } from '../dto/cart/cart-item.dto';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 @Injectable()
 export class CartService {
@@ -55,7 +56,6 @@ export class CartService {
                 },
               },
             },
-            productOption: true,
           },
           orderBy: { addedAt: 'desc' },
         },
@@ -79,7 +79,7 @@ export class CartService {
 
     // 총 금액 및 수량 계산
     const totalProductPrice = cart.items.reduce((sum, item) => {
-      const price = Number(item.productOption.price);
+      const price = Number(item.product.price);
       return sum + (price * item.quantity);
     }, 0);
 
@@ -88,7 +88,7 @@ export class CartService {
     // 각 아이템의 소계 계산
     const itemsWithSubtotal = cart.items.map(item => ({
       ...item,
-      subtotal: Number(item.productOption.price) * item.quantity,
+      subtotal: Number(item.product.price) * item.quantity,
     }));
 
     return {
@@ -103,32 +103,28 @@ export class CartService {
    * 장바구니에 상품 추가
    */
   async addItem(userId: number, dto: AddCartItemDto): Promise<CartItemResponseDto> {
-    // 상품 옵션 확인
-    const productOption = await this.prisma.productOption.findUnique({
-      where: { id: dto.productOptionId },
+    // 상품 확인
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
       include: {
-        product: {
-          include: {
-            images: {
-              where: { imageType: 'MAIN' },
-              take: 1,
-            },
-          },
+        images: {
+          where: { imageType: 'MAIN' },
+          take: 1,
         },
       },
     });
 
-    if (!productOption || !productOption.isActive) {
-      throw new NotFoundException('상품 옵션을 찾을 수 없습니다');
+    if (!product) {
+      throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
-    if (productOption.product.status !== 'ACTIVE') {
+    if (product.status !== 'ACTIVE') {
       throw new BadRequestException('판매 중인 상품이 아닙니다');
     }
 
     // 최대 주문 수량 체크
-    if (dto.quantity > productOption.maxOrderQty) {
-      throw new BadRequestException(`최대 주문 수량은 ${productOption.maxOrderQty}개입니다`);
+    if (dto.quantity > product.maxOrderQty) {
+      throw new BadRequestException(`최대 주문 수량은 ${product.maxOrderQty}개입니다`);
     }
 
     // 장바구니 가져오기 또는 생성
@@ -137,9 +133,9 @@ export class CartService {
     // 이미 장바구니에 있는지 확인
     const existingItem = await this.prisma.cartItem.findUnique({
       where: {
-        cartId_productOptionId: {
+        cartId_productId: {
           cartId: cart.id,
-          productOptionId: dto.productOptionId,
+          productId: dto.productId,
         },
       },
     });
@@ -147,16 +143,16 @@ export class CartService {
     if (existingItem) {
       // 이미 있으면 수량 증가
       const newQuantity = existingItem.quantity + dto.quantity;
-      
-      if (newQuantity > productOption.maxOrderQty) {
-        throw new BadRequestException(`최대 주문 수량은 ${productOption.maxOrderQty}개입니다`);
+
+      if (newQuantity > product.maxOrderQty) {
+        throw new BadRequestException(`최대 주문 수량은 ${product.maxOrderQty}개입니다`);
       }
 
       const updatedItem = await this.prisma.cartItem.update({
         where: { id: existingItem.id },
-        data: { 
+        data: {
           quantity: newQuantity,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
         include: {
           product: {
@@ -167,13 +163,12 @@ export class CartService {
               },
             },
           },
-          productOption: true,
         },
       });
 
       return {
         ...updatedItem,
-        subtotal: Number(updatedItem.productOption.price) * updatedItem.quantity,
+        subtotal: Number(updatedItem.product.price) * updatedItem.quantity,
       };
     }
 
@@ -181,8 +176,7 @@ export class CartService {
     const newItem = await this.prisma.cartItem.create({
       data: {
         cartId: cart.id,
-        productId: productOption.productId,
-        productOptionId: dto.productOptionId,
+        productId: dto.productId,
         quantity: dto.quantity,
         stockAvailable: true,
       },
@@ -195,13 +189,12 @@ export class CartService {
             },
           },
         },
-        productOption: true,
       },
     });
 
     return {
       ...newItem,
-      subtotal: Number(newItem.productOption.price) * newItem.quantity,
+      subtotal: Number(newItem.product.price) * newItem.quantity,
     };
   }
 
@@ -209,8 +202,8 @@ export class CartService {
    * 장바구니 아이템 수량 변경
    */
   async updateItemQuantity(
-    userId: number, 
-    itemId: number, 
+    userId: number,
+    itemId: number,
     dto: UpdateCartItemDto
   ): Promise<CartItemResponseDto> {
     // 장바구니 아이템 확인
@@ -220,7 +213,7 @@ export class CartService {
         cart: { userId },
       },
       include: {
-        productOption: true,
+        product: true,
       },
     });
 
@@ -229,16 +222,16 @@ export class CartService {
     }
 
     // 최대 주문 수량 체크
-    if (dto.quantity > item.productOption.maxOrderQty) {
-      throw new BadRequestException(`최대 주문 수량은 ${item.productOption.maxOrderQty}개입니다`);
+    if (dto.quantity > item.product.maxOrderQty) {
+      throw new BadRequestException(`최대 주문 수량은 ${item.product.maxOrderQty}개입니다`);
     }
 
     // 수량 업데이트
     const updatedItem = await this.prisma.cartItem.update({
       where: { id: itemId },
-      data: { 
+      data: {
         quantity: dto.quantity,
-        updatedAt: new Date(),
+        updatedAt: getNowKST(),
       },
       include: {
         product: {
@@ -249,13 +242,12 @@ export class CartService {
             },
           },
         },
-        productOption: true,
       },
     });
 
     return {
       ...updatedItem,
-      subtotal: Number(updatedItem.productOption.price) * updatedItem.quantity,
+      subtotal: Number(updatedItem.product.price) * updatedItem.quantity,
     };
   }
 
@@ -305,7 +297,6 @@ export class CartService {
         items: {
           include: {
             product: true,
-            productOption: true,
           },
         },
       },
@@ -332,16 +323,6 @@ export class CartService {
         continue;
       }
 
-      // 옵션 활성화 확인
-      if (!item.productOption.isActive) {
-        invalidItems.push({
-          ...item,
-          stockAvailable: false,
-          subtotal: 0,
-        });
-        continue;
-      }
-
       // TODO: 실제 재고 API 호출
       // 현재는 모의로 처리
       const mockStock = Math.floor(Math.random() * 100);
@@ -352,7 +333,7 @@ export class CartService {
         where: { id: item.id },
         data: {
           stockAvailable: isAvailable,
-          stockCheckedAt: new Date(),
+          stockCheckedAt: getNowKST(),
         },
       });
 

@@ -29,7 +29,7 @@ import {
 } from '../dto/cart/cart-item.dto';
 
 // 쇼핑몰 관련 API 임시 비활성화
-@Controller('api/shop/cart')
+@Controller('shop/cart')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class CartController {

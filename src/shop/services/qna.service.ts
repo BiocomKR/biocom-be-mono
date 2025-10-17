@@ -17,6 +17,7 @@ import {
   QnaFilterType
 } from '../dto/qna/qna.dto';
 import { Prisma } from '@prisma/client';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 상품 Q&A 서비스
@@ -37,20 +38,11 @@ export class QnaService {
 
     // 상품 존재 확인
     const product = await this.prisma.product.findUnique({
-      where: { id: dto.productId },
-      include: {
-        options: {
-          where: { id: dto.productOptionId }
-        }
-      }
+      where: { id: dto.productId }
     });
 
     if (!product) {
       throw new NotFoundException('상품을 찾을 수 없습니다');
-    }
-
-    if (dto.productOptionId && product.options.length === 0) {
-      throw new NotFoundException('상품 옵션을 찾을 수 없습니다');
     }
 
     // Q&A 작성
@@ -58,7 +50,6 @@ export class QnaService {
       data: {
         userId,
         productId: dto.productId,
-        productOptionId: dto.productOptionId,
         feedbackType: 'QUESTION',
         title: dto.title,
         content: dto.content,
@@ -77,13 +68,6 @@ export class QnaService {
             id: true,
             name: true,
             sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
           }
         },
         replies: {
@@ -176,13 +160,6 @@ export class QnaService {
               sku: true
             }
           },
-          productOption: {
-            select: {
-              id: true,
-              optionName: true,
-              price: true
-            }
-          },
           replies: {
             where: {
               status: 'ACTIVE'
@@ -244,13 +221,6 @@ export class QnaService {
             id: true,
             name: true,
             sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
           }
         },
         replies: {
@@ -329,13 +299,6 @@ export class QnaService {
             id: true,
             name: true,
             sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
           }
         },
         replies: {
@@ -432,7 +395,6 @@ export class QnaService {
       data: {
         userId: adminId,
         productId: question.productId,
-        productOptionId: question.productOptionId,
         feedbackType: 'QUESTION',
         parentId: questionId,
         content: dto.content
@@ -445,7 +407,7 @@ export class QnaService {
       data: {
         hasAnswer: true,
         answeredBy: adminId,
-        answeredAt: new Date()
+        answeredAt: getNowKST()
       },
       include: {
         user: {
@@ -458,13 +420,6 @@ export class QnaService {
             id: true,
             name: true,
             sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
           }
         },
         replies: {
@@ -544,13 +499,6 @@ export class QnaService {
             id: true,
             name: true,
             sku: true
-          }
-        },
-        productOption: {
-          select: {
-            id: true,
-            optionName: true,
-            price: true
           }
         },
         replies: {
@@ -640,7 +588,6 @@ export class QnaService {
     return {
       id: question.id,
       productId: question.productId,
-      productOptionId: question.productOptionId,
       userId: question.userId,
       userName: this.maskUserName(question.user.name),
       title: question.title,
@@ -658,11 +605,6 @@ export class QnaService {
         id: question.product.id,
         name: question.product.name,
         sku: question.product.sku
-      } : undefined,
-      productOption: question.productOption ? {
-        id: question.productOption.id,
-        optionName: question.productOption.optionName,
-        price: Number(question.productOption.price)
       } : undefined
     };
   }

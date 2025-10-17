@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, UseGuards, Req, Logger, Pars
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PointService } from './point.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 포인트 관리 컨트롤러
@@ -47,7 +48,7 @@ export class PointController {
     return {
       userId,
       balance,
-      timestamp: new Date()
+      timestamp: getNowKST()
     };
   }
 

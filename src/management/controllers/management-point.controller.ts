@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Logger, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
 import { ApiKeyGuard } from '../guards/api-key.guard';
 import { PointService } from '../../point/point.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 백오피스 포인트 관리 컨트롤러
@@ -28,7 +29,7 @@ export class ManagementPointController {
     return {
       userId,
       balance,
-      timestamp: new Date()
+      timestamp: getNowKST()
     };
   }
 

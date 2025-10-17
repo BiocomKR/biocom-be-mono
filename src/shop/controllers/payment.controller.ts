@@ -27,8 +27,7 @@ import {
   PaymentWebhookDto
 } from '../dto/payment/payment.dto';
 
-// 쇼핑몰 관련 API 임시 비활성화
-@Controller('api/shop/payment')
+@Controller('shop/payment')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
@@ -118,9 +117,9 @@ export class PaymentController {
   @Get('status/:orderNumber')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
-    summary: '결제 상태 조회', 
-    description: '주문의 결제 상태를 조회합니다' 
+  @ApiOperation({
+    summary: '결제 상태 조회',
+    description: '주문의 결제 상태를 조회합니다'
   })
   @ApiParam({ name: 'orderNumber', description: '주문번호' })
   @ApiResponse({ status: 200, description: '성공' })
@@ -137,4 +136,5 @@ export class PaymentController {
       paymentKey: payment.paymentKey
     };
   }
+
 }

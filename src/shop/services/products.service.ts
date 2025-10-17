@@ -13,6 +13,7 @@ import {
 import { ProductDetailDto, ReviewSummaryDto, QnaSummaryDto } from '../dto/products/product-detail.dto';
 import { Prisma } from '@prisma/client';
 import { ProductCategory, CategoryNameMap, CategorySortOrder } from '../enums/product-category.enum';
+import { getNowKST } from '../../common/utils/kst-date.util';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 
 
@@ -228,7 +229,7 @@ export class ProductsService {
           },
         },
         data: {
-          viewedAt: new Date(),
+          viewedAt: getNowKST(),
         },
       });
 
@@ -436,12 +437,12 @@ export class ProductsService {
           where: { sku: item.sku },
           update: {
             availableQty: mockStock,
-            lastUpdated: new Date(),
+            lastUpdated: getNowKST(),
           },
           create: {
             sku: item.sku,
             availableQty: mockStock,
-            lastUpdated: new Date(),
+            lastUpdated: getNowKST(),
           },
         });
 
@@ -453,7 +454,7 @@ export class ProductsService {
             requestData: { quantity: item.quantity },
             responseData: { stock: mockStock },
             responseStatus: 200,
-            createdAt: new Date(),
+            createdAt: getNowKST(),
           },
         });
 

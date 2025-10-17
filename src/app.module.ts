@@ -23,7 +23,7 @@ import { SurveyModule } from './survey/survey.module';
 import { ChallengeModule } from './challenge/challenge.module';
 import { ManagementModule } from './management/management.module';
 import { PointModule } from './point/point.module';
-import { CategoriesModule } from './categories/categories.module';
+// import { CategoriesModule } from './categories/categories.module'; // ⚠️ 제거됨: 소규모 쇼핑몰로 Products.categoryCode 사용
 import { ProductsModule } from './shop/products.module';
 import { CartModule } from './shop/cart.module';
 import { OrdersModule } from './shop/orders.module';
@@ -104,7 +104,7 @@ import { BannersModule } from './shop/banners.module';
     ChallengeModule,  // 챌린지 관리 모듈
     ManagementModule, // 백오피스 관리 모듈
     PointModule,      // 포인트 관리 모듈
-    CategoriesModule, // 카테고리 관리 모듈
+    // CategoriesModule, // ⚠️ 제거됨: Products.categoryCode 사용
     ProductsModule,   // 상품 관리 모듈
     BannersModule,    // 쇼핑몰 배너 모듈
     CartModule,       // 장바구니 모듈

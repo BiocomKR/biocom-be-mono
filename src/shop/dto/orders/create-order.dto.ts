@@ -50,19 +50,47 @@ export class ShippingAddressDto {
 }
 
 /**
+ * 구매 아이템 DTO
+ */
+export class PurchaseItemDto {
+  @ApiProperty({ description: '상품 ID' })
+  @IsInt()
+  @IsPositive()
+  productId: number;
+
+  @ApiProperty({ description: '수량' })
+  @IsInt()
+  @IsPositive()
+  quantity: number;
+}
+
+/**
  * 주문 생성 요청 DTO
+ *
+ * items: 구매할 상품 정보 (필수)
+ * cartItemIds: 장바구니에서 구매하는 경우 장바구니 아이템 ID 목록 (선택, 있으면 주문 후 장바구니에서 삭제)
  */
 export class CreateOrderDto {
-  @ApiProperty({ 
-    description: '장바구니 아이템 ID 목록',
+  @ApiProperty({
+    description: '구매할 상품 정보',
+    type: [PurchaseItemDto]
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PurchaseItemDto)
+  items: PurchaseItemDto[];
+
+  @ApiPropertyOptional({
+    description: '장바구니 아이템 ID 목록 (장바구니에서 구매 시 제공하면 주문 후 삭제됨)',
     example: [1, 2, 3]
   })
+  @IsOptional()
   @IsArray()
   @IsInt({ each: true })
   @IsPositive({ each: true })
-  cartItemIds: number[];
+  cartItemIds?: number[];
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: '배송 주소 정보',
     type: ShippingAddressDto
   })
@@ -70,7 +98,7 @@ export class CreateOrderDto {
   @Type(() => ShippingAddressDto)
   shippingAddress: ShippingAddressDto;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: '사용할 포인트',
     default: 0,
     minimum: 0
@@ -94,14 +122,8 @@ export class OrderItemResponseDto {
   @ApiProperty({ description: '상품 ID' })
   productId: number;
 
-  @ApiProperty({ description: '상품 옵션 ID' })
-  productOptionId: number;
-
   @ApiProperty({ description: '상품명 (주문 시점)' })
   productName: string;
-
-  @ApiProperty({ description: '옵션명 (주문 시점)', nullable: true })
-  optionName: string | null;
 
   @ApiProperty({ description: '상품 단가' })
   productPrice: number;
@@ -153,8 +175,8 @@ export class OrderResponseDto {
   @ApiProperty({ description: '수령인명' })
   recipientName: string;
 
-  @ApiProperty({ description: '수령인 전화번호' })
-  recipientPhone: string;
+  @ApiProperty({ description: '수령인 휴대폰번호' })
+  recipientMobile: string;
 
   @ApiProperty({ description: '우편번호' })
   postalCode: string;

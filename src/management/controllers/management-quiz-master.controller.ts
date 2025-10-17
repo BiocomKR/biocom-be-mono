@@ -16,6 +16,7 @@ import { ApiKeyGuard } from '../guards/api-key.guard';
 import { QuizMasterService } from '../../quiz/quiz-master.service';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
 import { QuizDifficulty } from '../../quiz/quiz.types';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management 퀴즈 관리 컨트롤러
@@ -75,7 +76,7 @@ export class ManagementQuizMasterController {
         success: true,
         message: '퀴즈 목록이 성공적으로 조회되었습니다.',
         data: result,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('퀴즈 목록 조회 실패', error);
@@ -99,7 +100,7 @@ export class ManagementQuizMasterController {
         success: true,
         message: '퀴즈가 성공적으로 생성되었습니다.',
         data: quiz,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`퀴즈 생성 실패 - 제목: ${createQuizDto.title}`, error);
@@ -123,7 +124,7 @@ export class ManagementQuizMasterController {
         success: true,
         message: '퀴즈가 성공적으로 조회되었습니다.',
         data: quiz,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`퀴즈 상세 조회 실패 - ID: ${id}`, error);
@@ -150,7 +151,7 @@ export class ManagementQuizMasterController {
         success: true,
         message: '퀴즈가 성공적으로 수정되었습니다.',
         data: quiz,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`퀴즈 수정 실패 - ID: ${id}`, error);
@@ -174,7 +175,7 @@ export class ManagementQuizMasterController {
         success: true,
         message: '퀴즈가 성공적으로 삭제되었습니다.',
         data: null,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`퀴즈 삭제 실패 - ID: ${id}`, error);

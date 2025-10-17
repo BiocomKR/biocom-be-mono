@@ -22,6 +22,7 @@ import {
   SurveyAnswerResponseDto,
 } from '../../survey/dto/survey-response.dto';
 import { ApiResponseDto } from '../../common/dto/api-response.dto';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management 설문 관리 컨트롤러
@@ -81,7 +82,7 @@ export class ManagementSurveyController {
         success: true,
         message: '설문 목록이 성공적으로 조회되었습니다.',
         data: result,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error('설문 목록 조회 실패', error);
@@ -107,7 +108,7 @@ export class ManagementSurveyController {
         success: true,
         message: '설문이 성공적으로 생성되었습니다.',
         data: survey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 생성 실패 - 이름: ${createSurveyDto.name}`, error);
@@ -133,7 +134,7 @@ export class ManagementSurveyController {
         success: true,
         message: '설문이 성공적으로 조회되었습니다.',
         data: survey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 상세 조회 실패 - ID: ${id}`, error);
@@ -160,7 +161,7 @@ export class ManagementSurveyController {
         success: true,
         message: '설문이 성공적으로 수정되었습니다.',
         data: survey,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 수정 실패 - ID: ${id}`, error);
@@ -186,7 +187,7 @@ export class ManagementSurveyController {
         success: true,
         message: '설문이 성공적으로 삭제되었습니다.',
         data: null,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 삭제 실패 - ID: ${id}`, error);
@@ -213,7 +214,7 @@ export class ManagementSurveyController {
         success: true,
         message: '질문이 설문에 성공적으로 추가되었습니다.',
         data: question,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문에 질문 추가 실패 - 설문 ID: ${surveyId}`, error);
@@ -239,7 +240,7 @@ export class ManagementSurveyController {
         success: true,
         message: '설문 질문이 성공적으로 생성되었습니다.',
         data: question,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 질문 생성 응답 실패 - 질문: ${createSurveyQuestionDto.questionText}`, error);
@@ -274,7 +275,7 @@ export class ManagementSurveyController {
         success: true,
         message: '설문 선택지가 성공적으로 생성되었습니다.',
         data: responseDto,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`설문 선택지 생성 응답 실패 - 질문 ID: ${createSurveyOptionDto.surveyQuestionId}`, error);
@@ -301,7 +302,7 @@ export class ManagementSurveyController {
         success: true,
         message: '질문에 대한 모든 답변이 성공적으로 조회되었습니다.',
         data: answers,
-        timestamp: new Date(),
+        timestamp: getNowKST(),
       };
     } catch (error) {
       this.logger.error(`질문별 설문 답변 조회 응답 실패 - 질문 ID: ${questionId}`, error);

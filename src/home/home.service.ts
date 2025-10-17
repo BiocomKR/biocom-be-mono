@@ -6,6 +6,7 @@ import {
   ChallengerHomeDataDto,
   SubscriberHomeDataDto,
 } from './dto/home.dto';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 홈 화면 서비스
@@ -37,14 +38,16 @@ export class HomeService {
             where: { status: 'ACTIVE' },
             select: {
               id: true,
-              challengeId: true,
+              productId: true,
               activatedAt: true,
               expiresAt: true,
               status: true,
-              challenge: {
+              product: {
                 select: {
+                  id: true,
                   name: true,
-                  description: true
+                  description: true,
+                  metadata: true
                 }
               }
             },
@@ -119,7 +122,7 @@ export class HomeService {
   private async getChallengerHomeData(userId: number, baseData: any, activeChallenge: any): Promise<ChallengerHomeDataDto> {
     this.logger.log(`챌린저 홈 화면 데이터 생성 - 사용자 ID: ${userId}`);
 
-    const today = new Date();
+    const today = getNowKST();
     const endDate = new Date(activeChallenge.expiresAt);
     const startDate = new Date(activeChallenge.activatedAt);
     const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
@@ -152,7 +155,7 @@ export class HomeService {
       homeType: 'challenger',
       currentChallenge: {
         id: activeChallenge.id,
-        challengeType: activeChallenge.challenge?.name || '21일 챌린지',
+        challengeType: (activeChallenge.product?.metadata as any)?.challengeName || activeChallenge.product?.name || '21일 챌린지',
         startDate: activeChallenge.activatedAt.toISOString().split('T')[0],
         endDate: activeChallenge.expiresAt.toISOString().split('T')[0],
         daysRemaining,
@@ -225,11 +228,11 @@ export class HomeService {
    * 주간 통계 요약 조회
    */
   private async getWeeklyStats(userId: number): Promise<{ recordsThisWeek: number; completedMissions: number; totalMissions: number }> {
-    const startOfWeek = new Date();
+    const startOfWeek = getNowKST();
     startOfWeek.setDate(startOfWeek.getDate() - 6);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const endOfWeek = new Date();
+    const endOfWeek = getNowKST();
     endOfWeek.setHours(23, 59, 59, 999);
 
     // 이번 주 기록 수 조회
@@ -262,7 +265,7 @@ export class HomeService {
     sleep: number;
     activity: number;
   }> {
-    const recentDate = new Date();
+    const recentDate = getNowKST();
     recentDate.setDate(recentDate.getDate() - 7); // 최근 7일
 
     const records = await this.prisma.userRecord.groupBy({

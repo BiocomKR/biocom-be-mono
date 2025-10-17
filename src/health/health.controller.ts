@@ -4,6 +4,7 @@ import { HealthCheckService, HealthCheck, DiskHealthIndicator, MemoryHealthIndic
 import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { PrismaHealthIndicator } from './indicators/prisma.health';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * Health Check 컨트롤러
@@ -57,7 +58,7 @@ export class HealthController {
 
     return {
       status: 'ok',
-      timestamp: new Date().toISOString(),
+      timestamp: getNowKST().toISOString(),
       service: 'biocom-api',
       version: '1.0.0',
       uptime,
@@ -126,7 +127,7 @@ export class HealthController {
   liveness() {
     return {
       status: 'ok',
-      timestamp: new Date().toISOString(),
+      timestamp: getNowKST().toISOString(),
     };
   }
 
