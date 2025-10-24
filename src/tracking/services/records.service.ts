@@ -2,6 +2,7 @@ import { Injectable, Logger, ConflictException, NotFoundException } from '@nestj
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { getKoreanToday } from '../../common/utils/korea-date.util';
+import { getNowKST } from '../../common/utils/kst-date.util';
 import {
   CreateBeautyRecordDto,
   CreateDietRecordDto,
@@ -251,6 +252,7 @@ export class RecordsService {
         name: dto.name,
         dosage: dto.dosage,
         memo: dto.memo,
+        createdAt: getNowKST(),
       },
     });
 

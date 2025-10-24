@@ -55,7 +55,8 @@ export class QnaService {
         content: dto.content,
         questionType: dto.questionType,
         isSecret: dto.isSecret || false,
-        hasAnswer: false
+        hasAnswer: false,
+        createdAt: getNowKST(),
       },
       include: {
         user: {
@@ -397,7 +398,8 @@ export class QnaService {
         productId: question.productId,
         feedbackType: 'QUESTION',
         parentId: questionId,
-        content: dto.content
+        content: dto.content,
+        createdAt: getNowKST(),
       }
     });
 

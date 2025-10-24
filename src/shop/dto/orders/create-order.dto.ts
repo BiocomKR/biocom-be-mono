@@ -107,6 +107,15 @@ export class CreateOrderDto {
   @IsInt()
   @Min(0)
   pointUsed?: number;
+
+  @ApiPropertyOptional({
+    description: '사용할 쿠폰 ID (UserCoupon ID)',
+    example: 1
+  })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  userCouponId?: number;
 }
 
 /**

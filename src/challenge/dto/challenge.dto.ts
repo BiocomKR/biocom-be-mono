@@ -70,6 +70,7 @@ export class ChallengeResponseDto {
 
 /**
  * 챌린지 수행권 응답 DTO
+ * @description 구매했지만 아직 활성화하지 않은 이용권 목록 (PURCHASED 상태만)
  */
 export class ChallengeTicketResponseDto {
   @ApiProperty({
@@ -91,8 +92,8 @@ export class ChallengeTicketResponseDto {
   purchaseDate: Date;
 
   @ApiProperty({
-    description: '상태',
-    enum: ['PURCHASED', 'ACTIVATED', 'COMPLETED', 'EXPIRED'],
+    description: '상태 (항상 PURCHASED)',
+    enum: ['PURCHASED'],
     example: 'PURCHASED'
   })
   status: string;

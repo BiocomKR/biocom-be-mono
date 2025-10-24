@@ -143,7 +143,8 @@ export class ManagementShippingService {
             orderId: order.id,
             fromStatus: 'PAID',
             toStatus: 'PREPARING',
-            changeReason: '운송장 등록 - 배송 준비'
+            changeReason: '운송장 등록 - 배송 준비',
+            createdAt: getNowKST(),
           }
         });
       }
@@ -207,7 +208,8 @@ export class ManagementShippingService {
           orderId: order.id,
           fromStatus: 'PREPARING',
           toStatus: 'SHIPPED',
-          changeReason: '배송 시작'
+          changeReason: '배송 시작',
+          createdAt: getNowKST(),
         }
       });
     });
@@ -263,7 +265,8 @@ export class ManagementShippingService {
           orderId: order.id,
           fromStatus: 'SHIPPED',
           toStatus: 'DELIVERED',
-          changeReason: '배송 완료'
+          changeReason: '배송 완료',
+          createdAt: getNowKST(),
         }
       });
     });

@@ -30,7 +30,7 @@ import {
   CouponDetailResponseDto
 } from '../dto/coupon.dto';
 
-@ApiTags('쿠폰')
+@ApiTags('쇼핑몰 - 쿠폰')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('coupons')

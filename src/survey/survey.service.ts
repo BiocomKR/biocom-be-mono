@@ -2,7 +2,7 @@ import { Injectable, Logger, ConflictException, NotFoundException } from '@nestj
 import { PrismaService } from '../common/services/prisma.service';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
 import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption, User } from '@prisma/client';
-import { getNowKST } from '../common/utils/kst-date.util';
+import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
 
 /**
  * 설문 서비스
@@ -53,6 +53,7 @@ export class SurveyService {
         surveyQuestionId: createSurveyAnswerDto.surveyQuestionId,
         surveyOptionId: createSurveyAnswerDto.surveyOptionId,
         type: createSurveyAnswerDto.type,
+        createdAt: getNowKST(),
       },
       include: {
         surveyQuestion: true,
@@ -93,6 +94,7 @@ export class SurveyService {
               surveyQuestionId: questionId,
               surveyOptionId: optionId,
               type,
+              createdAt: getNowKST(),
             },
           });
           createdAnswers.push(answer);
@@ -398,6 +400,7 @@ export class SurveyService {
 
     return await this.prisma.$transaction(async (tx) => {
       // 1. 설문 답변 저장
+      const now = getNowKST();
       for (const answer of answers) {
         await tx.surveyAnswer.create({
           data: {
@@ -405,6 +408,7 @@ export class SurveyService {
             type,
             surveyQuestionId: answer.questionId,
             surveyOptionId: answer.optionId,
+            createdAt: now,
           },
         });
       }
@@ -460,12 +464,14 @@ export class SurveyService {
       });
 
       // 새 답변 저장
+      const now = getNowKST();
       await tx.surveyAnswer.createMany({
         data: answers.map((answer) => ({
           userId,
           type,
           surveyQuestionId: answer.questionId,
           surveyOptionId: answer.optionId,
+          createdAt: now,
         })),
       });
 
@@ -623,7 +629,8 @@ export class SurveyService {
       // 2️⃣ 특정 설문이 오늘의 챌린지 설문인지 확인
       const today = getNowKST();
       const todayStr = today.toISOString().split('T')[0];
-      const currentDay = activeChallenge.currentDay;
+      // activatedAt 기준으로 현재 챌린지 일차 계산
+      const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
 
       const todaySurvey = await tx.challengeSurvey.findFirst({
         where: {
@@ -649,11 +656,14 @@ export class SurveyService {
       });
 
       if (!dailyProgress) {
+        const now = getNowKST();
         dailyProgress = await tx.dailyProgress.create({
           data: {
             userChallengeId: activeChallenge.id,
             day: currentDay,
-            date: new Date(todayStr)
+            date: new Date(todayStr),
+            createdAt: now,
+            updatedAt: now
           }
         });
       }
@@ -691,6 +701,7 @@ export class SurveyService {
         }
       });
 
+      const now = getNowKST();
       await tx.pointHistory.create({
         data: {
           userId,
@@ -699,7 +710,8 @@ export class SurveyService {
           balance: user.points,
           description: `설문 완료: ${todaySurvey.survey.name}`,
           relatedType: 'SURVEY',
-          relatedId: todaySurvey.id
+          relatedId: todaySurvey.id,
+          createdAt: now
         }
       });
 

@@ -23,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { QnaService } from '../services/qna.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { ManagerGuard } from '../../common/guards/manager.guard';
 import {
   CreateQnaDto,
   UpdateQnaDto,
@@ -151,6 +152,7 @@ export class QnaController {
    * Q&A 답변 작성 (관리자용)
    */
   @Post(':id/answer')
+  @UseGuards(ManagerGuard)
   @ApiOperation({
     summary: 'Q&A 답변 작성 (관리자)',
     description: 'Q&A에 답변을 작성합니다. 관리자만 사용 가능합니다.'
@@ -159,6 +161,7 @@ export class QnaController {
   @ApiBody({ type: CreateQnaAnswerDto })
   @ApiResponse({ status: 201, description: '답변 작성 성공', type: QnaResponseDto })
   @ApiResponse({ status: 400, description: '잘못된 요청 (이미 답변 존재)' })
+  @ApiResponse({ status: 403, description: '권한 없음 (관리자 아님)' })
   @ApiResponse({ status: 404, description: 'Q&A를 찾을 수 없음' })
   async createAnswer(
     @Req() req: any,
@@ -173,6 +176,7 @@ export class QnaController {
    * Q&A 답변 수정 (관리자용)
    */
   @Patch(':id/answer')
+  @UseGuards(ManagerGuard)
   @ApiOperation({
     summary: 'Q&A 답변 수정 (관리자)',
     description: 'Q&A 답변을 수정합니다. 관리자만 사용 가능합니다.'
@@ -180,6 +184,7 @@ export class QnaController {
   @ApiParam({ name: 'id', description: 'Q&A ID' })
   @ApiBody({ type: CreateQnaAnswerDto })
   @ApiResponse({ status: 200, description: '답변 수정 성공', type: QnaResponseDto })
+  @ApiResponse({ status: 403, description: '권한 없음 (관리자 아님)' })
   @ApiResponse({ status: 404, description: 'Q&A 또는 답변을 찾을 수 없음' })
   async updateAnswer(
     @Req() req: any,
@@ -194,12 +199,14 @@ export class QnaController {
    * Q&A 답변 삭제 (관리자용)
    */
   @Delete(':id/answer')
+  @UseGuards(ManagerGuard)
   @ApiOperation({
     summary: 'Q&A 답변 삭제 (관리자)',
     description: 'Q&A 답변을 삭제합니다. 관리자만 사용 가능합니다.'
   })
   @ApiParam({ name: 'id', description: 'Q&A ID' })
   @ApiResponse({ status: 200, description: '답변 삭제 성공', example: { success: true, message: 'Q&A 답변이 삭제되었습니다' } })
+  @ApiResponse({ status: 403, description: '권한 없음 (관리자 아님)' })
   @ApiResponse({ status: 404, description: 'Q&A 또는 답변을 찾을 수 없음' })
   async deleteAnswer(
     @Req() req: any,

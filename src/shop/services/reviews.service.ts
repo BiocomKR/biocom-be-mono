@@ -91,7 +91,8 @@ export class ReviewsService {
           mediaUrls: dto.mediaUrls || [],
           rewardGiven: isFirstReview && rewardAmount > 0,
           rewardAmount: isFirstReview ? rewardAmount : null,
-          rewardedAt: isFirstReview && rewardAmount > 0 ? getNowKST() : null
+          rewardedAt: isFirstReview && rewardAmount > 0 ? getNowKST() : null,
+          createdAt: getNowKST()
         },
         include: {
           user: {
@@ -129,7 +130,8 @@ export class ReviewsService {
             balance: updatedUser.points,
             description: `리뷰 작성 적립금 (상품: ${product.name})`,
             relatedType: 'REVIEW',
-            relatedId: review.id
+            relatedId: review.id,
+            createdAt: getNowKST()
           }
         });
 
@@ -579,7 +581,8 @@ export class ReviewsService {
         feedbackType: 'REVIEW',
         parentId: reviewId,
         content: dto.content,
-        mediaUrls: dto.mediaUrls || []
+        mediaUrls: dto.mediaUrls || [],
+        createdAt: getNowKST()
       },
       include: {
         user: {

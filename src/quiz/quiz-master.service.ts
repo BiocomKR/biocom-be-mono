@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../common/services/prisma.service';
 import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.util';
 import { QuizDifficulty } from './quiz.types';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 퀴즈 마스터 서비스
@@ -84,6 +85,7 @@ export class QuizMasterService {
         points: createQuizDto.points || 50,
         category: createQuizDto.category,
         difficulty: createQuizDto.difficulty,
+        createdAt: getNowKST(),
       },
     });
 

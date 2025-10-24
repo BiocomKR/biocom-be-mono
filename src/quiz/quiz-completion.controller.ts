@@ -1,6 +1,6 @@
-import { Controller, Post, Param, ParseIntPipe, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Param, ParseIntPipe, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-// import { QuizzesService } from './quizzes.service'; // 임시 주석
+import { QuizCompletionService } from './quiz-completion.service';
 import { CompleteQuizDto, QuizCompletionResponseDto } from './dto/quiz-completion.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -12,14 +12,32 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('quizzes')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
-export class QuizzesController {
-  // constructor(private readonly quizzesService: QuizzesService) {} // 임시 주석
+export class QuizCompletionController {
+  constructor(private readonly quizCompletionService: QuizCompletionService) {}
+
+  /**
+   * 오늘의 퀴즈 조회
+   * @description 현재 챌린지 일차의 퀴즈를 조회합니다
+   */
+  @Get('daily')
+  @ApiOperation({
+    summary: '오늘의 퀴즈 조회',
+    description: '현재 챌린지 일차의 퀴즈를 조회합니다'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '오늘의 퀴즈 조회 성공'
+  })
+  async getDailyQuizzes(@Request() req: any) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.quizCompletionService.getDailyQuizzes(userId);
+  }
 
   /**
    * 퀴즈 답변 제출 및 완료 처리
    * @description 퀴즈 답변을 제출하고 채점하여 포인트를 적립합니다
    */
-  @Post(':id/complete')
+  @Post('complete')
   @ApiOperation({
     summary: '퀴즈 답변 제출',
     description: '퀴즈 답변을 제출하고 채점합니다. 정답일 경우 포인트가 적립되며, 챌린지와 연동되어 진행상황이 업데이트됩니다.'
@@ -38,11 +56,10 @@ export class QuizzesController {
     description: '퀴즈를 찾을 수 없음'
   })
   async completeQuiz(
-    @Param('id', ParseIntPipe) quizId: number,
     @Body() dto: CompleteQuizDto,
     @Request() req: any
   ) {
-    // return this.quizzesService.completeQuiz(req.user.userId, quizId, dto);
-    throw new Error('임시 비활성화됨');
+    const userId = req.user?.userId || req.user?.sub || req.user?.id;
+    return this.quizCompletionService.completeQuiz(userId, dto);
   }
 }

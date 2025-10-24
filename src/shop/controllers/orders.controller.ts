@@ -25,7 +25,7 @@ import { CreateOrderDto, OrderResponseDto } from '../dto/orders/create-order.dto
 @Controller('shop/orders')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
-@ApiTags('주문')
+@ApiTags('쇼핑몰 - 주문')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 

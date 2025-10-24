@@ -196,6 +196,7 @@ export class UploadServiceGCS {
           mimetype: file.mimetype,
           fileType: 'image',
           uploadCategory: relatedType || 'general',
+          uploadedAt: getNowKST(),
           // metadata 필드는 Prisma 스키마에 추가 필요
           // metadata: {
           //   bucketName: this.bucketName,

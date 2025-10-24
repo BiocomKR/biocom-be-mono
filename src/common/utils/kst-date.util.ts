@@ -83,3 +83,35 @@ export const getNowKST = (): Date => {
     now.getSeconds()
   );
 };
+
+/**
+ * 챌린지 시작일(activatedAt) 기준으로 현재 몇일차인지 계산
+ * DB에서 가져온 날짜는 이미 KST로 저장되어 있으므로, KST 기준으로 일자 계산
+ *
+ * @param activatedAt - 챌린지 시작일 (KST 기준으로 DB에 저장된 값)
+ * @returns 현재 챌린지 일차 (1일차부터 시작)
+ *
+ * @example
+ * // 오늘이 2025-10-22이고, activatedAt이 2025-10-20인 경우
+ * calculateChallengeDay(new Date('2025-10-20')) // returns 3
+ *
+ * // 오늘이 2025-10-22이고, activatedAt이 2025-10-22인 경우
+ * calculateChallengeDay(new Date('2025-10-22')) // returns 1
+ */
+export const calculateChallengeDay = (activatedAt: Date): number => {
+  // DB에서 가져온 activatedAt는 이미 KST로 저장되어 있음
+  // 따라서 그대로 사용 (UTC 변환 없이)
+  const now = getNowKST();
+
+  // 날짜만 비교 (시간은 무시)
+  // activatedAt는 DB에서 KST로 저장된 값이므로 그대로 사용
+  const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startDate = new Date(activatedAt.getFullYear(), activatedAt.getMonth(), activatedAt.getDate());
+
+  // 경과 일수 계산 (밀리초 -> 일)
+  const diffTime = nowDate.getTime() - startDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  // 1일차부터 시작 (경과일 + 1)
+  return diffDays + 1;
+};

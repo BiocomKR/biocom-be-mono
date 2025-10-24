@@ -76,8 +76,13 @@ async function seedExerciseTypes() {
 
   // 데이터 삽입
   for (const exerciseType of exerciseTypes) {
+    const now = new Date();
     await prisma.exerciseType.create({
-      data: exerciseType,
+      data: {
+        ...exerciseType,
+        createdAt: now,
+        updatedAt: now
+      },
     });
     console.log(`✅ ${exerciseType.name} (${exerciseType.code}) 추가 완료`);
   }

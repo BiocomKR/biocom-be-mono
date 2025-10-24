@@ -6,29 +6,25 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class CompleteQuizDto {
   @ApiProperty({
-    description: '선택한 답변 번호 (0부터 시작)',
+    description: '챌린지 미션 ID (필수)',
+    example: 123
+  })
+  @IsNumber({}, { message: '챌린지 미션 ID는 숫자여야 합니다' })
+  challengeMissionId: number;
+
+  @ApiProperty({
+    description: '퀴즈 ID (필수)',
+    example: 45
+  })
+  @IsNumber({}, { message: '퀴즈 ID는 숫자여야 합니다' })
+  quizId: number;
+
+  @ApiProperty({
+    description: '선택한 답변 번호 (1~4)',
     example: 2
   })
   @IsNumber({}, { message: '답변 번호는 숫자여야 합니다' })
   selectedAnswer: number;
-
-  @ApiProperty({
-    description: '풀이 시간 (초 단위)',
-    example: 15,
-    required: false
-  })
-  @IsOptional()
-  @IsNumber({}, { message: '풀이 시간은 숫자여야 합니다' })
-  timeSpent?: number;
-
-  @ApiProperty({
-    description: '추가 메모',
-    example: '어려웠어요',
-    required: false
-  })
-  @IsOptional()
-  @IsString({ message: '메모는 문자열이어야 합니다' })
-  note?: string;
 }
 
 /**

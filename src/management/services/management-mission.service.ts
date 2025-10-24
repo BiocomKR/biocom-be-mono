@@ -177,7 +177,8 @@ export class ManagementMissionService {
           specificDay: data.specificDay,
           totalDays: data.totalDays ?? 21,
           uploadType: data.uploadType,
-          isActive: data.isActive ?? true
+          isActive: data.isActive ?? true,
+          createdAt: getNowKST(),
         }
       });
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 사용자 서비스
@@ -195,6 +196,7 @@ export class UsersService {
           password: hashedPassword,
           name,
           mobile,
+          createdAt: getNowKST(),
         },
         select: {
           id: true,

@@ -17,6 +17,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { ChallengeTicketStatus } from '../../common/enums/challenge-ticket-status.enum';
 
 @Injectable()
 export class PaymentService {
@@ -64,7 +65,9 @@ export class PaymentService {
           paymentMethod: 'CARD', // 기본값, 실제 결제 시 업데이트
           amount: convertDecimalToNumber(order.totalAmount) || 0,
           status: 'PENDING',
-          pgProvider: 'TOSS_PAYMENTS'
+          pgProvider: 'TOSS_PAYMENTS',
+          requestedAt: getNowKST(),
+          createdAt: getNowKST(),
         }
       });
 
@@ -167,7 +170,8 @@ export class PaymentService {
             orderId: order.id,
             fromStatus: 'PENDING_PAYMENT',
             toStatus: 'PAID',
-            changeReason: '결제 완료'
+            changeReason: '결제 완료',
+            createdAt: getNowKST(),
           }
         });
 
@@ -214,8 +218,9 @@ export class PaymentService {
                   productId: item.productId,
                   orderItemId: item.id,
                   purchaseDate: getNowKST(),
-                  status: 'ACTIVE',
-                  ticketType: 'CHALLENGE'
+                  status: ChallengeTicketStatus.PURCHASED,
+                  ticketType: 'CHALLENGE',
+                  createdAt: getNowKST(),
                 }
               });
             }
@@ -252,7 +257,8 @@ export class PaymentService {
             orderId: order.id,
             fromStatus: order.status,
             toStatus: order.status,
-            changeReason: `결제 실패: ${error.message}`
+            changeReason: `결제 실패: ${error.message}`,
+            createdAt: getNowKST(),
           }
         });
 
@@ -321,12 +327,15 @@ export class PaymentService {
           data: {
             orderId: order.id,
             paymentId: payment.id,
-            amount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
+            refundType: 'CANCEL',
+            refundAmount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
             reason: dto.cancelReason,
             status: 'COMPLETED',
-            method: dto.refundAccount ? 'BANK_TRANSFER' : 'ORIGINAL_METHOD',
-            refundedAt: getNowKST(),
-            transactionId: tossResult.cancels[0].transactionKey
+            tossCancelId: tossResult.cancels[0].transactionKey,
+            tossResponse: tossResult as any,
+            requestedAt: getNowKST(),
+            completedAt: getNowKST(),
+            createdAt: getNowKST(),
           }
         });
 
@@ -356,7 +365,8 @@ export class PaymentService {
               orderId: order.id,
               fromStatus: order.status,
               toStatus: 'CANCELLED',
-              changeReason: dto.cancelReason
+              changeReason: dto.cancelReason,
+              createdAt: getNowKST(),
             }
           });
 
@@ -407,7 +417,8 @@ export class PaymentService {
                 balance: 0, // 추후 계산
                 description: `주문 취소 환불 (${order.orderNumber})`,
                 relatedType: 'ORDER',
-                relatedId: order.id
+                relatedId: order.id,
+                createdAt: getNowKST(),
               }
             });
           }
@@ -431,11 +442,13 @@ export class PaymentService {
           data: {
             orderId: order.id,
             paymentId: payment.id,
-            amount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
+            refundType: 'CANCEL',
+            refundAmount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
             reason: dto.cancelReason,
             status: 'FAILED',
-            method: dto.refundAccount ? 'BANK_TRANSFER' : 'ORIGINAL_METHOD',
-            failReason: error.message
+            reasonDetail: error.message,
+            requestedAt: getNowKST(),
+            createdAt: getNowKST(),
           }
         });
 
@@ -496,7 +509,8 @@ export class PaymentService {
                 orderId: payment.orderId,
                 fromStatus: 'PAID',
                 toStatus: 'CANCELLED',
-                changeReason: '토스페이먼츠 웹훅 취소'
+                changeReason: '토스페이먼츠 웹훅 취소',
+                createdAt: getNowKST(),
               }
             });
           });

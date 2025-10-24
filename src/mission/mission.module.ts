@@ -4,7 +4,6 @@ import { PointModule } from '../point/point.module';
 import { MissionService } from './mission.service';
 import { MissionController } from './mission.controller';
 import { MissionCompletionService } from './mission-completion.service';
-import { RecordCompletionService } from './record-completion.service';
 
 /**
  * 미션 모듈
@@ -13,7 +12,7 @@ import { RecordCompletionService } from './record-completion.service';
 @Module({
   imports: [CommonModule, PointModule],
   controllers: [MissionController],
-  providers: [MissionService, MissionCompletionService, RecordCompletionService],
+  providers: [MissionService, MissionCompletionService],
   exports: [MissionService],
 })
 export class MissionModule {}

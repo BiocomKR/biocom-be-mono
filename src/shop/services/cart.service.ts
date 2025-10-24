@@ -31,7 +31,10 @@ export class CartService {
 
     if (!cart) {
       cart = await this.prisma.cart.create({
-        data: { userId },
+        data: {
+          userId,
+          createdAt: getNowKST(),
+        },
         select: { id: true },
       });
     }
@@ -65,7 +68,10 @@ export class CartService {
     if (!cart) {
       // 장바구니가 없으면 빈 장바구니 생성
       const newCart = await this.prisma.cart.create({
-        data: { userId },
+        data: {
+          userId,
+          createdAt: getNowKST(),
+        },
         include: { items: true },
       });
 
@@ -179,6 +185,7 @@ export class CartService {
         productId: dto.productId,
         quantity: dto.quantity,
         stockAvailable: true,
+        addedAt: getNowKST(),
       },
       include: {
         product: {

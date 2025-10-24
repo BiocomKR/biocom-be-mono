@@ -27,6 +27,24 @@ export class MissionController {
   ) {}
 
   /**
+   * 오늘의 1일 1미션 조회
+   * @description 현재 챌린지 일차의 1일 1미션을 조회합니다
+   */
+  @Get('daily')
+  @ApiOperation({
+    summary: '오늘의 1일 1미션 조회',
+    description: '현재 챌린지 일차의 1일 1미션을 조회합니다'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '1일 1미션 조회 성공'
+  })
+  async getDailyMission(@Request() req: any) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.missionCompletionService.getDailyMission(userId);
+  }
+
+  /**
    * 일일 미션 진행도 조회 (메인화면용)
    * @description 오늘의 미션 목록과 전체 미션 달성률을 조회합니다
    */
@@ -48,7 +66,7 @@ export class MissionController {
    * 미션 수행 완료
    * @description 챌린지 미션을 수행하고 완료 처리합니다
    */
-  @Post(':challengeMissionId/complete')
+  @Post('complete')
   @ApiOperation({
     summary: '미션 수행 완료',
     description: '챌린지 미션을 수행하고 완료 처리합니다. dailyLimit에 따라 진행도가 추적됩니다.'
@@ -66,14 +84,12 @@ export class MissionController {
     description: '미션을 찾을 수 없음'
   })
   async completeMission(
-    @Param('challengeMissionId', ParseIntPipe) challengeMissionId: number,
     @Body() dto: CompleteMissionDto,
     @Request() req: any
   ) {
     const userId = req.user?.userId || req.user?.sub;
     return this.missionCompletionService.completeMission(
       userId,
-      challengeMissionId,
       dto
     );
   }

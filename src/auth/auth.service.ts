@@ -187,6 +187,7 @@ export class AuthService {
         name: true,
         mobile: true,
         points: true,
+        role: true,
         createdAt: true,
       },
     });
@@ -227,6 +228,7 @@ export class AuthService {
         token,
         userId,
         expiresAt,
+        createdAt: getNowKST(),
       },
     });
     

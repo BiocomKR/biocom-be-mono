@@ -13,7 +13,7 @@ model User {
   id                     Int                         @id @default(autoincrement())
   email                  String                      @unique
   password               String
-  createdAt              DateTime                    @default(now()) @map("created_at")
+  createdAt              DateTime                    @map("created_at")
   updatedAt              DateTime?                   @updatedAt @map("updated_at")
   points                 Int                         @default(0)
   mobile                 String
@@ -22,6 +22,7 @@ model User {
   deletedAt              DateTime?                   @map("deleted_at")
   characterId            Int?                        @map("character_id")
   subscriptionStatus     String                      @default("NEWCOMER") @map("subscription_status") @db.VarChar(20)
+  role                   String                      @default("USER") @db.VarChar(20)
   cart                   Cart?
   challengeTickets       ChallengeTicket[]
   contentViews           ContentView[]
@@ -53,7 +54,7 @@ model RefreshToken {
   token     String   @unique
   userId    Int      @map("user_id")
   expiresAt DateTime @map("expires_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @map("created_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -71,7 +72,7 @@ model FileUpload {
   mimetype        String
   size            Int
   path            String
-  uploadedAt      DateTime         @default(now()) @map("uploaded_at")
+  uploadedAt      DateTime         @map("uploaded_at")
   fileType        String           @map("file_type")
   uploadCategory  String           @map("upload_category")
   user            User             @relation(fields: [userId], references: [id])
@@ -91,7 +92,7 @@ model Content {
   points          Int                @default(50)
   viewCount       Int                @default(0) @map("view_count")
   isActive        Boolean            @default(true) @map("is_active")
-  createdAt       DateTime           @default(now()) @map("created_at")
+  createdAt       DateTime           @map("created_at")
   updatedAt       DateTime?          @updatedAt @map("updated_at")
   accessLevel     ContentAccessLevel @default(ALL) @map("access_level")
   contentFiles    ContentFile[]
@@ -115,7 +116,7 @@ model ContentFile {
   fileSize  Int      @map("file_size")
   mimeType  String   @map("mime_type")
   sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @map("created_at")
   content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
   @@index([contentId])
@@ -144,7 +145,7 @@ model ImwebInfo {
   /// 아임웹 API 리프레시 토큰 (90일 유효)
   refreshToken String?   @map("refresh_token")
   /// 생성 일시
-  createdAt    DateTime  @default(now()) @map("created_at")
+  createdAt    DateTime  @map("created_at")
   /// 수정 일시 (최초 생성 시 null)
   updatedAt    DateTime? @map("updated_at")
 
@@ -160,7 +161,7 @@ model Survey {
   /// 설문 타입 ('before': 사전설문, 'after': 사후설문)
   type             String            @default("before") @db.VarChar(20)
   isActive         Boolean           @default(true) @map("is_active")
-  createdAt        DateTime          @default(now()) @map("created_at")
+  createdAt        DateTime          @map("created_at")
   updatedAt        DateTime?         @updatedAt @map("updated_at")
   challengeSurveys ChallengeSurvey[]
   surveyQuestions  SurveyQuestion[]
@@ -176,7 +177,7 @@ model SurveyQuestion {
   category      String
   questionText  String         @map("question_text")
   sortOrder     Int            @map("sort_order")
-  createdAt     DateTime       @default(now()) @map("created_at")
+  createdAt     DateTime       @map("created_at")
   updatedAt     DateTime?      @updatedAt @map("updated_at")
   categoryCode  String         @map("category_code")
   surveyId      Int?           @map("survey_id")
@@ -193,7 +194,7 @@ model SurveyOption {
   id            Int            @id @default(autoincrement())
   optionText    String         @map("option_text")
   score         Int
-  createdAt     DateTime       @default(now()) @map("created_at")
+  createdAt     DateTime       @map("created_at")
   surveyAnswers SurveyAnswer[]
 
   @@map("survey_options")
@@ -207,7 +208,7 @@ model SurveyAnswer {
   surveyOptionId   Int            @map("survey_option_id")
   surveyQuestionId Int            @map("survey_question_id")
   type             String
-  createdAt        DateTime       @default(now()) @map("created_at")
+  createdAt        DateTime       @map("created_at")
   updatedAt        DateTime?      @updatedAt @map("updated_at")
   userChallengeId  Int?           @map("user_challenge_id")
   surveyOption     SurveyOption   @relation(fields: [surveyOptionId], references: [id])
@@ -232,7 +233,7 @@ model CategoryDetail {
   animalCharacter  String    @map("animal_character")
   characterKeyword String    @map("character_keyword")
   detailedFeatures String    @map("detailed_features")
-  createdAt        DateTime  @default(now()) @map("created_at")
+  createdAt        DateTime  @map("created_at")
   updatedAt        DateTime? @updatedAt @map("updated_at")
 
   @@map("category_details")
@@ -249,7 +250,7 @@ model PointHistory {
   description String
   relatedType String?  @map("related_type")
   relatedId   Int?     @map("related_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @map("created_at")
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
@@ -266,7 +267,7 @@ model Mission {
   requireUpload     Boolean            @default(false) @map("require_upload")
   sortOrder         Int                @map("sort_order")
   isActive          Boolean            @default(true) @map("is_active")
-  createdAt         DateTime           @default(now()) @map("created_at")
+  createdAt         DateTime           @map("created_at")
   updatedAt         DateTime?          @updatedAt @map("updated_at")
   category          String             @default("DAILY")
   type              String             @default("MISSION") @db.VarChar(20)
@@ -298,7 +299,7 @@ model DailyMission {
   reason      String?
   method      String?
   isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt   DateTime  @map("created_at")
   updatedAt   DateTime? @updatedAt @map("updated_at")
   missionId   Int       @map("mission_id")
   mission     Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
@@ -320,7 +321,7 @@ model ChallengeMission {
   points          Int              @default(100)
   isActive        Boolean          @default(true) @map("is_active")
   sortOrder       Int              @default(0) @map("sort_order")
-  createdAt       DateTime         @default(now()) @map("created_at")
+  createdAt       DateTime         @map("created_at")
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   mission         Mission          @relation(fields: [missionId], references: [id])
   product         Product          @relation(fields: [productId], references: [id])
@@ -340,7 +341,7 @@ model ChallengeSurvey {
   surveyId  Int       @map("survey_id")
   day       Int
   isActive  Boolean   @default(true) @map("is_active")
-  createdAt DateTime  @default(now()) @map("created_at")
+  createdAt DateTime  @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
   product   Product   @relation(fields: [productId], references: [id])
   survey    Survey    @relation(fields: [surveyId], references: [id])
@@ -360,7 +361,7 @@ model Quiz {
   correctAnswer    Int             @map("correct_answer")
   points           Int?            @default(50)
   isActive         Boolean?        @default(true) @map("is_active")
-  createdAt        DateTime?       @default(now()) @map("created_at") @db.Timestamp(6)
+  createdAt        DateTime?       @map("created_at") @db.Timestamp(6)
   updatedAt        DateTime?       @updatedAt @map("updated_at") @db.Timestamp(6)
   explanation      String?
   day              Int
@@ -384,7 +385,7 @@ model ChallengeQuiz {
   day       Int
   isActive  Boolean   @default(true) @map("is_active")
   sortOrder Int       @default(0) @map("sort_order")
-  createdAt DateTime  @default(now()) @map("created_at")
+  createdAt DateTime  @map("created_at")
   updatedAt DateTime? @updatedAt @map("updated_at")
   product   Product   @relation(fields: [productId], references: [id])
   quiz      Quiz      @relation(fields: [quizId], references: [id])
@@ -402,9 +403,9 @@ model ChallengeTicket {
   userId         Int             @map("user_id")
   productId      Int?            @map("product_id")
   orderItemId    Int?            @map("order_item_id")
-  purchaseDate   DateTime        @default(now()) @map("purchase_date")
+  purchaseDate   DateTime        @map("purchase_date")
   status         String          @default("PURCHASED") @db.VarChar(20)
-  createdAt      DateTime        @default(now()) @map("created_at")
+  createdAt      DateTime        @map("created_at")
   updatedAt      DateTime?       @updatedAt @map("updated_at")
   ticketType     String          @default("CHALLENGE") @map("ticket_type") @db.VarChar(20)
   startDate      DateTime?       @map("start_date")
@@ -431,10 +432,9 @@ model UserChallenge {
   endDate         DateTime?        @map("end_date") @db.Date
   expiresAt       DateTime         @map("expires_at")
   purchasedAt     DateTime         @map("purchased_at")
-  currentDay      Int              @default(1) @map("current_day")
   totalPoints     Int              @default(0) @map("total_points")
   status          String           @default("ACTIVE") @db.VarChar(20)
-  createdAt       DateTime         @default(now()) @map("created_at")
+  createdAt       DateTime         @map("created_at")
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   contentViews    ContentView[]
   dailyProgress   DailyProgress[]
@@ -468,7 +468,7 @@ model DailyProgress {
   trackingsTotal     Int           @default(0) @map("trackings_total")
   trackingsCompleted Int           @default(0) @map("trackings_completed")
   pointsEarned       Int           @default(0) @map("points_earned")
-  createdAt          DateTime      @default(now()) @map("created_at")
+  createdAt          DateTime      @map("created_at")
   updatedAt          DateTime?     @updatedAt @map("updated_at")
   userChallenge      UserChallenge @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
 
@@ -479,19 +479,7 @@ model DailyProgress {
 
 /// 기록 항목 마스터
 /// 기록 가능한 항목들의 메타데이터
-model RecordItem {
-  id            Int          @id @default(autoincrement())
-  code          String       @unique @db.VarChar(50)
-  name          String       @db.VarChar(100)
-  unit          String?      @db.VarChar(20)
-  defaultTarget Int?         @map("default_target")
-  inputType     String       @db.VarChar(20)
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime?    @updatedAt @map("updated_at")
-  userRecords   UserRecord[]
-
-  @@map("record_items")
-}
+// RecordItem 테이블 삭제됨 - missions 테이블과 중복으로 불필요
 
 /// 운동 종목 마스터 테이블
 /// 활동 기록에서 사용할 운동 종목들
@@ -510,7 +498,7 @@ model ExerciseType {
   /// 활성화 여부
   isActive    Boolean   @default(true) @map("is_active")
   /// 생성일시
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt   DateTime  @map("created_at")
   /// 수정일시
   updatedAt   DateTime? @updatedAt @map("updated_at")
 
@@ -525,21 +513,18 @@ model UserRecord {
   id              Int              @id @default(autoincrement())
   userId          Int              @map("user_id")
   userChallengeId Int?             @map("user_challenge_id")
-  recordCode      String           @map("record_code") @db.VarChar(50)
+  recordType      String           @map("record_type") @db.VarChar(50)
   date            DateTime         @db.Date
-  value           String?
-  unit            String?          @db.VarChar(20)
   metadata        Json?
-  createdAt       DateTime         @default(now()) @map("created_at")
+  createdAt       DateTime         @map("created_at")
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   missionAttempts MissionAttempt[]
-  recordItem      RecordItem       @relation(fields: [recordCode], references: [code])
   userChallenge   UserChallenge?   @relation(fields: [userChallengeId], references: [id])
   user            User             @relation(fields: [userId], references: [id])
 
   @@index([userId, date])
   @@index([userChallengeId])
-  @@index([userId, recordCode, date])
+  @@index([userId, recordType, date])
   @@map("user_records")
 }
 
@@ -550,7 +535,7 @@ model ApiKey {
   description String?
   isActive    Boolean   @default(true) @map("is_active")
   lastUsedAt  DateTime? @map("last_used_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt   DateTime  @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   @@index([key])
@@ -581,7 +566,7 @@ model Product {
   /// 조회수
   viewCount                  Int                         @default(0) @map("view_count")
   /// 생성일시
-  createdAt                  DateTime                    @default(now()) @map("created_at")
+  createdAt                  DateTime                    @map("created_at")
   /// 수정일시
   updatedAt                  DateTime?                   @updatedAt @map("updated_at")
   /// 카테고리 코드 (SUPPLEMENT, HEALTH_FOOD 등)
@@ -646,7 +631,7 @@ model ProductImage {
   /// 대체 텍스트
   altText   String?  @map("alt_text") @db.VarChar(200)
   /// 생성일시
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @map("created_at")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, sortOrder])
@@ -668,7 +653,7 @@ model ProductNutrient {
   /// RDA 비율 (%) - nullable
   rda       Int?
   /// 생성일시
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @map("created_at")
   /// 수정일시
   updatedAt DateTime @updatedAt @map("updated_at")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -685,7 +670,7 @@ model Cart {
   /// 사용자 ID
   userId    Int        @unique @map("user_id")
   /// 생성일시
-  createdAt DateTime   @default(now()) @map("created_at")
+  createdAt DateTime   @map("created_at")
   /// 수정일시
   updatedAt DateTime?  @updatedAt @map("updated_at")
   items     CartItem[]
@@ -709,7 +694,7 @@ model CartItem {
   /// 재고 가용 여부
   stockAvailable Boolean   @default(true) @map("stock_available")
   /// 추가일시
-  addedAt        DateTime  @default(now()) @map("added_at")
+  addedAt        DateTime  @map("added_at")
   /// 수정일시
   updatedAt      DateTime? @updatedAt @map("updated_at")
   cart           Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
@@ -755,7 +740,7 @@ model Order {
   /// 배송 메시지
   deliveryMessage   String?          @map("delivery_message")
   /// 주문일시
-  orderedAt         DateTime         @default(now()) @map("ordered_at")
+  orderedAt         DateTime         @map("ordered_at")
   /// 결제일시
   paidAt            DateTime?        @map("paid_at")
   /// 발송일시
@@ -767,7 +752,7 @@ model Order {
   /// 취소일시
   cancelledAt       DateTime?        @map("cancelled_at")
   /// 생성일시
-  createdAt         DateTime         @default(now()) @map("created_at")
+  createdAt         DateTime         @map("created_at")
   /// 수정일시
   updatedAt         DateTime?        @updatedAt @map("updated_at")
   exchangeReturns   ExchangeReturn[]
@@ -804,7 +789,7 @@ model OrderItem {
   /// 소계 (단가 × 수량)
   subtotal         Decimal           @db.Decimal(10, 0)
   /// 생성일시
-  createdAt        DateTime          @default(now()) @map("created_at")
+  createdAt        DateTime          @map("created_at")
   /// 수정일시
   updatedAt        DateTime?         @updatedAt @map("updated_at")
   challengeTickets ChallengeTicket[]
@@ -831,7 +816,7 @@ model OrderStateLog {
   /// 변경 사유
   changeReason String?  @map("change_reason")
   /// 생성일시
-  createdAt    DateTime @default(now()) @map("created_at")
+  createdAt    DateTime @map("created_at")
   order        Order    @relation(fields: [orderId], references: [id])
 
   @@index([orderId, createdAt])
@@ -859,7 +844,7 @@ model Payment {
   /// 결제 상세 정보 (암호화 필요)
   paymentDetails  Json?     @map("payment_details")
   /// 요청일시
-  requestedAt     DateTime  @default(now()) @map("requested_at")
+  requestedAt     DateTime  @map("requested_at")
   /// 결제일시
   paidAt          DateTime? @map("paid_at")
   /// 취소일시
@@ -869,7 +854,7 @@ model Payment {
   /// 실패 사유
   failReason      String?   @map("fail_reason") @db.VarChar(500)
   /// 생성일시
-  createdAt       DateTime  @default(now()) @map("created_at")
+  createdAt       DateTime  @map("created_at")
   /// 수정일시
   updatedAt       DateTime? @updatedAt @map("updated_at")
   order           Order     @relation(fields: [orderId], references: [id])
@@ -913,13 +898,13 @@ model Refund {
   /// 관리자 메모
   adminMemo            String?   @map("admin_memo")
   /// 요청일시
-  requestedAt          DateTime  @default(now()) @map("requested_at")
+  requestedAt          DateTime  @map("requested_at")
   /// 완료일시
   completedAt          DateTime? @map("completed_at")
   /// 거절일시
   rejectedAt           DateTime? @map("rejected_at")
   /// 생성일시
-  createdAt            DateTime  @default(now()) @map("created_at")
+  createdAt            DateTime  @map("created_at")
   order                Order     @relation(fields: [orderId], references: [id])
   payment              Payment   @relation(fields: [paymentId], references: [id])
 
@@ -941,7 +926,7 @@ model RefundPolicy {
   /// 활성화 여부
   isActive         Boolean  @default(true) @map("is_active")
   /// 생성일시
-  createdAt        DateTime @default(now()) @map("created_at")
+  createdAt        DateTime @map("created_at")
 
   @@map("refund_policies")
 }
@@ -967,7 +952,7 @@ model ProductFeedback {
   /// 상태 (ACTIVE, HIDDEN, DELETED)
   status         String            @default("ACTIVE") @db.VarChar(20)
   /// 생성일시
-  createdAt      DateTime          @default(now()) @map("created_at")
+  createdAt      DateTime          @map("created_at")
   /// 수정일시
   updatedAt      DateTime?         @updatedAt @map("updated_at")
   /// 별점 (1~5, 리뷰인 경우만)
@@ -1025,7 +1010,7 @@ model Wishlist {
   /// 상품 ID
   productId Int      @map("product_id")
   /// 생성일시
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @map("created_at")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1043,7 +1028,7 @@ model RecentlyViewed {
   /// 상품 ID
   productId Int      @map("product_id")
   /// 조회일시
-  viewedAt  DateTime @default(now()) @map("viewed_at")
+  viewedAt  DateTime @map("viewed_at")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1069,7 +1054,7 @@ model AiPersona {
   /// 정렬 순서
   sortOrder        Int               @default(0) @map("sort_order")
   /// 생성일시
-  createdAt        DateTime          @default(now()) @map("created_at")
+  createdAt        DateTime          @map("created_at")
   /// 수정일시
   updatedAt        DateTime?         @updatedAt @map("updated_at")
   balanceGameSteps BalanceGameStep[]
@@ -1116,7 +1101,7 @@ model UserChallengeSurveyResult {
   /// 사후설문 완료일시
   afterCompletedAt      DateTime? @map("after_completed_at")
   /// 생성일시
-  createdAt             DateTime  @default(now()) @map("created_at")
+  createdAt             DateTime  @map("created_at")
   /// 수정일시
   updatedAt             DateTime? @updatedAt @map("updated_at")
   product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1152,7 +1137,7 @@ model MissionAttempt {
   /// 추가 데이터
   metadata           Json?
   /// 시도 일시
-  createdAt          DateTime         @default(now()) @map("created_at")
+  createdAt          DateTime         @map("created_at")
   /// 수정일시
   updatedAt          DateTime?        @updatedAt @map("updated_at")
   challengeMission   ChallengeMission @relation(fields: [challengeMissionId], references: [id], onDelete: Cascade)
@@ -1180,7 +1165,7 @@ model ContentView {
   /// 사용자 챌린지 ID (챌린지 참여자인 경우)
   userChallengeId Int?           @map("user_challenge_id")
   /// 시청 일시
-  viewedAt        DateTime       @default(now()) @map("viewed_at")
+  viewedAt        DateTime       @map("viewed_at")
   content         Content        @relation(fields: [contentId], references: [id], onDelete: Cascade)
   userChallenge   UserChallenge? @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1249,7 +1234,7 @@ model UserCustomSupplement {
   /// 활성화 여부
   isActive  Boolean   @default(true) @map("is_active")
   /// 생성일시
-  createdAt DateTime  @default(now()) @map("created_at")
+  createdAt DateTime  @map("created_at")
   /// 수정일시
   updatedAt DateTime? @updatedAt @map("updated_at")
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1274,7 +1259,7 @@ model BalanceGame {
   /// 활성화 여부
   isActive      Boolean                  @default(true) @map("is_active")
   /// 생성일시
-  createdAt     DateTime                 @default(now()) @map("created_at")
+  createdAt     DateTime                 @map("created_at")
   /// 수정일시
   updatedAt     DateTime?                @updatedAt @map("updated_at")
   /// 챌린지 일차 (1~21일차)
@@ -1313,7 +1298,7 @@ model BalanceGameStep {
   /// 활성화 여부
   isActive       Boolean           @default(true) @map("is_active")
   /// 생성일시
-  createdAt      DateTime          @default(now()) @map("created_at")
+  createdAt      DateTime          @map("created_at")
   /// 수정일시
   updatedAt      DateTime?         @updatedAt @map("updated_at")
   /// AI 페르소나 ID (페르소나별 대사 구분용)
@@ -1344,7 +1329,7 @@ model UserBalanceGameHistory {
   /// 획득 쿠폰 ID
   earnedCouponId  Int?        @map("earned_coupon_id")
   /// 완료일시
-  completedAt     DateTime    @default(now()) @map("completed_at")
+  completedAt     DateTime    @map("completed_at")
   earnedCoupon    Coupon?     @relation(fields: [earnedCouponId], references: [id])
   game            BalanceGame @relation(fields: [gameId], references: [id])
   user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1376,7 +1361,7 @@ model Coupon {
   /// 활성화 여부
   isActive          Boolean                  @default(true) @map("is_active")
   /// 생성일시
-  createdAt         DateTime                 @default(now()) @map("created_at")
+  createdAt         DateTime                 @map("created_at")
   /// 수정일시
   updatedAt         DateTime?                @updatedAt @map("updated_at")
   gameSteps         BalanceGameStep[]
@@ -1399,7 +1384,7 @@ model UserCoupon {
   /// 쿠폰 상태 (ACTIVE: 사용가능, USED: 사용완료, EXPIRED: 만료)
   status      String    @default("ACTIVE") @db.VarChar(20)
   /// 발급일시
-  issuedAt    DateTime  @default(now()) @map("issued_at")
+  issuedAt    DateTime  @map("issued_at")
   /// 만료일시
   expiresAt   DateTime  @map("expires_at")
   /// 사용일시
@@ -1439,7 +1424,7 @@ model Shipping {
   /// 배송 완료일시
   deliveredAt    DateTime? @map("delivered_at")
   /// 생성일시
-  createdAt      DateTime  @default(now()) @map("created_at")
+  createdAt      DateTime  @map("created_at")
   /// 수정일시
   updatedAt      DateTime  @updatedAt @map("updated_at")
   order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1472,7 +1457,7 @@ model ShippingPolicy {
   /// 활성화 여부
   isActive              Boolean  @default(true) @map("is_active")
   /// 생성일시
-  createdAt             DateTime @default(now()) @map("created_at")
+  createdAt             DateTime @map("created_at")
   /// 수정일시
   updatedAt             DateTime @updatedAt @map("updated_at")
 
@@ -1506,7 +1491,7 @@ model ExchangeReturn {
   /// 관리자 메모
   adminMemo      String?   @map("admin_memo")
   /// 신청일시
-  requestedAt    DateTime  @default(now()) @map("requested_at")
+  requestedAt    DateTime  @map("requested_at")
   /// 승인일시
   approvedAt     DateTime? @map("approved_at")
   /// 거절일시
@@ -1542,7 +1527,7 @@ model ExchangeReturnPolicy {
   /// 활성화 여부
   isActive            Boolean  @default(true) @map("is_active")
   /// 생성일시
-  createdAt           DateTime @default(now()) @map("created_at")
+  createdAt           DateTime @map("created_at")
   /// 수정일시
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -1578,7 +1563,7 @@ model RefundWarranty {
   /// 관리자 메모
   adminMemo              String?   @map("admin_memo")
   /// 생성일시 (상품 수령일)
-  createdAt              DateTime  @default(now()) @map("created_at")
+  createdAt              DateTime  @map("created_at")
   /// 수정일시
   updatedAt              DateTime  @updatedAt @map("updated_at")
   order                  Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1612,7 +1597,7 @@ model Banner {
   /// 노출 종료일
   endDate     DateTime? @map("end_date")
   /// 생성일시
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt   DateTime  @map("created_at")
   /// 수정일시
   updatedAt   DateTime? @updatedAt @map("updated_at")
   /// 배너 타입 (SHOP: 쇼핑몰, HOME: 메인홈, EVENT: 이벤트)
@@ -1643,7 +1628,7 @@ model DateTimeTest {
   /// 메모
   memo        String?   @db.VarChar(200)
   /// 생성일시
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt   DateTime  @map("created_at")
 
   @@map("datetime_tests")
 }

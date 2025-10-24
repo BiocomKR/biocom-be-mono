@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import { UploadSecurityConfig } from './upload.security.config';
 import { Storage } from '@google-cloud/storage';
 import { ConfigService } from '../common/services/config.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 파일 업로드 서비스
@@ -212,6 +213,7 @@ export class UploadService {
           mimetype: file.mimetype,
           fileType: 'image',
           uploadCategory: relatedType || 'general',
+          uploadedAt: getNowKST(),
         },
       });
 

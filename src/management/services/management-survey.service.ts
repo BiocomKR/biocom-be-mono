@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, ConflictException } from '@nestj
 import { PrismaService } from '../../common/services/prisma.service';
 import { Survey, SurveyQuestion } from '@prisma/client';
 import { PaginationHelper, PaginatedResult } from '../../common/utils/pagination.util';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * Management 설문 관리 서비스
@@ -120,6 +121,7 @@ export class ManagementSurveyService {
         name: createSurveyDto.name,
         description: createSurveyDto.description,
         isActive: createSurveyDto.isActive ?? true,
+        createdAt: getNowKST(),
       }
     });
 
@@ -271,16 +273,19 @@ export class ManagementSurveyService {
           questionType: createQuestionDto.questionType,
           sortOrder: createQuestionDto.sortOrder || 0,
           isRequired: createQuestionDto.isRequired ?? true,
+          createdAt: getNowKST(),
         }
       });
 
       // 옵션이 있으면 생성
       if (createQuestionDto.options && createQuestionDto.options.length > 0) {
+        const now = getNowKST();
         await tx.surveyOption.createMany({
           data: createQuestionDto.options.map((optionText, index) => ({
             surveyQuestionId: question.id,
             optionText,
             score: index + 1,
+            createdAt: now,
           }))
         });
       }

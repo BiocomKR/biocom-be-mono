@@ -59,6 +59,7 @@ export class ContentService {
           content: sanitizedContent,
           type: data.type,
           isActive: data.isActive ?? true,
+          createdAt: getNowKST(),
         },
       });
 

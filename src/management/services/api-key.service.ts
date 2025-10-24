@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, ConflictException } from '@nestj
 import { PrismaService } from '../../common/services/prisma.service';
 import { ApiKey } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * API Key 관리 서비스
@@ -67,6 +68,7 @@ export class ApiKeyService {
         key: randomUUID(),
         name,
         description,
+        createdAt: getNowKST(),
       },
     });
 

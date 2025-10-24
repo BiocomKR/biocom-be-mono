@@ -77,7 +77,10 @@ export class ManagementShopService {
    */
   async createProduct(dto: any) {
     const product = await this.prisma.product.create({
-      data: dto
+      data: {
+        ...dto,
+        createdAt: getNowKST(),
+      }
     });
 
     this.logger.log(`상품 생성: ${product.name} (ID: ${product.id})`);
@@ -156,7 +159,8 @@ export class ManagementShopService {
     const image = await this.prisma.productImage.create({
       data: {
         productId,
-        ...dto
+        ...dto,
+        createdAt: getNowKST(),
       }
     });
 
@@ -320,7 +324,8 @@ export class ManagementShopService {
           orderId: order.id,
           fromStatus: order.status,
           toStatus: status,
-          changeReason: reason
+          changeReason: reason,
+          createdAt: getNowKST(),
         }
       });
     });
@@ -370,7 +375,8 @@ export class ManagementShopService {
     const category = await this.prisma.category.create({
       data: {
         ...dto,
-        depth
+        depth,
+        createdAt: getNowKST(),
       }
     });
 
@@ -447,7 +453,10 @@ export class ManagementShopService {
     }
 
     const policy = await this.prisma.shippingPolicy.create({
-      data: dto
+      data: {
+        ...dto,
+        createdAt: getNowKST(),
+      }
     });
 
     this.logger.log(`배송비 정책 생성: ${policy.name}`);

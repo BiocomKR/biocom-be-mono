@@ -39,16 +39,16 @@ export class ChallengeController {
 
   /**
    * 사용자의 챌린지 수행권 조회
-   * @description 사용자가 보유한 챌린지 수행권 목록을 조회합니다
+   * @description 구매했지만 아직 활성화하지 않은 이용권 목록을 조회합니다 (PURCHASED 상태만)
    */
   @Get('my-tickets')
   @ApiOperation({
     summary: '내 챌린지 수행권 조회',
-    description: '사용자가 보유한 챌린지 수행권 목록을 조회합니다'
+    description: '구매했지만 아직 활성화하지 않은 이용권 목록을 조회합니다. 활성화 가능한 티켓만 반환됩니다.'
   })
   @ApiResponse({
     status: 200,
-    description: '수행권 목록 조회 성공'
+    description: '수행권 목록 조회 성공 (PURCHASED 상태만)'
   })
   async getMyTickets(@Request() req: any) {
     return this.challengeService.getMyTickets(req.user.userId);

@@ -6,6 +6,7 @@ import {
   ConflictException
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 import {
   CreateAiPersonaDto,
   UpdateAiPersonaDto,
@@ -43,7 +44,8 @@ export class AiPersonaService {
           personality: dto.personality,
           personaUrl: dto.personaUrl,
           sortOrder: dto.sortOrder || 0,
-          isActive: true
+          isActive: true,
+          createdAt: getNowKST()
         }
       });
 

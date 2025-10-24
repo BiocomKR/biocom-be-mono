@@ -14,6 +14,8 @@ import {
 } from './dto/challenge-schedule.dto';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
 import { getKoreanNow } from '../common/utils/korea-date.util';
+import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { ChallengeTicketStatus, UserChallengeStatus } from '../common/enums/challenge-ticket-status.enum';
 
 /**
  * 챌린지 서비스
@@ -106,6 +108,7 @@ export class ChallengeService {
 
   /**
    * 사용자의 챌린지 수행권 조회
+   * @description 구매했지만 아직 활성화하지 않은 이용권 목록을 조회합니다 (PURCHASED 상태만)
    * @param userId 사용자 ID
    */
   async getMyTickets(userId: number) {
@@ -113,7 +116,10 @@ export class ChallengeService {
       this.logger.log(`사용자 ${userId}의 챌린지 수행권 조회 시작`);
 
       const tickets = await this.prisma.challengeTicket.findMany({
-        where: { userId },
+        where: {
+          userId,
+          status: ChallengeTicketStatus.PURCHASED // 활성화 가능한 티켓만
+        },
         include: {
           product: true
         },
@@ -124,6 +130,7 @@ export class ChallengeService {
         .filter(ticket => ticket.product && this.isChallengeProduct(ticket.product))
         .map(ticket => {
           const challengeInfo = this.extractChallengeInfo(ticket.product);
+
           return {
             id: ticket.id,
             challenge: {
@@ -138,7 +145,7 @@ export class ChallengeService {
           };
         });
 
-      this.logger.log(`사용자 ${userId}의 챌린지 수행권 ${result.length}개 조회 완료`);
+      this.logger.log(`사용자 ${userId}의 활성화 가능한 챌린지 수행권 ${result.length}개 조회 완료`);
       return { success: true, data: result };
     } catch (error) {
       this.logger.error('챌린지 수행권 조회 실패:', error);
@@ -175,7 +182,8 @@ export class ChallengeService {
       }
 
       const productId = activeChallenge.productId;
-      const currentDay = activeChallenge.currentDay;
+      // activatedAt 기준으로 현재 챌린지 일차 계산
+      const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
       const weekNumber = Math.ceil(currentDay / 7);
       const challengeInfo = this.extractChallengeInfo(activeChallenge.product);
 
@@ -222,23 +230,11 @@ export class ChallengeService {
       // ⚠️ 컨텐츠 조회 제거됨
       // - challenge_contents 테이블 제거로 인해 제거
       // - Content.accessLevel 기반 접근 제어로 변경
-      const contents = [];
+      // - 컨텐츠는 별도 Content API에서 조회
 
-      // 기록 항목 조회
-      const recordItems = await this.prisma.recordItem.findMany({
-        orderBy: { id: 'asc' }
-      });
-
-      // 오늘의 기록 현황 조회
-      const today = new Date();
-      const todayStr = today.toISOString().split('T')[0];
-
-      const todayRecords = await this.prisma.userRecord.findMany({
-        where: {
-          userId,
-          date: new Date(todayStr)
-        }
-      });
+      // ⚠️ 기록 항목 조회 제거됨
+      // - RecordItem 테이블 삭제로 인해 제거
+      // - 기록 관련 정보는 missions 테이블(type='RECORD')에서 관리
 
       const result = {
         // 기본 챌린지 정보
@@ -253,7 +249,7 @@ export class ChallengeService {
         // 오늘의 활동 (통합)
         todayActivities: {
           currentDay,
-          todayDate: today,
+          todayDate: new Date(),
           missions: missions.map(cm => ({
             id: cm.id,
             mission: cm.mission,
@@ -268,26 +264,12 @@ export class ChallengeService {
             id: cq.id,
             quiz: cq.quiz,
             sortOrder: cq.sortOrder
-          })),
-          contents: contents.map(cc => ({
-            id: cc.id,
-            content: cc.content,
-            weekNumber: cc.weekNumber
-          })),
-          records: recordItems.map(item => {
-            const todayRecord = todayRecords.find(r => r.recordCode === item.code);
-            return {
-              ...item,
-              isCompleted: !!todayRecord,
-              todayValue: todayRecord?.value || null,
-              recordedAt: todayRecord?.createdAt || null
-            };
-          })
+          }))
         }
       };
 
       this.logger.log(`사용자 ${userId}의 활성 챌린지 + 오늘 활동 조회 완료: ${challengeInfo.name} (${currentDay}일차)`);
-      this.logger.log(`- 미션 ${missions.length}개, 설문 ${surveys.length}개, 퀴즈 ${quizzes.length}개, 컨텐츠 ${contents.length}개`);
+      this.logger.log(`- 미션 ${missions.length}개, 설문 ${surveys.length}개, 퀴즈 ${quizzes.length}개`);
       return { success: true, data: result };
     } catch (error) {
       this.logger.error('활성 챌린지 + 오늘 활동 조회 실패:', error);
@@ -319,13 +301,29 @@ export class ChallengeService {
           where: {
             id: ticketId,
             userId,
-            status: 'PURCHASED'
+            status: ChallengeTicketStatus.PURCHASED
           },
           include: { product: true }
         });
 
         if (!ticket) {
           throw new NotFoundException('사용 가능한 수행권을 찾을 수 없습니다');
+        }
+
+        // 2-1. 티켓 소유자 재확인 (보안 강화)
+        if (ticket.userId !== userId) {
+          this.logger.error(`티켓 소유권 불일치 - 티켓 ${ticketId}: 소유자 ${ticket.userId}, 요청자 ${userId}`);
+          throw new BadRequestException('본인의 이용권만 사용할 수 있습니다');
+        }
+
+        // 2-2. 이 티켓으로 이미 생성된 챌린지가 있는지 확인 (재사용 방지)
+        const existingChallengeWithTicket = await tx.userChallenge.findFirst({
+          where: { ticketId }
+        });
+
+        if (existingChallengeWithTicket) {
+          this.logger.error(`티켓 재사용 시도 - 티켓 ${ticketId}는 이미 UserChallenge ${existingChallengeWithTicket.id}에서 사용됨`);
+          throw new ConflictException('이미 사용된 이용권입니다');
         }
 
         if (!ticket.product || !this.isChallengeProduct(ticket.product)) {
@@ -350,7 +348,8 @@ export class ChallengeService {
             activatedAt: now,
             expiresAt,
             currentDay: 1,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            createdAt: getNowKST(),
           },
           include: { product: true }
         });
@@ -362,7 +361,7 @@ export class ChallengeService {
         await tx.challengeTicket.update({
           where: { id: ticketId },
           data: {
-            status: 'ACTIVATED',
+            status: ChallengeTicketStatus.ACTIVATED,
             startDate,
             endDate
           }
@@ -491,7 +490,8 @@ export class ChallengeService {
         throw new NotFoundException('활성화된 챌린지를 찾을 수 없습니다');
       }
 
-      const currentDay = userChallenge.currentDay;
+      // activatedAt 기준으로 현재 챌린지 일차 계산
+      const currentDay = calculateChallengeDay(userChallenge.activatedAt);
       const weekNumber = Math.ceil(currentDay / 7);
 
       // 오늘의 미션 조회
@@ -529,12 +529,11 @@ export class ChallengeService {
       // ⚠️ 컨텐츠 조회 제거됨
       // - challenge_contents 테이블 제거로 인해 제거
       // - Content.accessLevel 기반 접근 제어로 변경
-      const contents = [];
+      // - 컨텐츠는 별도 Content API에서 조회
 
-      // 기록 항목 조회
-      const recordItems = await this.prisma.recordItem.findMany({
-        orderBy: { id: 'asc' }
-      });
+      // ⚠️ 기록 항목 조회 제거됨
+      // - RecordItem 테이블 삭제로 인해 제거
+      // - 기록 관련 정보는 missions 테이블(type='RECORD')에서 관리
 
       const result = {
         currentDay,
@@ -551,15 +550,10 @@ export class ChallengeService {
         quizzes: quizzes.map(cq => ({
           id: cq.id,
           quiz: cq.quiz
-        })),
-        contents: contents.map(cc => ({
-          id: cc.id,
-          content: cc.content
-        })),
-        records: recordItems
+        }))
       };
 
-      this.logger.log(`오늘의 활동 조회 완료 - 미션 ${missions.length}개, 설문 ${surveys.length}개, 퀴즈 ${quizzes.length}개, 컨텐츠 ${contents.length}개`);
+      this.logger.log(`오늘의 활동 조회 완료 - 미션 ${missions.length}개, 설문 ${surveys.length}개, 퀴즈 ${quizzes.length}개`);
       return { success: true, data: result };
     } catch (error) {
       this.logger.error('오늘의 활동 조회 실패:', error);
@@ -754,6 +748,7 @@ export class ChallengeService {
         categoryCode: data.categoryCode || 'CHALLENGE',
         categoryName: data.categoryName || '챌린지',
         price: data.price,
+        createdAt: getNowKST(),
         metadata: {
           totalDays: data.totalDays
         }
@@ -883,7 +878,8 @@ export class ChallengeService {
         missionId: data.missionId,
         day: data.day,
         points: data.points || 100,
-        isActive: data.isActive ?? true
+        isActive: data.isActive ?? true,
+        createdAt: getNowKST(),
       },
       include: {
         mission: true
@@ -904,7 +900,8 @@ export class ChallengeService {
         productId,
         surveyId: data.surveyId,
         day: data.day,
-        isActive: data.isActive ?? true
+        isActive: data.isActive ?? true,
+        createdAt: getNowKST(),
       },
       include: {
         survey: true
@@ -925,7 +922,8 @@ export class ChallengeService {
         productId,
         quizId: data.quizId,
         day: data.day,
-        isActive: data.isActive ?? true
+        isActive: data.isActive ?? true,
+        createdAt: getNowKST(),
       },
       include: {
         quiz: true
@@ -1142,7 +1140,6 @@ export class ChallengeService {
       const userChallenge = await this.prisma.userChallenge.findFirst({
         where: { userId, productId },
         include: {
-          challengeSchedule: true,
           ticket: {
             include: {
               product: true
@@ -1155,25 +1152,19 @@ export class ChallengeService {
         throw new NotFoundException('해당 챌린지를 찾을 수 없습니다');
       }
 
-      const schedule = userChallenge.challengeSchedule;
       const ticket = userChallenge.ticket;
 
-      if (!schedule) {
-        throw new NotFoundException('챌린지 일정 정보를 찾을 수 없습니다');
-      }
-
-      // 시작일 수정 가능 여부 확인 (확정되지 않은 상태에서만 수정 가능)
-      const canModify = !schedule.isConfirmed;
-
+      // ⚠️ challenge_schedules 테이블은 삭제되고 user_challenges로 통합되었음
+      // 일정 정보는 이제 userChallenge에 직접 저장됨
       const responseData: ChallengeScheduleResponseDto = {
-        id: schedule.id,
-        startDate: schedule.startDate ? formatDateToString(schedule.startDate) : null,
-        deliveryDate: schedule.deliveryDate ? formatDateToString(schedule.deliveryDate) : null,
-        endDate: schedule.endDate ? formatDateToString(schedule.endDate) : null,
-        isConfirmed: schedule.isConfirmed,
-        canModify,
+        id: userChallenge.id,
+        startDate: userChallenge.startDate ? formatDateToString(userChallenge.startDate) : null,
+        deliveryDate: userChallenge.deliveryDate ? formatDateToString(userChallenge.deliveryDate) : null,
+        endDate: userChallenge.endDate ? formatDateToString(userChallenge.endDate) : null,
+        isConfirmed: true, // 일정 설정 시 바로 확정됨
+        canModify: false,   // 설정 후 수정 불가
         purchasedAt: ticket.purchaseDate,
-        createdAt: schedule.createdAt
+        createdAt: userChallenge.createdAt
       };
 
       this.logger.log(`챌린지 일정 조회 완료 - 시작일: ${responseData.startDate}, 확정여부: ${responseData.isConfirmed}`);
@@ -1200,12 +1191,21 @@ export class ChallengeService {
       }
 
       return await this.prisma.$transaction(async (tx) => {
-        // 1. PURCHASED 상태의 티켓 찾기 (동일 상품의 티켓은 1개만 존재)
+        // 1. 이미 활성 챌린지가 있는지 확인
+        const existingActive = await tx.userChallenge.findFirst({
+          where: { userId, status: 'ACTIVE' }
+        });
+
+        if (existingActive) {
+          throw new ConflictException('이미 활성화된 챌린지가 있습니다. 한 번에 하나의 챌린지만 진행할 수 있습니다.');
+        }
+
+        // 2. PURCHASED 상태의 티켓 찾기 (동일 상품의 티켓은 1개만 존재)
         const ticket = await tx.challengeTicket.findFirst({
           where: {
             userId,
             productId,
-            status: 'PURCHASED'
+            status: ChallengeTicketStatus.PURCHASED
           }
         });
 
@@ -1213,7 +1213,23 @@ export class ChallengeService {
           throw new NotFoundException('사용 가능한 챌린지 이용권을 찾을 수 없습니다');
         }
 
-        // 2. 상품(챌린지) 정보 조회
+        // 2-1. 티켓 소유자 재확인 (보안 강화)
+        if (ticket.userId !== userId) {
+          this.logger.error(`티켓 소유권 불일치 - 티켓 ${ticket.id}: 소유자 ${ticket.userId}, 요청자 ${userId}`);
+          throw new BadRequestException('본인의 이용권만 사용할 수 있습니다');
+        }
+
+        // 2-2. 이 티켓으로 이미 생성된 챌린지가 있는지 확인 (재사용 방지)
+        const existingChallengeWithTicket = await tx.userChallenge.findFirst({
+          where: { ticketId: ticket.id }
+        });
+
+        if (existingChallengeWithTicket) {
+          this.logger.error(`티켓 재사용 시도 - 티켓 ${ticket.id}는 이미 UserChallenge ${existingChallengeWithTicket.id}에서 사용됨`);
+          throw new ConflictException('이미 사용된 이용권입니다');
+        }
+
+        // 3. 상품(챌린지) 정보 조회
         const product = await tx.product.findUnique({
           where: { id: productId }
         });
@@ -1222,7 +1238,7 @@ export class ChallengeService {
           throw new NotFoundException('챌린지 상품을 찾을 수 없습니다');
         }
 
-        // 3. 날짜 유효성 검증
+        // 4. 날짜 유효성 검증
         const startDateString = setStartDateDto.startDate; // "2025-10-20"
         const startDate = parseStringToDate(startDateString);
         const today = new Date();
@@ -1232,11 +1248,11 @@ export class ChallengeService {
           throw new BadRequestException('시작일은 오늘 이후여야 합니다');
         }
 
-        // 4. 배송일과 종료일 계산 (로컬 Date로 계산)
+        // 5. 배송일과 종료일 계산 (로컬 Date로 계산)
         const deliveryDate = calculateDeliveryDate(startDate);
         const endDate = calculateEndDate(startDate);
 
-        // 5. KST 날짜/시간 객체 생성 (Prisma 저장용)
+        // 6. KST 날짜/시간 객체 생성 (Prisma 저장용)
         const [startYear, startMonth, startDay] = startDateString.split('-').map(Number);
         const startDateKST = stringToKSTDate(startDateString, 0, 0, 0); // 00:00:00
 
@@ -1258,7 +1274,7 @@ export class ChallengeService {
           now.getSeconds()
         );
 
-        // 6. UserChallenge 생성 (티켓 활성화 + 일정 정보 포함)
+        // 7. UserChallenge 생성 (티켓 활성화 + 일정 정보 포함)
         const userChallenge = await tx.userChallenge.create({
           data: {
             user: { connect: { id: userId } },
@@ -1270,17 +1286,18 @@ export class ChallengeService {
             endDate: endDateKST,
             expiresAt: endDateKST,
             purchasedAt: ticket.purchaseDate,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            createdAt: nowKST,
           }
         });
 
-        // 7. 티켓 상태를 ACTIVATED로 변경
+        // 8. 티켓 상태를 ACTIVATED로 변경
         await tx.challengeTicket.update({
           where: { id: ticket.id },
-          data: { status: 'ACTIVATED' }
+          data: { status: ChallengeTicketStatus.ACTIVATED }
         });
 
-        // 8. 응답 데이터 생성
+        // 9. 응답 데이터 생성
         const responseData: ChallengeScheduleResponseDto = {
           id: userChallenge.id,
           startDate: formatDateToString(userChallenge.startDate!),

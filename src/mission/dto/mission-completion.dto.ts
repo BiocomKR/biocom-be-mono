@@ -6,37 +6,52 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class CompleteMissionDto {
   @ApiProperty({
-    description: '파일 업로드 ID (인증샷이 필요한 미션)',
-    example: 123,
+    description: '챌린지 미션 ID (필수)',
+    example: 123
+  })
+  @IsNumber({}, { message: '챌린지 미션 ID는 숫자여야 합니다' })
+  challengeMissionId: number;
+
+  @ApiProperty({
+    description: '데일리 미션 ID (선택) - daily_missions 테이블의 ID. 1일1미션 같은 경우에만 필요',
+    example: 45,
     required: false
   })
   @IsOptional()
-  @IsNumber({}, { message: '파일 업로드 ID는 숫자여야 합니다' })
-  fileUploadId?: number;
+  @IsNumber({}, { message: '데일리 미션 ID는 숫자여야 합니다' })
+  dailyMissionId?: number;
 
   @ApiProperty({
-    description: '기록 값 (기록형 미션의 경우 필수)',
-    example: '8',
-    required: false
-  })
-  @IsOptional()
-  @IsString({ message: '기록 값은 문자열이어야 합니다' })
-  @ValidateIf((o, value) => value !== null && value !== undefined)
-  value?: string;
-
-  @ApiProperty({
-    description: '단위 (기록형 미션)',
-    example: '시간',
-    required: false
-  })
-  @IsOptional()
-  @IsString({ message: '단위는 문자열이어야 합니다' })
-  unit?: string;
-
-  @ApiProperty({
-    description: '추가 메타데이터',
-    example: { photo: 'https://example.com/photo.jpg', note: '잘 잤음' },
-    required: false
+    description: '메타데이터 (선택) - verifyType에 따라 다른 데이터 포함. PHOTO: {fileUploadId}, TEXT: {text}, 기록형: {value, unit} 등',
+    example: { fileUploadId: 12 },
+    required: false,
+    examples: {
+      photo: {
+        value: { fileUploadId: 12 },
+        description: 'PHOTO 타입 - 파일 업로드 ID'
+      },
+      text: {
+        value: { text: '오늘 아침 7시에 일어났습니다.' },
+        description: 'TEXT 타입 - 텍스트 입력'
+      },
+      both: {
+        value: { fileUploadId: 12, text: '사진과 함께 한마디' },
+        description: 'BOTH 타입 - 파일과 텍스트 모두'
+      },
+      tracking: {
+        value: { value: '8', unit: '시간' },
+        description: '기록형 미션 - 수치 기록'
+      },
+      meal: {
+        value: {
+          mealType: 'breakfast',
+          time: '08:20',
+          menu: '샐러드',
+          calories: 300
+        },
+        description: '식단 기록'
+      }
+    }
   })
   @IsOptional()
   @IsObject({ message: '메타데이터는 객체여야 합니다' })

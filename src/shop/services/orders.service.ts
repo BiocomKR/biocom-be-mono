@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
+import { CouponService } from '../../coupons/services/coupon.service';
 import { CreateOrderDto, OrderResponseDto } from '../dto/orders/create-order.dto';
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
@@ -19,6 +20,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pointService: PointService,
+    private readonly couponService: CouponService,
   ) {}
 
   /**
@@ -153,6 +155,66 @@ export class OrdersService {
         }
       }
 
+      // 5-1. 쿠폰 검증 및 할인 금액 계산
+      let couponDiscount = 0;
+      let appliedCoupon = null;
+
+      if (dto.userCouponId) {
+        // 쿠폰 정보 조회
+        const userCoupon = await tx.userCoupon.findFirst({
+          where: {
+            id: dto.userCouponId,
+            userId,
+            status: 'ACTIVE'
+          },
+          include: {
+            coupon: {
+              include: {
+                product: true
+              }
+            }
+          }
+        });
+
+        if (!userCoupon) {
+          throw new BadRequestException('유효하지 않은 쿠폰입니다');
+        }
+
+        // 만료 확인
+        const now = getNowKST();
+        if (userCoupon.expiresAt <= now) {
+          throw new BadRequestException('만료된 쿠폰입니다');
+        }
+
+        // 쿠폰 적용 가능한 상품이 주문에 포함되어 있는지 확인
+        const applicableItem = orderItemsData.find(
+          item => item.product.id === userCoupon.coupon.productId
+        );
+
+        if (!applicableItem) {
+          throw new BadRequestException(
+            `이 쿠폰은 ${userCoupon.coupon.product.name}에만 사용할 수 있습니다`
+          );
+        }
+
+        // 할인 금액 계산
+        const productPrice = convertDecimalToNumber(applicableItem.product.price) || 0;
+        const itemTotal = productPrice * applicableItem.quantity;
+
+        if (userCoupon.coupon.discountType === 'PERCENTAGE') {
+          couponDiscount = Math.floor(itemTotal * userCoupon.coupon.discountValue / 100);
+          if (userCoupon.coupon.maxDiscountAmount) {
+            couponDiscount = Math.min(couponDiscount, userCoupon.coupon.maxDiscountAmount);
+          }
+        } else {
+          // AMOUNT 타입
+          couponDiscount = Math.min(userCoupon.coupon.discountValue, itemTotal);
+        }
+
+        appliedCoupon = userCoupon;
+        this.logger.log(`쿠폰 적용: ${userCoupon.coupon.name}, 할인액: ${couponDiscount}원`);
+      }
+
       // 6. 배송비 계산
       const shippingFee = await this.calculateShippingFee(
         totalProductPrice,
@@ -160,7 +222,7 @@ export class OrdersService {
       );
 
       // 7. 최종 결제액 계산
-      const totalAmount = totalProductPrice + shippingFee - pointUsed;
+      const totalAmount = totalProductPrice + shippingFee - couponDiscount - pointUsed;
 
       if (totalAmount < 0) {
         throw new BadRequestException('결제 금액이 0원 미만일 수 없습니다');
@@ -175,7 +237,7 @@ export class OrdersService {
           status: 'PENDING_PAYMENT',
           inventoryStatus: 'NOT_PROCESSED',
           totalProductPrice,
-          totalDiscount: 0,
+          totalDiscount: couponDiscount,
           shippingFee,
           pointUsed,
           totalAmount,
@@ -186,6 +248,7 @@ export class OrdersService {
           addressDetail: dto.shippingAddress.addressDetail ? CryptoUtil.encrypt(dto.shippingAddress.addressDetail) : null,
           deliveryMessage: dto.shippingAddress.deliveryMessage || null,
           orderedAt: getNowKST(),
+          createdAt: getNowKST(),
           user: {
             connect: { id: userId }
           }
@@ -204,6 +267,7 @@ export class OrdersService {
               productPrice: new Prisma.Decimal(price),
               quantity: item.quantity,
               subtotal: new Prisma.Decimal(price * item.quantity),
+              createdAt: getNowKST(),
             },
           });
         })
@@ -229,6 +293,7 @@ export class OrdersService {
                 status: 'PURCHASED',
                 ticketType,
                 purchaseDate: getNowKST(),
+                createdAt: getNowKST(),
               },
             });
           })
@@ -244,6 +309,7 @@ export class OrdersService {
           orderId: order.id,
           status: 'PREPARING',
           shippingFee,
+          createdAt: getNowKST(),
         },
       });
 
@@ -254,6 +320,7 @@ export class OrdersService {
           fromStatus: null,
           toStatus: 'PENDING_PAYMENT',
           changeReason: '주문 생성',
+          createdAt: getNowKST(),
         },
       });
 
@@ -273,7 +340,20 @@ export class OrdersService {
       //   )
       // );
 
-      // 14. 포인트 사용 처리
+      // 14. 쿠폰 사용 처리
+      if (appliedCoupon) {
+        await tx.userCoupon.update({
+          where: { id: appliedCoupon.id },
+          data: {
+            status: 'USED',
+            usedAt: getNowKST(),
+            usedOrderId: order.id
+          }
+        });
+        this.logger.log(`쿠폰 ${appliedCoupon.id} 사용 완료`);
+      }
+
+      // 15. 포인트 사용 처리
       if (pointUsed > 0) {
         // 포인트 차감
         await tx.user.update({
@@ -293,11 +373,12 @@ export class OrdersService {
             description: `주문 사용 (${orderNumber})`,
             relatedType: 'ORDER',
             relatedId: order.id,
+            createdAt: getNowKST(),
           },
         });
       }
 
-      // 15. 장바구니 아이템 삭제 (cartItemIds가 제공된 경우에만)
+      // 16. 장바구니 아이템 삭제 (cartItemIds가 제공된 경우에만)
       if (dto.cartItemIds && dto.cartItemIds.length > 0) {
         await tx.cartItem.deleteMany({
           where: {
@@ -306,7 +387,7 @@ export class OrdersService {
         });
       }
 
-      this.logger.log(`주문 생성 완료: ${orderNumber}`);
+      this.logger.log(`주문 생성 완료: ${orderNumber}, 쿠폰 할인: ${couponDiscount}원`);
 
       return {
         ...order,
@@ -433,6 +514,7 @@ export class OrdersService {
           fromStatus: order.status,
           toStatus: 'CANCELLED',
           changeReason: reason,
+          createdAt: getNowKST(),
         },
       });
 
@@ -496,6 +578,31 @@ export class OrdersService {
         // TODO: 이미 사용 중인 챌린지가 있는 경우 환불 정책에 따라 처리
       }
 
+      // 쿠폰 복구
+      const usedCoupon = await tx.userCoupon.findFirst({
+        where: {
+          usedOrderId: order.id,
+          status: 'USED'
+        }
+      });
+
+      if (usedCoupon) {
+        // 만료되지 않았으면 ACTIVE로 복구, 만료되었으면 EXPIRED로
+        const now = getNowKST();
+        const newStatus = usedCoupon.expiresAt > now ? 'ACTIVE' : 'EXPIRED';
+
+        await tx.userCoupon.update({
+          where: { id: usedCoupon.id },
+          data: {
+            status: newStatus,
+            usedAt: null,
+            usedOrderId: null
+          }
+        });
+
+        this.logger.log(`쿠폰 ${usedCoupon.id} 복구 완료 (상태: ${newStatus})`);
+      }
+
       // 포인트 복구
       if (order.pointUsed > 0) {
         await tx.user.update({
@@ -514,6 +621,7 @@ export class OrdersService {
             description: `주문 취소 환불 (${order.orderNumber})`,
             relatedType: 'ORDER',
             relatedId: order.id,
+            createdAt: getNowKST(),
           },
         });
       }
@@ -576,6 +684,7 @@ export class OrdersService {
           fromStatus: order.status,
           toStatus: 'COMPLETED',
           changeReason: '구매 확정',
+          createdAt: getNowKST(),
         },
       });
 
@@ -648,6 +757,7 @@ export class OrdersService {
           fromStatus: order.status,
           toStatus: newStatus,
           changeReason: reason,
+          createdAt: getNowKST(),
         },
       });
 

@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 포인트 관리 서비스
@@ -72,6 +73,7 @@ export class PointService {
           description,
           relatedType,
           relatedId,
+          createdAt: getNowKST(),
         },
       });
 
@@ -119,6 +121,7 @@ export class PointService {
           description,
           relatedType: relatedType || 'MANUAL',
           relatedId,
+          createdAt: getNowKST(),
         },
       });
 
@@ -165,6 +168,7 @@ export class PointService {
         description,
         relatedType: relatedType || 'MANUAL',
         relatedId,
+        createdAt: getNowKST(),
       },
     });
 
@@ -222,6 +226,7 @@ export class PointService {
           balance: updatedUser.points, // 실제 잔액
           description: `아임웹으로 포인트 이관`,
           relatedType: 'IMWEB_TRANSFER',
+          createdAt: getNowKST(),
         },
       });
 
@@ -268,6 +273,7 @@ export class PointService {
           balance: updatedUser.points, // 실제 잔액
           description: `아임웹에서 포인트 가져오기`,
           relatedType: 'IMWEB_TRANSFER',
+          createdAt: getNowKST(),
         },
       });
 
@@ -367,6 +373,7 @@ export class PointService {
           description,
           relatedType,
           relatedId,
+          createdAt: getNowKST(),
         },
       });
 
