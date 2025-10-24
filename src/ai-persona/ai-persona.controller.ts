@@ -20,6 +20,7 @@ import {
   ApiQuery
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ManagerGuard } from '../common/guards/manager.guard';
 import { AiPersonaService } from './ai-persona.service';
 import {
   CreateAiPersonaDto,
@@ -38,7 +39,7 @@ export class AiPersonaController {
    * 관리자용 API
    */
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ManagerGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'AI 페르소나 생성',
@@ -120,7 +121,7 @@ export class AiPersonaController {
    * 관리자용 API
    */
   @Put(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ManagerGuard)
   @ApiBearerAuth()
   @ApiParam({
     name: 'id',
@@ -157,7 +158,7 @@ export class AiPersonaController {
    * 관리자용 API
    */
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ManagerGuard)
   @ApiBearerAuth()
   @ApiParam({
     name: 'id',
