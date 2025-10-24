@@ -83,6 +83,7 @@ export class UsersService {
               name: true,
               mobile: true,
               points: true,
+              characterId: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -148,6 +149,7 @@ export class UsersService {
               name: true,
               mobile: true,
               points: true,
+              characterId: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -248,6 +250,23 @@ export class UsersService {
         }
       }
 
+      // AI 페르소나 변경 시 유효성 확인
+      if (updateUserDto.characterId !== undefined) {
+        const persona = await this.prisma.aiPersona.findUnique({
+          where: { id: updateUserDto.characterId },
+        });
+
+        if (!persona) {
+          throw new NotFoundException(`ID ${updateUserDto.characterId}인 페르소나를 찾을 수 없습니다.`);
+        }
+
+        if (!persona.isActive) {
+          throw new ConflictException('비활성화된 페르소나는 선택할 수 없습니다.');
+        }
+
+        this.logger.log(`사용자 ${id}의 페르소나 변경 - 기존: ${existingUser.characterId}, 새로운: ${updateUserDto.characterId}`);
+      }
+
       // 비밀번호 변경 시 해싱
       const updateData: any = { ...updateUserDto };
       if (updateUserDto.password) {
@@ -264,6 +283,7 @@ export class UsersService {
           name: true,
           mobile: true,
           points: true,
+          characterId: true,
           createdAt: true,
           updatedAt: true,
         },

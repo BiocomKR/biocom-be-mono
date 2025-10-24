@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsEmail, IsString, IsOptional, MinLength, MaxLength, Matches, IsInt, Min } from 'class-validator';
 
 /**
  * 사용자 수정 DTO
@@ -64,4 +64,18 @@ export class UpdateUserDto {
   @IsString({ message: '휴대폰 번호는 문자열이어야 합니다.' })
   @Matches(/^01[0-9]{8,9}$/, { message: '올바른 휴대폰 번호 형식이 아닙니다.' })
   mobile?: string;
+
+  /**
+   * AI 페르소나 ID (선택사항)
+   * 사용자의 AI 캐릭터 선택
+   */
+  @ApiProperty({
+    description: 'AI 페르소나 ID',
+    example: 1,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt({ message: '페르소나 ID는 정수여야 합니다.' })
+  @Min(1, { message: '페르소나 ID는 1 이상이어야 합니다.' })
+  characterId?: number;
 }

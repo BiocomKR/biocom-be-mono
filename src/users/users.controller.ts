@@ -1,7 +1,9 @@
-import { 
-  Controller, 
-  Get, 
-  Param, 
+import {
+  Controller,
+  Get,
+  Patch,
+  Body,
+  Param,
   UseGuards,
   Request
 } from '@nestjs/common';
@@ -16,6 +18,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { UsersService } from './users.service';
 import { ImwebApiService } from '../imweb/imweb-api.service';
+import { UpdateUserDto } from './dto/update-user.dto';
 import {
   SearchImwebMembersResponseDto,
   GetMyProfileResponseDto,
@@ -124,10 +127,68 @@ export class UsersController {
     // JWT payload에서 sub (user id) 추출
     const userId = req.user.sub;
     const user = await this.usersService.findOne(userId);
-    
+
     return {
       success: true,
       message: '사용자 정보를 조회했습니다.',
+      data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 현재 로그인한 사용자 정보 수정
+   * AI 페르소나 선택 등 사용자 프로필 업데이트
+   */
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 정보 수정',
+    description: '현재 로그인한 사용자의 정보를 수정합니다. AI 페르소나 선택, 이름/휴대폰 변경 등이 가능합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '사용자 정보 수정 성공',
+    schema: {
+      example: {
+        success: true,
+        message: '사용자 정보가 수정되었습니다.',
+        data: {
+          id: 1,
+          email: 'user1@example.com',
+          name: '김철수',
+          mobile: '01012345678',
+          points: 100,
+          characterId: 1,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z'
+        },
+        timestamp: '2024-01-02T00:00:00.000Z'
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: '페르소나를 찾을 수 없음',
+    type: ApiErrorResponseDto
+  })
+  @ApiResponse({
+    status: 409,
+    description: '비활성화된 페르소나이거나 이메일 중복',
+    type: ApiErrorResponseDto
+  })
+  async updateMe(
+    @Request() req: any,
+    @Body() updateUserDto: UpdateUserDto
+  ): Promise<ApiResponseDto> {
+    // JWT payload에서 sub (user id) 추출
+    const userId = req.user.sub;
+    const user = await this.usersService.update(userId, updateUserDto);
+
+    return {
+      success: true,
+      message: '사용자 정보가 수정되었습니다.',
       data: user,
       timestamp: getNowKST(),
     };
