@@ -1067,45 +1067,45 @@ model AiPersona {
 /// 사용자별 챌린지별 설문 결과 테이블
 /// 챌린지마다 다른 사전/사후 설문 결과 저장
 model UserChallengeSurveyResult {
-  id                    Int       @id @default(autoincrement())
+  id                     Int       @id @default(autoincrement())
   /// 사용자 ID
-  userId                Int       @map("user_id")
+  userId                 Int       @map("user_id")
   /// 상품 ID (챌린지 이용권)
-  productId             Int       @map("product_id")
-  /// 사전설문 최저점수 카테고리 (CategoryDetail.category 참조)
-  beforeCategory        String?   @map("before_category") @db.VarChar(50)
-  /// 사후설문 최저점수 카테고리 (CategoryDetail.category 참조)
-  afterCategory         String?   @map("after_category") @db.VarChar(50)
+  productId              Int       @map("product_id")
+  /// 사전설문 건강 유형 (HealthTypeAnimal.healthType 참조)
+  beforeHealthType       String?   @map("before_health_type") @db.VarChar(50)
+  /// 사후설문 건강 유형 (HealthTypeAnimal.healthType 참조)
+  afterHealthType        String?   @map("after_health_type") @db.VarChar(50)
   /// 사전설문 피부건강 점수
-  beforeSkinHealthScore Int?      @map("before_skin_health_score")
+  beforeScoreSkinHealth  Int?      @map("before_score_skin_health")
   /// 사전설문 대사 점수
-  beforeMetabolismScore Int?      @map("before_metabolism_score")
+  beforeScoreMetabolism  Int?      @map("before_score_metabolism")
   /// 사전설문 면역 점수
-  beforeImmuneScore     Int?      @map("before_immune_score")
+  beforeScoreImmune      Int?      @map("before_score_immune")
   /// 사전설문 장건강 점수
-  beforeGutHealthScore  Int?      @map("before_gut_health_score")
+  beforeScoreGutHealth   Int?      @map("before_score_gut_health")
   /// 사전설문 총점
-  beforeTotalScore      Int?      @map("before_total_score")
+  beforeScoreTotal       Int?      @map("before_score_total")
   /// 사후설문 피부건강 점수
-  afterSkinHealthScore  Int?      @map("after_skin_health_score")
+  afterScoreSkinHealth   Int?      @map("after_score_skin_health")
   /// 사후설문 대사 점수
-  afterMetabolismScore  Int?      @map("after_metabolism_score")
+  afterScoreMetabolism   Int?      @map("after_score_metabolism")
   /// 사후설문 면역 점수
-  afterImmuneScore      Int?      @map("after_immune_score")
+  afterScoreImmune       Int?      @map("after_score_immune")
   /// 사후설문 장건강 점수
-  afterGutHealthScore   Int?      @map("after_gut_health_score")
+  afterScoreGutHealth    Int?      @map("after_score_gut_health")
   /// 사후설문 총점
-  afterTotalScore       Int?      @map("after_total_score")
+  afterScoreTotal        Int?      @map("after_score_total")
   /// 사전설문 완료일시
-  beforeCompletedAt     DateTime? @map("before_completed_at")
+  beforeCompletedAt      DateTime? @map("before_completed_at")
   /// 사후설문 완료일시
-  afterCompletedAt      DateTime? @map("after_completed_at")
+  afterCompletedAt       DateTime? @map("after_completed_at")
   /// 생성일시
-  createdAt             DateTime  @map("created_at")
+  createdAt              DateTime  @map("created_at")
   /// 수정일시
-  updatedAt             DateTime? @updatedAt @map("updated_at")
-  product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt              DateTime? @updatedAt @map("updated_at")
+  product                Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
   @@index([productId])

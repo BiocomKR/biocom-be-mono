@@ -570,18 +570,18 @@ export class SurveyService {
     const updateData: Prisma.UserChallengeSurveyResultUpdateInput = {};
 
     if (surveyType === 'before') {
-      updateData.beforeCategory = lowestCategory;
-      updateData.beforeSkinHealthScore = categoryScores.SKIN_HEALTH;
-      updateData.beforeMetabolismScore = categoryScores.METABOLISM;
-      updateData.beforeImmuneScore = categoryScores.IMMUNE_BALANCE;
-      updateData.beforeGutHealthScore = categoryScores.GUT_HEALTH;
+      updateData.beforeHealthType = lowestCategory;
+      updateData.beforeScoreSkinHealth = categoryScores.SKIN_HEALTH;
+      updateData.beforeScoreMetabolism = categoryScores.METABOLISM;
+      updateData.beforeScoreImmune = categoryScores.IMMUNE_BALANCE;
+      updateData.beforeScoreGutHealth = categoryScores.GUT_HEALTH;
       updateData.beforeCompletedAt = getNowKST();
     } else {
-      updateData.afterCategory = lowestCategory;
-      updateData.afterSkinHealthScore = categoryScores.SKIN_HEALTH;
-      updateData.afterMetabolismScore = categoryScores.METABOLISM;
-      updateData.afterImmuneScore = categoryScores.IMMUNE_BALANCE;
-      updateData.afterGutHealthScore = categoryScores.GUT_HEALTH;
+      updateData.afterHealthType = lowestCategory;
+      updateData.afterScoreSkinHealth = categoryScores.SKIN_HEALTH;
+      updateData.afterScoreMetabolism = categoryScores.METABOLISM;
+      updateData.afterScoreImmune = categoryScores.IMMUNE_BALANCE;
+      updateData.afterScoreGutHealth = categoryScores.GUT_HEALTH;
       updateData.afterCompletedAt = getNowKST();
     }
 
@@ -790,16 +790,16 @@ export class SurveyService {
     }
 
     // Before 동물 캐릭터 정보
-    const beforeHealthTypeAnimal = result.beforeCategory
+    const beforeHealthTypeAnimal = result.beforeHealthType
       ? await this.prisma.healthTypeAnimal.findFirst({
-          where: { healthType: result.beforeCategory },
+          where: { healthType: result.beforeHealthType },
         })
       : null;
 
     // After 동물 캐릭터 정보
-    const afterHealthTypeAnimal = result.afterCategory
+    const afterHealthTypeAnimal = result.afterHealthType
       ? await this.prisma.healthTypeAnimal.findFirst({
-          where: { healthType: result.afterCategory },
+          where: { healthType: result.afterHealthType },
         })
       : null;
 
@@ -808,28 +808,28 @@ export class SurveyService {
       surveyId,
       productId: challengeSurvey.productId,
       before: {
-        category: result.beforeCategory,
+        category: result.beforeHealthType,
         animalCharacter: beforeHealthTypeAnimal?.animalName,
         characterKeyword: beforeHealthTypeAnimal?.catchphrase,
         detailedFeatures: beforeHealthTypeAnimal?.symptoms,
         scores: {
-          skinHealth: result.beforeSkinHealthScore,
-          metabolism: result.beforeMetabolismScore,
-          immune: result.beforeImmuneScore,
-          gutHealth: result.beforeGutHealthScore,
+          skinHealth: result.beforeScoreSkinHealth,
+          metabolism: result.beforeScoreMetabolism,
+          immune: result.beforeScoreImmune,
+          gutHealth: result.beforeScoreGutHealth,
         },
         completedAt: result.beforeCompletedAt,
       },
-      after: result.afterCategory ? {
-        category: result.afterCategory,
+      after: result.afterHealthType ? {
+        category: result.afterHealthType,
         animalCharacter: afterHealthTypeAnimal?.animalName,
         characterKeyword: afterHealthTypeAnimal?.catchphrase,
         detailedFeatures: afterHealthTypeAnimal?.symptoms,
         scores: {
-          skinHealth: result.afterSkinHealthScore,
-          metabolism: result.afterMetabolismScore,
-          immune: result.afterImmuneScore,
-          gutHealth: result.afterGutHealthScore,
+          skinHealth: result.afterScoreSkinHealth,
+          metabolism: result.afterScoreMetabolism,
+          immune: result.afterScoreImmune,
+          gutHealth: result.afterScoreGutHealth,
         },
         completedAt: result.afterCompletedAt,
       } : null,
@@ -841,29 +841,29 @@ export class SurveyService {
    * Before & After 개선도 계산
    */
   private calculateImprovement(result: any) {
-    if (!result.beforeCategory || !result.afterCategory) {
+    if (!result.beforeHealthType || !result.afterHealthType) {
       return null;
     }
 
-    const beforeTotalScore = 
-      (result.beforeSkinHealthScore || 0) +
-      (result.beforeMetabolismScore || 0) +
-      (result.beforeImmuneScore || 0) +
-      (result.beforeGutHealthScore || 0);
+    const beforeTotalScore =
+      (result.beforeScoreSkinHealth || 0) +
+      (result.beforeScoreMetabolism || 0) +
+      (result.beforeScoreImmune || 0) +
+      (result.beforeScoreGutHealth || 0);
 
-    const afterTotalScore = 
-      (result.afterSkinHealthScore || 0) +
-      (result.afterMetabolismScore || 0) +
-      (result.afterImmuneScore || 0) +
-      (result.afterGutHealthScore || 0);
+    const afterTotalScore =
+      (result.afterScoreSkinHealth || 0) +
+      (result.afterScoreMetabolism || 0) +
+      (result.afterScoreImmune || 0) +
+      (result.afterScoreGutHealth || 0);
 
     return {
       totalScoreImprovement: afterTotalScore - beforeTotalScore,
       categoryScoreChanges: {
-        skinHealth: (result.afterSkinHealthScore || 0) - (result.beforeSkinHealthScore || 0),
-        metabolism: (result.afterMetabolismScore || 0) - (result.beforeMetabolismScore || 0),
-        immune: (result.afterImmuneScore || 0) - (result.beforeImmuneScore || 0),
-        gutHealth: (result.afterGutHealthScore || 0) - (result.beforeGutHealthScore || 0),
+        skinHealth: (result.afterScoreSkinHealth || 0) - (result.beforeScoreSkinHealth || 0),
+        metabolism: (result.afterScoreMetabolism || 0) - (result.beforeScoreMetabolism || 0),
+        immune: (result.afterScoreImmune || 0) - (result.beforeScoreImmune || 0),
+        gutHealth: (result.afterScoreGutHealth || 0) - (result.beforeScoreGutHealth || 0),
       },
     };
   }

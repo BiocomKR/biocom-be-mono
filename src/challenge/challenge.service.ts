@@ -1041,16 +1041,16 @@ export class ChallengeService {
     }
 
     // Before 동물 캐릭터 정보
-    const beforeHealthTypeAnimal = result.beforeCategory
+    const beforeHealthTypeAnimal = result.beforeHealthType
       ? await this.prisma.healthTypeAnimal.findFirst({
-          where: { healthType: result.beforeCategory },
+          where: { healthType: result.beforeHealthType },
         })
       : null;
 
     // After 동물 캐릭터 정보
-    const afterHealthTypeAnimal = result.afterCategory
+    const afterHealthTypeAnimal = result.afterHealthType
       ? await this.prisma.healthTypeAnimal.findFirst({
-          where: { healthType: result.afterCategory },
+          where: { healthType: result.afterHealthType },
         })
       : null;
 
@@ -1060,62 +1060,62 @@ export class ChallengeService {
         userId,
         productId,
         before: {
-          category: result.beforeCategory,
+          category: result.beforeHealthType,
           animalCharacter: beforeHealthTypeAnimal?.animalName,
           characterKeyword: beforeHealthTypeAnimal?.catchphrase,
           detailedFeatures: beforeHealthTypeAnimal?.symptoms,
           scores: {
-            skinHealth: result.beforeSkinHealthScore,
-            metabolism: result.beforeMetabolismScore,
-            immune: result.beforeImmuneScore,
-            gutHealth: result.beforeGutHealthScore,
+            skinHealth: result.beforeScoreSkinHealth,
+            metabolism: result.beforeScoreMetabolism,
+            immune: result.beforeScoreImmune,
+            gutHealth: result.beforeScoreGutHealth,
           },
           completedAt: result.beforeCompletedAt,
         },
-        after: result.afterCategory ? {
-          category: result.afterCategory,
+        after: result.afterHealthType ? {
+          category: result.afterHealthType,
           animalCharacter: afterHealthTypeAnimal?.animalName,
           characterKeyword: afterHealthTypeAnimal?.catchphrase,
           detailedFeatures: afterHealthTypeAnimal?.symptoms,
           scores: {
-            skinHealth: result.afterSkinHealthScore,
-            metabolism: result.afterMetabolismScore,
-            immune: result.afterImmuneScore,
-            gutHealth: result.afterGutHealthScore,
+            skinHealth: result.afterScoreSkinHealth,
+            metabolism: result.afterScoreMetabolism,
+            immune: result.afterScoreImmune,
+            gutHealth: result.afterScoreGutHealth,
           },
           completedAt: result.afterCompletedAt,
         } : null,
         scoreComparison: {
           skinHealth: {
-            before: result.beforeSkinHealthScore || 0,
-            after: result.afterSkinHealthScore || 0,
-            change: (result.afterSkinHealthScore || 0) - (result.beforeSkinHealthScore || 0),
-            improvement: result.beforeSkinHealthScore
-              ? Math.round(((result.afterSkinHealthScore || 0) - result.beforeSkinHealthScore) / result.beforeSkinHealthScore * 100 * 100) / 100
+            before: result.beforeScoreSkinHealth || 0,
+            after: result.afterScoreSkinHealth || 0,
+            change: (result.afterScoreSkinHealth || 0) - (result.beforeScoreSkinHealth || 0),
+            improvement: result.beforeScoreSkinHealth
+              ? Math.round(((result.afterScoreSkinHealth || 0) - result.beforeScoreSkinHealth) / result.beforeScoreSkinHealth * 100 * 100) / 100
               : 0
           },
           metabolism: {
-            before: result.beforeMetabolismScore || 0,
-            after: result.afterMetabolismScore || 0,
-            change: (result.afterMetabolismScore || 0) - (result.beforeMetabolismScore || 0),
-            improvement: result.beforeMetabolismScore
-              ? Math.round(((result.afterMetabolismScore || 0) - result.beforeMetabolismScore) / result.beforeMetabolismScore * 100 * 100) / 100
+            before: result.beforeScoreMetabolism || 0,
+            after: result.afterScoreMetabolism || 0,
+            change: (result.afterScoreMetabolism || 0) - (result.beforeScoreMetabolism || 0),
+            improvement: result.beforeScoreMetabolism
+              ? Math.round(((result.afterScoreMetabolism || 0) - result.beforeScoreMetabolism) / result.beforeScoreMetabolism * 100 * 100) / 100
               : 0
           },
           immune: {
-            before: result.beforeImmuneScore || 0,
-            after: result.afterImmuneScore || 0,
-            change: (result.afterImmuneScore || 0) - (result.beforeImmuneScore || 0),
-            improvement: result.beforeImmuneScore
-              ? Math.round(((result.afterImmuneScore || 0) - result.beforeImmuneScore) / result.beforeImmuneScore * 100 * 100) / 100
+            before: result.beforeScoreImmune || 0,
+            after: result.afterScoreImmune || 0,
+            change: (result.afterScoreImmune || 0) - (result.beforeScoreImmune || 0),
+            improvement: result.beforeScoreImmune
+              ? Math.round(((result.afterScoreImmune || 0) - result.beforeScoreImmune) / result.beforeScoreImmune * 100 * 100) / 100
               : 0
           },
           gutHealth: {
-            before: result.beforeGutHealthScore || 0,
-            after: result.afterGutHealthScore || 0,
-            change: (result.afterGutHealthScore || 0) - (result.beforeGutHealthScore || 0),
-            improvement: result.beforeGutHealthScore
-              ? Math.round(((result.afterGutHealthScore || 0) - result.beforeGutHealthScore) / result.beforeGutHealthScore * 100 * 100) / 100
+            before: result.beforeScoreGutHealth || 0,
+            after: result.afterScoreGutHealth || 0,
+            change: (result.afterScoreGutHealth || 0) - (result.beforeScoreGutHealth || 0),
+            improvement: result.beforeScoreGutHealth
+              ? Math.round(((result.afterScoreGutHealth || 0) - result.beforeScoreGutHealth) / result.beforeScoreGutHealth * 100 * 100) / 100
               : 0
           }
         }
