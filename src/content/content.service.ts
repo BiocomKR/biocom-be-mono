@@ -766,6 +766,14 @@ export class ContentService {
    */
   private async getUserStatus(userId: number): Promise<any> {
     try {
+      // 사용자 구독 상태 조회
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          subscriptionStatus: true
+        }
+      });
+
       // 활성 챌린지 조회
       const activeChallenge = await this.prisma.userChallenge.findFirst({
         where: {
@@ -783,33 +791,21 @@ export class ContentService {
         }
       });
 
-      // 구독 상태 조회 (TODO: 구독 모델 추가 후 활성화)
-      // const subscription = await this.prisma.userSubscription.findFirst({
-      //   where: {
-      //     userId,
-      //     status: 'ACTIVE',
-      //     endDate: {
-      //       gte: getNowKST()
-      //     }
-      //   }
-      // });
-      const subscription = null; // 임시로 null 처리
+      // 구독 여부 판단: SUBSCRIBER 또는 CHALLENGER
+      const isSubscribed = user?.subscriptionStatus === 'SUBSCRIBER' ||
+                          user?.subscriptionStatus === 'CHALLENGER';
 
       const metadata = activeChallenge?.product.metadata as any;
 
       return {
         isInChallenge: !!activeChallenge,
-        isSubscribed: !!subscription,
+        isSubscribed: isSubscribed,
+        subscriptionStatus: user?.subscriptionStatus || 'NEWCOMER',
         challengeInfo: activeChallenge ? {
           id: activeChallenge.productId,
           name: metadata?.challengeName || activeChallenge.product.name,
           currentDay: activeChallenge.currentDay,
           totalDays: metadata?.totalDays || 21
-        } : null,
-        subscriptionInfo: subscription ? {
-          id: subscription.id,
-          startDate: subscription.startDate,
-          endDate: subscription.endDate
         } : null
       };
 
@@ -819,8 +815,8 @@ export class ContentService {
       return {
         isInChallenge: false,
         isSubscribed: false,
-        challengeInfo: null,
-        subscriptionInfo: null
+        subscriptionStatus: 'NEWCOMER',
+        challengeInfo: null
       };
     }
   }
