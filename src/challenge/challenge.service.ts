@@ -1041,16 +1041,16 @@ export class ChallengeService {
     }
 
     // Before 동물 캐릭터 정보
-    const beforeCategoryDetail = result.beforeCategory
-      ? await this.prisma.categoryDetail.findFirst({
-          where: { categoryCode: result.beforeCategory },
+    const beforeHealthTypeAnimal = result.beforeCategory
+      ? await this.prisma.healthTypeAnimal.findFirst({
+          where: { healthType: result.beforeCategory },
         })
       : null;
 
     // After 동물 캐릭터 정보
-    const afterCategoryDetail = result.afterCategory
-      ? await this.prisma.categoryDetail.findFirst({
-          where: { categoryCode: result.afterCategory },
+    const afterHealthTypeAnimal = result.afterCategory
+      ? await this.prisma.healthTypeAnimal.findFirst({
+          where: { healthType: result.afterCategory },
         })
       : null;
 
@@ -1061,9 +1061,9 @@ export class ChallengeService {
         productId,
         before: {
           category: result.beforeCategory,
-          animalCharacter: beforeCategoryDetail?.animalCharacter,
-          characterKeyword: beforeCategoryDetail?.characterKeyword,
-          detailedFeatures: beforeCategoryDetail?.detailedFeatures,
+          animalCharacter: beforeHealthTypeAnimal?.animalName,
+          characterKeyword: beforeHealthTypeAnimal?.catchphrase,
+          detailedFeatures: beforeHealthTypeAnimal?.symptoms,
           scores: {
             skinHealth: result.beforeSkinHealthScore,
             metabolism: result.beforeMetabolismScore,
@@ -1074,9 +1074,9 @@ export class ChallengeService {
         },
         after: result.afterCategory ? {
           category: result.afterCategory,
-          animalCharacter: afterCategoryDetail?.animalCharacter,
-          characterKeyword: afterCategoryDetail?.characterKeyword,
-          detailedFeatures: afterCategoryDetail?.detailedFeatures,
+          animalCharacter: afterHealthTypeAnimal?.animalName,
+          characterKeyword: afterHealthTypeAnimal?.catchphrase,
+          detailedFeatures: afterHealthTypeAnimal?.symptoms,
           scores: {
             skinHealth: result.afterSkinHealthScore,
             metabolism: result.afterMetabolismScore,

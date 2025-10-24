@@ -224,19 +224,19 @@ model SurveyAnswer {
   @@map("survey_answers")
 }
 
-/// 카테고리 상세 정보 테이블
-/// 각 카테고리별 동물 캐릭터 및 상세 설명 정보를 저장
-model CategoryDetail {
-  id               Int       @id @default(autoincrement())
-  categoryCode     String    @unique @map("category_code")
-  categoryType     String    @map("category_type")
-  animalCharacter  String    @map("animal_character")
-  characterKeyword String    @map("character_keyword")
-  detailedFeatures String    @map("detailed_features")
-  createdAt        DateTime  @map("created_at")
-  updatedAt        DateTime? @updatedAt @map("updated_at")
+/// 건강 유형별 동물 캐릭터 테이블
+/// 설문 결과에 따른 건강 유형별 동물 캐릭터 정보를 저장
+model HealthTypeAnimal {
+  id          Int       @id @default(autoincrement())
+  healthType  String    @unique @map("health_type") @db.VarChar(50)
+  typeName    String    @map("type_name") @db.VarChar(50)
+  animalName  String    @map("animal_name") @db.VarChar(50)
+  catchphrase String    @db.Text
+  symptoms    String    @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
 
-  @@map("category_details")
+  @@map("health_type_animals")
 }
 
 /// 포인트 내역 테이블

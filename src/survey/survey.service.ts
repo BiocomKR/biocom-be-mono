@@ -263,10 +263,10 @@ export class SurveyService {
     // 동물 캐릭터 매칭
     let animalCharacter: string | undefined;
     if (dominantCategory) {
-      const categoryDetail = await this.prisma.categoryDetail.findUnique({
-        where: { categoryCode: dominantCategory },
+      const healthTypeAnimal = await this.prisma.healthTypeAnimal.findUnique({
+        where: { healthType: dominantCategory },
       });
-      animalCharacter = categoryDetail?.animalCharacter;
+      animalCharacter = healthTypeAnimal?.animalName;
     }
 
     return {
@@ -424,9 +424,9 @@ export class SurveyService {
       // 4. UserChallengeSurveyResult 저장/업데이트
       await this.saveOrUpdateSurveyResult(userId, productId, type, categoryScores, lowestCategory, tx);
 
-      // 5. CategoryDetail에서 동물 캐릭터 정보 조회
-      const categoryDetail = await tx.categoryDetail.findFirst({
-        where: { categoryCode: lowestCategory },
+      // 5. HealthTypeAnimal에서 동물 캐릭터 정보 조회
+      const healthTypeAnimal = await tx.healthTypeAnimal.findFirst({
+        where: { healthType: lowestCategory },
       });
 
       // 6. 챌린지 진행 상황 업데이트
@@ -435,9 +435,9 @@ export class SurveyService {
       return {
         scores: categoryScores,
         lowestCategory,
-        animalCharacter: categoryDetail?.animalCharacter,
-        characterKeyword: categoryDetail?.characterKeyword,
-        detailedFeatures: categoryDetail?.detailedFeatures,
+        animalCharacter: healthTypeAnimal?.animalName,
+        characterKeyword: healthTypeAnimal?.catchphrase,
+        detailedFeatures: healthTypeAnimal?.symptoms,
       };
     });
   }
@@ -790,16 +790,16 @@ export class SurveyService {
     }
 
     // Before 동물 캐릭터 정보
-    const beforeCategoryDetail = result.beforeCategory
-      ? await this.prisma.categoryDetail.findFirst({
-          where: { categoryCode: result.beforeCategory },
+    const beforeHealthTypeAnimal = result.beforeCategory
+      ? await this.prisma.healthTypeAnimal.findFirst({
+          where: { healthType: result.beforeCategory },
         })
       : null;
 
     // After 동물 캐릭터 정보
-    const afterCategoryDetail = result.afterCategory
-      ? await this.prisma.categoryDetail.findFirst({
-          where: { categoryCode: result.afterCategory },
+    const afterHealthTypeAnimal = result.afterCategory
+      ? await this.prisma.healthTypeAnimal.findFirst({
+          where: { healthType: result.afterCategory },
         })
       : null;
 
@@ -809,9 +809,9 @@ export class SurveyService {
       productId: challengeSurvey.productId,
       before: {
         category: result.beforeCategory,
-        animalCharacter: beforeCategoryDetail?.animalCharacter,
-        characterKeyword: beforeCategoryDetail?.characterKeyword,
-        detailedFeatures: beforeCategoryDetail?.detailedFeatures,
+        animalCharacter: beforeHealthTypeAnimal?.animalName,
+        characterKeyword: beforeHealthTypeAnimal?.catchphrase,
+        detailedFeatures: beforeHealthTypeAnimal?.symptoms,
         scores: {
           skinHealth: result.beforeSkinHealthScore,
           metabolism: result.beforeMetabolismScore,
@@ -822,9 +822,9 @@ export class SurveyService {
       },
       after: result.afterCategory ? {
         category: result.afterCategory,
-        animalCharacter: afterCategoryDetail?.animalCharacter,
-        characterKeyword: afterCategoryDetail?.characterKeyword,
-        detailedFeatures: afterCategoryDetail?.detailedFeatures,
+        animalCharacter: afterHealthTypeAnimal?.animalName,
+        characterKeyword: afterHealthTypeAnimal?.catchphrase,
+        detailedFeatures: afterHealthTypeAnimal?.symptoms,
         scores: {
           skinHealth: result.afterSkinHealthScore,
           metabolism: result.afterMetabolismScore,
