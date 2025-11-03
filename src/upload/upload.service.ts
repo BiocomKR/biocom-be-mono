@@ -68,34 +68,56 @@ export class UploadService {
   }
 
   /**
-   * Google Cloud Storage에 파일 업로드
+   * Google Cloud Storage에 파일 업로드 (재시도 로직 포함)
    */
   private async uploadToGoogleStorage(
     fileBuffer: Buffer,
     fileName: string,
-    mimeType: string
+    mimeType: string,
+    maxRetries: number = 3
   ): Promise<string> {
-    try {
-      const bucket = this.storage.bucket(this.bucketName);
-      const file = bucket.file(fileName);
+    let lastError: any;
 
-      // 파일 업로드
-      await file.save(fileBuffer, {
-        metadata: {
-          contentType: mimeType,
-        },
-        public: true, // 공개 접근 허용
-      });
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const bucket = this.storage.bucket(this.bucketName);
+        const file = bucket.file(fileName);
 
-      // 공개 URL 반환
-      const publicUrl = `https://storage.googleapis.com/${this.bucketName}/${fileName}`;
-      this.logger.log(`Google Cloud Storage 업로드 완료: ${publicUrl}`);
+        // 파일 업로드
+        await file.save(fileBuffer, {
+          metadata: {
+            contentType: mimeType,
+          },
+          public: true, // 공개 접근 허용
+        });
 
-      return publicUrl;
-    } catch (error) {
-      this.logger.error('Google Cloud Storage 업로드 실패', error);
-      throw new BadRequestException('파일 업로드 중 오류가 발생했습니다.');
+        // 공개 URL 반환
+        const publicUrl = `https://storage.googleapis.com/${this.bucketName}/${fileName}`;
+
+        if (attempt > 1) {
+          this.logger.log(`GCS 업로드 성공 (${attempt}번째 시도): ${publicUrl}`);
+        } else {
+          this.logger.log(`GCS 업로드 완료: ${publicUrl}`);
+        }
+
+        return publicUrl;
+
+      } catch (error) {
+        lastError = error;
+        this.logger.warn(`GCS 업로드 실패 (${attempt}/${maxRetries}번째 시도): ${error.message}`);
+
+        // 마지막 시도가 아니면 재시도 전 대기
+        if (attempt < maxRetries) {
+          const delayMs = Math.pow(2, attempt - 1) * 1000; // 지수 백오프: 1초, 2초, 4초
+          this.logger.log(`${delayMs}ms 후 재시도합니다...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
     }
+
+    // 모든 재시도 실패
+    this.logger.error(`GCS 업로드 최종 실패 (${maxRetries}번 시도)`, lastError);
+    throw new BadRequestException('파일 업로드 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   }
 
   /**
@@ -202,31 +224,43 @@ export class UploadService {
       // 7. Google Cloud Storage에 업로드
       const publicUrl = await this.uploadToGoogleStorage(fileBuffer, safeFileName, file.mimetype);
 
-      // 8. 파일 정보 데이터베이스에 저장
-      const fileUpload = await this.prisma.fileUpload.create({
+      // 8. 파일 마스터 정보 저장
+      const fileRecord = await this.prisma.file.create({
+        data: {
+          originalName: file.originalname,
+          storedName: safeFileName,
+          filePath: publicUrl,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          storageType: 'gcs',
+          createdAt: getNowKST(),
+        },
+      });
+
+      // 9. 사용자-파일 관계 저장
+      const userFile = await this.prisma.userFile.create({
         data: {
           userId,
-          originalName: file.originalname,
-          filename: safeFileName,
-          path: publicUrl, // Google Cloud Storage 공개 URL
-          size: file.size,
-          mimetype: file.mimetype,
+          fileId: fileRecord.id,
           fileType: 'image',
           uploadCategory: relatedType || 'general',
           uploadedAt: getNowKST(),
         },
+        include: {
+          file: true,
+        },
       });
 
-      this.logger.log(`이미지 업로드 완료 - ID: ${fileUpload.id}, URL: ${publicUrl}`);
+      this.logger.log(`이미지 업로드 완료 - ID: ${userFile.id}, URL: ${publicUrl}`);
 
       return {
-        id: fileUpload.id,
-        filename: safeFileName,
-        originalName: fileUpload.originalName,
-        mimeType: fileUpload.mimetype,
-        size: fileUpload.size,
-        path: fileUpload.path,
-        uploadedAt: fileUpload.uploadedAt,
+        id: userFile.id,
+        filename: userFile.file.storedName,
+        originalName: userFile.file.originalName,
+        mimeType: userFile.file.mimeType,
+        size: userFile.file.fileSize,
+        path: userFile.file.filePath,
+        uploadedAt: userFile.uploadedAt,
       };
     } catch (error) {
       this.logger.error(`이미지 업로드 중 오류 발생: ${error.message}`, error);
@@ -240,22 +274,25 @@ export class UploadService {
   async getFileInfo(fileId: number): Promise<FileUploadResponseDto> {
     this.logger.log(`파일 정보 조회 - ID: ${fileId}`);
 
-    const file = await this.prisma.fileUpload.findUnique({
+    const userFile = await this.prisma.userFile.findUnique({
       where: { id: fileId },
+      include: {
+        file: true,
+      },
     });
 
-    if (!file) {
+    if (!userFile) {
       throw new NotFoundException('파일을 찾을 수 없습니다.');
     }
 
     return {
-      id: file.id,
-      filename: file.filename,
-      originalName: file.originalName,
-      mimeType: file.mimetype,
-      size: file.size,
-      path: file.path,
-      uploadedAt: file.uploadedAt,
+      id: userFile.id,
+      filename: userFile.file.storedName,
+      originalName: userFile.file.originalName,
+      mimeType: userFile.file.mimeType,
+      size: userFile.file.fileSize,
+      path: userFile.file.filePath,
+      uploadedAt: userFile.uploadedAt,
     };
   }
 
@@ -270,22 +307,25 @@ export class UploadService {
 
     const where: any = { userId };
     if (relatedType) {
-      where.activityType = relatedType;
+      where.uploadCategory = relatedType;
     }
 
-    const files = await this.prisma.fileUpload.findMany({
+    const userFiles = await this.prisma.userFile.findMany({
       where,
       orderBy: { uploadedAt: 'desc' },
+      include: {
+        file: true,
+      },
     });
 
-    return files.map(file => ({
-      id: file.id,
-      filename: file.filename,
-      originalName: file.originalName,
-      mimeType: file.mimetype,
-      size: file.size,
-      path: file.path,
-      uploadedAt: file.uploadedAt,
+    return userFiles.map(userFile => ({
+      id: userFile.id,
+      filename: userFile.file.storedName,
+      originalName: userFile.file.originalName,
+      mimeType: userFile.file.mimeType,
+      size: userFile.file.fileSize,
+      path: userFile.file.filePath,
+      uploadedAt: userFile.uploadedAt,
     }));
   }
 
@@ -295,21 +335,24 @@ export class UploadService {
   async deleteFile(fileId: number, userId: number): Promise<void> {
     this.logger.log(`파일 삭제 요청 - ID: ${fileId}, 사용자: ${userId}`);
 
-    const file = await this.prisma.fileUpload.findFirst({
+    const userFile = await this.prisma.userFile.findFirst({
       where: {
         id: fileId,
         userId,
       },
+      include: {
+        file: true,
+      },
     });
 
-    if (!file) {
+    if (!userFile) {
       throw new NotFoundException('파일을 찾을 수 없거나 삭제 권한이 없습니다.');
     }
 
     // Google Cloud Storage에서 파일 삭제
     try {
       // URL에서 파일명 추출 (https://storage.googleapis.com/bucket-name/filename.ext)
-      const urlParts = file.path.split('/');
+      const urlParts = userFile.file.filePath.split('/');
       const fileName = urlParts[urlParts.length - 1];
 
       if (fileName) {
@@ -325,7 +368,7 @@ export class UploadService {
     }
 
     // 데이터베이스에서 삭제
-    await this.prisma.fileUpload.delete({
+    await this.prisma.userFile.delete({
       where: { id: fileId },
     });
 

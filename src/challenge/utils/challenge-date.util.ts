@@ -98,17 +98,131 @@ export const isWeekday = (date: Date): boolean => {
 };
 
 /**
- * 시작일 기준으로 배송일 계산 (시작일 -1일, 평일만)
- * @param startDate - 챌린지 시작일
- * @returns 배송 가능한 가장 가까운 평일
+ * 주어진 날짜가 월요일인지 확인
+ * @param date - 확인할 날짜
+ * @returns 월요일이면 true, 아니면 false
  */
-export const calculateDeliveryDate = (startDate: Date): Date => {
-  const deliveryDate = new Date(startDate);
-  deliveryDate.setDate(deliveryDate.getDate() - 1);
+export const isMonday = (date: Date): boolean => {
+  return date.getDay() === 1; // 1 = Monday
+};
 
-  // 시작일 -1일이 주말이면 그 이전 평일을 찾음
-  while (!isWeekday(deliveryDate)) {
-    deliveryDate.setDate(deliveryDate.getDate() - 1);
+/**
+ * 신청일 기준 선택 가능한 시작일 범위 계산
+ * 정책:
+ * - 월~수요일 신청: 다음주 월요일부터 3주간의 월요일
+ * - 목~금요일 신청: 차차주 월요일부터 3주간의 월요일 (배송 준비 기간 확보)
+ * - 토~일요일 신청: 다음주 월요일부터 3주간의 월요일
+ *
+ * @param applicationDate - 신청일 (오늘)
+ * @returns 선택 가능한 월요일 목록 3개
+ *
+ * @example
+ * // 신청일이 2025-10-28 (화요일)인 경우
+ * // 다음주 월요일: 2025-11-03, 2025-11-10, 2025-11-17
+ *
+ * // 신청일이 2025-12-26 (금요일)인 경우
+ * // 차차주 월요일: 2026-01-05, 2026-01-12, 2026-01-19
+ */
+export const getAvailableStartDates = (applicationDate: Date): Date[] => {
+  const result: Date[] = [];
+  const today = new Date(applicationDate);
+  today.setHours(0, 0, 0, 0);
+
+  const dayOfWeek = today.getDay(); // 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
+
+  // 다음주 월요일 찾기
+  const nextMonday = new Date(today);
+  const daysUntilNextMonday = (8 - dayOfWeek) % 7 || 7; // 다음주 월요일까지 남은 일수
+  nextMonday.setDate(today.getDate() + daysUntilNextMonday);
+
+  // 목요일(4) 또는 금요일(5)에 신청하면 차차주 월요일부터 시작
+  const startWeekOffset = (dayOfWeek === 4 || dayOfWeek === 5) ? 7 : 0;
+
+  // 시작 월요일부터 3주간의 월요일 추가
+  for (let i = 0; i < 3; i++) {
+    const monday = new Date(nextMonday);
+    monday.setDate(nextMonday.getDate() + startWeekOffset + (i * 7));
+    result.push(monday);
+  }
+
+  return result;
+};
+
+/**
+ * 주어진 날짜가 유효한 시작일인지 검증
+ * 정책: 신청일 기준 다음주부터 3주간의 월요일만 가능
+ *
+ * @param startDate - 검증할 시작일
+ * @param applicationDate - 신청일
+ * @returns 유효하면 true, 아니면 false
+ */
+export const isValidStartDate = (startDate: Date, applicationDate: Date): boolean => {
+  // 월요일이 아니면 불가
+  if (!isMonday(startDate)) {
+    return false;
+  }
+
+  // 선택 가능한 월요일 목록 가져오기
+  const availableDates = getAvailableStartDates(applicationDate);
+
+  // 시작일을 YYYY-MM-DD 문자열로 변환하여 비교
+  const startDateStr = formatDateToString(startDate);
+
+  return availableDates.some(date => formatDateToString(date) === startDateStr);
+};
+
+/**
+ * 시작일 기준으로 배송도착예정일 계산
+ * 정책: 시작일 전주 금요일 (단, 금요일이 주말/공휴일이면 앞당김)
+ *
+ * @param startDate - 챌린지 시작일 (월요일)
+ * @returns 배송도착예정일 (전주 금요일, 또는 가장 가까운 평일)
+ *
+ * @example
+ * // 시작일이 2025-11-03 (월요일)인 경우
+ * // 배송도착예정일: 2025-10-31 (전주 금요일)
+ * // 만약 10-31이 공휴일이면 10-30 (목요일)
+ */
+export const calculateDeliveryArrivalDate = async (startDate: Date): Promise<Date> => {
+  const { findNearestDeliveryDate } = await import('../../common/utils/holiday.util');
+
+  const arrivalDate = new Date(startDate);
+  // 시작일(월요일) - 3일 = 전주 금요일
+  arrivalDate.setDate(arrivalDate.getDate() - 3);
+
+  // 배송 가능한 가장 가까운 날짜 찾기 (금요일부터 과거로 최대 7일)
+  const deliveryDate = await findNearestDeliveryDate(arrivalDate, 7);
+
+  if (!deliveryDate) {
+    throw new Error('배송 가능한 날짜를 찾을 수 없습니다. 관리자에게 문의하세요.');
+  }
+
+  return deliveryDate;
+};
+
+/**
+ * 배송도착예정일 기준으로 배송시작일 계산
+ * 정책: 배송도착일 2일전 (단, 주말/공휴일이면 앞당김)
+ *
+ * @param deliveryArrivalDate - 배송도착예정일
+ * @returns 배송시작일 (배송도착일 2일전, 또는 가장 가까운 평일)
+ *
+ * @example
+ * // 배송도착예정일이 2025-10-31 (금요일)인 경우
+ * // 배송시작일: 2025-10-29 (수요일)
+ * // 만약 10-29가 공휴일이면 10-28 (화요일)
+ */
+export const calculateDeliveryStartDate = async (deliveryArrivalDate: Date): Promise<Date> => {
+  const { findNearestDeliveryDate } = await import('../../common/utils/holiday.util');
+
+  const startDate = new Date(deliveryArrivalDate);
+  startDate.setDate(startDate.getDate() - 2);
+
+  // 배송 가능한 가장 가까운 날짜 찾기 (2일전부터 과거로 최대 7일)
+  const deliveryDate = await findNearestDeliveryDate(startDate, 7);
+
+  if (!deliveryDate) {
+    throw new Error('배송 시작 가능한 날짜를 찾을 수 없습니다. 관리자에게 문의하세요.');
   }
 
   return deliveryDate;

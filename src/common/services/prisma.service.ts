@@ -194,7 +194,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // PrismaClient의 주요 메서드들을 명시적으로 노출
   get user() { return this.prisma.user; }
   get refreshToken() { return this.prisma.refreshToken; }
-  get fileUpload() { return this.prisma.fileUpload; }
+  get userFile() { return this.prisma.userFile; }
+  get file() { return this.prisma.file; }
   get imwebInfo() { return this.prisma.imwebInfo; }
   get survey() { return this.prisma.survey; }
   get surveyQuestion() { return this.prisma.surveyQuestion; }
@@ -262,6 +263,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 커스텀 영양제 테이블
   get userCustomSupplement() { return this.prisma.userCustomSupplement; }
+
+  // 식품 카테고리 테이블
+  get foodCategory() { return this.prisma.foodCategory; }
 
   // 밸런스게임 관련 테이블
   get balanceGame() { return this.prisma.balanceGame; }

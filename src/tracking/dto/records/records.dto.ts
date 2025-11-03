@@ -11,10 +11,8 @@ export class BeautyQuestionDto {
   @IsNumber()
   no: number;
 
-  @ApiProperty({ description: '점수 (1-5점)', example: 3 })
+  @ApiProperty({ description: '점수 (25, 20, 15, 10, 5)', example: 20, enum: [25, 20, 15, 10, 5] })
   @IsNumber()
-  @Min(1)
-  @Max(5)
   score: number;
 }
 
@@ -27,10 +25,10 @@ export class CreateBeautyRecordDto {
     description: '이너뷰티 4개 질문에 대한 응답',
     type: [BeautyQuestionDto],
     example: [
-      { no: 1, score: 3 },
-      { no: 2, score: 2 },
-      { no: 3, score: 5 },
-      { no: 4, score: 1 }
+      { no: 1, score: 25 },
+      { no: 2, score: 20 },
+      { no: 3, score: 15 },
+      { no: 4, score: 10 }
     ]
   })
   @IsArray()
@@ -42,25 +40,16 @@ export class CreateBeautyRecordDto {
     description: '아우터뷰티 4개 질문에 대한 응답',
     type: [BeautyQuestionDto],
     example: [
-      { no: 1, score: 3 },
-      { no: 2, score: 2 },
-      { no: 3, score: 5 },
-      { no: 4, score: 1 }
+      { no: 1, score: 25 },
+      { no: 2, score: 20 },
+      { no: 3, score: 15 },
+      { no: 4, score: 10 }
     ]
   })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BeautyQuestionDto)
   outerBeauty: BeautyQuestionDto[];
-
-  @ApiProperty({
-    description: '기록 날짜 (YYYY-MM-DD 형식)',
-    example: '2024-01-15',
-    required: false
-  })
-  @IsOptional()
-  @IsDateString()
-  date?: string;
 }
 
 /**

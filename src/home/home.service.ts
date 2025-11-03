@@ -269,7 +269,7 @@ export class HomeService {
     recentDate.setDate(recentDate.getDate() - 7); // 최근 7일
 
     const records = await this.prisma.userRecord.groupBy({
-      by: ['recordCode'],
+      by: ['recordType'],
       where: {
         userId,
         createdAt: {
@@ -291,7 +291,7 @@ export class HomeService {
     };
 
     records.forEach((record) => {
-      switch (record.recordCode) {
+      switch (record.recordType) {
         case 'BEAUTY':
           summary.beauty = record._count.id;
           break;

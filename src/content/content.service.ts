@@ -3,7 +3,6 @@ import { PrismaService } from '../common/services/prisma.service';
 import { PointService } from '../point/point.service';
 import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.util';
 import { CreateContentDto, UpdateContentDto, ContentFileDto } from './content.types';
-import { ContentAccessLevel } from '../common/enums/content-access-level.enum';
 import * as DOMPurify from 'isomorphic-dompurify';
 import { getNowKST } from '../common/utils/kst-date.util';
 
@@ -85,24 +84,24 @@ export class ContentService {
   }
 
   /**
-   * 컨텐츠 상세 조회
+   * 컨텐츠 상세 조회 (구버전 - deprecated)
+   * @deprecated GET /api/contents/columns/:id 또는 /api/contents/lectures/:id 사용 권장
    */
   async getContentById(id: number): Promise<any> {
     const content = await this.prisma.content.findUnique({
       where: { id },
       include: {
         contentFiles: {
+          include: {
+            file: true
+          },
           orderBy: { sortOrder: 'asc' },
         },
-        challengeContents: {
-          include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                metadata: true,
-              },
-            },
+        challenge: {
+          select: {
+            id: true,
+            name: true,
+            metadata: true,
           },
         },
       },
@@ -112,7 +111,183 @@ export class ContentService {
       throw new NotFoundException(`컨텐츠를 찾을 수 없습니다: ${id}`);
     }
 
+    // 칼럼인 경우 이전글/다음글 추가
+    if (content.type === 'COLUMN') {
+      // 이전글 (현재 글보다 ID가 작은 것 중 가장 큰 ID)
+      const prevContent = await this.prisma.content.findFirst({
+        where: {
+          type: 'COLUMN',
+          isActive: true,
+          id: { lt: id }
+        },
+        orderBy: { id: 'desc' },
+        select: { id: true, title: true }
+      });
+
+      // 다음글 (현재 글보다 ID가 큰 것 중 가장 작은 ID)
+      const nextContent = await this.prisma.content.findFirst({
+        where: {
+          type: 'COLUMN',
+          isActive: true,
+          id: { gt: id }
+        },
+        orderBy: { id: 'asc' },
+        select: { id: true, title: true }
+      });
+
+      return {
+        ...content,
+        prevContent: prevContent || null,
+        nextContent: nextContent || null
+      };
+    }
+
     return content;
+  }
+
+  /**
+   * 칼럼 상세 조회 (이전글/다음글 포함)
+   */
+  async getColumnById(id: number): Promise<any> {
+    this.logger.log(`칼럼 상세 조회 - ID: ${id}`);
+
+    const content = await this.prisma.content.findUnique({
+      where: { id },
+      include: {
+        contentFiles: {
+          include: {
+            file: true
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!content) {
+      throw new NotFoundException(`칼럼을 찾을 수 없습니다: ${id}`);
+    }
+
+    if (content.type !== 'COLUMN') {
+      throw new BadRequestException(`해당 컨텐츠는 칼럼이 아닙니다: ${id}`);
+    }
+
+    // 이전글 (현재 글보다 ID가 작은 것 중 가장 큰 ID)
+    const prevContent = await this.prisma.content.findFirst({
+      where: {
+        type: 'COLUMN',
+        isActive: true,
+        id: { lt: id }
+      },
+      orderBy: { id: 'desc' },
+      select: { id: true, title: true }
+    });
+
+    // 다음글 (현재 글보다 ID가 큰 것 중 가장 작은 ID)
+    const nextContent = await this.prisma.content.findFirst({
+      where: {
+        type: 'COLUMN',
+        isActive: true,
+        id: { gt: id }
+      },
+      orderBy: { id: 'asc' },
+      select: { id: true, title: true }
+    });
+
+    this.logger.log(`칼럼 상세 조회 완료 - ID: ${id}`);
+
+    return {
+      ...content,
+      prevContent: prevContent || null,
+      nextContent: nextContent || null
+    };
+  }
+
+  /**
+   * 강의 상세 조회 (퀴즈 포함)
+   */
+  async getLectureById(id: number): Promise<any> {
+    this.logger.log(`강의 상세 조회 - ID: ${id}`);
+
+    const content = await this.prisma.content.findUnique({
+      where: { id },
+      include: {
+        contentFiles: {
+          include: {
+            file: true
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+        // 연결된 퀴즈들
+        lectureQuizzes: {
+          include: {
+            quiz: true
+          },
+          orderBy: { sortOrder: 'asc' }
+        },
+        // 연결된 상품들
+        lectureProducts: {
+          include: {
+            product: true
+          },
+          orderBy: { sortOrder: 'asc' }
+        },
+        challenge: {
+          select: {
+            id: true,
+            name: true,
+            metadata: true,
+          },
+        },
+      },
+    });
+
+    if (!content) {
+      throw new NotFoundException(`강의를 찾을 수 없습니다: ${id}`);
+    }
+
+    if (content.type !== 'LECTURE') {
+      throw new BadRequestException(`해당 컨텐츠는 강의가 아닙니다: ${id}`);
+    }
+
+    // 같은 주차의 다른 강의 목록 조회 (플레이리스트)
+    this.logger.log(`플레이리스트 조회 조건 - weekNumber: ${content.weekNumber}, challengeId: ${content.challengeId}`);
+
+    const playlist = await this.prisma.content.findMany({
+      where: {
+        type: 'LECTURE',
+        isActive: true,
+        weekNumber: content.weekNumber,
+        challengeId: content.challengeId,
+      },
+      select: {
+        id: true,
+        title: true,
+        dayNumber: true,
+        weekNumber: true,
+        contentFiles: {
+          where: {
+            file: {
+              mimeType: {
+                startsWith: 'image/'
+              }
+            }
+          },
+          include: {
+            file: true
+          },
+          orderBy: { sortOrder: 'asc' },
+          take: 1, // 썸네일 1개만
+        },
+      },
+      orderBy: { dayNumber: 'asc' },
+    });
+
+    this.logger.log(`강의 상세 조회 완료 - ID: ${id}, 플레이리스트: ${playlist.length}개, 조회된 ID들: ${playlist.map(p => p.id).join(', ')}`);
+
+    return {
+      ...content,
+      playlist,
+    };
   }
 
   /**
@@ -172,13 +347,14 @@ export class ContentService {
     this.logger.log(`컨텐츠 삭제 - ID: ${id}`);
 
     // 챌린지와 연결된 컨텐츠인지 확인
-    const challengeContentCount = await this.prisma.challengeContent.count({
-      where: { contentId: id },
+    const content = await this.prisma.content.findUnique({
+      where: { id },
+      select: { challengeId: true },
     });
 
-    if (challengeContentCount > 0) {
+    if (content?.challengeId) {
       throw new BadRequestException(
-        `챌린지에서 사용 중인 컨텐츠는 삭제할 수 없습니다. (연결된 챌린지 수: ${challengeContentCount})`
+        `챌린지에서 사용 중인 컨텐츠는 삭제할 수 없습니다. (챌린지 ID: ${content.challengeId})`
       );
     }
 
@@ -238,11 +414,15 @@ export class ContentService {
         where,
         include: {
           contentFiles: {
+            include: {
+              file: true
+            },
             orderBy: { sortOrder: 'asc' },
           },
           _count: {
             select: {
-              challengeContents: true,
+              contentFiles: true,
+              quizAttempts: true,
             },
           },
         },
@@ -256,55 +436,19 @@ export class ContentService {
   }
 
   /**
-   * 조회수 증가 (사용자별 중복 방지)
+   * 조회수 증가 (중복 허용)
    * @param contentId 컨텐츠 ID
-   * @param userId 사용자 ID (선택사항, 로그인하지 않은 경우 null)
+   * @param userId 사용자 ID (선택사항, 사용 안함)
+   * @deprecated userId 파라미터는 더 이상 사용되지 않음 (중복 방지 제거됨)
    */
   async increaseViewCount(contentId: number, userId?: number): Promise<void> {
-    this.logger.log(`컨텐츠 조회수 증가 요청 - 컨텐츠: ${contentId}, 사용자: ${userId}`);
+    this.logger.log(`컨텐츠 조회수 증가 - 컨텐츠: ${contentId}`);
 
     try {
-      // 오늘 날짜 (YYYY-MM-DD 형식)
-      const today = getNowKST();
-      const todayStr = today.toISOString().split('T')[0];
-
-      // 1️⃣ 로그인된 사용자인 경우 중복 방지 체크
-      if (userId) {
-        const existingView = await this.prisma.contentView.findFirst({
-          where: {
-            userId,
-            contentId,
-            viewedAt: {
-              gte: new Date(todayStr), // 오늘 00:00:00부터
-              lt: new Date(new Date(todayStr).getTime() + 24 * 60 * 60 * 1000) // 내일 00:00:00 전까지
-            }
-          }
-        });
-
-        // 이미 오늘 조회한 적이 있으면 조회수 증가하지 않음
-        if (existingView) {
-          this.logger.log(`이미 오늘 조회한 컨텐츠 - 컨텐츠: ${contentId}, 사용자: ${userId}`);
-          return;
-        }
-      }
-
-      await this.prisma.$transaction(async (tx) => {
-        // 2️⃣ 컨텐츠 조회수 증가
-        await tx.content.update({
-          where: { id: contentId },
-          data: { viewCount: { increment: 1 } }
-        });
-
-        // 3️⃣ 로그인된 사용자인 경우 조회 기록 생성
-        if (userId) {
-          await tx.contentView.create({
-            data: {
-              userId,
-              contentId,
-              viewedAt: getNowKST()
-            }
-          });
-        }
+      // 단순 조회수 증가 (중복 허용)
+      await this.prisma.content.update({
+        where: { id: contentId },
+        data: { viewCount: { increment: 1 } }
       });
 
       this.logger.log(`컨텐츠 조회수 증가 완료 - 컨텐츠: ${contentId}`);
@@ -317,10 +461,13 @@ export class ContentService {
 
   /**
    * 컨텐츠 시청 완료 처리
+   * @deprecated 2025-10-28 - 포인트 지급은 퀴즈 풀이로 이동
    * @param userId 사용자 ID
    * @param contentId 컨텐츠 ID
    */
   async completeContent(userId: number, contentId: number) {
+    throw new BadRequestException('이 API는 더 이상 사용되지 않습니다. 퀴즈 풀이 API를 사용하세요.');
+    /*
     try {
       this.logger.log(`컨텐츠 시청 완료 처리 시작 - 사용자: ${userId}, 컨텐츠: ${contentId}`);
 
@@ -463,6 +610,7 @@ export class ContentService {
       this.logger.error('컨텐츠 시청 완료 처리 실패:', error);
       throw error;
     }
+    */
   }
 
 
@@ -480,12 +628,15 @@ export class ContentService {
       take: limit,
       include: {
         contentFiles: {
+          include: {
+            file: true
+          },
           orderBy: { sortOrder: 'asc' },
         },
         _count: {
           select: {
-            challengeContents: true,
-            contentViews: true,
+            contentFiles: true,
+            quizAttempts: true,
           },
         },
       },
@@ -546,7 +697,7 @@ export class ContentService {
           _count: {
             select: {
               contentFiles: true,
-              challengeContents: true,
+              quizAttempts: true,
             },
           },
         },
@@ -560,7 +711,7 @@ export class ContentService {
   }
 
   /**
-   * 강의 목록 조회 (주차별, 사용자 상태별)
+   * 강의 목록 조회 (주차별)
    * @param userId 사용자 ID
    * @param week 주차 (1,2,3)
    * @param challengeId 챌린지 ID (옵션)
@@ -569,27 +720,69 @@ export class ContentService {
     this.logger.log(`강의 목록 조회 - 사용자: ${userId}, 주차: ${week}, 챌린지: ${challengeId}`);
 
     try {
-      // 1️⃣ 사용자 상태 조회 (챌린지/구독 상태)
-      const userStatus = await this.getUserStatus(userId);
+      // 1️⃣ 사용자 구독 상태 확인
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { subscriptionStatus: true }
+      });
 
-      // 2️⃣ 접근 가능한 accessLevel 결정
-      const accessLevels: ContentAccessLevel[] = [ContentAccessLevel.ALL]; // 기본: 모두 접근 가능한 컨텐츠
+      const isSubscriber = user?.subscriptionStatus === 'SUBSCRIBER';
 
-      if (userStatus.isInChallenge) {
-        accessLevels.push(ContentAccessLevel.CHALLENGE_ONLY, ContentAccessLevel.CHALLENGE_OR_SUB);
+      // 2️⃣ 챌린저인 경우 주차 접근 권한 검증
+      if (!isSubscriber && week) {
+        // 활성 챌린지 조회
+        const activeChallenge = await this.prisma.userChallenge.findFirst({
+          where: {
+            userId,
+            status: 'ACTIVE'
+          },
+          select: { activatedAt: true }
+        });
+
+        if (activeChallenge) {
+          // 챌린지 일차 계산 (calculateChallengeDay 사용)
+          const { calculateChallengeDay } = await import('../common/utils/kst-date.util');
+          const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+
+          // 접근 가능한 주차 계산 (1~7일: 1주차, 8~14일: 2주차, 15~21일: 3주차)
+          const allowedWeek = Math.ceil(currentDay / 7);
+
+          this.logger.log(`챌린저 주차 검증 - 현재 ${currentDay}일차, 요청 ${week}주차, 허용 ${allowedWeek}주차`);
+
+          // 요청한 주차가 허용 범위 초과면 빈 배열 반환
+          if (week > allowedWeek) {
+            this.logger.log(`챌린저 접근 제한 - ${week}주차 조회 불가 (현재 ${currentDay}일차)`);
+            return [];
+          }
+        }
       }
 
-      if (userStatus.isSubscribed) {
-        accessLevels.push(ContentAccessLevel.SUBSCRIPTION_ONLY, ContentAccessLevel.CHALLENGE_OR_SUB);
+      // 3️⃣ 챌린지 상품 ID 확정 (없으면 기본 챌린지 조회)
+      let finalChallengeId = challengeId;
+
+      if (!finalChallengeId) {
+        const defaultChallenge = await this.prisma.product.findFirst({
+          where: {
+            categoryCode: 'CHALLENGE',
+            status: 'ACTIVE'
+          },
+          select: { id: true },
+          orderBy: { id: 'asc' }
+        });
+
+        if (!defaultChallenge) {
+          throw new NotFoundException('활성화된 챌린지 상품이 없습니다');
+        }
+
+        finalChallengeId = defaultChallenge.id;
+        this.logger.log(`기본 챌린지 상품 사용 - productId: ${finalChallengeId}`);
       }
 
-      this.logger.log(`접근 가능한 레벨: ${accessLevels.join(', ')}`);
-
-      // 3️⃣ 기본 WHERE 조건
+      // 4️⃣ WHERE 조건
       const where: any = {
         type: 'LECTURE',
         isActive: true,
-        accessLevel: { in: accessLevels } // accessLevel 기반 필터링
+        challengeId: finalChallengeId
       };
 
       // 주차 필터가 있으면 추가
@@ -597,23 +790,22 @@ export class ContentService {
         where.weekNumber = week;
       }
 
+      this.logger.log(`강의 조회 조건 - 챌린지: ${finalChallengeId}, 주차: ${week || '전체'}`);
+
       // 4️⃣ 강의 목록 조회
       const lectures = await this.prisma.content.findMany({
         where,
         include: {
           contentFiles: {
+            include: {
+              file: true
+            },
             orderBy: { sortOrder: 'asc' }
           },
           // 연결된 퀴즈들
           lectureQuizzes: {
             include: {
-              quiz: {
-                include: {
-                  contentFiles: {
-                    orderBy: { sortOrder: 'asc' }
-                  }
-                }
-              }
+              quiz: true
             },
             orderBy: { sortOrder: 'asc' }
           },
@@ -626,9 +818,8 @@ export class ContentService {
           },
           _count: {
             select: {
-              contentViews: {
-                where: { userId }
-              }
+              contentFiles: true,
+              quizAttempts: true,
             }
           }
         },
@@ -640,16 +831,9 @@ export class ContentService {
         ]
       });
 
-      // 5️⃣ 사용자 상태에 따른 퀴즈 필터링 적용
-      const filteredLectures = await this.filterLecturesByUserStatus(lectures, userStatus);
+      this.logger.log(`강의 목록 조회 완료 - 총 ${lectures.length}개`);
 
-      this.logger.log(`강의 목록 조회 완료 - 총 ${filteredLectures.length}개 (접근 레벨 필터 적용됨)`);
-
-      return {
-        lectures: filteredLectures,
-        userStatus,
-        totalCount: filteredLectures.length
-      };
+      return lectures;
 
     } catch (error) {
       this.logger.error('강의 목록 조회 실패:', error);
@@ -702,11 +886,15 @@ export class ContentService {
           where,
           include: {
             contentFiles: {
+              include: {
+                file: true
+              },
               orderBy: { sortOrder: 'asc' }
             },
             _count: {
               select: {
-                contentViews: true
+                contentFiles: true,
+                quizAttempts: true,
               }
             }
           },
@@ -738,11 +926,15 @@ export class ContentService {
         },
         include: {
           contentFiles: {
+            include: {
+              file: true
+            },
             orderBy: { sortOrder: 'asc' }
           },
           _count: {
             select: {
-              contentViews: true
+              contentFiles: true,
+              quizAttempts: true,
             }
           }
         },
@@ -760,106 +952,4 @@ export class ContentService {
     }
   }
 
-  /**
-   * 사용자 상태 조회 (챌린지/구독 여부)
-   * @private
-   */
-  private async getUserStatus(userId: number): Promise<any> {
-    try {
-      // 사용자 구독 상태 조회
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          subscriptionStatus: true
-        }
-      });
-
-      // 활성 챌린지 조회
-      const activeChallenge = await this.prisma.userChallenge.findFirst({
-        where: {
-          userId,
-          status: 'ACTIVE'
-        },
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-              metadata: true
-            }
-          }
-        }
-      });
-
-      // 구독 여부 판단: SUBSCRIBER 또는 CHALLENGER
-      const isSubscribed = user?.subscriptionStatus === 'SUBSCRIBER' ||
-                          user?.subscriptionStatus === 'CHALLENGER';
-
-      const metadata = activeChallenge?.product.metadata as any;
-
-      return {
-        isInChallenge: !!activeChallenge,
-        isSubscribed: isSubscribed,
-        subscriptionStatus: user?.subscriptionStatus || 'NEWCOMER',
-        challengeInfo: activeChallenge ? {
-          id: activeChallenge.productId,
-          name: metadata?.challengeName || activeChallenge.product.name,
-          currentDay: activeChallenge.currentDay,
-          totalDays: metadata?.totalDays || 21
-        } : null
-      };
-
-    } catch (error) {
-      this.logger.error('사용자 상태 조회 실패:', error);
-      // 에러 발생 시 기본값 반환
-      return {
-        isInChallenge: false,
-        isSubscribed: false,
-        subscriptionStatus: 'NEWCOMER',
-        challengeInfo: null
-      };
-    }
-  }
-
-  /**
-   * 사용자 상태에 따른 강의 필터링
-   * @private
-   */
-  private async filterLecturesByUserStatus(lectures: any[], userStatus: any): Promise<any[]> {
-    return lectures.map(lecture => {
-      // 기본적으로 강의는 모두 노출
-      const result = {
-        ...lecture,
-        isViewable: true,
-        quizzes: [],
-        products: lecture.lectureProducts?.map((lp: any) => lp.product) || []
-      };
-
-      // 연결된 퀴즈 필터링
-      if (lecture.lectureQuizzes && lecture.lectureQuizzes.length > 0) {
-        result.quizzes = lecture.lectureQuizzes.map((lq: any) => {
-          const quiz = { ...lq.quiz };
-
-          if (userStatus.isInChallenge && !userStatus.isSubscribed) {
-            // 챌린지만 참여 중: 현재 일차까지만 퀴즈 노출
-            const currentDay = userStatus.challengeInfo?.currentDay || 1;
-            quiz.isAccessible = (quiz.dayNumber || 1) <= currentDay;
-            quiz.canEarnPoints = true; // 챌린지 참여자는 포인트 획득 가능
-          } else if (userStatus.isSubscribed) {
-            // 구독자: 모든 퀴즈 접근 가능
-            quiz.isAccessible = true;
-            quiz.canEarnPoints = !userStatus.isInChallenge; // 챌린지 미참여 구독자만 포인트 획득
-          } else {
-            // 일반 사용자: 퀴즈 접근 불가
-            quiz.isAccessible = false;
-            quiz.canEarnPoints = false;
-          }
-
-          return quiz;
-        });
-      }
-
-      return result;
-    });
-  }
 }

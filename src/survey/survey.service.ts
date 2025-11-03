@@ -70,7 +70,7 @@ export class SurveyService {
    */
   async createBulkAnswers(
     userId: number,
-    type: 'before' | 'after',
+    type: 'BEFORE' | 'AFTER',
     answers: Array<{ questionId: number; optionId: number }>
   ): Promise<SurveyAnswer[]> {
     this.logger.log(`설문 답변 대량 생성 - 사용자: ${userId}, 개수: ${answers.length}`);
@@ -133,7 +133,7 @@ export class SurveyService {
    */
   async getUserAnswers(
     userId: number,
-    type?: 'before' | 'after'
+    type?: 'BEFORE' | 'AFTER'
   ): Promise<(SurveyAnswer & { 
     surveyQuestion: SurveyQuestion; 
     surveyOption: SurveyOption; 
@@ -161,7 +161,7 @@ export class SurveyService {
   async getUserAnswersByChallenge(
     userId: number,
     productId: number,
-    type?: 'before' | 'after'
+    type?: 'BEFORE' | 'AFTER'
   ): Promise<(SurveyAnswer & {
     surveyQuestion: SurveyQuestion;
     surveyOption: SurveyOption;
@@ -224,17 +224,33 @@ export class SurveyService {
    */
   async analyzeSurveyResult(
     userId: number,
-    type: 'before' | 'after'
+    type: 'BEFORE' | 'AFTER',
+    tx?: Prisma.TransactionClient
   ): Promise<{
     categoryScores: Record<string, number>;
     totalScore: number;
     dominantCategory: string | null;
     animalCharacter?: string;
   }> {
-    const answers = await this.getUserAnswers(userId, type);
+    const prismaClient = tx || this.prisma;
+
+    // 트랜잭션 내부에서 답변 조회
+    const where: Prisma.SurveyAnswerWhereInput = { userId, type };
+    const answers = await prismaClient.surveyAnswer.findMany({
+      where,
+      include: {
+        surveyQuestion: true,
+        surveyOption: true,
+      },
+      orderBy: {
+        surveyQuestion: {
+          sortOrder: 'asc',
+        },
+      },
+    });
 
     if (answers.length === 0) {
-      throw new NotFoundException(`${type === 'before' ? '사전' : '사후'} 설문 답변이 없습니다.`);
+      throw new NotFoundException(`${type === 'BEFORE' ? '사전' : '사후'} 설문 답변이 없습니다.`);
     }
 
     // 카테고리별 점수 계산
@@ -263,7 +279,7 @@ export class SurveyService {
     // 동물 캐릭터 매칭
     let animalCharacter: string | undefined;
     if (dominantCategory) {
-      const healthTypeAnimal = await this.prisma.healthTypeAnimal.findUnique({
+      const healthTypeAnimal = await prismaClient.healthTypeAnimal.findUnique({
         where: { healthType: dominantCategory },
       });
       animalCharacter = healthTypeAnimal?.animalName;
@@ -322,8 +338,8 @@ export class SurveyService {
     const totalQuestions = challengeSurveys[0].survey.surveyQuestions.length;
 
     const [beforeAnswers, afterAnswers] = await Promise.all([
-      this.getUserAnswersByChallenge(userId, productId, 'before'),
-      this.getUserAnswersByChallenge(userId, productId, 'after'),
+      this.getUserAnswersByChallenge(userId, productId, 'BEFORE'),
+      this.getUserAnswersByChallenge(userId, productId, 'AFTER'),
     ]);
 
     const beforeCompleted = beforeAnswers.length === totalQuestions;
@@ -366,7 +382,7 @@ export class SurveyService {
   /**
    * 사용자별 답변 조회
    */
-  async findAnswersByUser(userId: number, type?: 'before' | 'after') {
+  async findAnswersByUser(userId: number, type?: 'BEFORE' | 'AFTER') {
     const where: Prisma.SurveyAnswerWhereInput = { userId };
     if (type) where.type = type;
 
@@ -393,7 +409,7 @@ export class SurveyService {
   async completeChallengeSurvey(
     userId: number,
     productId: number,
-    type: 'before' | 'after',
+    type: 'BEFORE' | 'AFTER',
     answers: Array<{ questionId: number; optionId: number }>
   ) {
     this.logger.log(`챌린지 설문 완료 처리 - 사용자: ${userId}, 상품: ${productId}, 타입: ${type}`);
@@ -448,13 +464,21 @@ export class SurveyService {
   async completeSurveyById(
     userId: number,
     surveyId: number,
-    type: 'before' | 'after',
+    type: 'BEFORE' | 'AFTER',
     answers: Array<{ questionId: number; optionId: number }>
   ) {
     this.logger.log(`설문 완료 처리 - 사용자: ${userId}, 설문ID: ${surveyId}, 타입: ${type}`);
 
     // 트랜잭션으로 처리
     return await this.prisma.$transaction(async (tx) => {
+      // 활성 챌린지 조회
+      const activeChallenge = await tx.userChallenge.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE'
+        }
+      });
+
       // 기존 답변 삭제
       await tx.surveyAnswer.deleteMany({
         where: {
@@ -463,7 +487,7 @@ export class SurveyService {
         },
       });
 
-      // 새 답변 저장
+      // 새 답변 저장 (userChallengeId 포함)
       const now = getNowKST();
       await tx.surveyAnswer.createMany({
         data: answers.map((answer) => ({
@@ -471,6 +495,7 @@ export class SurveyService {
           type,
           surveyQuestionId: answer.questionId,
           surveyOptionId: answer.optionId,
+          userChallengeId: activeChallenge?.id || null,
           createdAt: now,
         })),
       });
@@ -478,8 +503,8 @@ export class SurveyService {
       // 🔥 챌린지 연동 로직 추가
       await this.processChallengeIntegration(tx, userId, surveyId);
 
-      // 결과 분석
-      return await this.analyzeSurveyResult(userId, type);
+      // 결과 분석 (트랜잭션 클라이언트 전달)
+      return await this.analyzeSurveyResult(userId, type, tx);
     });
   }
 
@@ -553,7 +578,7 @@ export class SurveyService {
   private async saveOrUpdateSurveyResult(
     userId: number,
     productId: number,
-    surveyType: 'before' | 'after',
+    surveyType: 'BEFORE' | 'AFTER',
     categoryScores: Record<string, number>,
     lowestCategory: string,
     tx: Prisma.TransactionClient,
@@ -569,7 +594,7 @@ export class SurveyService {
 
     const updateData: Prisma.UserChallengeSurveyResultUpdateInput = {};
 
-    if (surveyType === 'before') {
+    if (surveyType === 'BEFORE') {
       updateData.beforeHealthType = lowestCategory;
       updateData.beforeScoreSkinHealth = categoryScores.SKIN_HEALTH;
       updateData.beforeScoreMetabolism = categoryScores.METABOLISM;
@@ -668,10 +693,7 @@ export class SurveyService {
         });
       }
 
-      // 4️⃣ 설문 포인트 계산 (기본 50포인트)
-      const surveyPoints = 50;
-
-      // 5️⃣ DailyProgress 업데이트
+      // 4️⃣ DailyProgress 업데이트 (설문 완료 횟수만 증가, 포인트 지급 없음)
       await tx.dailyProgress.update({
         where: {
           userChallengeId_day: {
@@ -680,42 +702,11 @@ export class SurveyService {
           }
         },
         data: {
-          surveysCompleted: { increment: 1 },
-          pointsEarned: { increment: surveyPoints }
+          surveysCompleted: { increment: 1 }
         }
       });
 
-      // 6️⃣ 사용자 총 포인트 업데이트
-      await tx.userChallenge.update({
-        where: { id: activeChallenge.id },
-        data: {
-          totalPoints: { increment: surveyPoints }
-        }
-      });
-
-      // 7️⃣ 포인트 히스토리 기록
-      const user = await tx.user.update({
-        where: { id: userId },
-        data: {
-          points: { increment: surveyPoints }
-        }
-      });
-
-      const now = getNowKST();
-      await tx.pointHistory.create({
-        data: {
-          userId,
-          type: 'EARNED',
-          amount: surveyPoints,
-          balance: user.points,
-          description: `설문 완료: ${todaySurvey.survey.name}`,
-          relatedType: 'SURVEY',
-          relatedId: todaySurvey.id,
-          createdAt: now
-        }
-      });
-
-      this.logger.log(`설문 완료 챌린지 연동 성공 - 사용자: ${userId}, 설문: ${todaySurvey.survey.name}, 포인트: ${surveyPoints}`);
+      this.logger.log(`설문 완료 챌린지 연동 성공 - 사용자: ${userId}, 설문: ${todaySurvey.survey.name}`);
 
     } catch (error) {
       this.logger.error('설문 완료 챌린지 연동 실패:', error);
@@ -726,14 +717,14 @@ export class SurveyService {
   /**
    * 설문 결과 조회
    */
-  async findResults(userId: number, type?: 'before' | 'after') {
+  async findResults(userId: number, type?: 'BEFORE' | 'AFTER') {
     const results = [];
-    
-    if (!type || type === 'before') {
+
+    if (!type || type === 'BEFORE') {
       try {
-        const beforeResult = await this.analyzeSurveyResult(userId, 'before');
+        const beforeResult = await this.analyzeSurveyResult(userId, 'BEFORE');
         results.push({
-          type: 'before' as const,
+          type: 'BEFORE' as const,
           ...beforeResult,
           createdAt: getNowKST(),
         });
@@ -742,11 +733,11 @@ export class SurveyService {
       }
     }
 
-    if (!type || type === 'after') {
+    if (!type || type === 'AFTER') {
       try {
-        const afterResult = await this.analyzeSurveyResult(userId, 'after');
+        const afterResult = await this.analyzeSurveyResult(userId, 'AFTER');
         results.push({
-          type: 'after' as const,
+          type: 'AFTER' as const,
           ...afterResult,
           createdAt: getNowKST(),
         });
@@ -922,8 +913,8 @@ export class SurveyService {
    * 설문 전후 비교 (기존 로직 - 호환성 유지)
    */
   async compareResults(userId: number) {
-    const beforeResult = await this.analyzeSurveyResult(userId, 'before');
-    const afterResult = await this.analyzeSurveyResult(userId, 'after');
+    const beforeResult = await this.analyzeSurveyResult(userId, 'BEFORE');
+    const afterResult = await this.analyzeSurveyResult(userId, 'AFTER');
 
     const categoryImprovements: Record<string, number> = {};
     
@@ -934,7 +925,7 @@ export class SurveyService {
     }
 
     // SurveyResultResponseDto 형식으로 변환
-    const formatResult = (result: any, type: 'before' | 'after') => ({
+    const formatResult = (result: any, type: 'BEFORE' | 'AFTER') => ({
       id: 0, // 실제 저장된 결과가 아님
       userId,
       type,
@@ -952,8 +943,8 @@ export class SurveyService {
     });
 
     return {
-      before: formatResult(beforeResult, 'before'),
-      after: formatResult(afterResult, 'after'),
+      before: formatResult(beforeResult, 'BEFORE'),
+      after: formatResult(afterResult, 'AFTER'),
       improvement: {
         totalScore: afterResult.totalScore - beforeResult.totalScore,
         categoryScores: categoryImprovements,
@@ -969,24 +960,55 @@ export class SurveyService {
   /**
    * 카테고리별 설문 질문 조회
    */
-  async findQuestions(categoryCode?: string) {
-    this.logger.log(`설문 질문 조회 - 카테고리: ${categoryCode || '전체'}`);
+  async findQuestions(surveyId?: number, categoryCode?: string) {
+    this.logger.log(`설문 질문 조회 - surveyId: ${surveyId || '전체'}, 카테고리: ${categoryCode || '전체'}`);
+
+    // 공통 옵션 조회 (모든 질문에서 사용)
+    const options = await this.prisma.surveyOption.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        optionText: true,
+        score: true
+      },
+      orderBy: { score: 'asc' }
+    });
 
     const questions = await this.prisma.surveyQuestion.findMany({
       where: {
         isActive: true,
+        ...(surveyId && { surveyId }),
         ...(categoryCode && { categoryCode }),
       },
-      include: {
-        options: {
-          where: { isActive: true },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: [
+        { sortOrder: 'asc' }  // 일단 sortOrder로 정렬
+      ],
     });
 
-    return questions;
+    // 커스텀 카테고리 순서: 염증 → 대사밸런스 → 장건강 → 면역과민반응
+    const categoryOrder = {
+      'SKIN_HEALTH': 1,      // 염증
+      'METABOLISM': 2,        // 대사밸런스
+      'GUT_HEALTH': 3,        // 장건강
+      'IMMUNE_BALANCE': 4     // 면역과민반응
+    };
+
+    // 카테고리 순서 → sortOrder 순으로 정렬
+    const sortedQuestions = questions.sort((a, b) => {
+      const categoryDiff = (categoryOrder[a.categoryCode] || 999) - (categoryOrder[b.categoryCode] || 999);
+      if (categoryDiff !== 0) return categoryDiff;
+      return a.sortOrder - b.sortOrder;
+    });
+
+    // 각 질문에 옵션 추가
+    return sortedQuestions.map(question => ({
+      ...question,
+      options: options.map(opt => ({
+        id: opt.id,
+        text: opt.optionText,
+        score: opt.score
+      }))
+    }));
   }
 
   /**
@@ -1000,12 +1022,6 @@ export class SurveyService {
         id,
         isActive: true,
       },
-      include: {
-        options: {
-          where: { isActive: true },
-          orderBy: { sortOrder: 'asc' },
-        },
-      },
     });
 
     if (!question) {
@@ -1018,7 +1034,7 @@ export class SurveyService {
   /**
    * 질문별 답변 조회
    */
-  async findAnswersByQuestion(questionId: number, type?: 'before' | 'after') {
+  async findAnswersByQuestion(questionId: number, type?: 'BEFORE' | 'AFTER') {
     this.logger.log(`질문별 답변 조회 - 질문ID: ${questionId}, 타입: ${type || '전체'}`);
 
     const answers = await this.prisma.surveyAnswer.findMany({

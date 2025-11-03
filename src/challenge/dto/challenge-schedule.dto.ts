@@ -50,13 +50,22 @@ export class ChallengeScheduleResponseDto {
   startDate: string | null;
 
   @ApiProperty({
-    description: '배송일 (시작일 -1일, 평일만)',
-    example: '2024-09-09',
+    description: '배송시작일 (배송도착일 2일전)',
+    example: '2024-09-05',
     type: 'string',
     format: 'date',
     nullable: true
   })
-  deliveryDate: string | null;
+  deliveryStartDate: string | null;
+
+  @ApiProperty({
+    description: '배송도착예정일 (시작일 전주 금요일)',
+    example: '2024-09-07',
+    type: 'string',
+    format: 'date',
+    nullable: true
+  })
+  deliveryArrivalDate: string | null;
 
   @ApiProperty({
     description: '종료일 (시작일 +20일)',

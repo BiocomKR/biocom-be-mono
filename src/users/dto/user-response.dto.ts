@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { FileUpload } from '@prisma/client';
+import { UserFile } from '@prisma/client';
 
 /**
  * 사용자 응답 DTO
@@ -71,14 +71,14 @@ export class UserResponseDto {
   updatedAt: Date | null;
 
   /**
-   * 업로드한 파일 목록 (include=fileUploads 시에만 포함)
+   * 업로드한 파일 목록 (include=userFiles 시에만 포함)
    */
   @ApiProperty({
     description: '사용자가 업로드한 파일 목록',
     type: [Object],
     required: false,
   })
-  fileUploads?: Partial<FileUpload>[];
+  userFiles?: Partial<UserFile>[];
 }
 
 /**

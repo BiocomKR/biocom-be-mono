@@ -160,7 +160,7 @@ export class UsersController {
           name: '김철수',
           mobile: '01012345678',
           points: 100,
-          characterId: 1,
+          aiPersonaId: 1,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-02T00:00:00.000Z'
         },

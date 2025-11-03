@@ -1,0 +1,259 @@
+{
+  "success": true,
+  "message": "강의가 성공적으로 조회되었습니다.",
+  "data": {
+    "id": 15,
+    "title": "15일차 - 근력 운동의 중요성",
+    "content": "<h2>근력 운동으로 건강한 몸 만들기</h2><p>오늘은 근력 운동이 왜 중요한지 배워봅시다...</p>",
+    "type": "LECTURE",
+    "weekNumber": 3,
+    "dayNumber": 15,
+    "sortOrder": 15,
+    "isActive": true,
+    "viewCount": 87,
+    "challengeId": 1,
+    "createdAt": "2025-01-15T09:00:00.000Z",
+    "updatedAt": "2025-01-15T09:00:00.000Z",
+
+    "contentFiles": [
+      {
+        "id": 29,
+        "contentId": 15,
+        "fileId": 229,
+        "sortOrder": 0,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "file": {
+          "id": 229,
+          "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day15-thumbnail.jpg",
+          "fileName": "day15-thumbnail.jpg",
+          "fileSize": 540000,
+          "mimeType": "image/jpeg",
+          "uploadedAt": "2025-01-15T09:00:00.000Z"
+        }
+      },
+      {
+        "id": 30,
+        "contentId": 15,
+        "fileId": 230,
+        "sortOrder": 1,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "file": {
+          "id": 230,
+          "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/videos/day15-lecture.mp4",
+          "fileName": "day15-lecture.mp4",
+          "fileSize": 58428800,
+          "mimeType": "video/mp4",
+          "uploadedAt": "2025-01-15T09:00:00.000Z"
+        }
+      }
+    ],
+
+    "lectureQuizzes": [],
+
+    "lectureProducts": [
+      {
+        "id": 1,
+        "lectureId": 15,
+        "productId": 101,
+        "sortOrder": 0,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "product": {
+          "id": 101,
+          "code": "CHALLENGE-21DAYS",
+          "name": "21일 건강 챌린지",
+          "categoryCode": "CHALLENGE",
+          "price": 99000,
+          "status": "ACTIVE",
+          "metadata": {
+            "challengeName": "21일 건강 챌린지",
+            "duration": 21,
+            "description": "21일간의 건강한 습관 형성 프로그램"
+          },
+          "createdAt": "2025-01-01T00:00:00.000Z",
+          "updatedAt": "2025-01-01T00:00:00.000Z"
+        }
+      }
+    ],
+
+    "challenge": {
+      "id": 1,
+      "name": "21일 건강 챌린지",
+      "metadata": {
+        "challengeName": "21일 건강 챌린지",
+        "duration": 21,
+        "description": "21일간의 건강한 습관 형성 프로그램"
+      }
+    },
+
+    "playlist": [
+      {
+        "id": 15,
+        "title": "15일차 - 근력 운동의 중요성",
+        "dayNumber": 15,
+        "weekNumber": 3,
+        "contentFiles": [
+          {
+            "id": 29,
+            "contentId": 15,
+            "fileId": 229,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 229,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day15-thumbnail.jpg",
+              "fileName": "day15-thumbnail.jpg",
+              "fileSize": 540000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "16일차 - 유산소와 무산소 운동",
+        "dayNumber": 16,
+        "weekNumber": 3,
+        "contentFiles": [
+          {
+            "id": 31,
+            "contentId": 16,
+            "fileId": 231,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 231,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day16-thumbnail.jpg",
+              "fileName": "day16-thumbnail.jpg",
+              "fileSize": 535000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "17일차 - 운동 후 회복의 중요성",
+        "dayNumber": 17,
+        "weekNumber": 3,
+        "contentFiles": [
+          {
+            "id": 33,
+            "contentId": 17,
+            "fileId": 233,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 233,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day17-thumbnail.jpg",
+              "fileName": "day17-thumbnail.jpg",
+              "fileSize": 528000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "18일차 - 스트레스 관리법",
+        "dayNumber": 18,
+        "weekNumber": 3,
+        "contentFiles": [
+          {
+            "id": 35,
+            "contentId": 18,
+            "fileId": 235,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 235,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day18-thumbnail.jpg",
+              "fileName": "day18-thumbnail.jpg",
+              "fileSize": 522000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 19,
+        "title": "19일차 - 건강한 간식 선택하기",
+        "dayNumber": 19,
+        "weekNumber": 3,
+        "contentFiles": [
+          {
+            "id": 37,
+            "contentId": 19,
+            "fileId": 237,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 237,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day19-thumbnail.jpg",
+              "fileName": "day19-thumbnail.jpg",
+              "fileSize": 518000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "title": "20일차 - 습관 유지의 비결",
+        "dayNumber": 20,
+        "weekNumber": 3,
+        "contentFiles": [
+          {
+            "id": 39,
+            "contentId": 20,
+            "fileId": 239,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 239,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day20-thumbnail.jpg",
+              "fileName": "day20-thumbnail.jpg",
+              "fileSize": 512000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "title": "21일차 - 챌린지 완료 및 다음 단계",
+        "dayNumber": 21,
+        "weekNumber": 3,
+        "contentFiles": [
+          {
+            "id": 41,
+            "contentId": 21,
+            "fileId": 241,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 241,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day21-thumbnail.jpg",
+              "fileName": "day21-thumbnail.jpg",
+              "fileSize": 525000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      }
+    ],
+
+    "quizStatus": {
+      "available": false,
+      "openDay": 15,
+      "message": "15일차에 오픈됩니다."
+    }
+  },
+  "timestamp": "2025-11-03T12:30:45+09:00"
+}

@@ -4,6 +4,7 @@ import {
   UseGuards,
   Request,
   Param,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -11,6 +12,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { StatisticsService } from '../services/statistics.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -71,13 +73,29 @@ export class StatisticsController {
     summary: '이너뷰티 상세 통계 조회',
     description: '이너뷰티와 아우터뷰티의 1주일 상세 통계(평균점수, 일별추이, 세부분석)를 조회합니다.',
   })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-10-27',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-11-02',
+  })
   @ApiResponse({
     status: 200,
     description: '이너뷰티 통계 조회 성공',
     type: BeautyStatisticsResponseDto,
   })
-  async getBeautyStatistics(@Request() req: any) {
-    const data = await this.statisticsService.getBeautyStatistics(req.user.id);
+  async getBeautyStatistics(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const data = await this.statisticsService.getBeautyStatistics(req.user.id, startDate, endDate);
     return {
       success: true,
       data,

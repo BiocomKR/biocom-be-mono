@@ -51,23 +51,29 @@ export class UsersService {
       const total = await this.prisma.user.count({ where });
 
       // include 옵션에 따라 쿼리 분기
-      const includeFileUploads = include?.includes('fileUploads');
-      
+      const includeUserFiles = include?.includes('userFiles');
+
       // 사용자 목록 조회
-      const users = includeFileUploads 
+      const users = includeUserFiles
         ? await this.prisma.user.findMany({
             where,
             include: {
-              fileUploads: {
+              userFiles: {
                 select: {
                   id: true,
-                  originalName: true,
-                  filename: true,
-                  mimetype: true,
-                  size: true,
+                  fileId: true,
                   uploadedAt: true,
                   fileType: true,
                   uploadCategory: true,
+                  file: {
+                    select: {
+                      originalName: true,
+                      storedName: true,
+                      filePath: true,
+                      fileSize: true,
+                      mimeType: true,
+                    },
+                  },
                 },
               },
             },
@@ -83,7 +89,7 @@ export class UsersService {
               name: true,
               mobile: true,
               points: true,
-              characterId: true,
+              aiPersonaId: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -121,22 +127,28 @@ export class UsersService {
 
     try {
       // include 옵션에 따라 쿼리 분기
-      const includeFileUploads = include?.includes('fileUploads');
-      
-      const user = includeFileUploads
+      const includeUserFiles = include?.includes('userFiles');
+
+      const user = includeUserFiles
         ? await this.prisma.user.findUnique({
             where: { id },
             include: {
-              fileUploads: {
+              userFiles: {
                 select: {
                   id: true,
-                  originalName: true,
-                  filename: true,
-                  mimetype: true,
-                  size: true,
+                  fileId: true,
                   uploadedAt: true,
                   fileType: true,
                   uploadCategory: true,
+                  file: {
+                    select: {
+                      originalName: true,
+                      storedName: true,
+                      filePath: true,
+                      fileSize: true,
+                      mimeType: true,
+                    },
+                  },
                 },
               },
             },
@@ -149,7 +161,7 @@ export class UsersService {
               name: true,
               mobile: true,
               points: true,
-              characterId: true,
+              aiPersonaId: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -251,20 +263,20 @@ export class UsersService {
       }
 
       // AI 페르소나 변경 시 유효성 확인
-      if (updateUserDto.characterId !== undefined) {
+      if (updateUserDto.aiPersonaId !== undefined) {
         const persona = await this.prisma.aiPersona.findUnique({
-          where: { id: updateUserDto.characterId },
+          where: { id: updateUserDto.aiPersonaId },
         });
 
         if (!persona) {
-          throw new NotFoundException(`ID ${updateUserDto.characterId}인 페르소나를 찾을 수 없습니다.`);
+          throw new NotFoundException(`ID ${updateUserDto.aiPersonaId}인 페르소나를 찾을 수 없습니다.`);
         }
 
         if (!persona.isActive) {
           throw new ConflictException('비활성화된 페르소나는 선택할 수 없습니다.');
         }
 
-        this.logger.log(`사용자 ${id}의 페르소나 변경 - 기존: ${existingUser.characterId}, 새로운: ${updateUserDto.characterId}`);
+        this.logger.log(`사용자 ${id}의 페르소나 변경 - 기존: ${existingUser.aiPersonaId}, 새로운: ${updateUserDto.aiPersonaId}`);
       }
 
       // 비밀번호 변경 시 해싱
@@ -319,8 +331,8 @@ export class UsersService {
 
       // 트랜잭션으로 관련 데이터와 함께 삭제
       await this.prisma.$transaction(async (prisma) => {
-        // 관련 파일 업로드 데이터 먼저 삭제
-        await prisma.fileUpload.deleteMany({
+        // 관련 사용자 파일 데이터 먼저 삭제
+        await prisma.userFile.deleteMany({
           where: { userId: id },
         });
 

@@ -149,7 +149,7 @@ export class MissionCompletionService {
               challengeMissionId: challengeMission.id,
               day: currentDay,
               trackingRecord: {
-                recordCode: mission.recordType
+                recordType: mission.recordType
               }
             }
           });
@@ -192,14 +192,14 @@ export class MissionCompletionService {
 
           // 파일 업로드 ID 검증 (필요시)
           if (fileUploadIdFromMetadata) {
-            const fileUpload = await tx.fileUpload.findFirst({
+            const userFile = await tx.userFile.findFirst({
               where: {
                 id: fileUploadIdFromMetadata,
                 userId
               }
             });
 
-            if (!fileUpload) {
+            if (!userFile) {
               throw new NotFoundException('업로드된 파일을 찾을 수 없습니다');
             }
 

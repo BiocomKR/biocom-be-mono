@@ -2,11 +2,14 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { PrismaService } from '../common/services/prisma.service';
 import { Logger } from '@nestjs/common';
 import {
-  calculateDeliveryDate,
+  calculateDeliveryArrivalDate,
+  calculateDeliveryStartDate,
   calculateEndDate,
   formatDateToString,
   parseStringToDate,
-  stringToKSTDate
+  stringToKSTDate,
+  isValidStartDate,
+  getAvailableStartDates
 } from './utils/challenge-date.util';
 import {
   SetStartDateDto,
@@ -169,7 +172,8 @@ export class ChallengeService {
         include: {
           product: true,
           ticket: true
-        }
+        },
+        orderBy: { id: 'desc' }
       });
 
       if (!activeChallenge) {
@@ -183,93 +187,67 @@ export class ChallengeService {
 
       const productId = activeChallenge.productId;
       // activatedAt 기준으로 현재 챌린지 일차 계산
+      console.log('🔥 DEBUG - activatedAt from DB:', activeChallenge.activatedAt);
+      console.log('🔥 DEBUG - activatedAt ISO:', activeChallenge.activatedAt.toISOString());
       const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+      console.log('🔥 DEBUG - calculated currentDay:', currentDay);
       const weekNumber = Math.ceil(currentDay / 7);
       const challengeInfo = this.extractChallengeInfo(activeChallenge.product);
 
-      // 오늘의 미션 조회
-      const missions = await this.prisma.challengeMission.findMany({
+      // 오늘의 챌린지_미션 매핑 ID 조회
+      const todayMissions = await this.prisma.challengeMission.findMany({
         where: {
           productId,
           day: currentDay,
           isActive: true
         },
-        include: { mission: true },
+        select: {
+          id: true
+        },
         orderBy: { sortOrder: 'asc' }
       });
 
-      // 오늘의 설문 조회
-      const surveys = await this.prisma.challengeSurvey.findMany({
+      // 오늘의 챌린지_설문 매핑 정보 조회
+      const todaySurveys = await this.prisma.challengeSurvey.findMany({
         where: {
           productId,
           day: currentDay,
           isActive: true
         },
-        include: {
+        select: {
+          id: true,
+          day: true,
           survey: {
-            include: {
-              surveyQuestions: {
-                orderBy: { sortOrder: 'asc' }
-              }
+            select: {
+              type: true
             }
           }
-        }
-      });
-
-      // 오늘의 퀴즈 조회
-      const quizzes = await this.prisma.challengeQuiz.findMany({
-        where: {
-          productId,
-          day: currentDay,
-          isActive: true
         },
-        include: { quiz: true },
-        orderBy: { sortOrder: 'asc' }
+        orderBy: { day: 'asc' }
       });
-
-      // ⚠️ 컨텐츠 조회 제거됨
-      // - challenge_contents 테이블 제거로 인해 제거
-      // - Content.accessLevel 기반 접근 제어로 변경
-      // - 컨텐츠는 별도 Content API에서 조회
-
-      // ⚠️ 기록 항목 조회 제거됨
-      // - RecordItem 테이블 삭제로 인해 제거
-      // - 기록 관련 정보는 missions 테이블(type='RECORD')에서 관리
 
       const result = {
         // 기본 챌린지 정보
-        id: activeChallenge.id,
+        userChallengeId: activeChallenge.id,
+        productId: activeChallenge.productId,
         challenge: challengeInfo,
         activatedAt: activeChallenge.activatedAt,
         expiresAt: activeChallenge.expiresAt,
-        currentDay: activeChallenge.currentDay,
+        currentDay,
         totalPoints: activeChallenge.totalPoints,
         status: activeChallenge.status,
 
-        // 오늘의 활동 (통합)
-        todayActivities: {
-          currentDay,
-          todayDate: new Date(),
-          missions: missions.map(cm => ({
-            id: cm.id,
-            mission: cm.mission,
-            points: cm.points,
-            sortOrder: cm.sortOrder
-          })),
-          surveys: surveys.map(cs => ({
-            id: cs.id,
-            survey: cs.survey
-          })),
-          quizzes: quizzes.map(cq => ({
-            id: cq.id,
-            quiz: cq.quiz,
-            sortOrder: cq.sortOrder
-          }))
-        }
+        // 오늘의 활동 ID들
+        missionIds: todayMissions.map(m => m.id),
+        surveys: todaySurveys.map(s => ({
+          id: s.id,
+          day: s.day,
+          type: s.survey.type
+        }))
       };
 
-      this.logger.log(`사용자 ${userId}의 활성 챌린지 + 오늘 활동 조회 완료: ${challengeInfo.name} (${currentDay}일차)`);
-      this.logger.log(`- 미션 ${missions.length}개, 설문 ${surveys.length}개, 퀴즈 ${quizzes.length}개`);
+      this.logger.log(`사용자 ${userId}의 활성 챌린지 조회 완료: ${challengeInfo.name} (${currentDay}일차)`);
+      this.logger.log(`- 오늘의 미션 ${todayMissions.length}개, 설문 ${todaySurveys.length}개`);
       return { success: true, data: result };
     } catch (error) {
       this.logger.error('활성 챌린지 + 오늘 활동 조회 실패:', error);
@@ -516,15 +494,8 @@ export class ChallengeService {
       });
 
       // 오늘의 퀴즈 조회
-      const quizzes = await this.prisma.challengeQuiz.findMany({
-        where: {
-          productId,
-          day: currentDay,
-          isActive: true
-        },
-        include: { quiz: true },
-        orderBy: { sortOrder: 'asc' }
-      });
+      // ⚠️ ChallengeQuiz 테이블 미구현으로 임시 빈 배열 처리
+      const quizzes = [];
 
       // ⚠️ 컨텐츠 조회 제거됨
       // - challenge_contents 테이블 제거로 인해 제거
@@ -1159,7 +1130,8 @@ export class ChallengeService {
       const responseData: ChallengeScheduleResponseDto = {
         id: userChallenge.id,
         startDate: userChallenge.startDate ? formatDateToString(userChallenge.startDate) : null,
-        deliveryDate: userChallenge.deliveryDate ? formatDateToString(userChallenge.deliveryDate) : null,
+        deliveryStartDate: userChallenge.deliveryStartDate ? formatDateToString(userChallenge.deliveryStartDate) : null,
+        deliveryArrivalDate: userChallenge.deliveryArrivalDate ? formatDateToString(userChallenge.deliveryArrivalDate) : null,
         endDate: userChallenge.endDate ? formatDateToString(userChallenge.endDate) : null,
         isConfirmed: true, // 일정 설정 시 바로 확정됨
         canModify: false,   // 설정 후 수정 불가
@@ -1239,28 +1211,45 @@ export class ChallengeService {
         }
 
         // 4. 날짜 유효성 검증
-        const startDateString = setStartDateDto.startDate; // "2025-10-20"
+        const startDateString = setStartDateDto.startDate; // "2025-11-03"
         const startDate = parseStringToDate(startDateString);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        if (startDate < today) {
-          throw new BadRequestException('시작일은 오늘 이후여야 합니다');
+        // 4-1. 월요일인지 확인 & 다음주부터 3주간 범위인지 확인
+        if (!isValidStartDate(startDate, today)) {
+          const availableDates = getAvailableStartDates(today);
+          const availableDatesStr = availableDates.map(d => formatDateToString(d)).join(', ');
+          throw new BadRequestException(
+            `시작일은 다음주부터 3주간의 월요일만 선택 가능합니다. 선택 가능한 날짜: ${availableDatesStr}`
+          );
         }
 
-        // 5. 배송일과 종료일 계산 (로컬 Date로 계산)
-        const deliveryDate = calculateDeliveryDate(startDate);
-        const endDate = calculateEndDate(startDate);
+        // 5. 배송일과 종료일 계산 (로컬 Date로 계산, 공휴일 체크 포함)
+        const deliveryArrivalDate = await calculateDeliveryArrivalDate(startDate); // 시작일 전주 금요일 (공휴일 체크)
+        const deliveryStartDate = await calculateDeliveryStartDate(deliveryArrivalDate); // 배송도착일 2일전 (공휴일 체크)
+        const endDate = calculateEndDate(startDate); // 시작일 +20일
 
         // 6. KST 날짜/시간 객체 생성 (Prisma 저장용)
-        const [startYear, startMonth, startDay] = startDateString.split('-').map(Number);
         const startDateKST = stringToKSTDate(startDateString, 0, 0, 0); // 00:00:00
 
-        const deliveryYear = deliveryDate.getFullYear();
-        const deliveryMonth = deliveryDate.getMonth() + 1;
-        const deliveryDay = deliveryDate.getDate();
-        const deliveryDateKST = stringToKSTDate(`${deliveryYear}-${String(deliveryMonth).padStart(2, '0')}-${String(deliveryDay).padStart(2, '0')}`);
+        // 배송시작일 KST
+        const deliveryStartYear = deliveryStartDate.getFullYear();
+        const deliveryStartMonth = deliveryStartDate.getMonth() + 1;
+        const deliveryStartDay = deliveryStartDate.getDate();
+        const deliveryStartDateKST = stringToKSTDate(
+          `${deliveryStartYear}-${String(deliveryStartMonth).padStart(2, '0')}-${String(deliveryStartDay).padStart(2, '0')}`
+        );
 
+        // 배송도착예정일 KST
+        const deliveryArrivalYear = deliveryArrivalDate.getFullYear();
+        const deliveryArrivalMonth = deliveryArrivalDate.getMonth() + 1;
+        const deliveryArrivalDay = deliveryArrivalDate.getDate();
+        const deliveryArrivalDateKST = stringToKSTDate(
+          `${deliveryArrivalYear}-${String(deliveryArrivalMonth).padStart(2, '0')}-${String(deliveryArrivalDay).padStart(2, '0')}`
+        );
+
+        // 종료일 KST
         const endYear = endDate.getFullYear();
         const endMonth = endDate.getMonth() + 1;
         const endDay = endDate.getDate();
@@ -1282,7 +1271,8 @@ export class ChallengeService {
             ticket: { connect: { id: ticket.id } },
             activatedAt: nowKST,
             startDate: startDateKST,
-            deliveryDate: deliveryDateKST,
+            deliveryStartDate: deliveryStartDateKST,
+            deliveryArrivalDate: deliveryArrivalDateKST,
             endDate: endDateKST,
             expiresAt: endDateKST,
             purchasedAt: ticket.purchaseDate,
@@ -1301,7 +1291,8 @@ export class ChallengeService {
         const responseData: ChallengeScheduleResponseDto = {
           id: userChallenge.id,
           startDate: formatDateToString(userChallenge.startDate!),
-          deliveryDate: formatDateToString(userChallenge.deliveryDate!),
+          deliveryStartDate: formatDateToString(userChallenge.deliveryStartDate!),
+          deliveryArrivalDate: formatDateToString(userChallenge.deliveryArrivalDate!),
           endDate: formatDateToString(userChallenge.endDate!),
           isConfirmed: true,
           canModify: false,
@@ -1309,7 +1300,7 @@ export class ChallengeService {
           createdAt: userChallenge.createdAt
         };
 
-        this.logger.log(`챌린지 시작일 설정 완료 및 활성화 - 시작일: ${responseData.startDate}, 배송일: ${responseData.deliveryDate}, 종료일: ${responseData.endDate}, 상태: ACTIVE`);
+        this.logger.log(`챌린지 시작일 설정 완료 및 활성화 - 시작일: ${responseData.startDate}, 배송시작일: ${responseData.deliveryStartDate}, 배송도착일: ${responseData.deliveryArrivalDate}, 종료일: ${responseData.endDate}, 상태: ACTIVE`);
         return { success: true, data: responseData };
       });
     } catch (error) {

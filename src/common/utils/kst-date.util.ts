@@ -99,14 +99,17 @@ export const getNowKST = (): Date => {
  * calculateChallengeDay(new Date('2025-10-22')) // returns 1
  */
 export const calculateChallengeDay = (activatedAt: Date): number => {
-  // DB에서 가져온 activatedAt는 이미 KST로 저장되어 있음
-  // 따라서 그대로 사용 (UTC 변환 없이)
   const now = getNowKST();
 
+  // DB에서 읽은 날짜의 년월일만 추출 (시간 무시)
+  // Prisma가 UTC로 읽어오지만, 우리는 KST로 저장했으므로 날짜 부분만 사용
+  const activatedDateStr = activatedAt.toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  const [year, month, day] = activatedDateStr.split('-').map(Number);
+
   // 날짜만 비교 (시간은 무시)
-  // activatedAt는 DB에서 KST로 저장된 값이므로 그대로 사용
-  const nowDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startDate = new Date(activatedAt.getFullYear(), activatedAt.getMonth(), activatedAt.getDate());
+  // ⚠️ UTC 메서드 사용해야 타임존 오프셋 문제 없음
+  const nowDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const startDate = new Date(Date.UTC(year, month - 1, day)); // month는 0부터 시작
 
   // 경과 일수 계산 (밀리초 -> 일)
   const diffTime = nowDate.getTime() - startDate.getTime();

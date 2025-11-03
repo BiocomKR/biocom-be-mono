@@ -147,22 +147,33 @@ export class StatisticsService {
   /**
    * 이너뷰티 통계 조회 (형님 정확한 데이터셋 기준)
    * @param userId 사용자 ID
+   * @param startDate 시작일 (YYYY-MM-DD)
+   * @param endDate 종료일 (YYYY-MM-DD)
    */
-  async getBeautyStatistics(userId: number): Promise<BeautyStatisticsDto> {
+  async getBeautyStatistics(userId: number, startDate: string, endDate: string): Promise<BeautyStatisticsDto> {
     try {
-      this.logger.log(`이너뷰티 통계 조회 시작 - 사용자: ${userId}`);
+      this.logger.log(`이너뷰티 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
 
-      const { startDate, endDate } = this.getWeekDateRange();
-      const { startDate: prevStartDate, endDate: prevEndDate } = this.getPreviousWeekDateRange();
+      // 이전 주 날짜 계산 (제공된 날짜 기준으로 -7일)
+      const currentStartDate = new Date(startDate);
+      const prevStartDate = new Date(currentStartDate);
+      prevStartDate.setDate(currentStartDate.getDate() - 7);
+
+      const currentEndDate = new Date(endDate);
+      const prevEndDate = new Date(currentEndDate);
+      prevEndDate.setDate(currentEndDate.getDate() - 7);
+
+      const prevStartDateStr = prevStartDate.toISOString().split('T')[0];
+      const prevEndDateStr = prevEndDate.toISOString().split('T')[0];
 
       // 이번 주 뷰티 기록 조회
       const currentWeekRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordCode: 'BEAUTY',
+          recordType: 'BEAUTY',
           date: {
-            gte: startDate,
-            lte: endDate
+            gte: new Date(startDate),
+            lte: new Date(endDate)
           }
         },
         orderBy: { date: 'asc' }
@@ -172,17 +183,17 @@ export class StatisticsService {
       const previousWeekRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordCode: 'BEAUTY',
+          recordType: 'BEAUTY',
           date: {
-            gte: prevStartDate,
-            lte: prevEndDate
+            gte: new Date(prevStartDateStr),
+            lte: new Date(prevEndDateStr)
           }
         },
         orderBy: { date: 'asc' }
       });
 
       const weekDates = this.generateWeekDates(startDate);
-      const prevWeekDates = this.generateWeekDates(prevStartDate);
+      const prevWeekDates = this.generateWeekDates(prevStartDateStr);
 
       // 이번 주 데이터 분석
       const currentWeekAnalysis = this.analyzeBeautyDataForCorrectStructure(currentWeekRecords, weekDates);
@@ -246,7 +257,10 @@ export class StatisticsService {
 
     // 일별 데이터 처리
     weekDates.forEach(date => {
-      const record = records.find(r => r.date === date);
+      const record = records.find(r => {
+        const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+        return recordDate === date;
+      });
 
       let dayInnerScore = 0;
       let dayOuterScore = 0;
@@ -257,48 +271,32 @@ export class StatisticsService {
 
         // 이너뷰티 질문 1-4 처리
         if (innerBeauty && Array.isArray(innerBeauty)) {
-          let innerDayTotal = 0;
-          let innerCount = 0;
-
           innerBeauty.forEach(item => {
             if (item.no && item.score) {
-              const questionScore = Math.round((item.score / 5 * 100));
-
               // 질문별 누적
               if (item.no === 1) innerQ1Total += item.score;
               else if (item.no === 2) innerQ2Total += item.score;
               else if (item.no === 3) innerQ3Total += item.score;
               else if (item.no === 4) innerQ4Total += item.score;
 
-              innerDayTotal += questionScore;
-              innerCount++;
+              dayInnerScore += item.score;
             }
           });
-
-          dayInnerScore = innerCount > 0 ? Math.round(innerDayTotal / innerCount) : 0;
         }
 
         // 아우터뷰티 질문 1-4 처리
         if (outerBeauty && Array.isArray(outerBeauty)) {
-          let outerDayTotal = 0;
-          let outerCount = 0;
-
           outerBeauty.forEach(item => {
             if (item.no && item.score) {
-              const questionScore = Math.round((item.score / 5 * 100));
-
               // 질문별 누적
               if (item.no === 1) outerQ1Total += item.score;
               else if (item.no === 2) outerQ2Total += item.score;
               else if (item.no === 3) outerQ3Total += item.score;
               else if (item.no === 4) outerQ4Total += item.score;
 
-              outerDayTotal += questionScore;
-              outerCount++;
+              dayOuterScore += item.score;
             }
           });
-
-          dayOuterScore = outerCount > 0 ? Math.round(outerDayTotal / outerCount) : 0;
         }
 
         totalInnerScore += dayInnerScore;
@@ -313,24 +311,25 @@ export class StatisticsService {
       outerWeekScore.push({ date, value: dayOuterScore.toString() });
     });
 
-    // 주간 평균 계산
-    const innerScore = recordCount > 0 ? Math.round(totalInnerScore / recordCount) : 0;
-    const outerScore = recordCount > 0 ? Math.round(totalOuterScore / recordCount) : 0;
+    // 주간 평균 계산 (검색일 수 기준)
+    const daysCount = weekDates.length;
+    const innerScore = daysCount > 0 ? Math.round(totalInnerScore / daysCount) : 0;
+    const outerScore = daysCount > 0 ? Math.round(totalOuterScore / daysCount) : 0;
     const summaryScore = Math.round((innerScore + outerScore) / 2);
 
-    // 답변별 평균 점수 계산 (소수점 반올림)
+    // 답변별 평균 점수 계산 (검색일 수 기준, 소수점 반올림)
     const innerAnswers = [
-      { no: 1, score: recordCount > 0 ? Math.round((innerQ1Total / recordCount) / 5 * 100) : 0 },
-      { no: 2, score: recordCount > 0 ? Math.round((innerQ2Total / recordCount) / 5 * 100) : 0 },
-      { no: 3, score: recordCount > 0 ? Math.round((innerQ3Total / recordCount) / 5 * 100) : 0 },
-      { no: 4, score: recordCount > 0 ? Math.round((innerQ4Total / recordCount) / 5 * 100) : 0 }
+      { no: 1, score: daysCount > 0 ? Math.round(innerQ1Total / daysCount) : 0 },
+      { no: 2, score: daysCount > 0 ? Math.round(innerQ2Total / daysCount) : 0 },
+      { no: 3, score: daysCount > 0 ? Math.round(innerQ3Total / daysCount) : 0 },
+      { no: 4, score: daysCount > 0 ? Math.round(innerQ4Total / daysCount) : 0 }
     ];
 
     const outerAnswers = [
-      { no: 1, score: recordCount > 0 ? Math.round((outerQ1Total / recordCount) / 5 * 100) : 0 },
-      { no: 2, score: recordCount > 0 ? Math.round((outerQ2Total / recordCount) / 5 * 100) : 0 },
-      { no: 3, score: recordCount > 0 ? Math.round((outerQ3Total / recordCount) / 5 * 100) : 0 },
-      { no: 4, score: recordCount > 0 ? Math.round((outerQ4Total / recordCount) / 5 * 100) : 0 }
+      { no: 1, score: daysCount > 0 ? Math.round(outerQ1Total / daysCount) : 0 },
+      { no: 2, score: daysCount > 0 ? Math.round(outerQ2Total / daysCount) : 0 },
+      { no: 3, score: daysCount > 0 ? Math.round(outerQ3Total / daysCount) : 0 },
+      { no: 4, score: daysCount > 0 ? Math.round(outerQ4Total / daysCount) : 0 }
     ];
 
     return {
@@ -363,7 +362,7 @@ export class StatisticsService {
       const dietRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordCode: 'DIET',
+          recordType: 'DIET',
           date: {
             gte: startDate,
             lte: endDate
@@ -459,7 +458,7 @@ export class StatisticsService {
       const supplementRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordCode: 'SUPPLEMENT',
+          recordType: 'SUPPLEMENT',
           date: {
             gte: startDate,
             lte: endDate
@@ -550,7 +549,7 @@ export class StatisticsService {
       const fastingRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordCode: 'FASTING',
+          recordType: 'FASTING',
           date: {
             gte: startDate,
             lte: endDate
@@ -645,7 +644,7 @@ export class StatisticsService {
       const sleepRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordCode: 'SLEEP',
+          recordType: 'SLEEP',
           date: {
             gte: startDate,
             lte: endDate
@@ -748,7 +747,7 @@ export class StatisticsService {
       const activityRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordCode: 'ACTIVITY',
+          recordType: 'ACTIVITY',
           date: {
             gte: startDate,
             lte: endDate
@@ -858,7 +857,7 @@ export class StatisticsService {
         sleepStats,
         activityStats
       ] = await Promise.all([
-        this.getBeautyStatistics(userId),
+        this.getBeautyStatistics(userId, startDate, endDate),
         this.getDietStatistics(userId),
         this.getSupplementStatistics(userId),
         this.getFastingStatistics(userId),

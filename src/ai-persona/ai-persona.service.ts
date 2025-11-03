@@ -181,7 +181,7 @@ export class AiPersonaService {
 
     // 해당 페르소나를 사용하는 사용자가 있는지 확인
     const usersUsingPersona = await this.prisma.user.count({
-      where: { characterId: id }
+      where: { aiPersonaId: id }
     });
 
     if (usersUsingPersona > 0) {
@@ -224,6 +224,19 @@ export class AiPersonaService {
       description: persona.description,
       personality: persona.personality,
       personaUrl: persona.personaUrl,
+      thumbnailUrl: persona.thumbnailUrl,
+      gender: persona.gender,
+      introTitle: persona.introTitle,
+      introContent: persona.introContent,
+      hashtags: persona.hashtags,
+      featureTitle: persona.featureTitle,
+      featureContent: persona.featureContent,
+      speechTitle: persona.speechTitle,
+      speechContent: persona.speechContent,
+      speechImageUrl: persona.speechImageUrl,
+      intimacyTitle: persona.intimacyTitle,
+      intimacyContent: persona.intimacyContent,
+      intimacyImageUrl: persona.intimacyImageUrl,
       isActive: persona.isActive,
       sortOrder: persona.sortOrder,
       createdAt: persona.createdAt.toISOString(),

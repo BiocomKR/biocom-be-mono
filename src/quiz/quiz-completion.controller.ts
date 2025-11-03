@@ -62,4 +62,33 @@ export class QuizCompletionController {
     const userId = req.user?.userId || req.user?.sub || req.user?.id;
     return this.quizCompletionService.completeQuiz(userId, dto);
   }
+
+  /**
+   * 강의 퀴즈 답변 제출 및 완료 처리
+   * @description 강의 연결 퀴즈 답변을 제출하고 채점하여 포인트를 적립합니다 (최초 1회)
+   */
+  @Post('lecture/complete')
+  @ApiOperation({
+    summary: '강의 퀴즈 답변 제출',
+    description: '강의 연결 퀴즈 답변을 제출합니다. 최초 1회에 한해 300점이 지급됩니다 (정답/오답 무관).'
+  })
+  @ApiResponse({
+    status: 201,
+    description: '강의 퀴즈 답변 제출 성공'
+  })
+  @ApiResponse({
+    status: 400,
+    description: '잘못된 요청 (이미 답변한 퀴즈 등)'
+  })
+  @ApiResponse({
+    status: 404,
+    description: '퀴즈를 찾을 수 없음'
+  })
+  async completeLectureQuiz(
+    @Body() dto: { quizId: number; selectedAnswer: number },
+    @Request() req: any
+  ) {
+    const userId = req.user?.userId || req.user?.sub || req.user?.id;
+    return this.quizCompletionService.completeLectureQuiz(userId, dto.quizId, dto.selectedAnswer);
+  }
 }

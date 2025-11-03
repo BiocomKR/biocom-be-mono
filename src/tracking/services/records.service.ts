@@ -92,7 +92,7 @@ export class RecordsService {
    * @param dto 뷰티 기록 데이터 (이너뷰티 4개 + 아우터뷰티 4개)
    */
   async createBeautyRecord(userId: number, dto: CreateBeautyRecordDto) {
-    const targetDate = dto.date || getKoreanToday();
+    const targetDate = getKoreanToday();
 
     // 이너뷰티 점수 계산
     const innerBeautyScore = dto.innerBeauty.reduce((sum, item) => sum + item.score, 0);
@@ -527,7 +527,7 @@ export class RecordsService {
   private async createBeautyRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     // 중복 체크
     const existingRecord = await tx.userRecord.findFirst({
-      where: { userId, recordCode: 'BEAUTY', date },
+      where: { userId, recordType: 'BEAUTY', date: new Date(date) },
     });
 
     if (existingRecord) {
@@ -635,9 +635,10 @@ export class RecordsService {
       data: {
         userId,
         userChallengeId: activeChallenge?.id || null,
-        recordCode,
-        date,
+        recordType: recordCode,
+        date: new Date(date),
         metadata,
+        createdAt: getNowKST(),
       },
     });
 

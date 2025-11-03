@@ -367,4 +367,116 @@ export class QuizCompletionService {
       throw error;
     }
   }
+
+  /**
+   * 강의 퀴즈 완료 처리
+   * @param userId 사용자 ID
+   * @param quizId 퀴즈 ID
+   * @param selectedAnswer 선택한 답변 번호
+   * @description 강의 연결 퀴즈를 풀고 포인트를 지급합니다 (최초 1회, 정답/오답 무관)
+   */
+  async completeLectureQuiz(userId: number, quizId: number, selectedAnswer: number) {
+    try {
+      this.logger.log(`강의 퀴즈 완료 처리 시작 - 사용자: ${userId}, 퀴즈: ${quizId}`);
+
+      return await this.prisma.$transaction(async (tx) => {
+        // 1️⃣ 퀴즈 조회
+        const quiz = await tx.quiz.findFirst({
+          where: {
+            id: quizId,
+            isActive: true
+          },
+          include: {
+            content: true, // 강의 정보
+            lectureQuizzes: {
+              include: {
+                content: true
+              }
+            }
+          }
+        });
+
+        if (!quiz) {
+          throw new NotFoundException('퀴즈를 찾을 수 없습니다');
+        }
+
+        // 2️⃣ 강의 연결 확인 (contentId 또는 lectureQuizzes를 통해)
+        const linkedContent = quiz.content || quiz.lectureQuizzes?.[0]?.content;
+
+        if (!linkedContent) {
+          throw new BadRequestException('강의와 연결되지 않은 퀴즈입니다');
+        }
+
+        // 3️⃣ 답변 번호 유효성 검증
+        if (selectedAnswer < 1 || selectedAnswer > (quiz.options as any[]).length) {
+          throw new BadRequestException('올바르지 않은 답변 번호입니다');
+        }
+
+        // 4️⃣ 포인트 지급 여부 확인 (최초 1회만 포인트, 재시도는 허용)
+        const pointsAlreadyGiven = await tx.quizAttempt.findFirst({
+          where: {
+            userId,
+            quizId,
+            pointsEarned: { gt: 0 }
+          }
+        });
+
+        // 5️⃣ 정답 채점
+        const isCorrect = selectedAnswer === quiz.correctAnswer;
+
+        // 6️⃣ 포인트 계산 (최초 1회, 정답/오답 무관 300점)
+        const pointsEarned = pointsAlreadyGiven ? 0 : (linkedContent.points || 300);
+
+        const now = getNowKST();
+
+        // 7️⃣ 퀴즈 시도 기록 저장 (매 시도마다 기록, 재도전 허용)
+        await tx.quizAttempt.create({
+          data: {
+            userId,
+            quizId,
+            contentId: linkedContent.id,
+            selectedAnswer,
+            isCorrect,
+            pointsEarned,
+            createdAt: now
+          }
+        });
+
+        // 8️⃣ 포인트 지급 (최초 1회만)
+        if (pointsEarned > 0) {
+          await this.pointService.addPoints(
+            userId,
+            pointsEarned,
+            `강의 퀴즈 완료: ${linkedContent.title}`,
+            'QUIZ',
+            quizId
+          );
+        }
+
+        const result = {
+          quiz: {
+            id: quiz.id,
+            question: quiz.question,
+            explanation: quiz.explanation
+          },
+          content: {
+            id: linkedContent.id,
+            title: linkedContent.title
+          },
+          selectedAnswer,
+          correctAnswer: quiz.correctAnswer,
+          isCorrect,
+          pointsEarned,
+          answeredAt: now
+        };
+
+        this.logger.log(`강의 퀴즈 완료 성공 - 퀴즈: ${quiz.id}, 정답: ${isCorrect}, 포인트: ${pointsEarned}`);
+        return { success: true, data: result };
+      });
+
+    } catch (error) {
+      this.logger.error('강의 퀴즈 완료 처리 실패:', error);
+      throw error;
+    }
+  }
 }

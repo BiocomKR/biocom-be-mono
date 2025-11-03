@@ -77,5 +77,5 @@ export class UpdateUserDto {
   @IsOptional()
   @IsInt({ message: '페르소나 ID는 정수여야 합니다.' })
   @Min(1, { message: '페르소나 ID는 1 이상이어야 합니다.' })
-  characterId?: number;
+  aiPersonaId?: number;
 }

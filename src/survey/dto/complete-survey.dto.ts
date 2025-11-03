@@ -19,13 +19,13 @@ class SurveyAnswerDto {
 }
 
 export class CompleteSurveyDto {
-  @ApiProperty({ 
+  @ApiProperty({
     description: '설문 타입',
-    enum: ['before', 'after'],
-    example: 'before'
+    enum: ['BEFORE', 'AFTER'],
+    example: 'BEFORE'
   })
-  @IsEnum(['before', 'after'])
-  type: 'before' | 'after';
+  @IsEnum(['BEFORE', 'AFTER'])
+  type: 'BEFORE' | 'AFTER';
 
   @ApiProperty({ 
     description: '설문 답변 목록 (20개 질문에 대한 답변)',
