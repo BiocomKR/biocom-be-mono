@@ -112,13 +112,29 @@ export class StatisticsController {
     summary: '식단 상세 통계 조회',
     description: '음식물과민식품, 고포드맵식품, 가공식품 섭취 현황과 식단점수 1주일 통계를 조회합니다.',
   })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-10-27',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-11-02',
+  })
   @ApiResponse({
     status: 200,
     description: '식단 통계 조회 성공',
     type: DietStatisticsResponseDto,
   })
-  async getDietStatistics(@Request() req: any) {
-    const data = await this.statisticsService.getDietStatistics(req.user.id);
+  async getDietStatistics(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const data = await this.statisticsService.getDietStatistics(req.user.id, startDate, endDate);
     return {
       success: true,
       data,

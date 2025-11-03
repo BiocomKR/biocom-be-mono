@@ -118,7 +118,7 @@ export class RecordsService {
    * @param dto 식단 기록 데이터 (단일 식품 등록)
    */
   async createDietRecord(userId: number, dto: CreateDietRecordDto) {
-    const targetDate = dto.date || getKoreanToday();
+    const targetDate = getKoreanToday();
 
     // 과민식품 개수 계산 (레벨과 무관하게 개수만)
     const allergyScore = dto.allergyFoods.length;
@@ -538,17 +538,46 @@ export class RecordsService {
   }
 
   /**
-   * 식단 기록 구현 (중복 허용, 1일 1회 포인트)
+   * 식단 기록 구현
+   * 아침/점심/저녁: 각각 1일 1회만 허용, 첫 기록 시 100점
+   * 간식: 1일 3회까지 허용, 포인트 없음
+   * 야식: 1일 3회까지 허용, 포인트 없음
    */
   private async createDietRecordImpl(tx: any, userId: number, date: string, metadata: any) {
-    // 포인트 지급 여부 확인 (해당 날짜에 첫 번째 기록인지)
-    const existingDietRecord = await tx.userRecord.findFirst({
-      where: { userId, recordCode: 'DIET', date },
+    const dietType = metadata.diet;
+
+    // 오늘 날짜의 모든 식단 기록 조회
+    const todayRecords = await tx.userRecord.findMany({
+      where: {
+        userId,
+        recordType: 'DIET',
+        date: new Date(date)
+      }
     });
 
-    const pointsToAward = existingDietRecord ? 0 : 100;
+    // 같은 diet 타입 개수 확인
+    const sameDietTypeCount = todayRecords.filter(r => r.metadata?.diet === dietType).length;
 
-    return await this.createRecordBase(tx, userId, 'DIET', date, metadata, pointsToAward);
+    // 아침/점심/저녁: 1번만 허용
+    if (dietType === 'BREAKFAST' || dietType === 'LUNCH' || dietType === 'DINNER') {
+      if (sameDietTypeCount >= 1) {
+        throw new ConflictException(`오늘 이미 ${dietType} 기록을 완료했습니다`);
+      }
+      // 첫 기록이므로 100점
+      return await this.createRecordBase(tx, userId, 'DIET', date, metadata, 100);
+    }
+
+    // 간식/야식: 3번까지 허용
+    if (dietType === 'SNACK' || dietType === 'MIDNIGHT_SNACK') {
+      if (sameDietTypeCount >= 3) {
+        throw new ConflictException(`오늘 ${dietType} 기록은 최대 3회까지만 가능합니다`);
+      }
+      // 포인트 없음
+      return await this.createRecordBase(tx, userId, 'DIET', date, metadata, 0);
+    }
+
+    // 그 외 타입은 일단 허용 (포인트 없음)
+    return await this.createRecordBase(tx, userId, 'DIET', date, metadata, 0);
   }
 
   /**

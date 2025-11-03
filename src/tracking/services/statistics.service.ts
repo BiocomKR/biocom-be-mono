@@ -352,20 +352,18 @@ export class StatisticsService {
    * 식단 통계 조회 (새로운 구조)
    * @param userId 사용자 ID
    */
-  async getDietStatistics(userId: number): Promise<DietStatisticsDto> {
+  async getDietStatistics(userId: number, startDate: string, endDate: string): Promise<DietStatisticsDto> {
     try {
-      this.logger.log(`식단 통계 조회 시작 - 사용자: ${userId}`);
+      this.logger.log(`식단 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
 
-      const { startDate, endDate } = this.getWeekDateRange();
-
-      // 1주일간 식단 기록 조회
+      // 식단 기록 조회
       const dietRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
           recordType: 'DIET',
           date: {
-            gte: startDate,
-            lte: endDate
+            gte: new Date(startDate),
+            lte: new Date(endDate)
           }
         },
         orderBy: { date: 'asc' }
@@ -384,7 +382,10 @@ export class StatisticsService {
 
       // 일별 데이터 계산
       weekDates.forEach(date => {
-        const dailyRecords = dietRecords.filter(r => r.date === date);
+        const dailyRecords = dietRecords.filter(r => {
+          const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+          return recordDate === date;
+        });
 
         let dayAllergyScore = 0;
         let dayHighFodmapCount = 0;
@@ -407,8 +408,8 @@ export class StatisticsService {
         totalProcessedCount += dayProcessedCount;
       });
 
-      // 전체 요약 점수 계산 (임시 공식)
-      const summaryScore = Math.round((totalAllergyScore + totalHighFodmapCount + totalProcessedCount) / 3);
+      // 전체 요약 점수 계산 (합계)
+      const summaryScore = totalAllergyScore + totalHighFodmapCount + totalProcessedCount;
 
       this.logger.log(`식단 통계 조회 완료 - 사용자: ${userId}, 요약점수: ${summaryScore}`);
 
@@ -858,7 +859,7 @@ export class StatisticsService {
         activityStats
       ] = await Promise.all([
         this.getBeautyStatistics(userId, startDate, endDate),
-        this.getDietStatistics(userId),
+        this.getDietStatistics(userId, startDate, endDate),
         this.getSupplementStatistics(userId),
         this.getFastingStatistics(userId),
         this.getSleepStatistics(userId),

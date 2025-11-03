@@ -134,15 +134,6 @@ export class CreateDietRecordDto {
   @IsArray()
   @IsString({ each: true })
   processedFoods: string[];
-
-  @ApiProperty({
-    description: '기록 날짜 (YYYY-MM-DD 형식)',
-    example: '2025-09-17',
-    required: false
-  })
-  @IsOptional()
-  @IsDateString()
-  date?: string;
 }
 
 /**
