@@ -81,6 +81,7 @@ export class AllergyFoodDto {
 /**
  * 식단 기록 DTO (새로운 구조)
  * 단일 식품을 한 번에 등록하는 방식
+ * isFasting이 true인 경우 식품 정보 없이 공복 식사 기록 가능
  */
 export class CreateDietRecordDto {
   @ApiProperty({
@@ -91,9 +92,18 @@ export class CreateDietRecordDto {
   @IsString()
   diet: DietType;
 
-  @ApiProperty({ description: '식품명', example: '무화과 샐러드' })
+  @ApiProperty({
+    description: '공복 여부 (true인 경우 식품 정보 없이 저장)',
+    example: false,
+    required: false
+  })
+  @IsOptional()
+  isFasting?: boolean;
+
+  @ApiProperty({ description: '식품명', example: '무화과 샐러드', required: false })
+  @IsOptional()
   @IsString()
-  foodName: string;
+  foodName?: string;
 
   @ApiProperty({
     description: '식품 이미지 URL',
@@ -110,30 +120,36 @@ export class CreateDietRecordDto {
     example: [
       { name: '오징어', level: 4 },
       { name: '밀가루', level: 3 }
-    ]
+    ],
+    required: false
   })
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => AllergyFoodDto)
-  allergyFoods: AllergyFoodDto[];
+  allergyFoods?: AllergyFoodDto[];
 
   @ApiProperty({
     description: '고포드맵식품 목록',
     type: [String],
-    example: ['사과', '우유']
+    example: ['사과', '우유'],
+    required: false
   })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  highFodmapFoods: string[];
+  highFodmapFoods?: string[];
 
   @ApiProperty({
     description: '가공식품 목록',
     type: [String],
-    example: ['젤리', '사탕']
+    example: ['젤리', '사탕'],
+    required: false
   })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  processedFoods: string[];
+  processedFoods?: string[];
 }
 
 /**
@@ -268,48 +284,42 @@ export class CustomSupplementDto {
 
 /**
  * 간헐적 단식 기록 DTO
- * 공복 시작/종료 시간 기록
+ * 공복 시작/종료 날짜+시간 기록
  */
 export class CreateFastingRecordDto {
-  @ApiProperty({ description: '공복 시작 시간', example: '20:00' })
+  @ApiProperty({
+    description: '공복 시작 날짜+시간 (YYYY-MM-DD HH:mm:ss 형식, 어제 또는 오늘만 가능)',
+    example: '2025-11-02 20:00:00'
+  })
   @IsString()
-  startTime: string;
-
-  @ApiProperty({ description: '공복 종료 시간', example: '12:00' })
-  @IsString()
-  endTime: string;
+  startDateTime: string;
 
   @ApiProperty({
-    description: '기록 날짜 (YYYY-MM-DD 형식)',
-    example: '2024-01-15',
-    required: false
+    description: '공복 종료 날짜+시간 (YYYY-MM-DD HH:mm:ss 형식, 오늘만 가능)',
+    example: '2025-11-03 12:00:00'
   })
-  @IsOptional()
-  @IsDateString()
-  date?: string;
+  @IsString()
+  endDateTime: string;
 }
 
 /**
  * 수면 기록 DTO
- * 잠든 시간과 기상 시간 기록
+ * 잠든 시간과 기상 시간 날짜+시간 기록
  */
 export class CreateSleepRecordDto {
-  @ApiProperty({ description: '잠든 시간', example: '23:30' })
+  @ApiProperty({
+    description: '잠든 날짜+시간 (YYYY-MM-DD HH:mm:ss 형식, 어제 또는 오늘만 가능)',
+    example: '2025-11-02 23:30:00'
+  })
   @IsString()
-  bedTime: string;
-
-  @ApiProperty({ description: '기상 시간', example: '07:00' })
-  @IsString()
-  wakeTime: string;
+  bedDateTime: string;
 
   @ApiProperty({
-    description: '기록 날짜 (YYYY-MM-DD 형식)',
-    example: '2024-01-15',
-    required: false
+    description: '기상 날짜+시간 (YYYY-MM-DD HH:mm:ss 형식, 오늘만 가능)',
+    example: '2025-11-03 07:00:00'
   })
-  @IsOptional()
-  @IsDateString()
-  date?: string;
+  @IsString()
+  wakeDateTime: string;
 }
 
 /**

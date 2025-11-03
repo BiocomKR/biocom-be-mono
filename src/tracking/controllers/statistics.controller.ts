@@ -174,13 +174,29 @@ export class StatisticsController {
     summary: '간헐적단식 상세 통계 조회',
     description: '간헐적단식 평균시간, 일별 단식시간, 16시간 목표 달성률의 1주일 통계를 조회합니다.',
   })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-10-27',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-11-02',
+  })
   @ApiResponse({
     status: 200,
     description: '간헐적단식 통계 조회 성공',
     type: FastingStatisticsResponseDto,
   })
-  async getFastingStatistics(@Request() req: any) {
-    const data = await this.statisticsService.getFastingStatistics(req.user.id);
+  async getFastingStatistics(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const data = await this.statisticsService.getFastingStatistics(req.user.id, startDate, endDate);
     return {
       success: true,
       data,
@@ -197,13 +213,29 @@ export class StatisticsController {
     summary: '수면 상세 통계 조회',
     description: '수면 평균시간, 일별 수면시간, 8시간 목표 달성률의 1주일 통계를 조회합니다.',
   })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-10-27',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-11-02',
+  })
   @ApiResponse({
     status: 200,
     description: '수면 통계 조회 성공',
     type: SleepStatisticsResponseDto,
   })
-  async getSleepStatistics(@Request() req: any) {
-    const data = await this.statisticsService.getSleepStatistics(req.user.id);
+  async getSleepStatistics(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const data = await this.statisticsService.getSleepStatistics(req.user.id, startDate, endDate);
     return {
       success: true,
       data,

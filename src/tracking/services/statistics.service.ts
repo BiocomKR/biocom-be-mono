@@ -539,12 +539,9 @@ export class StatisticsService {
    * 간헐적단식 통계 조회 (형님 데이터셋 기준)
    * @param userId 사용자 ID
    */
-  async getFastingStatistics(userId: number): Promise<FastingStatisticsDto> {
+  async getFastingStatistics(userId: number, startDate: string, endDate: string): Promise<FastingStatisticsDto> {
     try {
-      this.logger.log(`간헐적단식 통계 조회 시작 - 사용자: ${userId}`);
-
-      // 7일간 기간 설정 (한국시간)
-      const { startDate, endDate } = this.getWeekDateRange();
+      this.logger.log(`간헐적단식 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
 
       // 간헐적단식 기록 조회 (FASTING)
       const fastingRecords = await this.prisma.userRecord.findMany({
@@ -552,8 +549,8 @@ export class StatisticsService {
           userId,
           recordType: 'FASTING',
           date: {
-            gte: startDate,
-            lte: endDate
+            gte: new Date(startDate),
+            lte: new Date(endDate)
           }
         },
         orderBy: {
@@ -561,34 +558,37 @@ export class StatisticsService {
         }
       });
 
-      // 7일 전체 날짜 배열 생성
+      // 주간 날짜 배열 생성
       const weekDates = this.generateWeekDates(startDate);
 
       // 주간 점수 데이터 생성
       const weekScore = weekDates.map(date => {
-        const record = fastingRecords.find(r => r.date === date);
+        const record = fastingRecords.find(r => {
+          const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+          return recordDate === date;
+        });
 
         if (!record || !record.metadata) {
           return {
             date,
-            startTime: '00:00',
-            endTime: '12:00',
+            startDateTime: `${date} 00:00:00`,
+            endDateTime: `${date} 12:00:00`,
             value: '0',
             isCompleted: false
           };
         }
 
         const metadata = record.metadata as any;
-        const startTime = metadata.startTime || '00:00';
-        const endTime = metadata.endTime || '12:00';
+        const startDateTime = metadata.startDateTime || `${date} 00:00:00`;
+        const endDateTime = metadata.endDateTime || `${date} 12:00:00`;
         const fastingHours = metadata.fastingHours || 0;
         const value = fastingHours.toString();
         const isCompleted = fastingHours >= 16; // 16시간 이상일 때 완료
 
         return {
           date,
-          startTime,
-          endTime,
+          startDateTime,
+          endDateTime,
           value,
           isCompleted
         };
@@ -596,11 +596,12 @@ export class StatisticsService {
 
       // 평균 단식시간 계산
       const totalHours = weekScore.reduce((sum, item) => sum + parseFloat(item.value), 0);
-      const averageScore = Math.round(totalHours / 7);
+      const daysCount = weekDates.length;
+      const averageScore = daysCount > 0 ? Math.round(totalHours / daysCount) : 0;
 
       // 달성률 계산 (완료된 날 / 전체 날)
       const completedDays = weekScore.filter(item => item.isCompleted).length;
-      const achievementScore = Math.round((completedDays / 7) * 100);
+      const achievementScore = daysCount > 0 ? Math.round((completedDays / daysCount) * 100) : 0;
 
       const summary = {
         score: averageScore,
@@ -634,12 +635,9 @@ export class StatisticsService {
    * 수면 통계 조회 (형님 데이터셋 기준)
    * @param userId 사용자 ID
    */
-  async getSleepStatistics(userId: number): Promise<SleepStatisticsDto> {
+  async getSleepStatistics(userId: number, startDate: string, endDate: string): Promise<SleepStatisticsDto> {
     try {
-      this.logger.log(`수면 통계 조회 시작 - 사용자: ${userId}`);
-
-      // 7일간 기간 설정 (한국시간)
-      const { startDate, endDate } = this.getWeekDateRange();
+      this.logger.log(`수면 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
 
       // 수면 기록 조회 (SLEEP)
       const sleepRecords = await this.prisma.userRecord.findMany({
@@ -647,8 +645,8 @@ export class StatisticsService {
           userId,
           recordType: 'SLEEP',
           date: {
-            gte: startDate,
-            lte: endDate
+            gte: new Date(startDate),
+            lte: new Date(endDate)
           }
         },
         orderBy: {
@@ -656,34 +654,37 @@ export class StatisticsService {
         }
       });
 
-      // 7일 전체 날짜 배열 생성
+      // 주간 날짜 배열 생성
       const weekDates = this.generateWeekDates(startDate);
 
       // 주간 점수 데이터 생성
       const weekScore = weekDates.map(date => {
-        const record = sleepRecords.find(r => r.date === date);
+        const record = sleepRecords.find(r => {
+          const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+          return recordDate === date;
+        });
 
         if (!record || !record.metadata) {
           return {
             date,
-            bedTime: '23:00',
-            wakeTime: '07:00',
+            bedDateTime: `${date} 23:00:00`,
+            wakeDateTime: `${date} 07:00:00`,
             value: '0',
             isCompleted: false
           };
         }
 
         const metadata = record.metadata as any;
-        const bedTime = metadata.bedTime || '23:00';
-        const wakeTime = metadata.wakeTime || '07:00';
+        const bedDateTime = metadata.bedDateTime || `${date} 23:00:00`;
+        const wakeDateTime = metadata.wakeDateTime || `${date} 07:00:00`;
         const sleepHours = metadata.sleepHours || 0;
         const value = sleepHours.toString();
         const isCompleted = sleepHours >= 8; // 8시간 이상일 때 완료
 
         return {
           date,
-          bedTime,
-          wakeTime,
+          bedDateTime,
+          wakeDateTime,
           value,
           isCompleted
         };
@@ -691,20 +692,15 @@ export class StatisticsService {
 
       // 평균 수면 점수 계산 (평균 수면시간)
       const totalHours = weekScore.reduce((sum, item) => sum + parseFloat(item.value), 0);
-      const averageScore = Math.round(totalHours / 7);
-
-      // 평균 취침시간과 기상시간 계산
-      const averageBedTime = this.calculateAverageTime(weekScore.map(item => item.bedTime));
-      const averageWakeTime = this.calculateAverageTime(weekScore.map(item => item.wakeTime));
+      const daysCount = weekDates.length;
+      const averageScore = daysCount > 0 ? Math.round(totalHours / daysCount) : 0;
 
       // 달성률 계산 (완료된 날 / 전체 날)
       const completedDays = weekScore.filter(item => item.isCompleted).length;
-      const achievementScore = Math.round((completedDays / 7) * 100);
+      const achievementScore = daysCount > 0 ? Math.round((completedDays / daysCount) * 100) : 0;
 
       const summary = {
         score: averageScore,
-        bedTime: averageBedTime,
-        wakeTime: averageWakeTime,
         comment: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
       };
 
@@ -861,8 +857,8 @@ export class StatisticsService {
         this.getBeautyStatistics(userId, startDate, endDate),
         this.getDietStatistics(userId, startDate, endDate),
         this.getSupplementStatistics(userId),
-        this.getFastingStatistics(userId),
-        this.getSleepStatistics(userId),
+        this.getFastingStatistics(userId, startDate, endDate),
+        this.getSleepStatistics(userId, startDate, endDate),
         this.getActivityStatistics(userId)
       ]);
 

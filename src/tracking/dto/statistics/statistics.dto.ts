@@ -299,11 +299,11 @@ export class FastingWeekScoreDto {
   @ApiProperty({ description: '단식 기록일 (YYYY-MM-DD)', example: '2025-09-10' })
   date: string;
 
-  @ApiProperty({ description: '단식 시작시간', example: '20:00' })
-  startTime: string;
+  @ApiProperty({ description: '단식 시작 날짜+시간', example: '2025-10-26 20:00:00' })
+  startDateTime: string;
 
-  @ApiProperty({ description: '단식 종료시간', example: '12:00' })
-  endTime: string;
+  @ApiProperty({ description: '단식 종료 날짜+시간', example: '2025-10-27 12:00:00' })
+  endDateTime: string;
 
   @ApiProperty({ description: '단식 시간', example: '16' })
   value: string;
@@ -365,11 +365,11 @@ export class SleepWeekScoreDto {
   @ApiProperty({ description: '수면 기록일 (YYYY-MM-DD)', example: '2025-09-10' })
   date: string;
 
-  @ApiProperty({ description: '취침 시간', example: '23:30' })
-  bedTime: string;
+  @ApiProperty({ description: '취침 날짜+시간', example: '2025-10-26 23:30:00' })
+  bedDateTime: string;
 
-  @ApiProperty({ description: '기상 시간', example: '07:00' })
-  wakeTime: string;
+  @ApiProperty({ description: '기상 날짜+시간', example: '2025-10-27 07:00:00' })
+  wakeDateTime: string;
 
   @ApiProperty({ description: '수면 시간', example: '7.5' })
   value: string;
@@ -401,12 +401,6 @@ export class SleepDetailDataDto {
 export class SleepSummaryDto {
   @ApiProperty({ description: '평균 수면시간', example: 10 })
   score: number;
-
-  @ApiProperty({ description: '평균 취침시간', example: '23:30' })
-  bedTime: string;
-
-  @ApiProperty({ description: '평균 기상시간', example: '07:00' })
-  wakeTime: string;
 
   @ApiProperty({
     description: '요약 코멘트',

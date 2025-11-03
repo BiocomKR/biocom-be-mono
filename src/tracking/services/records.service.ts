@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { getKoreanToday } from '../../common/utils/korea-date.util';
@@ -120,14 +120,36 @@ export class RecordsService {
   async createDietRecord(userId: number, dto: CreateDietRecordDto) {
     const targetDate = getKoreanToday();
 
+    // isFasting이 true인 경우 공복 식사로 기록
+    if (dto.isFasting) {
+      this.logger.log(`공복 식사 기록 생성 - 사용자: ${userId}, 식사: ${dto.diet}`);
+
+      return this.createRecord(userId, 'DIET', {
+        date: targetDate,
+        metadata: {
+          diet: dto.diet,           // 식사 종류 (BREAKFAST, LUNCH, etc.)
+          isFasting: true,          // 공복 여부
+          foodName: null,
+          imageUrl: null,
+          allergyFoods: [],
+          highFodmapFoods: [],
+          processedFoods: [],
+          allergyScore: 0,
+          highFodmapCount: 0,
+          processedCount: 0,
+        },
+      });
+    }
+
+    // 일반 식단 기록 (isFasting이 false이거나 없는 경우)
     // 과민식품 개수 계산 (레벨과 무관하게 개수만)
-    const allergyScore = dto.allergyFoods.length;
+    const allergyScore = dto.allergyFoods?.length || 0;
 
     // 고포드맵식품 개수
-    const highFodmapCount = dto.highFodmapFoods.length;
+    const highFodmapCount = dto.highFodmapFoods?.length || 0;
 
     // 가공식품 개수
-    const processedCount = dto.processedFoods.length;
+    const processedCount = dto.processedFoods?.length || 0;
 
     this.logger.log(`식단 기록 생성 - 사용자: ${userId}, 식품: ${dto.foodName}, 식사: ${dto.diet}`);
 
@@ -135,11 +157,12 @@ export class RecordsService {
       date: targetDate,
       metadata: {
         diet: dto.diet,                    // 식사 종류 (BREAKFAST, LUNCH, etc.)
+        isFasting: false,                  // 공복 아님
         foodName: dto.foodName,            // 식품명
         imageUrl: dto.imageUrl,            // 이미지 URL
-        allergyFoods: dto.allergyFoods,    // 과민식품 배열 (name, level)
-        highFodmapFoods: dto.highFodmapFoods, // 고포드맵식품 배열 (string[])
-        processedFoods: dto.processedFoods,   // 가공식품 배열 (string[])
+        allergyFoods: dto.allergyFoods || [],    // 과민식품 배열 (name, level)
+        highFodmapFoods: dto.highFodmapFoods || [], // 고포드맵식품 배열 (string[])
+        processedFoods: dto.processedFoods || [],   // 가공식품 배열 (string[])
         // 통계용 계산된 값들
         allergyScore,      // 과민식품 점수 합계
         highFodmapCount,   // 고포드맵식품 개수
@@ -361,27 +384,66 @@ export class RecordsService {
    * @param dto 간헐적 단식 기록 데이터
    */
   async createFastingRecord(userId: number, dto: CreateFastingRecordDto) {
-    const targetDate = dto.date || getKoreanToday();
-    
-    // 단식 시간 계산 (예시 로직)
-    const startTime = new Date(`${targetDate} ${dto.startTime}`);
-    const endTime = new Date(`${targetDate} ${dto.endTime}`);
-    
-    // 종료 시간이 다음날인 경우 처리
-    if (endTime < startTime) {
-      endTime.setDate(endTime.getDate() + 1);
-    }
-    
-    const fastingHours = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60) * 10) / 10;
-    
+    const today = getKoreanToday();
+
+    // DateTime 파싱
+    const startDateTime = new Date(dto.startDateTime);
+    const endDateTime = new Date(dto.endDateTime);
+
+    // 유효성 검증
+    this.validateFastingDateTime(startDateTime, endDateTime, today);
+
+    // 단식 시간 계산 (소수점 첫째자리)
+    const fastingHours = Math.round((endDateTime.getTime() - startDateTime.getTime()) / (1000 * 60 * 60) * 10) / 10;
+
     return this.createRecord(userId, 'FASTING', {
-      date: targetDate,
+      date: today,
       metadata: {
-        startTime: dto.startTime,
-        endTime: dto.endTime,
+        startDateTime: dto.startDateTime,
+        endDateTime: dto.endDateTime,
         fastingHours,
       },
     });
+  }
+
+  /**
+   * 단식 DateTime 유효성 검증
+   */
+  private validateFastingDateTime(startDateTime: Date, endDateTime: Date, today: string) {
+    // 클라이언트가 보낸 날짜 문자열에서 날짜 부분만 추출 (YYYY-MM-DD)
+    const startDateStr = this.extractDateFromDateTime(startDateTime);
+    const endDateStr = this.extractDateFromDateTime(endDateTime);
+
+    // 어제 날짜 계산
+    const todayDate = new Date(today);
+    const yesterdayDate = new Date(todayDate);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+    // startDateTime은 어제 또는 오늘만 가능
+    if (startDateStr !== yesterdayStr && startDateStr !== today) {
+      throw new BadRequestException('공복 시작 시간은 어제 또는 오늘만 가능합니다');
+    }
+
+    // endDateTime은 오늘만 가능
+    if (endDateStr !== today) {
+      throw new BadRequestException('공복 종료 시간은 오늘만 가능합니다');
+    }
+
+    // endDateTime >= startDateTime
+    if (endDateTime <= startDateTime) {
+      throw new BadRequestException('공복 종료 시간은 시작 시간보다 커야 합니다');
+    }
+  }
+
+  /**
+   * DateTime 객체에서 KST 기준 날짜 추출 (YYYY-MM-DD)
+   */
+  private extractDateFromDateTime(dateTime: Date): string {
+    // KST 오프셋 (+9시간)
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstTime = new Date(dateTime.getTime() + kstOffset);
+    return kstTime.toISOString().split('T')[0];
   }
 
   /**
@@ -390,27 +452,56 @@ export class RecordsService {
    * @param dto 수면 기록 데이터
    */
   async createSleepRecord(userId: number, dto: CreateSleepRecordDto) {
-    const targetDate = dto.date || getKoreanToday();
-    
-    // 수면 시간 계산
-    const bedTime = new Date(`${targetDate} ${dto.bedTime}`);
-    const wakeTime = new Date(`${targetDate} ${dto.wakeTime}`);
-    
-    // 기상 시간이 다음날인 경우 처리
-    if (wakeTime < bedTime) {
-      wakeTime.setDate(wakeTime.getDate() + 1);
-    }
-    
-    const sleepHours = Math.round((wakeTime.getTime() - bedTime.getTime()) / (1000 * 60 * 60) * 10) / 10;
-    
+    const today = getKoreanToday();
+
+    // DateTime 파싱
+    const bedDateTime = new Date(dto.bedDateTime);
+    const wakeDateTime = new Date(dto.wakeDateTime);
+
+    // 유효성 검증
+    this.validateSleepDateTime(bedDateTime, wakeDateTime, today);
+
+    // 수면 시간 계산 (소수점 첫째자리)
+    const sleepHours = Math.round((wakeDateTime.getTime() - bedDateTime.getTime()) / (1000 * 60 * 60) * 10) / 10;
+
     return this.createRecord(userId, 'SLEEP', {
-      date: targetDate,
+      date: today,
       metadata: {
-        bedTime: dto.bedTime,
-        wakeTime: dto.wakeTime,
+        bedDateTime: dto.bedDateTime,
+        wakeDateTime: dto.wakeDateTime,
         sleepHours,
       },
     });
+  }
+
+  /**
+   * 수면 DateTime 유효성 검증
+   */
+  private validateSleepDateTime(bedDateTime: Date, wakeDateTime: Date, today: string) {
+    // 클라이언트가 보낸 날짜 문자열에서 날짜 부분만 추출 (YYYY-MM-DD)
+    const bedDateStr = this.extractDateFromDateTime(bedDateTime);
+    const wakeDateStr = this.extractDateFromDateTime(wakeDateTime);
+
+    // 어제 날짜 계산
+    const todayDate = new Date(today);
+    const yesterdayDate = new Date(todayDate);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+    // bedDateTime은 어제 또는 오늘만 가능
+    if (bedDateStr !== yesterdayStr && bedDateStr !== today) {
+      throw new BadRequestException('잠든 시간은 어제 또는 오늘만 가능합니다');
+    }
+
+    // wakeDateTime은 오늘만 가능
+    if (wakeDateStr !== today) {
+      throw new BadRequestException('기상 시간은 오늘만 가능합니다');
+    }
+
+    // wakeDateTime >= bedDateTime
+    if (wakeDateTime <= bedDateTime) {
+      throw new BadRequestException('기상 시간은 잠든 시간보다 커야 합니다');
+    }
   }
 
   /**
@@ -601,7 +692,7 @@ export class RecordsService {
   private async createFastingRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     // 중복 체크
     const existingRecord = await tx.userRecord.findFirst({
-      where: { userId, recordCode: 'FASTING', date },
+      where: { userId, recordType: 'FASTING', date: new Date(date) },
     });
 
     if (existingRecord) {
@@ -617,7 +708,7 @@ export class RecordsService {
   private async createSleepRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     // 중복 체크
     const existingRecord = await tx.userRecord.findFirst({
-      where: { userId, recordCode: 'SLEEP', date },
+      where: { userId, recordType: 'SLEEP', date: new Date(date) },
     });
 
     if (existingRecord) {
