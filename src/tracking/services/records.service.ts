@@ -15,6 +15,7 @@ import {
 } from '../dto/records/records.dto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { ExamCode } from '@/common/enums/exam-code.enum';
 
 /**
  * 기록 서비스
@@ -54,29 +55,54 @@ export class RecordsService {
       const records = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          date: targetDate, // String 직접 비교
-          ...(recordType && { recordCode: recordType }),
+          date: new Date(targetDate), // Date 객체로 변환
+          ...(recordType && { recordType: recordType }),
         },
         orderBy: {
           createdAt: 'desc',
         },
       });
 
-      // 각 기록 타입별로 형님이 원하는 형태로 변환
+      // DIET 레코드는 그룹화해서 하나로 통합, 나머지는 개별 처리
       this.logger.log(`기록 변환 시작 - 총 ${records.length}개 기록`);
-      const result = await Promise.all(
-        records.map(async (record) => {
-          this.logger.log(`기록 변환 중: ${record.recordCode}, ID: ${record.id}`);
-          const transformedMetadata = await this.transformRecordMetadata(record.recordCode, record.metadata, userId, record.date);
-          this.logger.log(`변환 완료: ${record.recordCode}, 변환된 데이터:`, transformedMetadata);
-          return {
-            id: record.id,
-            recordType: record.recordCode,
-            date: record.date,
+
+      // recordType별로 그룹화
+      const groupedRecords = records.reduce((acc, record) => {
+        if (!acc[record.recordType]) {
+          acc[record.recordType] = [];
+        }
+        acc[record.recordType].push(record);
+        return acc;
+      }, {} as Record<string, any[]>);
+
+      const result = [];
+
+      // 각 recordType별로 처리
+      for (const [type, typeRecords] of Object.entries(groupedRecords)) {
+        const recordsArray = typeRecords as any[]; // 타입 단언
+
+        if (type === 'DIET') {
+          // DIET는 모든 레코드를 종합해서 하나로 만듦
+          const transformedMetadata = await this.transformRecordMetadata(type, recordsArray, userId, recordsArray[0].date);
+          result.push({
+            id: recordsArray[0].id, // 대표 ID
+            recordType: type,
+            date: recordsArray[0].date,
             metadata: transformedMetadata,
-          };
-        })
-      );
+          });
+        } else {
+          // 나머지는 개별 처리
+          for (const record of recordsArray) {
+            const transformedMetadata = await this.transformRecordMetadata(type, record.metadata, userId, record.date);
+            result.push({
+              id: record.id,
+              recordType: type,
+              date: record.date,
+              metadata: transformedMetadata,
+            });
+          }
+        }
+      }
 
       return {
         success: true,
@@ -832,18 +858,19 @@ export class RecordsService {
   /**
    * 기록 메타데이터를 형님이 원하는 형태로 변환
    * @param recordType 기록 타입
-   * @param metadata 원본 메타데이터
+   * @param metadata 원본 메타데이터 (DIET의 경우 레코드 배열)
    * @param userId 사용자 ID
    * @param date 기록 날짜
    */
-  private async transformRecordMetadata(recordType: string, metadata: any, userId: number, date: string) {
+  private async transformRecordMetadata(recordType: string, metadata: any, userId: number, date: any) {
     switch (recordType) {
       case 'BEAUTY':
         return this.transformBeautyMetadata(metadata, userId, date);
       case 'DIET':
+        // DIET는 레코드 배열이 들어옴
         return this.transformDietMetadata(metadata);
-      case 'SUPPLEMENT':
-        return this.transformSupplementMetadata(metadata);
+      // case 'SUPPLEMENT':
+      //   return this.transformSupplementMetadata(metadata);
       case 'FASTING':
         return this.transformFastingMetadata(metadata);
       case 'SLEEP':
@@ -857,81 +884,78 @@ export class RecordsService {
 
   /**
    * 이너뷰티 메타데이터 변환
+   * 정책: (이너뷰티점수 + 아우터뷰티점수) / 2, 정수로 반올림
    */
   private async transformBeautyMetadata(metadata: any, userId: number, date: string) {
-    // 이전 점수 조회 (전날 데이터)
-    const yesterday = this.getPreviousDate(date);
-    let scoreDiff = 0;
-
-    try {
-      const yesterdayRecord = await this.prisma.userRecord.findFirst({
-        where: {
-          userId,
-          recordCode: 'BEAUTY',
-          date: yesterday,
-        },
-      });
-
-      if (yesterdayRecord && yesterdayRecord.metadata) {
-        const yesterdayScore = yesterdayRecord.metadata?.totalScore || 0;
-        scoreDiff = metadata.totalScore - yesterdayScore;
-      }
-    } catch (error) {
-      this.logger.warn(`전날 이너뷰티 점수 조회 실패: ${error.message}`);
-    }
+    const innerScore = metadata.innerBeautyScore || 0;
+    const outerScore = metadata.outerBeautyScore || 0;
+    const averageScore = Math.round((innerScore + outerScore) / 2); // 정수로 반올림
 
     return {
-      totalScore: metadata.totalScore,
-      targetScore: 100, // TODO: 하드코딩 -> 실제 목표값으로 변경
-      scoreDiff: scoreDiff,
+      totalScore: averageScore,
+      baseScore: 100,
     };
   }
 
   /**
    * 식단 메타데이터 변환
+   * 정책: 아침/점심/저녁/간식 이미지 + 과민식품/고포드맵/가공식품 카운트 종합
+   * @param dataOrRecords 레코드 배열 또는 단일 메타데이터 (배열이면 종합, 아니면 단일)
    */
-  private transformDietMetadata(metadata: any) {
-    const result: any = {};
+  private transformDietMetadata(dataOrRecords: any) {
+    // 배열이 아니면 배열로 감싸기
+    const records = Array.isArray(dataOrRecords) ? dataOrRecords : [{ metadata: dataOrRecords }];
 
-    // 아침, 점심, 저녁, 간식, 야식 처리
-    const mealTypes = [
-      { key: 'breakfast', korean: '아침' },
-      { key: 'lunch', korean: '점심' },
-      { key: 'dinner', korean: '저녁' },
-      { key: 'snack', korean: '간식' },
-      { key: 'lateSnack', korean: '야식' },
-    ];
+    const result: any = {
+      breakfastImg: null,
+      lunchImg: null,
+      dinnerImg: null,
+      snackImg: null,
+      allergyScore: 0,
+      highFodmapCount: 0,
+      processedCount: 0,
+    };
 
-    mealTypes.forEach(({ key, korean }) => {
-      if (metadata[key] && metadata[key].foods && metadata[key].foods.length > 0) {
-        result[key] = {
-          name: metadata[key].foods[0].name,
-          imageUrl: '', // TODO: 이미지 URL 처리 로직 추가
-        };
+    // 각 레코드를 순회하면서 데이터 수집
+    records.forEach((record) => {
+      const metadata = record.metadata;
+
+      // 식사 타입별 이미지 URL 매핑
+      const dietType = metadata.diet;
+      if (dietType === 'BREAKFAST' && metadata.imageUrl) {
+        result.breakfastImg = metadata.imageUrl;
+      } else if (dietType === 'LUNCH' && metadata.imageUrl) {
+        result.lunchImg = metadata.imageUrl;
+      } else if (dietType === 'DINNER' && metadata.imageUrl) {
+        result.dinnerImg = metadata.imageUrl;
+      } else if (dietType === 'SNACK' && metadata.imageUrl) {
+        result.snackImg = metadata.imageUrl;
       }
-      // 안 먹은 식사는 객체 생성하지 않음
-    });
 
-    // dietScore 추가
-    result.dietScore = 40; // TODO: 하드코딩 -> 실제 계산 로직으로 변경
+      // 카운트 누적
+      result.allergyScore += metadata.allergyScore || 0;
+      result.highFodmapCount += metadata.highFodmapCount || 0;
+      result.processedCount += metadata.processedCount || 0;
+    });
 
     return result;
   }
 
   /**
    * 영양제 메타데이터 변환
+   * TODO: 영양제 기획 확정 후 재개 (몇일 내 예정)
    */
-  private transformSupplementMetadata(metadata: any) {
-    const complianceRate = metadata.totalCount > 0
-      ? Math.round((metadata.takenCount / metadata.totalCount) * 100)
-      : 0;
+  // private transformSupplementMetadata(metadata: any) {
+  //   const complianceRate = metadata.totalCount > 0
+  //     ? Math.round((metadata.takenCount / metadata.totalCount) * 100)
+  //     : 0;
 
-    return {
-      takenCount: metadata.takenCount,
-      targetCount: metadata.totalCount,
-      complianceRate: complianceRate,
-    };
-  }
+  //   return {
+  //     takenCount: metadata.takenCount,
+  //     targetCount: metadata.totalCount,
+  //     complianceRate: complianceRate,
+  //   };
+  // }
 
   /**
    * 간헐적 단식 메타데이터 변환
@@ -943,7 +967,7 @@ export class RecordsService {
     return {
       fastingHours: fastingHours,
       fastingMinutes: fastingMinutes,
-      targetTime: 16, // TODO: 하드코딩 -> 실제 목표값으로 변경
+      baseTime: 16, // TODO: 하드코딩 -> 실제 목표값으로 변경
     };
   }
 
@@ -957,7 +981,7 @@ export class RecordsService {
     return {
       sleepHours: sleepHours,
       sleepMinutes: sleepMinutes,
-      targetTime: 8, // TODO: 하드코딩 -> 실제 목표값으로 변경
+      baseTime: 8, // TODO: 하드코딩 -> 실제 목표값으로 변경
     };
   }
 
@@ -1118,16 +1142,16 @@ export class RecordsService {
         throw new ForbiddenException('접근 권한이 없습니다.');
       }
 
-      // D0060 검사 결과 찾기 (가장 최신 것)
-      const d0060Results = charts
-        .filter((chart: any) => chart.orderCode === 'D0060' && chart.resultYN === 'Y')
+      // 지연성알러지 검사 결과 찾기 (가장 최신 것)
+      const examResults = charts
+        .filter((chart: any) => chart.orderCode === ExamCode.DELAYED_ALLERGY && chart.resultYN === 'Y')
         .sort((a: any, b: any) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
 
-      if (d0060Results.length === 0) {
+      if (examResults.length === 0) {
         throw new ForbiddenException('접근 권한이 없습니다.');
       }
 
-      const latestResult = d0060Results[0];
+      const latestResult = examResults[0];
 
       // 180일 경과 체크
       const receiptDate = new Date(latestResult.receiptDate);
