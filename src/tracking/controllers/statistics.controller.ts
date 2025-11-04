@@ -50,13 +50,29 @@ export class StatisticsController {
     summary: '통계 목록 (요약) 조회',
     description: '6가지 기록 유형(이너뷰티, 식단, 영양제, 간헐적단식, 수면, 활동)의 1주일 요약 통계를 조회합니다.',
   })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-10-27',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-11-02',
+  })
   @ApiResponse({
     status: 200,
     description: '통계 목록 조회 성공',
     type: StatisticsSummaryResponseDto,
   })
-  async getStatisticsSummary(@Request() req: any) {
-    const data = await this.statisticsService.getStatisticsSummary(req.user.id);
+  async getStatisticsSummary(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const data = await this.statisticsService.getStatisticsSummary(req.user.id, startDate, endDate);
     return {
       success: true,
       data,

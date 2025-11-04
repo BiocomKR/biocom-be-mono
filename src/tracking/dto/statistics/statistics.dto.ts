@@ -581,16 +581,10 @@ export interface StatisticsSummaryCard {
  */
 export class StatisticsSummaryDto {
   @ApiProperty({
-    description: '통계 기간 (현재 1주일 고정)',
-    example: '1week'
-  })
-  period: StatisticsPeriod;
-
-  @ApiProperty({
     description: '통계 기준 날짜 범위',
     example: {
-      startDate: '2024-07-20',
-      endDate: '2024-07-26'
+      startDate: '2025-10-27',
+      endDate: '2025-11-02'
     }
   })
   dateRange: {
@@ -598,27 +592,35 @@ export class StatisticsSummaryDto {
     endDate: string;
   };
 
-  // @ApiProperty({
-  //   description: '6개 기록 유형별 요약 통계',
-  //   example: [
-  //     {
-  //       type: 'BEAUTY',
-  //       title: '이너뷰티 통계',
-  //       mainValue: 50,
-  //       unit: '점',
-  //       status: '향상',
-  //       weeklyData: [45, 48, 52, 49, 53, 50, 51]
-  //     },
-  //     {
-  //       type: 'DIET',
-  //       title: '식단 기록', 
-  //       mainValue: '좋음',
-  //       status: '좋음',
-  //       weeklyData: [5, 8, 3, 12, 6, 9, 4]
-  //     }
-  //   ]
-  // }
-  summaryCards: StatisticsSummaryCard[];
+  @ApiProperty({
+    description: '뷰티 통계',
+    type: () => BeautyStatisticsDto
+  })
+  beauty: BeautyStatisticsDto;
+
+  @ApiProperty({
+    description: '다이어트 통계',
+    type: () => DietStatisticsDto
+  })
+  diet: DietStatisticsDto;
+
+  @ApiProperty({
+    description: '단식 통계',
+    type: () => FastingStatisticsDto
+  })
+  fasting: FastingStatisticsDto;
+
+  @ApiProperty({
+    description: '수면 통계',
+    type: () => SleepStatisticsDto
+  })
+  sleep: SleepStatisticsDto;
+
+  @ApiProperty({
+    description: '활동 통계',
+    type: () => ActivityStatisticsDto
+  })
+  activity: ActivityStatisticsDto;
 }
 
 // ========================================

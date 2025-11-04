@@ -840,95 +840,29 @@ export class StatisticsService {
    * 통계 목록 (요약) 조회
    * @param userId 사용자 ID
    */
-  async getStatisticsSummary(userId: number): Promise<StatisticsSummaryDto> {
+  async getStatisticsSummary(userId: number, startDate: string, endDate: string): Promise<StatisticsSummaryDto> {
     try {
-      this.logger.log(`통계 목록 조회 시작 - 사용자: ${userId}`);
+      this.logger.log(`통계 목록 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
       
-      const { startDate, endDate } = this.getWeekDateRange();
-      
-      // 각 통계 조회 (병렬 처리)
-      const [
-        beautyStats,
-        dietStats,
-        supplementStats,
-        fastingStats,
-        sleepStats,
-        activityStats
-      ] = await Promise.all([
+      // 각 통계 조회 (병렬 처리) - 완성된 5개 통계 API 응답을 그대로 묶어서 반환
+      const [beauty, diet, fasting, sleep, activity] = await Promise.all([
         this.getBeautyStatistics(userId, startDate, endDate),
         this.getDietStatistics(userId, startDate, endDate),
-        this.getSupplementStatistics(userId),
         this.getFastingStatistics(userId, startDate, endDate),
         this.getSleepStatistics(userId, startDate, endDate),
         this.getActivityStatistics(userId, startDate, endDate)
       ]);
 
-      // 요약 카드 생성
-      // 요약 카드 생성
-      const summaryCards: StatisticsSummaryCard[] = [
-        {
-          type: 'BEAUTY',
-          score: beautyStats.summary.score,
-          weeklyData: beautyStats.summary.weekScore,
-          innerBeauty: beautyStats.detailData.innerBeauty,
-          outerBeauty: beautyStats.detailData.outerBeauty,
-          // weeklyData: beautyStats.summary.weekScore.map(s => parseInt(s.value))
-        },
-        {
-          type: 'DIET',
-          allergyFoods: dietStats.detailData.allergyFoods,
-          healthFoods: dietStats.detailData.healthFoods,
-          processedFoods: dietStats.detailData.processedFoods,
-          status: dietStats.summary.score > 50 ? '좋음' : '주의',
-          // weeklyData: dietStats.detailData.allergyFoods.weekScore.map(d => parseInt(d.value))
-          // status: dietStats.summary.score > 50 ? '좋음' : '주의',
-          // weeklyData: dietStats.detailData.allergyFoods.weekScore.map(d => parseInt(d.value))
-        },
-        {
-          type: 'SUPPLEMENT',
-          score: supplementStats.summary.score,
-          weeklyData: supplementStats.weeklySupplements,
-          // status: supplementStats.summary.score > 50 ? '좋음' : '주의',
-          // unit: '%',
-          // status: '준수',
-          // weeklyData: supplementStats.weeklySupplements.map(s => s.taken)
-          // unit: '%',
-          // status: '준수',
-          // weeklyData: supplementStats.weeklySupplements.map(s => s.taken)
-        },
-        {
-          type: 'FASTING',
-          score: fastingStats.summary.score,
-          weeklyData: fastingStats.detailData.weekScore,
-          // weeklyData: fastingStats.detailData.weekScore.map(d => parseFloat(d.value))
-        },
-        {
-          type: 'SLEEP',
-          score: sleepStats.summary.score,
-          weeklyData: sleepStats.detailData.weekScore,
-          // unit: '시간',
-          // status: '평균',
-          // weeklyData: sleepStats.detailData.weekScore.map(d => parseFloat(d.value))
-        },
-        {
-          type: 'ACTIVITY',
-          score: activityStats.summary.score,
-          weeklyData: activityStats.detailData.weekScore,
-          // unit: 'Kcal',
-          // status: '평균',
-          // weeklyData: activityStats.detailData.weekScore.map(d => parseInt(d.value.toString()))
-        }
-      ];
-
       this.logger.log(`통계 목록 조회 완료 - 사용자: ${userId}`);
 
+      // 5개 통계 응답을 그대로 반환 (프론트엔드에서 알아서 처리)
       return {
-        period: '1week',
-        dateRange: {
-          startDate,
-          endDate
-        },
-        summaryCards
+        dateRange: { startDate, endDate },
+        beauty,
+        diet,
+        fasting,
+        sleep,
+        activity
       };
     } catch (error) {
       this.logger.error(`통계 목록 조회 실패 - 사용자: ${userId}`, error);
