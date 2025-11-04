@@ -535,10 +535,10 @@ model ExerciseType {
   name        String    @db.VarChar(50)
   /// 운동 종목 코드 (WALKING, RUNNING, WEIGHT_TRAINING 등)
   code        String    @unique @db.VarChar(50)
-  /// 카테고리 (유산소, 무산소, 스트레칭 등)
-  category    String    @db.VarChar(30)
-  /// 칼로리 계수 (시간당 소모 칼로리 추정용)
+  /// 칼로리 계수 (10분당 소모 칼로리)
   calorieRate Float?    @map("calorie_rate")
+  /// 기준 시간 (분 단위, 기본값: 10분)
+  baseMinutes Int       @default(10) @map("base_minutes")
   /// 정렬 순서
   sortOrder   Int       @default(0) @map("sort_order")
   /// 활성화 여부
@@ -548,7 +548,7 @@ model ExerciseType {
   /// 수정일시
   updatedAt   DateTime? @updatedAt @map("updated_at")
 
-  @@index([category, isActive])
+  @@index([isActive])
   @@index([sortOrder])
   @@map("exercise_types")
 }

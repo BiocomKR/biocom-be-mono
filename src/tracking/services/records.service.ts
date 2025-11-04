@@ -820,34 +820,24 @@ export class RecordsService {
   async getExerciseTypes() {
     try {
       this.logger.log('운동 종목 목록 조회');
-      
+
       // 데이터베이스에서 활성화된 운동 종목 조회
       const exerciseTypes = await this.prisma.exerciseType.findMany({
         where: { isActive: true },
-        orderBy: [
-          { category: 'asc' },
-          { sortOrder: 'asc' },
-          { name: 'asc' },
-        ],
+        orderBy: { sortOrder: 'asc' },
       });
 
-      // 카테고리별로 그룹핑
-      const groupedTypes = exerciseTypes.reduce((groups, exercise) => {
-        const category = exercise.category;
-        if (!groups[category]) {
-          groups[category] = [];
-        }
-        groups[category].push({
-          code: exercise.code,
-          name: exercise.name,
-          calorieRate: exercise.calorieRate,
-        });
-        return groups;
-      }, {} as Record<string, any[]>);
+      // 운동 종목 배열로 반환 (카테고리 그룹핑 제거)
+      const result = exerciseTypes.map(exercise => ({
+        code: exercise.code,
+        name: exercise.name,
+        calorieRate: exercise.calorieRate,
+        baseMinutes: exercise.baseMinutes,
+      }));
 
       return {
         success: true,
-        data: groupedTypes,
+        data: result,
       };
     } catch (error) {
       this.logger.error('운동 종목 목록 조회 실패', error);

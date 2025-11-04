@@ -14,8 +14,8 @@ async function checkExerciseTypes() {
     id: et.id,
     name: et.name,
     code: et.code,
-    category: et.category,
     calorieRate: et.calorieRate,
+    baseMinutes: et.baseMinutes,
     sortOrder: et.sortOrder,
     isActive: et.isActive,
   })));
