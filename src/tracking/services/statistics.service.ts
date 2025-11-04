@@ -155,19 +155,7 @@ export class StatisticsService {
     try {
       this.logger.log(`이너뷰티 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
 
-      // 이전 주 날짜 계산 (제공된 날짜 기준으로 -7일)
-      const currentStartDate = new Date(startDate);
-      const prevStartDate = new Date(currentStartDate);
-      prevStartDate.setDate(currentStartDate.getDate() - 7);
-
-      const currentEndDate = new Date(endDate);
-      const prevEndDate = new Date(currentEndDate);
-      prevEndDate.setDate(currentEndDate.getDate() - 7);
-
-      const prevStartDateStr = prevStartDate.toISOString().split('T')[0];
-      const prevEndDateStr = prevEndDate.toISOString().split('T')[0];
-
-      // 이번 주 뷰티 기록 조회
+      // 뷰티 기록 조회
       const currentWeekRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
@@ -180,32 +168,10 @@ export class StatisticsService {
         orderBy: { date: 'asc' }
       });
 
-      // 이전 주 뷰티 기록 조회 (비교용)
-      const previousWeekRecords = await this.prisma.userRecord.findMany({
-        where: {
-          userId,
-          recordType: 'BEAUTY',
-          date: {
-            gte: new Date(prevStartDateStr),
-            lte: new Date(prevEndDateStr)
-          }
-        },
-        orderBy: { date: 'asc' }
-      });
-
       const weekDates = this.generateWeekDates(startDate);
-      const prevWeekDates = this.generateWeekDates(prevStartDateStr);
 
       // 이번 주 데이터 분석
       const currentWeekAnalysis = this.analyzeBeautyDataForCorrectStructure(currentWeekRecords, weekDates);
-
-      // 이전 주 데이터 분석 (비교용)
-      const previousWeekAnalysis = this.analyzeBeautyDataForCorrectStructure(previousWeekRecords, prevWeekDates);
-
-      // 전주 대비 차이 계산
-      const summaryPrevWeekDiff = currentWeekAnalysis.summaryScore - previousWeekAnalysis.summaryScore;
-      const innerPrevWeekDiff = currentWeekAnalysis.innerScore - previousWeekAnalysis.innerScore;
-      const outerPrevWeekDiff = currentWeekAnalysis.outerScore - previousWeekAnalysis.outerScore;
 
       this.logger.log(`이너뷰티 통계 조회 완료 - 사용자: ${userId}, 종합점수: ${currentWeekAnalysis.summaryScore}`);
 
@@ -213,20 +179,17 @@ export class StatisticsService {
       return {
         summary: {
           score: currentWeekAnalysis.summaryScore,
-          prevWeekDiff: summaryPrevWeekDiff,
           weekScore: currentWeekAnalysis.summaryWeekScore,
           comment: "평균점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다."
         },
         detailData: {
           innerBeauty: {
             score: currentWeekAnalysis.innerScore,
-            prevWeekDiff: innerPrevWeekDiff,
             weekScore: currentWeekAnalysis.innerWeekScore,
             answer: currentWeekAnalysis.innerAnswers
           },
           outerBeauty: {
             score: currentWeekAnalysis.outerScore,
-            prevWeekDiff: outerPrevWeekDiff,
             weekScore: currentWeekAnalysis.outerWeekScore,
             answer: currentWeekAnalysis.outerAnswers
           },

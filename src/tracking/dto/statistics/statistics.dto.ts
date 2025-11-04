@@ -52,7 +52,6 @@ export interface AnswerScore {
  */
 export interface BeautySummary {
   score: number; // 주간 이너뷰티,아우터뷰티의 평균값의 합
-  prevWeekDiff: number; // 전주 평균점수대비 + 또는 - 수치
   weekScore: DailyScore[]; // 지난7일의 일자별 이너뷰티,아우터뷰티의 평균값
   comment: string; // 하드코딩 멘트
 }
@@ -62,7 +61,6 @@ export interface BeautySummary {
  */
 export interface InnerBeautyDetail {
   score: number; // 주간 이너뷰티점수의 평균값
-  prevWeekDiff: number; // 전주 이너뷰티점수의 평균값 대비 + 또는 - 수치
   weekScore: DailyScore[]; // 지난7일의 일자별 이너뷰티의 평균값
   answer: AnswerScore[]; // 질문별 평균 점수
 }
@@ -72,7 +70,6 @@ export interface InnerBeautyDetail {
  */
 export interface OuterBeautyDetail {
   score: number; // 주간 아우터뷰티점수의 평균값
-  prevWeekDiff: number; // 전주 아우터뷰티점수의 평균값 대비 + 또는 - 수치
   weekScore: DailyScore[]; // 지난7일의 일자별 아우터뷰티의 평균값
   answer: AnswerScore[]; // 질문별 평균 점수
 }
@@ -94,7 +91,6 @@ export class BeautyStatisticsDto {
     description: '요약 데이터',
     example: {
       score: 50,
-      prevWeekDiff: -10,
       weekScore: [
         { date: "2025-09-09", value: "30" },
         { date: "2025-09-10", value: "40" }
@@ -109,7 +105,6 @@ export class BeautyStatisticsDto {
     example: {
       innerBeauty: {
         score: 20,
-        prevWeekDiff: -20,
         weekScore: [
           { date: "2025-09-09", value: "30" }
         ],
@@ -120,7 +115,6 @@ export class BeautyStatisticsDto {
       },
       outerBeauty: {
         score: 40,
-        prevWeekDiff: 20,
         weekScore: [
           { date: "2025-09-09", value: "20" }
         ],
