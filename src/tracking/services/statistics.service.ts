@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { getDayOfWeek } from '../../common/utils/korea-date.util';
 import {
   BeautyStatisticsDto,
   DietStatisticsDto,
@@ -730,12 +731,12 @@ export class StatisticsService {
   /**
    * 활동 통계 조회
    * @param userId 사용자 ID
+   * @param startDate 시작일 (YYYY-MM-DD)
+   * @param endDate 종료일 (YYYY-MM-DD)
    */
-  async getActivityStatistics(userId: number): Promise<ActivityStatisticsDto> {
+  async getActivityStatistics(userId: number, startDate: string, endDate: string): Promise<ActivityStatisticsDto> {
     try {
-      this.logger.log(`활동 통계 조회 시작 - 사용자: ${userId}`);
-
-      const { startDate, endDate } = this.getWeekDateRange();
+      this.logger.log(`활동 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
 
       // 기준 소모칼로리 (400kcal)
       const TARGET_CALORIES = 400;
@@ -746,8 +747,8 @@ export class StatisticsService {
           userId,
           recordType: 'ACTIVITY',
           date: {
-            gte: startDate,
-            lte: endDate
+            gte: new Date(startDate),
+            lte: new Date(endDate)
           }
         },
         orderBy: [{ date: 'asc' }, { createdAt: 'asc' }]
@@ -758,12 +759,14 @@ export class StatisticsService {
       const weekActivity: DailyActivity[] = [];
 
       let totalCalories = 0;
-      let totalAchievementRate = 0;
 
       // 일별 데이터 생성
       weekDates.forEach((date) => {
         // 해당 날짜의 모든 활동 기록
-        const dayRecords = activityRecords.filter((r: any) => r.date === date);
+        const dayRecords = activityRecords.filter((r: any) => {
+          const recordDate = new Date(r.date).toISOString().split('T')[0];
+          return recordDate === date;
+        });
 
         let dayTotalCalories = 0;
         const dayActivities: ActivityDetail[] = [];
@@ -781,22 +784,18 @@ export class StatisticsService {
           }
         });
 
-        // 일별 달성률 계산 (기준 400kcal 대비)
-        const dailyAchievementRate = Math.round((dayTotalCalories / TARGET_CALORIES) * 100);
-        totalAchievementRate += dailyAchievementRate;
-
-        // weekScore에 일별 총 칼로리와 달성률 추가
+        // weekScore에 일별 총 칼로리 추가
         weekScore.push({
           date,
           value: dayTotalCalories,
-          hasRecord: dayRecords.length > 0,
-          achievementRate: dailyAchievementRate
+          hasRecord: dayRecords.length > 0
         });
 
         // weekActivity에 일별 활동 상세 추가 (기록이 있는 날만)
         if (dayActivities.length > 0) {
           weekActivity.push({
             date,
+            dayOfWeek: getDayOfWeek(date),
             activity: dayActivities
           });
         }
@@ -804,13 +803,15 @@ export class StatisticsService {
         totalCalories += dayTotalCalories;
       });
 
+      // 준수율 계산: 실제 수행일수 / 총 일수 × 100
+      const performedDays = weekScore.filter(day => day.hasRecord).length;
+      const totalDays = weekScore.length;
+      const complianceRate = Math.round((performedDays / totalDays) * 100);
+
       // 주간 평균 점수 (평균 칼로리)
-      const weekAverageScore = Math.round(totalCalories / 7);
+      const weekAverageScore = Math.round(totalCalories / totalDays);
 
-      // 주간 평균 달성률 계산
-      const averageAchievementRate = Math.round(totalAchievementRate / 7);
-
-      this.logger.log(`활동 통계 조회 완료 - 사용자: ${userId}, 총 칼로리: ${totalCalories}kcal, 평균 칼로리: ${weekAverageScore}kcal, 평균 달성률: ${averageAchievementRate}%`);
+      this.logger.log(`활동 통계 조회 완료 - 사용자: ${userId}, 총 칼로리: ${totalCalories}kcal, 평균 칼로리: ${weekAverageScore}kcal, 준수율: ${complianceRate}%`);
 
       return {
         summary: {
@@ -819,7 +820,7 @@ export class StatisticsService {
         },
         detailData: {
           score: weekAverageScore,
-          averageAchievementRate,
+          complianceRate,
           weekScore,
           weekActivity,
           totalComment: '평균칼로리(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
@@ -859,7 +860,7 @@ export class StatisticsService {
         this.getSupplementStatistics(userId),
         this.getFastingStatistics(userId, startDate, endDate),
         this.getSleepStatistics(userId, startDate, endDate),
-        this.getActivityStatistics(userId)
+        this.getActivityStatistics(userId, startDate, endDate)
       ]);
 
       // 요약 카드 생성

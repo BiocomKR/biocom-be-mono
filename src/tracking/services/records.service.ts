@@ -81,8 +81,8 @@ export class RecordsService {
       for (const [type, typeRecords] of Object.entries(groupedRecords)) {
         const recordsArray = typeRecords as any[]; // 타입 단언
 
-        if (type === 'DIET') {
-          // DIET는 모든 레코드를 종합해서 하나로 만듦
+        if (type === 'DIET' || type === 'ACTIVITY') {
+          // DIET와 ACTIVITY는 모든 레코드를 종합해서 하나로 만듦
           const transformedMetadata = await this.transformRecordMetadata(type, recordsArray, userId, recordsArray[0].date);
           result.push({
             id: recordsArray[0].id, // 대표 ID
@@ -563,8 +563,37 @@ export class RecordsService {
 
     const durationInMinutes = timeToMinutes(dto.activityTime);
 
-    // 칼로리 계산 (DB의 calorie_rate는 시간당 소모 칼로리)
-    const estimatedCalories = Math.round((exerciseType.calorieRate || 0) * (durationInMinutes / 60));
+    // 해당 날짜의 기존 활동 기록 조회
+    const existingRecords = await this.prisma.userRecord.findMany({
+      where: {
+        userId,
+        recordType: 'ACTIVITY',
+        date: new Date(targetDate),
+      },
+    });
+
+    // 1. 1일 최대 입력 횟수 체크 (5회)
+    if (existingRecords.length >= 5) {
+      throw new BadRequestException('하루 최대 5회까지만 활동을 기록할 수 있습니다.');
+    }
+
+    // 2. 1일 최대 입력 시간 체크 (10시간 = 600분)
+    const totalMinutes = existingRecords.reduce((sum, record) => {
+      const metadata = record.metadata as any;
+      return sum + (metadata.durationInMinutes || 0);
+    }, 0);
+
+    if (totalMinutes + durationInMinutes > 600) {
+      const remainingMinutes = 600 - totalMinutes;
+      const remainingHours = Math.floor(remainingMinutes / 60);
+      const remainingMins = remainingMinutes % 60;
+      throw new BadRequestException(
+        `하루 최대 10시간까지만 활동을 기록할 수 있습니다. (남은 시간: ${remainingHours}시간 ${remainingMins}분)`
+      );
+    }
+
+    // 칼로리 계산 (DB의 calorie_rate는 10분당 소모 칼로리)
+    const estimatedCalories = Math.round((exerciseType.calorieRate || 0) * (durationInMinutes / exerciseType.baseMinutes));
 
     this.logger.log(`칼로리 계산: ${exerciseType.name} ${dto.activityTime} = ${estimatedCalories}kcal`);
 
@@ -574,8 +603,8 @@ export class RecordsService {
         activityType: {
           code: exerciseType.code,
           name: exerciseType.name,
-          category: exerciseType.category,
           calorie_rate: exerciseType.calorieRate,
+          base_minutes: exerciseType.baseMinutes,
         },
         activityTime: dto.activityTime,
         durationInMinutes,
@@ -753,7 +782,7 @@ export class RecordsService {
   private async createActivityRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     // 포인트 지급 여부 확인 (해당 날짜에 첫 번째 기록인지)
     const existingActivityRecord = await tx.userRecord.findFirst({
-      where: { userId, recordCode: 'ACTIVITY', date },
+      where: { userId, recordType: 'ACTIVITY', date: new Date(date) },
     });
 
     const pointsToAward = existingActivityRecord ? 0 : 100;
@@ -977,17 +1006,21 @@ export class RecordsService {
 
   /**
    * 활동 메타데이터 변환
+   * 정책: 해당 날짜의 모든 활동 칼로리를 합산
+   * @param dataOrRecords 레코드 배열 또는 단일 메타데이터 (배열이면 종합, 아니면 단일)
    */
-  private transformActivityMetadata(metadata: any) {
+  private transformActivityMetadata(dataOrRecords: any) {
+    // 배열이 아니면 배열로 감싸기
+    const records = Array.isArray(dataOrRecords) ? dataOrRecords : [{ metadata: dataOrRecords }];
+
+    // 모든 활동의 칼로리 합산
+    const totalCalories = records.reduce((sum, record) => {
+      const metadata = record.metadata;
+      return sum + (metadata.estimatedCalories || 0);
+    }, 0);
+
     return {
-      activityType: metadata.activityType,
-      activityTime: metadata.activityTime,
-      durationInMinutes: metadata.durationInMinutes,
-      imageUrl: metadata.imageUrl,
-      burnedCalories: metadata.estimatedCalories || 0,
-      targetCalories: 800, // TODO: 하드코딩 -> 실제 목표값으로 변경
-      // 기존 호환성 유지
-      totalDuration: metadata.totalDuration || metadata.durationInMinutes || 0,
+      totalCalories,
     };
   }
 

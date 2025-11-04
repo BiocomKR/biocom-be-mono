@@ -41,3 +41,14 @@ export function getKoreanNow(): Date {
   const now = new Date();
   return new Date(now.getTime() + (9 * 60 * 60 * 1000));
 }
+
+/**
+ * 날짜 문자열을 요일로 변환
+ * @param dateString YYYY-MM-DD 형식의 날짜 문자열
+ * @returns 요일 (일, 월, 화, 수, 목, 금, 토)
+ */
+export function getDayOfWeek(dateString: string): string {
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const date = new Date(dateString);
+  return days[date.getDay()];
+}

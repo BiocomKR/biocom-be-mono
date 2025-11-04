@@ -252,13 +252,29 @@ export class StatisticsController {
     summary: '활동 상세 통계 조회',
     description: '활동별 칼로리 소모량, 운동별 분석, 전일 대비 증감률의 1주일 통계를 조회합니다.',
   })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-10-27',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-11-02',
+  })
   @ApiResponse({
     status: 200,
     description: '활동 통계 조회 성공',
     type: ActivityStatisticsResponseDto,
   })
-  async getActivityStatistics(@Request() req: any) {
-    const data = await this.statisticsService.getActivityStatistics(req.user.id);
+  async getActivityStatistics(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const data = await this.statisticsService.getActivityStatistics(req.user.id, startDate, endDate);
     return {
       success: true,
       data,

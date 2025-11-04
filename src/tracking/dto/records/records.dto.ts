@@ -334,9 +334,13 @@ export class ActivityTypeDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ description: '칼로리 계수 (시간당)', example: 150 })
+  @ApiProperty({ description: '칼로리 계수 (10분당)', example: 100 })
   @IsNumber()
   calorie_rate: number;
+
+  @ApiProperty({ description: '기준 시간 (분)', example: 10 })
+  @IsNumber()
+  base_minutes: number;
 }
 
 /**
@@ -350,7 +354,8 @@ export class CreateActivityRecordDto {
     example: {
       code: 'RUNNING',
       name: '달리기',
-      calorie_rate: 150
+      calorie_rate: 100,
+      base_minutes: 10
     }
   })
   @IsNotEmpty()

@@ -467,6 +467,12 @@ export class DailyActivity {
   date: string;
 
   @ApiProperty({
+    description: '요일',
+    example: '월'
+  })
+  dayOfWeek: string;
+
+  @ApiProperty({
     description: '해당 날짜의 활동 목록',
     type: [ActivityDetail]
   })
@@ -484,10 +490,10 @@ export class ActivityDetailData {
   score: number;
 
   @ApiProperty({
-    description: '주간 평균 달성률 (%)',
-    example: 83
+    description: '준수율 (%) - 실제 수행일수 / 총 일수 × 100',
+    example: 86
   })
-  averageAchievementRate: number;
+  complianceRate: number;
 
   @ApiProperty({
     description: '일별 점수 (칼로리)',
