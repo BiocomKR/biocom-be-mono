@@ -1730,3 +1730,28 @@ model FoodCategory {
   @@index([category, isActive])
   @@map("food_categories")
 }
+
+/// 뷰티 설문지 마스터 테이블
+/// 이너뷰티 4개 항목 + 아우터뷰티 4개 항목 관리
+model BeautyQuestion {
+  id        Int       @id @default(autoincrement())
+  /// 뷰티 타입 (INNER: 이너뷰티, OUTER: 아우터뷰티)
+  type      String    @db.VarChar(20)
+  /// 구분 (장 건강, 대사 밸런스, 붓기, 수분감 등)
+  category  String    @db.VarChar(50)
+  /// 질문 문구
+  question  String    @db.Text
+  /// 정렬 순서
+  sortOrder Int       @map("sort_order")
+  /// 활성화 여부 (false시 앱에서 안보임)
+  isActive  Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([sortOrder])
+  @@index([isActive])
+  @@map("beauty_questions")
+}

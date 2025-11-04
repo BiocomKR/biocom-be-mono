@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { getKoreanToday } from '../../common/utils/korea-date.util';
@@ -13,6 +13,8 @@ import {
   CreateCustomSupplementDto,
   CustomSupplementDto,
 } from '../dto/records/records.dto';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * 기록 서비스
@@ -28,6 +30,7 @@ export class RecordsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pointService: PointService,
+    private readonly httpService: HttpService,
   ) {}
 
   /**
@@ -981,5 +984,201 @@ export class RecordsService {
     const date = new Date(dateString);
     date.setDate(date.getDate() - 1);
     return date.toISOString().split('T')[0];
+  }
+
+  /**
+   * 뷰티 설문지 조회
+   * @description 뷰티 기록 작성에 필요한 설문지 질문 목록 조회 (이너뷰티 4개 + 아우터뷰티 4개)
+   */
+  async getBeautyQuestions() {
+    try {
+      this.logger.log('뷰티 설문지 조회');
+
+      // DB에서 활성화된 설문지 조회
+      const questions = await this.prisma.beautyQuestion.findMany({
+        where: { isActive: true },
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true,
+          type: true,
+          category: true,
+          question: true,
+          sortOrder: true,
+        },
+      });
+
+      // 이너뷰티와 아우터뷰티로 분류
+      const innerBeauty = questions
+        .filter(q => q.type === 'INNER')
+        .map(q => ({
+          id: q.id,
+          category: q.category,
+          question: q.question,
+        }));
+
+      const outerBeauty = questions
+        .filter(q => q.type === 'OUTER')
+        .map(q => ({
+          id: q.id,
+          category: q.category,
+          question: q.question,
+        }));
+
+      return {
+        success: true,
+        message: '뷰티 설문지 조회 성공',
+        data: {
+          innerBeauty,
+          outerBeauty,
+        },
+      };
+    } catch (error) {
+      this.logger.error('뷰티 설문지 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 식단 초기 데이터 조회
+   * @description 사용자의 지연성알러지 검사 결과를 바탕으로 알러지 식품, 고포드맵 식품, 가공식품 목록을 조회
+   * @param userId 사용자 ID
+   */
+  async getDietInitData(userId: number) {
+    try {
+      this.logger.log(`식단 초기 데이터 조회 - 사용자: ${userId}`);
+
+      // 사용자 정보 조회 (휴대폰번호)
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { mobile: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException('사용자를 찾을 수 없습니다.');
+      }
+
+      // 고포드맵 식품 조회
+      const highFodmapFoods = await this.prisma.foodCategory.findMany({
+        where: {
+          category: 'HIGH_FODMAP',
+          isActive: true,
+        },
+        orderBy: { displayOrder: 'asc' },
+        select: { name: true },
+      });
+
+      // 가공식품 조회
+      const processedFoods = await this.prisma.foodCategory.findMany({
+        where: {
+          category: 'PROCESSED',
+          isActive: true,
+        },
+        orderBy: { displayOrder: 'asc' },
+        select: { name: true },
+      });
+
+      // 알러지 식품 조회 (지연성 알러지 검사 결과)
+      const allergyFoods = await this.getAllergyFoods(user.mobile);
+
+      return {
+        success: true,
+        message: '요청이 성공적으로 처리되었습니다.',
+        data: {
+          allergyFoods,
+          highFodmapFoods: highFodmapFoods.map(f => f.name),
+          processedFoods: processedFoods.map(f => f.name),
+        },
+        timestamp: getNowKST().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(`식단 초기 데이터 조회 실패 - 사용자: ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 지연성 알러지 검사 결과 조회
+   * @param mobile 휴대폰번호 (자동 복호화됨)
+   */
+  private async getAllergyFoods(mobile: string): Promise<Array<{ name: string; level: number }>> {
+    try {
+      this.logger.log(`지연성 알러지 검사 결과 조회 - 휴대폰: ${mobile.substring(0, 3)}****`);
+
+      // 1. chartIdByMobile API 호출
+      const chartResponse = await firstValueFrom(
+        this.httpService.get(`https://sib.codns.com:3001/api/challenge/chartIdByMobile`, {
+          params: { mobile },
+        })
+      );
+
+      const charts = chartResponse.data;
+
+      // 배열이 비어있으면 접근 제한
+      if (!Array.isArray(charts) || charts.length === 0) {
+        throw new ForbiddenException('접근 권한이 없습니다.');
+      }
+
+      // D0060 검사 결과 찾기 (가장 최신 것)
+      const d0060Results = charts
+        .filter((chart: any) => chart.orderCode === 'D0060' && chart.resultYN === 'Y')
+        .sort((a: any, b: any) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
+
+      if (d0060Results.length === 0) {
+        throw new ForbiddenException('접근 권한이 없습니다.');
+      }
+
+      const latestResult = d0060Results[0];
+
+      // 180일 경과 체크
+      const receiptDate = new Date(latestResult.receiptDate);
+      const now = getNowKST();
+      const daysDiff = Math.floor((now.getTime() - receiptDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysDiff > 180) {
+        throw new ForbiddenException('접근 권한이 없습니다.');
+      }
+
+      this.logger.log(`D0060 검사 결과 발견 - chartID: ${latestResult.chartID}, 경과일: ${daysDiff}일`);
+
+      // 2. getIggLevels API 호출
+      const iggResponse = await firstValueFrom(
+        this.httpService.get(`https://sib.codns.com:3001/api/report/getIggLevels`, {
+          params: { chartId: latestResult.chartID },
+        })
+      );
+
+      const iggData = iggResponse.data;
+
+      if (!Array.isArray(iggData) || iggData.length === 0) {
+        this.logger.warn('IgG 검사 결과가 비어있습니다.');
+        return [];
+      }
+
+      // 데이터 변환 (level1~level5를 allergyFoods 배열로)
+      const allergyFoods: Array<{ name: string; level: number }> = [];
+      const result = iggData[0];
+
+      for (let level = 1; level <= 5; level++) {
+        const levelKey = `level${level}`;
+        const foodsStr = result[levelKey];
+
+        if (foodsStr && foodsStr !== '해당없음') {
+          const foods = foodsStr.split(',').map((f: string) => f.trim());
+          foods.forEach((food: string) => {
+            allergyFoods.push({ name: food, level });
+          });
+        }
+      }
+
+      this.logger.log(`알러지 식품 ${allergyFoods.length}개 조회 완료`);
+      return allergyFoods;
+
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw error;
+      }
+      this.logger.error('지연성 알러지 검사 결과 조회 실패', error);
+      throw error;
+    }
   }
 }

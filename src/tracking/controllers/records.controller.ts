@@ -79,6 +79,23 @@ export class RecordsController {
   }
 
   /**
+   * 뷰티 설문지 조회
+   * @description 뷰티 설문지 질문 목록을 조회합니다 (이너뷰티 4개 + 아우터뷰티 4개)
+   */
+  @Get('beauty/questions')
+  @ApiOperation({
+    summary: '뷰티 설문지 조회',
+    description: '뷰티 기록 작성에 필요한 설문지 질문 목록을 조회합니다. 이너뷰티 4개 항목과 아우터뷰티 4개 항목으로 구성됩니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '뷰티 설문지 조회 성공',
+  })
+  async getBeautyQuestions() {
+    return this.recordsService.getBeautyQuestions();
+  }
+
+  /**
    * 이너뷰티 기록 저장
    * @description 설문식 이너뷰티 기록을 저장합니다 (5점 척도 × 5개 질문)
    */
@@ -97,6 +114,23 @@ export class RecordsController {
     @Body() createBeautyRecordDto: CreateBeautyRecordDto,
   ) {
     return this.recordsService.createBeautyRecord(req.user.id, createBeautyRecordDto);
+  }
+
+  /**
+   * 식단 초기 데이터 조회
+   * @description 사용자의 지연성알러지 검사 결과를 바탕으로 알러지 식품, 고포드맵 식품, 가공식품 목록을 조회합니다
+   */
+  @Get('diet/init')
+  @ApiOperation({
+    summary: '식단 초기 데이터 조회',
+    description: '사용자의 지연성알러지 검사 결과를 바탕으로 알러지 식품, 고포드맵 식품, 가공식품 목록을 조회합니다',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '식단 초기 데이터 조회 성공',
+  })
+  async getDietInitData(@Request() req: any) {
+    return this.recordsService.getDietInitData(req.user.id);
   }
 
   /**

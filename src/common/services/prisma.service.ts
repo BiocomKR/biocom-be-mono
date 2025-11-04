@@ -267,6 +267,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 식품 카테고리 테이블
   get foodCategory() { return this.prisma.foodCategory; }
 
+  // 뷰티 설문지 테이블
+  get beautyQuestion() { return this.prisma.beautyQuestion; }
+
   // 밸런스게임 관련 테이블
   get balanceGame() { return this.prisma.balanceGame; }
   get balanceGameStep() { return this.prisma.balanceGameStep; }
