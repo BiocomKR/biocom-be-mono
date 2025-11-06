@@ -28,6 +28,25 @@ export class CompleteQuizDto {
 }
 
 /**
+ * 강의 퀴즈 완료 요청 DTO
+ */
+export class CompleteLectureQuizDto {
+  @ApiProperty({
+    description: '퀴즈 ID',
+    example: 10
+  })
+  @IsNumber({}, { message: '퀴즈 ID는 숫자여야 합니다' })
+  quizId: number;
+
+  @ApiProperty({
+    description: '선택한 답변 번호 (1~4)',
+    example: 2
+  })
+  @IsNumber({}, { message: '답변 번호는 숫자여야 합니다' })
+  selectedAnswer: number;
+}
+
+/**
  * 퀴즈 완료 응답 DTO
  */
 export class QuizCompletionResponseDto {

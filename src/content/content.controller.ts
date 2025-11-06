@@ -295,44 +295,63 @@ export class ContentController {
 
       this.logger.log(`강의 접근 권한 확인 완료 - 사용자 ID: ${req.user.sub}, 구독: ${isSubscriber}, 챌린지: ${hasActiveChallenge}`);
 
-      // 퀴즈는 챌린저의 경우 currentDay와 정확히 일치할 때만 노출
+      // 퀴즈 노출 로직
+      // 챌린저: currentDay === dayNumber (노출 + 포인트 O), currentDay > dayNumber (노출 + 포인트 X), currentDay < dayNumber (비노출)
+      // 구독자 및 기타 사용자: 퀴즈 비노출
       let lectureData: any = { ...lecture };
 
       if (!isSubscriber && hasActiveChallenge && currentDay !== null) {
-        if (lecture.dayNumber !== currentDay) {
-          // 현재 일차와 일치하지 않으면 퀴즈 상태 정보 추가
+        if (currentDay < lecture.dayNumber) {
+          // 미래 퀴즈 - 비노출
           lectureData = {
             ...lecture,
             lectureQuizzes: [],
             quizStatus: {
               available: false,
               openDay: lecture.dayNumber,
-              message: `${lecture.dayNumber}일차에 오픈됩니다.`
+              message: `${lecture.dayNumber}일차에 오픈됩니다.`,
+              canEarnPoints: false
             }
           };
-          this.logger.log(`퀴즈 미노출 - 현재 ${currentDay}일차, 강의 ${lecture.dayNumber}일차 (불일치)`);
-        } else {
-          // 일치하면 퀴즈 이용 가능
+          this.logger.log(`퀴즈 미노출 - 현재 ${currentDay}일차, 강의 ${lecture.dayNumber}일차 (미래)`);
+        } else if (currentDay === lecture.dayNumber) {
+          // 당일 퀴즈 - 노출 + 포인트 지급 O
           lectureData = {
             ...lecture,
             quizStatus: {
               available: true,
               openDay: lecture.dayNumber,
-              message: null
+              message: null,
+              canEarnPoints: true
             }
           };
-          this.logger.log(`퀴즈 노출 - 현재 ${currentDay}일차, 강의 ${lecture.dayNumber}일차 (일치)`);
+          this.logger.log(`퀴즈 노출 - 현재 ${currentDay}일차, 강의 ${lecture.dayNumber}일차 (당일, 포인트 지급 O)`);
+        } else {
+          // 과거 퀴즈 - 노출 + 포인트 지급 X
+          lectureData = {
+            ...lecture,
+            quizStatus: {
+              available: true,
+              openDay: lecture.dayNumber,
+              message: '이미 지나간 퀴즈입니다. 포인트는 지급되지 않습니다.',
+              canEarnPoints: false
+            }
+          };
+          this.logger.log(`퀴즈 노출 - 현재 ${currentDay}일차, 강의 ${lecture.dayNumber}일차 (과거, 포인트 지급 X)`);
         }
-      } else if (isSubscriber) {
-        // 구독자는 항상 퀴즈 이용 가능
+      } else {
+        // 구독자 및 기타 사용자는 퀴즈 비노출
         lectureData = {
           ...lecture,
+          lectureQuizzes: [],
           quizStatus: {
-            available: true,
+            available: false,
             openDay: null,
-            message: null
+            message: '챌린지 참여자만 이용 가능합니다.',
+            canEarnPoints: false
           }
         };
+        this.logger.log(`퀴즈 비노출 - 구독자 또는 챌린지 미참여자`);
       }
 
       // 조회수 증가

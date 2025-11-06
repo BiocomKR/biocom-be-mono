@@ -1285,17 +1285,21 @@ model LectureQuiz {
 /// 강의-상품 연결 테이블
 /// 각 강의에 연결된 추천 상품들
 model LectureProduct {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   /// 강의 컨텐츠 ID
-  contentId Int     @map("content_id")
+  contentId Int      @map("content_id")
   /// 상품 ID
-  productId Int     @map("product_id")
+  productId Int      @map("product_id")
   /// 정렬 순서
-  sortOrder Int     @default(0) @map("sort_order")
+  sortOrder Int      @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive  Boolean @default(true) @map("is_active")
-  content   Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  isActive  Boolean  @default(true) @map("is_active")
+  /// 생성일시
+  createdAt DateTime @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt DateTime @updatedAt @map("updated_at")
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([contentId, productId])
   @@index([contentId])
@@ -1754,4 +1758,58 @@ model BeautyQuestion {
   @@index([sortOrder])
   @@index([isActive])
   @@map("beauty_questions")
+}
+
+/// 휴대폰 본인인증 로그 테이블
+/// NHN KCP SMS 인증 감사 로그 (법적 요구사항)
+model PhoneVerificationLog {
+  id                 Int       @id @default(autoincrement())
+  /// 본인확인 거래번호 (KCP 발급)
+  certNumber         String    @map("cert_number") @db.VarChar(50)
+  /// 주문번호 (우리 시스템에서 생성)
+  orderId            String?   @map("order_id") @db.VarChar(50)
+  /// 휴대폰 번호
+  phoneNumber        String    @map("phone_number") @db.VarChar(11)
+  /// 통신사 코드 (SKT, KTF, LGT, SKM, KTM, LGM)
+  telecom            String    @db.VarChar(3)
+  /// 사용자 이름
+  userName           String    @map("user_name") @db.VarChar(50)
+  /// 생년월일 (YYYYMMDD)
+  birthDay           String    @map("birth_day") @db.VarChar(8)
+  /// 성별 코드 (1: 남, 2: 여)
+  sex                String    @db.VarChar(2)
+  /// CI (개인 고유 연계정보)
+  ci                 String?   @db.VarChar(500)
+  /// DI (업체별 중복가입 확인정보)
+  di                 String?   @db.VarChar(500)
+  /// KCP VAN Transaction ID
+  vanTxId            String?   @map("van_tx_id") @db.VarChar(100)
+  /// KCP SMS 발송 여부
+  smsSndYn           String?   @map("sms_snd_yn") @db.VarChar(1)
+  /// KCP 본인확인 전용 여부
+  idenOnlyYn         String?   @map("iden_only_yn") @db.VarChar(1)
+  /// KCP SafeGuard 여부
+  safeGuardYn        String?   @map("safe_guard_yn") @db.VarChar(1)
+  /// KCP USIM OTP 여부
+  usimOtpYn          String?   @map("usim_otp_yn") @db.VarChar(1)
+  /// KCP 인증번호 보호 여부
+  certNumGuardYn     String?   @map("cert_num_guard_yn") @db.VarChar(1)
+  /// KCP 기관 Transaction ID
+  authTxId           String?   @map("auth_tx_id") @db.VarChar(100)
+  /// 인증 상태 (pending: 대기, completed: 완료, failed: 실패)
+  verificationStatus String    @default("PENDING") @map("verification_status") @db.VarChar(50)
+  /// 진행 단계 (identity: 실명확인, sms_sent: SMS발송, verified: 인증완료)
+  step               String    @db.VarChar(50)
+  /// 실패 사유
+  failReason         String?   @map("fail_reason")
+  /// 생성일시
+  createdAt          DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt          DateTime? @updatedAt @map("updated_at")
+
+  @@index([certNumber])
+  @@index([phoneNumber])
+  @@index([verificationStatus])
+  @@index([createdAt])
+  @@map("phone_verification_logs")
 }

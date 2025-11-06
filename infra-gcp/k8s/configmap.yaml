@@ -40,6 +40,7 @@ data:
 
   # JWT 설정
   JWT_ACCESS_TOKEN_EXPIRES_IN: "3h"  # Access Token 만료 시간: 3시간
+  JWT_REFRESH_TOKEN_EXPIRES_IN: "180d"  # Refresh Token 만료 시간: 180일 (약 6개월)
   
   # Google Cloud Storage 설정
   GOOGLE_CLOUD_api-dev-biocom: "api-dev-biocom"
@@ -63,6 +64,13 @@ data:
   AI_ANALYSIS_TIMEOUT: "30000"
   GEMINI_MODEL: "gemini-2.5-flash-image-preview"
   FACE_SLIMMING_TIMEOUT: "60000"
+
+  # NHN KCP 휴대폰 본인인증 설정
+  KCP_SITE_CODE: "ALDXX"
+  KCP_WEB_SITE_ID: "J25091911744"
+  KCP_CERT_INFO: "/config/kcp-cert/KCP_AUTH_ALDXX_CERT.pem"
+  KCP_PRIVATE_KEY_PATH: "/config/kcp-cert/KCP_AUTH_ALDXX_PRIKEY.pem"
+  KCP_CALLBACK_NUMBER: "0220390295"
   
 ---
 # 📝 로깅 설정용 ConfigMap

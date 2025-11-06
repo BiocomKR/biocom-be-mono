@@ -373,7 +373,10 @@ export class QuizCompletionService {
    * @param userId 사용자 ID
    * @param quizId 퀴즈 ID
    * @param selectedAnswer 선택한 답변 번호
-   * @description 강의 연결 퀴즈를 풀고 포인트를 지급합니다 (최초 1회, 정답/오답 무관)
+   * @description 강의 연결 퀴즈를 풀고 포인트를 지급합니다
+   * - 챌린저 당일 퀴즈 (currentDay === dayNumber): 200점 지급
+   * - 챌린저 과거 퀴즈 (currentDay > dayNumber): 포인트 지급 안함
+   * - 구독자: 퀴즈 풀이 불가 (Controller에서 차단)
    */
   async completeLectureQuiz(userId: number, quizId: number, selectedAnswer: number) {
     try {
@@ -387,7 +390,6 @@ export class QuizCompletionService {
             isActive: true
           },
           include: {
-            content: true, // 강의 정보
             lectureQuizzes: {
               include: {
                 content: true
@@ -400,8 +402,8 @@ export class QuizCompletionService {
           throw new NotFoundException('퀴즈를 찾을 수 없습니다');
         }
 
-        // 2️⃣ 강의 연결 확인 (contentId 또는 lectureQuizzes를 통해)
-        const linkedContent = quiz.content || quiz.lectureQuizzes?.[0]?.content;
+        // 2️⃣ 강의 연결 확인 (lectureQuizzes를 통해)
+        const linkedContent = quiz.lectureQuizzes?.[0]?.content;
 
         if (!linkedContent) {
           throw new BadRequestException('강의와 연결되지 않은 퀴즈입니다');
@@ -412,7 +414,44 @@ export class QuizCompletionService {
           throw new BadRequestException('올바르지 않은 답변 번호입니다');
         }
 
-        // 4️⃣ 포인트 지급 여부 확인 (최초 1회만 포인트, 재시도는 허용)
+        // 4️⃣ 활성 챌린지 조회 및 currentDay 계산
+        const activeChallenge = await tx.userChallenge.findFirst({
+          where: {
+            userId,
+            status: 'ACTIVE'
+          }
+        });
+
+        let canEarnPoints = false;
+        let pointEarnMessage = '';
+
+        if (activeChallenge) {
+          // activatedAt 기준으로 현재 챌린지 일차 계산
+          const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+          const lectureDayNumber = linkedContent.dayNumber;
+
+          if (currentDay === lectureDayNumber) {
+            // 당일 퀴즈: 포인트 지급 가능
+            canEarnPoints = true;
+            pointEarnMessage = '당일 퀴즈 완료';
+            this.logger.log(`당일 퀴즈 - currentDay: ${currentDay}, lectureDayNumber: ${lectureDayNumber}, 포인트 지급 O`);
+          } else if (currentDay > lectureDayNumber) {
+            // 과거 퀴즈: 포인트 지급 안함
+            canEarnPoints = false;
+            pointEarnMessage = '과거 퀴즈는 포인트가 지급되지 않습니다';
+            this.logger.log(`과거 퀴즈 - currentDay: ${currentDay}, lectureDayNumber: ${lectureDayNumber}, 포인트 지급 X`);
+          } else {
+            // 미래 퀴즈: 접근 불가 (여기까지 오면 안됨, Controller에서 차단되어야 함)
+            throw new BadRequestException('아직 접근할 수 없는 퀴즈입니다');
+          }
+        } else {
+          // 챌린지 미참여자 (구독자 등): 포인트 지급 안함
+          canEarnPoints = false;
+          pointEarnMessage = '챌린지 참여자만 포인트를 받을 수 있습니다';
+          this.logger.log(`챌린지 미참여자 - 포인트 지급 X`);
+        }
+
+        // 5️⃣ 포인트 지급 여부 확인 (최초 1회만 포인트, 재시도는 허용)
         const pointsAlreadyGiven = await tx.quizAttempt.findFirst({
           where: {
             userId,
@@ -421,15 +460,16 @@ export class QuizCompletionService {
           }
         });
 
-        // 5️⃣ 정답 채점
+        // 6️⃣ 정답 채점
         const isCorrect = selectedAnswer === quiz.correctAnswer;
 
-        // 6️⃣ 포인트 계산 (최초 1회, 정답/오답 무관 300점)
-        const pointsEarned = pointsAlreadyGiven ? 0 : (linkedContent.points || 300);
+        // 7️⃣ 포인트 계산 (당일 퀴즈 + 최초 1회 + 포인트 지급 가능한 경우만 200점)
+        const basePoints = 200;
+        const pointsEarned = (canEarnPoints && !pointsAlreadyGiven) ? basePoints : 0;
 
         const now = getNowKST();
 
-        // 7️⃣ 퀴즈 시도 기록 저장 (매 시도마다 기록, 재도전 허용)
+        // 8️⃣ 퀴즈 시도 기록 저장 (매 시도마다 기록, 재도전 허용)
         await tx.quizAttempt.create({
           data: {
             userId,
@@ -442,7 +482,7 @@ export class QuizCompletionService {
           }
         });
 
-        // 8️⃣ 포인트 지급 (최초 1회만)
+        // 9️⃣ 포인트 지급 (조건 충족 시만)
         if (pointsEarned > 0) {
           await this.pointService.addPoints(
             userId,
@@ -467,6 +507,8 @@ export class QuizCompletionService {
           correctAnswer: quiz.correctAnswer,
           isCorrect,
           pointsEarned,
+          canEarnPoints,
+          pointEarnMessage: pointsEarned === 0 ? pointEarnMessage : null,
           answeredAt: now
         };
 

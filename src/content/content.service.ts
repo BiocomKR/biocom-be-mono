@@ -227,7 +227,11 @@ export class ContentService {
         // 연결된 상품들
         lectureProducts: {
           include: {
-            product: true
+            product: {
+              include: {
+                images: true
+              }
+            }
           },
           orderBy: { sortOrder: 'asc' }
         },

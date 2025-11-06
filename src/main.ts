@@ -22,14 +22,25 @@ import { RequestIdInterceptor, ResponseTransformInterceptor, TimeoutInterceptor 
  */
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
-  
+
   logger.log('애플리케이션 초기화를 시작합니다...');
 
   // NestJS 애플리케이션 인스턴스 생성
   const app = await NestFactory.create(AppModule);
-  
-  // Winston Logger 사용
-  app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+
+  // 환경별 로거 설정
+  // 개발 환경: NestJS 기본 Logger (콘솔 로그 잘 보임)
+  // 운영 환경: Winston Logger (파일 저장)
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (isProduction) {
+    // 운영 환경: Winston Logger 사용 (파일 저장)
+    app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+    logger.log('Winston Logger 활성화 (운영 환경)');
+  } else {
+    // 개발 환경: NestJS 기본 Logger 사용 (콘솔 출력)
+    logger.log('NestJS 기본 Logger 활성화 (개발 환경)');
+  }
 
   // 글로벌 API 접두사 설정
   app.setGlobalPrefix('api');
