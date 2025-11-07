@@ -118,3 +118,59 @@ export const calculateChallengeDay = (activatedAt: Date): number => {
   // 1일차부터 시작 (경과일 + 1)
   return diffDays + 1;
 };
+
+/**
+ * 프론트엔드에서 받은 datetime 문자열을 KST 기준 Date 객체로 파싱
+ *
+ * ⚠️ 중요: 프론트엔드가 보내는 "YYYY-MM-DD HH:MM:SS" 형식은 항상 KST 기준입니다.
+ * new Date()로 파싱하면 UTC로 취급되므로, 이 함수를 사용하세요.
+ *
+ * @param datetimeString KST 기준 datetime 문자열 (예: "2025-11-07 20:00:00")
+ * @returns Date 객체 (DB 저장 시 KST 시간값 유지)
+ *
+ * @example
+ * // 프론트: "2025-11-07 20:00:00" (KST) 전송
+ * const dt = parseKSTDateTime("2025-11-07 20:00:00");
+ * // dt는 2025-11-07 20:00:00 KST를 나타내는 Date 객체
+ */
+export function parseKSTDateTime(datetimeString: string): Date {
+  // "YYYY-MM-DD HH:MM:SS" 형식을 파싱
+  const match = datetimeString.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+
+  if (!match) {
+    throw new Error(`Invalid datetime format: ${datetimeString}. Expected "YYYY-MM-DD HH:MM:SS"`);
+  }
+
+  const [, year, month, day, hour, minute, second] = match.map(Number);
+
+  // KST 시간 그대로 UTC Date 객체로 생성 (기존 createKSTDate 패턴 활용)
+  return createKSTDate(year, month, day, hour, minute, second);
+}
+
+/**
+ * Date 객체에서 KST 기준 날짜만 추출 (YYYY-MM-DD)
+ *
+ * @param date Date 객체
+ * @returns KST 기준 날짜 문자열 (예: "2025-11-07")
+ *
+ * @example
+ * const dt = parseKSTDateTime("2025-11-07 20:00:00");
+ * const dateStr = extractKSTDate(dt); // "2025-11-07"
+ */
+export function extractKSTDate(date: Date): string {
+  // Date 객체에서 UTC 기준 날짜 추출 (우리는 KST 시간을 UTC로 저장했으므로)
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * 오늘 날짜를 KST 기준으로 YYYY-MM-DD 형식으로 반환
+ *
+ * @returns 오늘 날짜 문자열 (예: "2025-11-07")
+ *
+ * @example
+ * const today = getKoreanToday(); // "2025-11-07"
+ */
+export function getKoreanToday(): string {
+  const now = getNowKST();
+  return extractKSTDate(now);
+}

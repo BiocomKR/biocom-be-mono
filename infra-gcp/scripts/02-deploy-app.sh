@@ -367,31 +367,57 @@ deploy_kubernetes() {
         --from-literal=SESSION_SECRET='C+HwoTESUErMHRg5GhL3Cd*SqEJe6B9q5&n#R7fq&jFvA' \
         --from-literal=ENCRYPTION_KEY='b!@c@m2@25!@#$@creTkEy!2E45bT8@' \
         --from-literal=OPENAI_API_KEY='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' \
-        --from-literal=GOOGLE_API_KEY='AIzaSyC_RxjEbJyHoV5oHtWky7pEJS5Iw5toqPU'
+        --from-literal=GOOGLE_API_KEY='AIzaSyC_RxjEbJyHoV5oHtWky7pEJS5Iw5toqPU' \
+        --from-literal=KCP_PRIVATE_KEY_PASSWORD='b!c0-pr!v@t2-0519!'
     
     # Google Service Account Key Secret 확인/생성
     log_info "Google Service Account Key Secret 확인 중..."
-    
+
     if kubectl get secret google-service-account-key -n "$NAMESPACE" &>/dev/null; then
         log_success "✅ Google Service Account Key Secret이 이미 존재합니다. 건너뜁니다."
     else
         log_info "Google Service Account Key Secret이 없습니다. 생성합니다..."
-        
+
         # 프로젝트 루트에서 서비스 계정 키 파일 확인
         SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
         SERVICE_ACCOUNT_KEY_FILE="$PROJECT_ROOT/google-service-account-key.json"
-        
+
         if [[ ! -f "$SERVICE_ACCOUNT_KEY_FILE" ]]; then
             log_error "Service Account Key 파일을 찾을 수 없습니다: $SERVICE_ACCOUNT_KEY_FILE"
             exit 1
         fi
-        
+
         kubectl create secret generic google-service-account-key \
             --namespace="$NAMESPACE" \
             --from-file=key.json="$SERVICE_ACCOUNT_KEY_FILE"
-        
+
         log_success "✅ Google Service Account Key Secret 생성 완료!"
+    fi
+
+    # KCP 인증서 Secret 확인/생성
+    log_info "KCP 인증서 Secret 확인 중..."
+
+    if kubectl get secret kcp-cert-files -n "$NAMESPACE" &>/dev/null; then
+        log_success "✅ KCP 인증서 Secret이 이미 존재합니다. 건너뜁니다."
+    else
+        log_info "KCP 인증서 Secret이 없습니다. 생성합니다..."
+
+        # KCP 인증서 파일 확인
+        KCP_CERT_FILE="$PROJECT_ROOT/config/kcp-cert/KCP_AUTH_ALDXX_CERT.pem"
+        KCP_PRIKEY_FILE="$PROJECT_ROOT/config/kcp-cert/KCP_AUTH_ALDXX_PRIKEY.pem"
+
+        if [[ ! -f "$KCP_CERT_FILE" ]] || [[ ! -f "$KCP_PRIKEY_FILE" ]]; then
+            log_error "KCP 인증서 파일을 찾을 수 없습니다: $PROJECT_ROOT/config/kcp-cert/"
+            exit 1
+        fi
+
+        kubectl create secret generic kcp-cert-files \
+            --namespace="$NAMESPACE" \
+            --from-file=KCP_AUTH_ALDXX_CERT.pem="$KCP_CERT_FILE" \
+            --from-file=KCP_AUTH_ALDXX_PRIKEY.pem="$KCP_PRIKEY_FILE"
+
+        log_success "✅ KCP 인증서 Secret 생성 완료!"
     fi
     
     # Service 배포

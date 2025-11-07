@@ -2,7 +2,11 @@ import { Injectable, Logger, ConflictException, NotFoundException, BadRequestExc
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { getKoreanToday } from '../../common/utils/korea-date.util';
-import { getNowKST } from '../../common/utils/kst-date.util';
+import {
+  getNowKST,
+  parseKSTDateTime,
+  extractKSTDate
+} from '../../common/utils/kst-date.util';
 import {
   CreateBeautyRecordDto,
   CreateDietRecordDto,
@@ -84,21 +88,33 @@ export class RecordsService {
         if (type === 'DIET' || type === 'ACTIVITY') {
           // DIET와 ACTIVITY는 모든 레코드를 종합해서 하나로 만듦
           const transformedMetadata = await this.transformRecordMetadata(type, recordsArray, userId, recordsArray[0].date);
+
+          // 현재 기록 횟수 / 최대 기록 횟수 추가
+          const recordLimit = this.getRecordLimit(type, recordsArray);
+
           result.push({
             id: recordsArray[0].id, // 대표 ID
             recordType: type,
             date: recordsArray[0].date,
             metadata: transformedMetadata,
+            currentCount: recordLimit.currentCount,
+            maxCount: recordLimit.maxCount,
           });
         } else {
           // 나머지는 개별 처리
           for (const record of recordsArray) {
             const transformedMetadata = await this.transformRecordMetadata(type, record.metadata, userId, record.date);
+
+            // 현재 기록 횟수 / 최대 기록 횟수 추가
+            const recordLimit = this.getRecordLimit(type, recordsArray);
+
             result.push({
               id: record.id,
               recordType: type,
               date: record.date,
               metadata: transformedMetadata,
+              currentCount: recordLimit.currentCount,
+              maxCount: recordLimit.maxCount,
             });
           }
         }
@@ -415,9 +431,9 @@ export class RecordsService {
   async createFastingRecord(userId: number, dto: CreateFastingRecordDto) {
     const today = getKoreanToday();
 
-    // DateTime 파싱
-    const startDateTime = new Date(dto.startDateTime);
-    const endDateTime = new Date(dto.endDateTime);
+    // ✅ KST DateTime 파싱 (프론트엔드에서 보내는 KST 문자열을 올바르게 파싱)
+    const startDateTime = parseKSTDateTime(dto.startDateTime);
+    const endDateTime = parseKSTDateTime(dto.endDateTime);
 
     // 유효성 검증
     this.validateFastingDateTime(startDateTime, endDateTime, today);
@@ -439,9 +455,9 @@ export class RecordsService {
    * 단식 DateTime 유효성 검증
    */
   private validateFastingDateTime(startDateTime: Date, endDateTime: Date, today: string) {
-    // 클라이언트가 보낸 날짜 문자열에서 날짜 부분만 추출 (YYYY-MM-DD)
-    const startDateStr = this.extractDateFromDateTime(startDateTime);
-    const endDateStr = this.extractDateFromDateTime(endDateTime);
+    // ✅ KST 기준 날짜 추출 (이제 올바르게 동작)
+    const startDateStr = extractKSTDate(startDateTime);
+    const endDateStr = extractKSTDate(endDateTime);
 
     // 어제 날짜 계산
     const todayDate = new Date(today);
@@ -465,15 +481,6 @@ export class RecordsService {
     }
   }
 
-  /**
-   * DateTime 객체에서 KST 기준 날짜 추출 (YYYY-MM-DD)
-   */
-  private extractDateFromDateTime(dateTime: Date): string {
-    // KST 오프셋 (+9시간)
-    const kstOffset = 9 * 60 * 60 * 1000;
-    const kstTime = new Date(dateTime.getTime() + kstOffset);
-    return kstTime.toISOString().split('T')[0];
-  }
 
   /**
    * 수면 기록 저장
@@ -483,9 +490,9 @@ export class RecordsService {
   async createSleepRecord(userId: number, dto: CreateSleepRecordDto) {
     const today = getKoreanToday();
 
-    // DateTime 파싱
-    const bedDateTime = new Date(dto.bedDateTime);
-    const wakeDateTime = new Date(dto.wakeDateTime);
+    // ✅ KST DateTime 파싱 (프론트엔드에서 보내는 KST 문자열을 올바르게 파싱)
+    const bedDateTime = parseKSTDateTime(dto.bedDateTime);
+    const wakeDateTime = parseKSTDateTime(dto.wakeDateTime);
 
     // 유효성 검증
     this.validateSleepDateTime(bedDateTime, wakeDateTime, today);
@@ -507,9 +514,9 @@ export class RecordsService {
    * 수면 DateTime 유효성 검증
    */
   private validateSleepDateTime(bedDateTime: Date, wakeDateTime: Date, today: string) {
-    // 클라이언트가 보낸 날짜 문자열에서 날짜 부분만 추출 (YYYY-MM-DD)
-    const bedDateStr = this.extractDateFromDateTime(bedDateTime);
-    const wakeDateStr = this.extractDateFromDateTime(wakeDateTime);
+    // ✅ KST 기준 날짜 추출 (이제 올바르게 동작)
+    const bedDateStr = extractKSTDate(bedDateTime);
+    const wakeDateStr = extractKSTDate(wakeDateTime);
 
     // 어제 날짜 계산
     const todayDate = new Date(today);
@@ -871,6 +878,43 @@ export class RecordsService {
     } catch (error) {
       this.logger.error('운동 종목 목록 조회 실패', error);
       throw error;
+    }
+  }
+
+  /**
+   * 기록 타입별 현재 기록 횟수 / 최대 기록 횟수 반환
+   * @param recordType 기록 타입
+   * @param records 해당 날짜의 해당 타입 기록 배열
+   */
+  private getRecordLimit(recordType: string, records: any[]): { currentCount: number; maxCount: number } {
+    switch (recordType) {
+      case 'BEAUTY':
+        // 1일 1회
+        return { currentCount: records.length, maxCount: 1 };
+
+      case 'DIET':
+        // DIET는 식사별로 다름: 아침/점심/저녁 각 1회, 간식/야식 각 3회
+        // 여기서는 전체 기록 개수만 표시 (식사별 상세는 클라이언트에서 처리)
+        return { currentCount: records.length, maxCount: 9 }; // 아침1+점심1+저녁1+간식3+야식3 = 9
+
+      case 'SUPPLEMENT':
+        // 무제한
+        return { currentCount: records.length, maxCount: -1 }; // -1 = 무제한
+
+      case 'FASTING':
+        // 1일 1회
+        return { currentCount: records.length, maxCount: 1 };
+
+      case 'SLEEP':
+        // 1일 1회
+        return { currentCount: records.length, maxCount: 1 };
+
+      case 'ACTIVITY':
+        // 1일 5회
+        return { currentCount: records.length, maxCount: 5 };
+
+      default:
+        return { currentCount: records.length, maxCount: -1 };
     }
   }
 
