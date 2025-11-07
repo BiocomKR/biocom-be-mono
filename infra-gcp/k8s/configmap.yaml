@@ -43,10 +43,10 @@ data:
   JWT_REFRESH_TOKEN_EXPIRES_IN: "180d"  # Refresh Token 만료 시간: 180일 (약 6개월)
   
   # Google Cloud Storage 설정
-  GOOGLE_CLOUD_api-dev-biocom: "api-dev-biocom"
+  GOOGLE_CLOUD_PROJECT_ID: "api-dev-biocom"
   GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
-  GOOGLE_SERVICE_ACCOUNT_KEY_FILE: "/app/secrets/key.json"
-  GCS_BUCKET_NAME: "api-dev-biocom-biocom-uploads"
+  GOOGLE_APPLICATION_CREDENTIALS: "/app/secrets/key.json"
+  GCS_BUCKET_NAME: "api-dev-biocom-uploads"
   
   # 파일 업로드 설정 (Google Cloud Storage 사용)
   MAX_FILE_SIZE: "10485760"  # 10MB
