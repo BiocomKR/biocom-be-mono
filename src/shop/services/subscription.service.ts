@@ -49,11 +49,12 @@ export class SubscriptionService {
       throw new NotFoundException('사용자를 찾을 수 없습니다');
     }
 
-    // 이미 빌링키가 등록되어 있으면 덮어쓰기
+    // 이미 빌링키가 등록되어 있으면 에러
     if (user.billingKey) {
       this.logger.warn(
-        `기존 빌링키 덮어쓰기: userId=${userId}, oldBillingKey=${user.billingKey}`,
+        `빌링키 중복 등록 시도: userId=${userId}, existingBillingKey=${user.billingKey}`,
       );
+      throw new BadRequestException('이미 등록된 카드가 있습니다. 카드를 변경하려면 먼저 삭제해주세요.');
     }
 
     // 토스 API를 호출하여 billingKey 발급
@@ -239,8 +240,16 @@ export class SubscriptionService {
    * 내 구독 목록 조회
    *
    * @param userId - 사용자 ID
+   * @returns 구독 목록 + 빌링키 등록 여부
    */
   async getMySubscriptions(userId: number) {
+    // 빌링키 등록 여부 확인
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { billingKey: true },
+    });
+
+    // 구독 목록 조회
     const subscriptions = await this.prisma.subscription.findMany({
       where: { userId: userId },
       include: {
@@ -261,6 +270,7 @@ export class SubscriptionService {
 
     return {
       success: true,
+      hasBillingKey: !!user?.billingKey,
       data: subscriptions,
     };
   }
