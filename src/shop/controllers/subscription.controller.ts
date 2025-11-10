@@ -54,7 +54,7 @@ export class SubscriptionController {
   @Post('billing')
   @ApiOperation({
     summary: '빌링키 등록',
-    description: '토스페이먼츠 빌링키를 사용자 계정에 등록합니다',
+    description: '토스페이먼츠 authKey로 빌링키를 발급받아 사용자 계정에 등록합니다',
   })
   @ApiResponse({ status: 201, description: '빌링키 등록 성공' })
   async registerBilling(
@@ -63,7 +63,7 @@ export class SubscriptionController {
   ) {
     const userId = req.user.id;
     this.logger.log(
-      `빌링키 등록 요청: userId=${userId}, billingKey=${registerBillingDto.billingKey}`,
+      `빌링키 등록 요청: userId=${userId}, authKey=${registerBillingDto.authKey}`,
     );
 
     return this.subscriptionService.registerBilling(userId, registerBillingDto);

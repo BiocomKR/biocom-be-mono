@@ -105,6 +105,45 @@ export class TossPaymentsService {
   }
 
   /**
+   * authKey로 빌링키 발급
+   *
+   * @param authKey - 토스 결제창에서 발급받은 인증키
+   * @param customerKey - 고객 식별 키
+   * @returns billingKey
+   */
+  async issueBillingKey(
+    authKey: string,
+    customerKey: string,
+  ): Promise<string> {
+    try {
+      const url = `${this.baseUrl}/billing/authorizations/issue`;
+      const headers = {
+        'Authorization': `Basic ${Buffer.from(this.secretKey + ':').toString('base64')}`,
+        'Content-Type': 'application/json'
+      };
+
+      const body = {
+        authKey,
+        customerKey,
+      };
+
+      this.logger.log(`빌링키 발급 요청: authKey=${authKey}, customerKey=${customerKey}`);
+
+      const response = await firstValueFrom(
+        this.httpService.post(url, body, { headers, timeout: 10000 })
+      );
+
+      const billingKey = response.data.billingKey;
+      this.logger.log(`빌링키 발급 성공: billingKey=${billingKey}`);
+
+      return billingKey;
+    } catch (error: any) {
+      this.logger.error(`빌링키 발급 실패: authKey=${authKey}`, error.response?.data);
+      throw error;
+    }
+  }
+
+  /**
    * 빌링키로 자동결제 (정기결제)
    *
    * @param billingKey - 토스페이먼츠 빌링키

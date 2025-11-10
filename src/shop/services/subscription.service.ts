@@ -31,13 +31,13 @@ export class SubscriptionService {
    * 빌링키 등록
    *
    * @param userId - 사용자 ID
-   * @param registerBillingDto - 빌링키 정보
+   * @param registerBillingDto - authKey와 customerKey
    */
   async registerBilling(userId: number, registerBillingDto: RegisterBillingDto) {
-    const { billingKey, customerKey } = registerBillingDto;
+    const { authKey, customerKey } = registerBillingDto;
 
     this.logger.log(
-      `빌링키 등록: userId=${userId}, billingKey=${billingKey}`,
+      `빌링키 등록: userId=${userId}, authKey=${authKey}`,
     );
 
     // 사용자 조회
@@ -55,6 +55,14 @@ export class SubscriptionService {
         `기존 빌링키 덮어쓰기: userId=${userId}, oldBillingKey=${user.billingKey}`,
       );
     }
+
+    // 토스 API를 호출하여 billingKey 발급
+    const billingKey = await this.tossPaymentsService.issueBillingKey(
+      authKey,
+      customerKey,
+    );
+
+    this.logger.log(`토스로부터 빌링키 발급 성공: billingKey=${billingKey}`);
 
     // 빌링키 저장
     await this.prisma.user.update({
