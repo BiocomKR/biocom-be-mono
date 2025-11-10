@@ -302,6 +302,9 @@ export class FastingWeekScoreDto {
   @ApiProperty({ description: '단식 시간', example: '16' })
   value: string;
 
+  @ApiProperty({ description: '목표 시간 (고정값)', example: 16 })
+  targetHour: number;
+
   @ApiProperty({ description: '완료 여부 (16시간 이상)', example: true })
   isCompleted: boolean;
 }
@@ -312,6 +315,9 @@ export class FastingWeekScoreDto {
 export class FastingDetailDataDto {
   @ApiProperty({ description: '달성률 점수 (7일중 isCompleted가 true인 백분율)', example: 60 })
   score: number;
+
+  @ApiProperty({ description: '목표 시간 (고정값)', example: 16 })
+  targetHour: number;
 
   @ApiProperty({ description: '주간 점수 배열', type: [FastingWeekScoreDto] })
   weekScore: FastingWeekScoreDto[];
@@ -368,6 +374,9 @@ export class SleepWeekScoreDto {
   @ApiProperty({ description: '수면 시간', example: '7.5' })
   value: string;
 
+  @ApiProperty({ description: '목표 시간 (고정값)', example: 8 })
+  targetHour: number;
+
   @ApiProperty({ description: '완료 여부 (8시간 이상)', example: false })
   isCompleted: boolean;
 }
@@ -378,6 +387,9 @@ export class SleepWeekScoreDto {
 export class SleepDetailDataDto {
   @ApiProperty({ description: '달성률 점수 (7일중 isCompleted가 true인 백분율)', example: 60 })
   score: number;
+
+  @ApiProperty({ description: '목표 시간 (고정값)', example: 8 })
+  targetHour: number;
 
   @ApiProperty({ description: '주간 점수 배열', type: [SleepWeekScoreDto] })
   weekScore: SleepWeekScoreDto[];

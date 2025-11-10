@@ -538,6 +538,7 @@ export class StatisticsService {
             startDateTime: `${date} 00:00:00`,
             endDateTime: `${date} 12:00:00`,
             value: '0',
+            targetHour: 16,
             isCompleted: false
           };
         }
@@ -554,6 +555,7 @@ export class StatisticsService {
           startDateTime,
           endDateTime,
           value,
+          targetHour: 16,
           isCompleted
         };
       });
@@ -574,6 +576,7 @@ export class StatisticsService {
 
       const detailData = {
         score: achievementScore,
+        targetHour: 16,
         weekScore,
         totalComment: '평균단식시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
       };
@@ -634,6 +637,7 @@ export class StatisticsService {
             bedDateTime: `${date} 23:00:00`,
             wakeDateTime: `${date} 07:00:00`,
             value: '0',
+            targetHour: 8,
             isCompleted: false
           };
         }
@@ -650,6 +654,7 @@ export class StatisticsService {
           bedDateTime,
           wakeDateTime,
           value,
+          targetHour: 8,
           isCompleted
         };
       });
@@ -670,6 +675,7 @@ export class StatisticsService {
 
       const detailData = {
         score: achievementScore,
+        targetHour: 8,
         weekScore,
         totalComment: '평균수면시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
       };
