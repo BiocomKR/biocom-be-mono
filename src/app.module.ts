@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService as NestConfigService } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR, APP_GUARD, Reflector } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
@@ -66,7 +67,10 @@ import { PhoneVerificationModule } from './phone-verification/phone-verification
         abortEarly: false,
       },
     }),
-    
+
+    // 스케줄러 모듈 (Cron Job)
+    ScheduleModule.forRoot(),
+
     // 정적 파일 서빙
     ServeStaticModule.forRootAsync({
       imports: [ConfigModule],

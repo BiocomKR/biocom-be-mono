@@ -55,7 +55,7 @@ export class AuthService {
         password: hashedPassword,
         name,
         mobile,
-        subscriptionStatus: UserSubscriptionStatus.NEWCOMER,
+        status: UserSubscriptionStatus.NEWCOMER,
         createdAt: getNowKST(), // KST 시간으로 저장
       },
       select: {

@@ -27,6 +27,7 @@ import { ManagementSurveyService } from './services/management-survey.service';
 import { ManagementMissionService } from './services/management-mission.service';
 import { PointModule } from '../point/point.module';
 import { ChallengeModule } from '../challenge/challenge.module';
+import { PaymentModule } from '../shop/payment.module';
 
 /**
  * Management 모듈
@@ -43,6 +44,7 @@ import { ChallengeModule } from '../challenge/challenge.module';
     ContentModule,
     PointModule,
     ChallengeModule,
+    PaymentModule,
   ],
   controllers: [
     ManagementUsersController,

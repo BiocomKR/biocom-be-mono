@@ -33,7 +33,7 @@ export class HomeService {
         select: {
           id: true,
           email: true,
-          subscriptionStatus: true,
+          status: true,
           userChallenges: {
             where: { status: 'ACTIVE' },
             select: {
@@ -60,13 +60,13 @@ export class HomeService {
       }
 
       const baseData = {
-        subscriptionStatus: user.subscriptionStatus,
+        status: user.status,
         userName: user.email, // TODO: 실제 이름 필드가 있으면 변경
         welcomeMessage: `안녕하세요, ${user.email}님!`,
       };
 
       // 구독 상태에 따른 홈 화면 데이터 반환
-      switch (user.subscriptionStatus) {
+      switch (user.status) {
         case UserSubscriptionStatus.NEWCOMER:
           return await this.getNewcomerHomeData(userId, baseData);
 

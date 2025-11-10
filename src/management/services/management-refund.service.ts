@@ -5,6 +5,7 @@ import {
   BadRequestException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { TossPaymentsService } from '../../shop/services/toss-payments.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../../common/utils/kst-date.util';
 
@@ -12,7 +13,10 @@ import { getNowKST } from '../../common/utils/kst-date.util';
 export class ManagementRefundService {
   private readonly logger = new Logger(ManagementRefundService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tossPaymentsService: TossPaymentsService,
+  ) {}
 
   /**
    * 전체 환불 목록 조회
@@ -500,5 +504,333 @@ export class ManagementRefundService {
         )
       }))
     };
+  }
+
+  /**
+   * 반품/교환 승인 (관리자용)
+   */
+  async approveReturn(orderNumber: string, returnId: number) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 반품/교환 조회
+      const exchangeReturn = await tx.exchangeReturn.findFirst({
+        where: {
+          id: returnId,
+          order: { orderNumber }
+        },
+        include: {
+          order: true
+        }
+      });
+
+      if (!exchangeReturn) {
+        throw new NotFoundException('반품/교환 요청을 찾을 수 없습니다');
+      }
+
+      // 승인 가능 상태 확인
+      if (exchangeReturn.status !== 'REQUESTED') {
+        throw new BadRequestException('이미 처리된 요청입니다');
+      }
+
+      // 반품/교환 상태 업데이트
+      const updated = await tx.exchangeReturn.update({
+        where: { id: returnId },
+        data: {
+          status: 'APPROVED',
+          approvedAt: getNowKST(),
+        }
+      });
+
+      this.logger.log(`반품/교환 승인 완료: 주문번호 ${orderNumber}, ${exchangeReturn.type} ID ${returnId}`);
+
+      return {
+        success: true,
+        message: `${exchangeReturn.type === 'RETURN' ? '반품' : '교환'}이 승인되었습니다. 고객에게 회수 안내가 발송됩니다.`,
+        data: {
+          returnId: updated.id,
+          type: updated.type,
+          status: updated.status,
+          approvedAt: updated.approvedAt
+        }
+      };
+    });
+  }
+
+  /**
+   * 반품 완료 및 환불 처리 (관리자용)
+   * 반품 상품을 수령한 후 호출
+   */
+  async completeReturn(orderNumber: string, returnId: number, returnTrackingNumber?: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 반품 조회
+      const exchangeReturn = await tx.exchangeReturn.findFirst({
+        where: {
+          id: returnId,
+          order: { orderNumber },
+          type: 'RETURN' // 반품만 환불 처리
+        },
+        include: {
+          order: {
+            include: {
+              payment: true
+            }
+          }
+        }
+      });
+
+      if (!exchangeReturn) {
+        throw new NotFoundException('반품 요청을 찾을 수 없습니다');
+      }
+
+      // 승인 상태 확인
+      if (exchangeReturn.status !== 'APPROVED') {
+        throw new BadRequestException('승인된 반품만 완료 처리 가능합니다');
+      }
+
+      const order = exchangeReturn.order;
+
+      // 결제 정보 확인
+      if (!order.payment) {
+        throw new BadRequestException('결제 정보를 찾을 수 없습니다');
+      }
+
+      // 1. 반품 상태 업데이트
+      await tx.exchangeReturn.update({
+        where: { id: returnId },
+        data: {
+          status: 'COMPLETED',
+          completedAt: getNowKST(),
+          returnTrackingNumber: returnTrackingNumber || null
+        }
+      });
+
+      // 2. Refund 레코드 생성
+      const refund = await tx.refund.create({
+        data: {
+          orderId: order.id,
+          paymentId: order.payment.id,
+          refundType: 'RETURN',
+          status: 'REQUESTED',
+          refundAmount: order.totalAmount, // 전액 환불
+          pointRefund: order.pointUsed,
+          reason: exchangeReturn.reason,
+          reasonDetail: exchangeReturn.reasonDetail,
+          requestedAt: getNowKST(),
+          createdAt: getNowKST(),
+        }
+      });
+
+      // 3. 토스페이먼츠 결제 취소 API 호출
+      try {
+        const tossResponse = await this.tossPaymentsService.cancelPayment(
+          order.payment.pgTransactionId, // paymentKey
+          `반품 환불 - ${exchangeReturn.reason}`,
+          undefined // 전액 취소
+        );
+
+        // 토스 응답 저장
+        await tx.refund.update({
+          where: { id: refund.id },
+          data: {
+            tossResponse: tossResponse as any,
+            tossCancelId: tossResponse.cancels?.[0]?.transactionKey || null,
+            status: 'COMPLETED',
+            completedAt: getNowKST(),
+          }
+        });
+
+        this.logger.log(`토스페이먼츠 취소 완료: ${order.payment.pgTransactionId}`);
+      } catch (error: any) {
+        this.logger.error(`토스페이먼츠 취소 실패: ${error.message}`);
+
+        // 환불 상태를 FAILED로 업데이트
+        await tx.refund.update({
+          where: { id: refund.id },
+          data: {
+            status: 'FAILED',
+            rejectedAt: getNowKST(),
+            reasonDetail: `토스페이먼츠 API 오류: ${error.message}`
+          }
+        });
+
+        throw new BadRequestException(`결제 취소 처리 중 오류가 발생했습니다: ${error.message}`);
+      }
+
+      // 4. 주문 상태 업데이트
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: 'COMPLETED', // 반품 완료는 COMPLETED로
+          completedAt: getNowKST(),
+        }
+      });
+
+      // 5. 주문 상태 로그
+      await tx.orderStateLog.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: 'COMPLETED',
+          changeReason: `반품 완료 - ${exchangeReturn.reason}`,
+          createdAt: getNowKST(),
+        }
+      });
+
+      // 6. 포인트 복구
+      if (Number(order.pointUsed) > 0) {
+        await tx.user.update({
+          where: { id: order.userId },
+          data: {
+            points: { increment: Number(order.pointUsed) }
+          }
+        });
+
+        await tx.pointHistory.create({
+          data: {
+            userId: order.userId,
+            type: 'REFUND',
+            amount: Number(order.pointUsed),
+            balance: 0, // 추후 계산
+            description: `반품 환불 (${order.orderNumber})`,
+            relatedType: 'ORDER',
+            relatedId: order.id,
+            createdAt: getNowKST(),
+          }
+        });
+      }
+
+      this.logger.log(`반품 완료 및 환불 처리 완료: ${orderNumber}, 환불ID: ${refund.id}`);
+
+      return {
+        success: true,
+        message: '반품이 완료되었습니다. 환불이 진행됩니다.',
+        data: {
+          returnId: returnId,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          refund: {
+            id: refund.id,
+            refundAmount: Number(refund.refundAmount),
+            pointRefund: Number(refund.pointRefund),
+            tossCancelId: refund.tossCancelId
+          },
+          completedAt: getNowKST()
+        }
+      };
+    });
+  }
+
+  /**
+   * 교환 승인 (관리자용)
+   */
+  async approveExchange(orderNumber: string, exchangeId: number) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 교환 조회
+      const exchangeReturn = await tx.exchangeReturn.findFirst({
+        where: {
+          id: exchangeId,
+          order: { orderNumber },
+          type: 'EXCHANGE' // 교환만
+        },
+        include: {
+          order: true
+        }
+      });
+
+      if (!exchangeReturn) {
+        throw new NotFoundException('교환 요청을 찾을 수 없습니다');
+      }
+
+      // 승인 가능 상태 확인
+      if (exchangeReturn.status !== 'REQUESTED') {
+        throw new BadRequestException('이미 처리된 요청입니다');
+      }
+
+      // 교환 상태 업데이트
+      const updated = await tx.exchangeReturn.update({
+        where: { id: exchangeId },
+        data: {
+          status: 'APPROVED',
+          approvedAt: getNowKST(),
+        }
+      });
+
+      this.logger.log(`교환 승인 완료: 주문번호 ${orderNumber}, 교환 ID ${exchangeId}`);
+
+      return {
+        success: true,
+        message: '교환이 승인되었습니다. 고객에게 회수 안내가 발송됩니다.',
+        data: {
+          exchangeId: updated.id,
+          type: updated.type,
+          status: updated.status,
+          approvedAt: updated.approvedAt
+        }
+      };
+    });
+  }
+
+  /**
+   * 교환 완료 처리 (관리자용)
+   * 교환 상품을 수령한 후 호출
+   */
+  async completeExchange(orderNumber: string, exchangeId: number, exchangeTrackingNumber?: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 교환 조회
+      const exchangeReturn = await tx.exchangeReturn.findFirst({
+        where: {
+          id: exchangeId,
+          order: { orderNumber },
+          type: 'EXCHANGE' // 교환만
+        },
+        include: {
+          order: true
+        }
+      });
+
+      if (!exchangeReturn) {
+        throw new NotFoundException('교환 요청을 찾을 수 없습니다');
+      }
+
+      // 승인 상태 확인
+      if (exchangeReturn.status !== 'APPROVED') {
+        throw new BadRequestException('승인된 교환만 완료 처리 가능합니다');
+      }
+
+      const order = exchangeReturn.order;
+
+      // 1. 교환 상태 업데이트
+      await tx.exchangeReturn.update({
+        where: { id: exchangeId },
+        data: {
+          status: 'COMPLETED',
+          completedAt: getNowKST(),
+          returnTrackingNumber: exchangeTrackingNumber || null
+        }
+      });
+
+      // 2. 주문 상태 로그 (교환 완료는 별도 로그만 남김)
+      await tx.orderStateLog.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: order.status, // 교환은 주문 상태 변경 없음
+          changeReason: `교환 완료 - ${exchangeReturn.reason}`,
+          createdAt: getNowKST(),
+        }
+      });
+
+      this.logger.log(`교환 완료 처리 완료: ${orderNumber}, 교환ID: ${exchangeId}`);
+
+      return {
+        success: true,
+        message: '교환이 완료되었습니다. 새 상품을 발송해 주세요.',
+        data: {
+          exchangeId: exchangeId,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          completedAt: getNowKST()
+        }
+      };
+    });
   }
 }

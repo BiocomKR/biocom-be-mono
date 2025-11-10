@@ -103,4 +103,47 @@ export class TossPaymentsService {
       throw error;
     }
   }
+
+  /**
+   * 빌링키로 자동결제 (정기결제)
+   *
+   * @param billingKey - 토스페이먼츠 빌링키
+   * @param customerKey - 고객 식별 키
+   * @param amount - 결제 금액
+   * @param orderName - 주문명
+   * @returns 결제 결과
+   */
+  async chargeWithBillingKey(
+    billingKey: string,
+    customerKey: string,
+    amount: number,
+    orderName: string,
+  ): Promise<any> {
+    try {
+      const url = `${this.baseUrl}/billing/${billingKey}`;
+      const headers = {
+        'Authorization': `Basic ${Buffer.from(this.secretKey + ':').toString('base64')}`,
+        'Content-Type': 'application/json'
+      };
+
+      const body = {
+        customerKey,
+        amount,
+        orderId: `AUTO_${Date.now()}`, // 자동결제 주문 ID
+        orderName,
+      };
+
+      this.logger.log(`빌링키 자동결제 요청: billingKey=${billingKey}, amount=${amount}원`);
+
+      const response = await firstValueFrom(
+        this.httpService.post(url, body, { headers, timeout: 10000 })
+      );
+
+      this.logger.log(`빌링키 자동결제 성공: paymentKey=${response.data.paymentKey}`);
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`빌링키 자동결제 실패: ${billingKey}`, error.response?.data);
+      throw error;
+    }
+  }
 }

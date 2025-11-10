@@ -21,8 +21,10 @@ model User {
   isActive               Boolean                     @default(true) @map("is_active")
   deletedAt              DateTime?                   @map("deleted_at")
   aiPersonaId            Int?                        @map("ai_persona_id")
-  subscriptionStatus     String                      @default("NEWCOMER") @map("subscription_status") @db.VarChar(20)
+  status                 String                      @default("NEWCOMER") @map("status") @db.VarChar(20)
   role                   String                      @default("USER") @db.VarChar(20)
+  billingKey             String?                     @map("billing_key") @db.VarChar(200)
+  customerKey            String?                     @map("customer_key") @db.VarChar(200)
   cart                   Cart?
   challengeTickets       ChallengeTicket[]
   userFiles              UserFile[]
@@ -43,6 +45,7 @@ model User {
   userRecords            UserRecord[]
   aiPersona              AiPersona?                  @relation(fields: [aiPersonaId], references: [id])
   wishlist               Wishlist[]
+  subscriptions          Subscription[]
 
   @@map("users")
 }
@@ -656,6 +659,7 @@ model Product {
   userChallengeSurveyResults UserChallengeSurveyResult[]
   userChallenges             UserChallenge[]
   wishlistItems              Wishlist[]
+  subscriptions              Subscription[]
 
   @@index([sku])
   @@index([categoryCode, status])
@@ -1812,4 +1816,64 @@ model PhoneVerificationLog {
   @@index([verificationStatus])
   @@index([createdAt])
   @@map("phone_verification_logs")
+}
+
+/// 구독 테이블
+/// 정기 구독 상품 관리 (자동결제)
+model Subscription {
+  /// 구독 ID
+  id              Int       @id @default(autoincrement())
+
+  /// 사용자 ID
+  userId          Int       @map("user_id")
+
+  /// 구독 상품 ID (products 테이블 참조)
+  productId       Int       @map("product_id")
+
+  /// 빌링키 (토스페이먼츠 자동결제 키)
+  billingKey      String    @map("billing_key") @db.VarChar(200)
+
+  /// 고객키 (토스페이먼츠 고객 식별자)
+  customerKey     String    @map("customer_key") @db.VarChar(200)
+
+  /// 구독 상태
+  /// - ACTIVE: 정상 구독 중
+  /// - PAUSED: 일시정지
+  /// - CANCELLED: 사용자가 취소
+  /// - BILLING_DELETED: 빌링키 삭제됨 (카드 삭제, 유효기간 만료 등)
+  /// - PAYMENT_FAILED: 자동결제 실패로 중지
+  /// - EXPIRED: 구독 기간 만료
+  status          String    @default("ACTIVE") @db.VarChar(20)
+
+  /// 구독 시작일
+  startDate       DateTime  @map("start_date")
+
+  /// 다음 결제일 (자동결제 예정일)
+  nextBillingDate DateTime  @map("next_billing_date")
+
+  /// 구독 종료일 (취소 시 설정)
+  endDate         DateTime? @map("end_date")
+
+  /// 결제 주기 (일 단위)
+  /// 예: 30 (월 구독), 90 (3개월 구독), 365 (연 구독)
+  billingCycle    Int       @default(30) @map("billing_cycle")
+
+  /// 구독 가격 (매 결제 금액)
+  price           Int
+
+  /// 생성일시
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  /// 수정일시
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  /// 관계
+  user            User      @relation(fields: [userId], references: [id])
+  product         Product   @relation(fields: [productId], references: [id])
+
+  @@index([userId])
+  @@index([billingKey])
+  @@index([status])
+  @@index([nextBillingDate])
+  @@map("subscriptions")
 }

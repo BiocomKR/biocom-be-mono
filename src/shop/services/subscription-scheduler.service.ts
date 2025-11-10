@@ -6,11 +6,14 @@ import { SubscriptionService } from './subscription.service';
 /**
  * 구독 자동결제 스케줄러
  *
- * 매일 새벽 2시에 실행되어:
- * 1. 오늘 결제해야 할 구독 찾기
+ * 매일 자정(00:00)에 실행되어:
+ * 1. 오늘 결제해야 할 ACTIVE 구독 찾기
  * 2. 각 구독마다 자동결제 실행
  * 3. 성공 시 다음 결제일 업데이트
  * 4. 실패 시 구독 상태를 PAYMENT_FAILED로 변경
+ *
+ * 00:01에 실행되어:
+ * 1. CANCELED 상태이면서 nextBillingDate가 지난 구독을 EXPIRED로 전환
  */
 @Injectable()
 export class SubscriptionSchedulerService {
@@ -93,7 +96,7 @@ export class SubscriptionSchedulerService {
   /**
    * 만료된 구독 정리 (매일 00:01)
    *
-   * 일시정지 상태가 30일 이상 지속된 구독을 만료 처리
+   * CANCELED 상태의 구독 중 nextBillingDate가 지난 것을 EXPIRED로 전환
    */
   @Cron('0 1 0 * * *', {
     name: 'expire-subscriptions',
@@ -102,21 +105,20 @@ export class SubscriptionSchedulerService {
   async handleExpiredSubscriptions() {
     this.logger.log('🕐 만료된 구독 정리 시작...');
 
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const now = new Date();
 
-    // 30일 이상 일시정지된 구독 찾기
+    // CANCELED 상태이면서 nextBillingDate가 지난 구독을 EXPIRED로 전환
     const expiredSubscriptions = await this.prisma.subscription.updateMany({
       where: {
-        status: 'PAUSED',
-        updatedAt: {
-          lt: thirtyDaysAgo,
+        status: 'CANCELED',
+        nextBillingDate: {
+          lt: now,
         },
       },
       data: {
         status: 'EXPIRED',
-        endDate: new Date(),
-        updatedAt: new Date(),
+        endDate: now,
+        updatedAt: now,
       },
     });
 

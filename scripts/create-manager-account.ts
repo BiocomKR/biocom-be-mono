@@ -57,7 +57,7 @@ async function createManagerAccount() {
         name: encryptedName,
         mobile: encryptedMobile,
         role: 'MANAGER',
-        subscriptionStatus: 'NEWCOMER',
+        status: 'NEWCOMER',
         points: 0,
         isActive: true,
         createdAt: getNowKST()

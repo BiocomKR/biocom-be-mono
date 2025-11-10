@@ -7,7 +7,13 @@ import {
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { CouponService } from '../../coupons/services/coupon.service';
+import { TossPaymentsService } from './toss-payments.service';
 import { CreateOrderDto, OrderResponseDto } from '../dto/orders/create-order.dto';
+import {
+  CreateReturnDto,
+  CreateExchangeDto,
+  ReturnExchangeResponseDto
+} from '../dto/orders/return-exchange.dto';
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { CryptoUtil } from '../../common/utils/crypto.util';
@@ -21,6 +27,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly pointService: PointService,
     private readonly couponService: CouponService,
+    private readonly tossPaymentsService: TossPaymentsService,
   ) {}
 
   /**
@@ -486,6 +493,7 @@ export class OrdersService {
               product: true,
             },
           },
+          payment: true,
         },
       });
 
@@ -496,6 +504,22 @@ export class OrdersService {
       // 취소 가능 상태 확인
       if (!['PENDING_PAYMENT', 'PAID', 'PREPARING'].includes(order.status)) {
         throw new BadRequestException('취소 가능한 상태가 아닙니다');
+      }
+
+      // 토스페이먼츠 결제 취소 (결제 완료 상태인 경우만)
+      if (order.status === 'PAID' && order.payment) {
+        try {
+          const tossResponse = await this.tossPaymentsService.cancelPayment(
+            order.payment.pgTransactionId, // paymentKey
+            `주문 취소 - ${reason}`,
+            undefined // 전액 취소
+          );
+
+          this.logger.log(`토스페이먼츠 결제 취소 완료: ${order.payment.pgTransactionId}`);
+        } catch (error: any) {
+          this.logger.error(`토스페이먼츠 결제 취소 실패: ${error.message}`);
+          throw new BadRequestException(`결제 취소 처리 중 오류가 발생했습니다: ${error.message}`);
+        }
       }
 
       // 주문 상태 업데이트
@@ -836,5 +860,145 @@ export class OrdersService {
         subtotal: Number(item.subtotal),
       })),
     };
+  }
+
+  /**
+   * 반품 신청 (고객용)
+   * 배송 완료 후 7일 이내만 가능
+   */
+  async createReturn(
+    userId: number,
+    orderNumber: string,
+    dto: CreateReturnDto
+  ): Promise<ReturnExchangeResponseDto> {
+    return await this.prisma.$transaction(async (tx) => {
+      // 주문 조회
+      const order = await tx.order.findFirst({
+        where: {
+          orderNumber,
+          userId,
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException('주문을 찾을 수 없습니다');
+      }
+
+      // 반품 가능 여부 확인
+      if (order.status !== 'DELIVERED') {
+        throw new BadRequestException('배송 완료된 주문만 반품 가능합니다');
+      }
+
+      if (!order.deliveredAt) {
+        throw new BadRequestException('배송 완료 일시가 기록되지 않았습니다');
+      }
+
+      // 배송 완료 후 7일 이내 확인
+      const now = getNowKST();
+      const deliveredDate = new Date(order.deliveredAt);
+      const daysDiff = Math.floor((now.getTime() - deliveredDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysDiff > 7) {
+        throw new BadRequestException('배송 완료 후 7일 이내만 반품 가능합니다');
+      }
+
+      // 반품 신청 생성
+      const returnRequest = await tx.exchangeReturn.create({
+        data: {
+          orderId: order.id,
+          type: 'RETURN',
+          status: 'REQUESTED',
+          reason: dto.reason,
+          reasonDetail: dto.reasonDetail || null,
+          requestedAt: getNowKST(),
+          createdAt: getNowKST(),
+        },
+      });
+
+      this.logger.log(`반품 신청 완료: ${orderNumber}, 반품ID: ${returnRequest.id}`);
+
+      return {
+        id: returnRequest.id,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        type: returnRequest.type,
+        status: returnRequest.status,
+        reason: returnRequest.reason,
+        reasonDetail: returnRequest.reasonDetail,
+        requestedAt: returnRequest.requestedAt,
+        approvedAt: returnRequest.approvedAt,
+        completedAt: returnRequest.completedAt,
+      };
+    });
+  }
+
+  /**
+   * 교환 신청 (고객용)
+   * 배송 완료 후 7일 이내만 가능
+   */
+  async createExchange(
+    userId: number,
+    orderNumber: string,
+    dto: CreateExchangeDto
+  ): Promise<ReturnExchangeResponseDto> {
+    return await this.prisma.$transaction(async (tx) => {
+      // 주문 조회
+      const order = await tx.order.findFirst({
+        where: {
+          orderNumber,
+          userId,
+        },
+      });
+
+      if (!order) {
+        throw new NotFoundException('주문을 찾을 수 없습니다');
+      }
+
+      // 교환 가능 여부 확인
+      if (order.status !== 'DELIVERED') {
+        throw new BadRequestException('배송 완료된 주문만 교환 가능합니다');
+      }
+
+      if (!order.deliveredAt) {
+        throw new BadRequestException('배송 완료 일시가 기록되지 않았습니다');
+      }
+
+      // 배송 완료 후 7일 이내 확인
+      const now = getNowKST();
+      const deliveredDate = new Date(order.deliveredAt);
+      const daysDiff = Math.floor((now.getTime() - deliveredDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysDiff > 7) {
+        throw new BadRequestException('배송 완료 후 7일 이내만 교환 가능합니다');
+      }
+
+      // 교환 신청 생성
+      const exchangeRequest = await tx.exchangeReturn.create({
+        data: {
+          orderId: order.id,
+          type: 'EXCHANGE',
+          status: 'REQUESTED',
+          reason: dto.reason,
+          reasonDetail: dto.reasonDetail || null,
+          requestedAt: getNowKST(),
+          createdAt: getNowKST(),
+        },
+      });
+
+      this.logger.log(`교환 신청 완료: ${orderNumber}, 교환ID: ${exchangeRequest.id}`);
+
+      return {
+        id: exchangeRequest.id,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        type: exchangeRequest.type,
+        status: exchangeRequest.status,
+        reason: exchangeRequest.reason,
+        reasonDetail: exchangeRequest.reasonDetail,
+        requestedAt: exchangeRequest.requestedAt,
+        approvedAt: exchangeRequest.approvedAt,
+        completedAt: exchangeRequest.completedAt,
+      };
+    });
   }
 }

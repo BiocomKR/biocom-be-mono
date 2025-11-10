@@ -119,4 +119,50 @@ export class ManagementRefundController {
     async getPendingRefunds() {
     return this.refundService.getPendingRefunds();
   }
+
+  /**
+   * 반품/교환 승인
+   */
+  @Post('return/:orderNumber/:returnId/approve')
+  async approveReturn(
+    @Param('orderNumber') orderNumber: string,
+    @Param('returnId', ParseIntPipe) returnId: number
+  ) {
+    return this.refundService.approveReturn(orderNumber, returnId);
+  }
+
+  /**
+   * 반품 완료 및 환불 처리
+   */
+  @Post('return/:orderNumber/:returnId/complete')
+  async completeReturn(
+    @Param('orderNumber') orderNumber: string,
+    @Param('returnId', ParseIntPipe) returnId: number,
+    @Body('returnTrackingNumber') returnTrackingNumber?: string
+  ) {
+    return this.refundService.completeReturn(orderNumber, returnId, returnTrackingNumber);
+  }
+
+  /**
+   * 교환 승인
+   */
+  @Post('exchange/:orderNumber/:exchangeId/approve')
+  async approveExchange(
+    @Param('orderNumber') orderNumber: string,
+    @Param('exchangeId', ParseIntPipe) exchangeId: number
+  ) {
+    return this.refundService.approveExchange(orderNumber, exchangeId);
+  }
+
+  /**
+   * 교환 완료 처리
+   */
+  @Post('exchange/:orderNumber/:exchangeId/complete')
+  async completeExchange(
+    @Param('orderNumber') orderNumber: string,
+    @Param('exchangeId', ParseIntPipe) exchangeId: number,
+    @Body('exchangeTrackingNumber') exchangeTrackingNumber?: string
+  ) {
+    return this.refundService.completeExchange(orderNumber, exchangeId, exchangeTrackingNumber);
+  }
 }

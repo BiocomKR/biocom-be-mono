@@ -21,6 +21,11 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { OrdersService } from '../services/orders.service';
 import { CreateOrderDto, OrderResponseDto } from '../dto/orders/create-order.dto';
+import {
+  CreateReturnDto,
+  CreateExchangeDto,
+  ReturnExchangeResponseDto
+} from '../dto/orders/return-exchange.dto';
 
 @Controller('shop/orders')
 @UseGuards(JwtAuthGuard)
@@ -122,6 +127,42 @@ export class OrdersController {
     @Param('orderNumber') orderNumber: string
   ): Promise<OrderResponseDto> {
     return this.ordersService.confirmOrder(req.user.id, orderNumber);
+  }
+
+  /**
+   * 반품 신청
+   */
+  @Post(':orderNumber/return')
+  @ApiOperation({ summary: '반품 신청', description: '배송 완료 후 7일 이내 반품 신청' })
+  @ApiParam({ name: 'orderNumber', description: '주문번호' })
+  @ApiBody({ type: CreateReturnDto })
+  @ApiResponse({ status: 201, description: '성공', type: ReturnExchangeResponseDto })
+  @ApiResponse({ status: 400, description: '반품 불가능한 상태 또는 기간 초과' })
+  @ApiResponse({ status: 404, description: '주문을 찾을 수 없음' })
+  async createReturn(
+    @Request() req,
+    @Param('orderNumber') orderNumber: string,
+    @Body() dto: CreateReturnDto
+  ): Promise<ReturnExchangeResponseDto> {
+    return this.ordersService.createReturn(req.user.id, orderNumber, dto);
+  }
+
+  /**
+   * 교환 신청
+   */
+  @Post(':orderNumber/exchange')
+  @ApiOperation({ summary: '교환 신청', description: '배송 완료 후 7일 이내 교환 신청' })
+  @ApiParam({ name: 'orderNumber', description: '주문번호' })
+  @ApiBody({ type: CreateExchangeDto })
+  @ApiResponse({ status: 201, description: '성공', type: ReturnExchangeResponseDto })
+  @ApiResponse({ status: 400, description: '교환 불가능한 상태 또는 기간 초과' })
+  @ApiResponse({ status: 404, description: '주문을 찾을 수 없음' })
+  async createExchange(
+    @Request() req,
+    @Param('orderNumber') orderNumber: string,
+    @Body() dto: CreateExchangeDto
+  ): Promise<ReturnExchangeResponseDto> {
+    return this.ordersService.createExchange(req.user.id, orderNumber, dto);
   }
 
   // 관리자 기능은 /api/management/orders로 이동됨

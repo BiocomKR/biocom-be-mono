@@ -348,7 +348,7 @@ export class ChallengeService {
         // 5. 사용자 구독 상태를 CHALLENGER로 변경 (무조건 CHALLENGER가 최우선)
         await tx.user.update({
           where: { id: userId },
-          data: { subscriptionStatus: UserSubscriptionStatus.CHALLENGER }
+          data: { status: UserSubscriptionStatus.CHALLENGER }
         });
 
         // 6. 첫날(Day 1) 진행 상황 생성
@@ -1371,7 +1371,7 @@ export class ChallengeService {
 
           await tx.user.update({
             where: { id: userId },
-            data: { subscriptionStatus: newStatus }
+            data: { status: newStatus }
           });
 
           this.logger.log(`사용자 ${userId}의 구독상태를 ${newStatus}로 변경 (챌린지 완료)`);
@@ -1444,7 +1444,7 @@ export class ChallengeService {
 
           await tx.user.update({
             where: { id: userId },
-            data: { subscriptionStatus: newStatus }
+            data: { status: newStatus }
           });
 
           this.logger.log(`사용자 ${userId}의 구독상태를 ${newStatus}로 변경 (챌린지 만료)`);

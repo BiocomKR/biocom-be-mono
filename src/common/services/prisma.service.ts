@@ -284,6 +284,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 휴대폰 본인인증 테이블
   get phoneVerificationLog() { return this.prisma.phoneVerificationLog; }
 
+  // 구독 테이블
+  get subscription() { return this.prisma.subscription; }
+
   // 메서드 바인딩
   $transaction(arg: any) {
     return (this.prisma as any).$transaction(arg);

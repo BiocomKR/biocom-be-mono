@@ -353,7 +353,6 @@ deploy_kubernetes() {
     # ConfigMap 업데이트 (DB_HOST 설정)
     log_info "ConfigMap 업데이트 중..."
     sed -i.bak "s/DB_HOST: .*/DB_HOST: \"$DB_HOST\"/" configmap.yaml
-    sed -i.bak "s/PROJECT_ID/$PROJECT_ID/g" configmap.yaml
     kubectl apply -f configmap.yaml
     
     # Secret 생성 (이미 있으면 업데이트)
@@ -368,7 +367,8 @@ deploy_kubernetes() {
         --from-literal=ENCRYPTION_KEY='b!@c@m2@25!@#$@creTkEy!2E45bT8@' \
         --from-literal=OPENAI_API_KEY='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' \
         --from-literal=GOOGLE_API_KEY='AIzaSyC_RxjEbJyHoV5oHtWky7pEJS5Iw5toqPU' \
-        --from-literal=KCP_PRIVATE_KEY_PASSWORD='b!c0-pr!v@t2-0519!'
+        --from-literal=KCP_PRIVATE_KEY_PASSWORD='b!c0-pr!v@t2-0519!' \
+        --from-literal=TOSS_PAYMENTS_SECRET_KEY='test_sk_5OWRapdA8djDxdeGWGk9Vo1zEqZK'
     
     # Google Service Account Key Secret 확인/생성
     log_info "Google Service Account Key Secret 확인 중..."
@@ -428,7 +428,6 @@ deploy_kubernetes() {
     # Deployment 배포
     log_info "Deployment 배포 중..."
     sed -i.bak "s|image: .*|image: $REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-api:$IMAGE_TAG|" deployment.yaml
-    sed -i.bak "s/PROJECT_ID/$PROJECT_ID/g" deployment.yaml
     kubectl apply -f deployment.yaml
     
     # Backend Config 배포

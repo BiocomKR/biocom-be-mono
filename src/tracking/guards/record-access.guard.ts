@@ -28,7 +28,7 @@ export class RecordAccessGuard implements CanActivate {
         where: { id: userId },
         select: {
           id: true,
-          subscriptionStatus: true,
+          status: true,
           userChallenges: {
             where: {
               status: 'ACTIVE'
@@ -46,7 +46,7 @@ export class RecordAccessGuard implements CanActivate {
       }
 
       // 1️⃣ 구독 사용자 체크 (newcomer가 아닌 경우)
-      const isSubscriber = user.subscriptionStatus !== UserSubscriptionStatus.NEWCOMER;
+      const isSubscriber = user.status !== UserSubscriptionStatus.NEWCOMER;
       
       // 2️⃣ 활성 챌린지 참여자 체크
       const hasActiveChallenge = user.userChallenges.length > 0;
@@ -56,14 +56,14 @@ export class RecordAccessGuard implements CanActivate {
       if (hasAccess) {
         this.logger.log(
           `기록 접근 권한 승인 - 사용자 ID: ${userId}, ` +
-          `구독상태: ${user.subscriptionStatus}, ` +
+          `구독상태: ${user.status}, ` +
           `활성챌린지: ${hasActiveChallenge ? '있음' : '없음'}`
         );
         return true;
       } else {
         this.logger.warn(
           `기록 접근 권한 거부 - 사용자 ID: ${userId}, ` +
-          `구독상태: ${user.subscriptionStatus}, ` +
+          `구독상태: ${user.status}, ` +
           `활성챌린지: ${hasActiveChallenge ? '있음' : '없음'}`
         );
         throw new ForbiddenException(

@@ -256,7 +256,7 @@ export class ContentController {
       const user = await this.prisma.user.findUnique({
         where: { id: req.user.sub },
         select: {
-          subscriptionStatus: true,
+          status: true,
           userChallenges: {
             where: { status: 'ACTIVE' },
             select: { id: true, activatedAt: true }
@@ -269,7 +269,7 @@ export class ContentController {
       }
 
       // 구독자(NEWCOMER 아닌 경우) OR 활성 챌린지 참여자 체크
-      const isSubscriber = user.subscriptionStatus === 'SUBSCRIBER';
+      const isSubscriber = user.status === 'SUBSCRIBER';
       const hasActiveChallenge = user.userChallenges.length > 0;
 
       if (!isSubscriber && !hasActiveChallenge) {
@@ -415,7 +415,7 @@ export class ContentController {
         const user = await this.prisma.user.findUnique({
           where: { id: userId },
           select: {
-            subscriptionStatus: true,
+            status: true,
             userChallenges: {
               where: { status: 'ACTIVE' },
               select: { id: true }
@@ -428,7 +428,7 @@ export class ContentController {
         }
 
         // 구독자(NEWCOMER 아닌 경우) OR 활성 챌린지 참여자 체크
-        const isSubscriber = user.subscriptionStatus !== UserSubscriptionStatus.NEWCOMER;
+        const isSubscriber = user.status !== UserSubscriptionStatus.NEWCOMER;
         const hasActiveChallenge = user.userChallenges.length > 0;
 
         if (!isSubscriber && !hasActiveChallenge) {

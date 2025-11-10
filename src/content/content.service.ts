@@ -727,10 +727,10 @@ export class ContentService {
       // 1️⃣ 사용자 구독 상태 확인
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { subscriptionStatus: true }
+        select: { status: true }
       });
 
-      const isSubscriber = user?.subscriptionStatus === 'SUBSCRIBER';
+      const isSubscriber = user?.status === 'SUBSCRIBER';
 
       // 2️⃣ 챌린저인 경우 주차 접근 권한 검증
       if (!isSubscriber && week) {

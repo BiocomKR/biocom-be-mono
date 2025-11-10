@@ -29,7 +29,7 @@ export class SubscriptionService {
         select: {
           id: true,
           email: true,
-          subscriptionStatus: true
+          status: true
         }
       });
 
@@ -38,7 +38,7 @@ export class SubscriptionService {
       }
 
       // CHALLENGER는 더 높은 권한이므로 유지
-      if (user.subscriptionStatus === UserSubscriptionStatus.CHALLENGER) {
+      if (user.status === UserSubscriptionStatus.CHALLENGER) {
         this.logger.log(
           `구독 활성화 - 사용자는 이미 CHALLENGER 상태이므로 유지 - 사용자: ${userId}`
         );
@@ -48,7 +48,7 @@ export class SubscriptionService {
           message: '구독이 활성화되었습니다 (CHALLENGER 상태 유지)',
           data: {
             userId: user.id,
-            subscriptionStatus: user.subscriptionStatus
+            status: user.status
           }
         };
       }
@@ -56,12 +56,12 @@ export class SubscriptionService {
       // NEWCOMER만 SUBSCRIBER로 변경
       const updatedUser = await this.prisma.user.update({
         where: { id: userId },
-        data: { subscriptionStatus: UserSubscriptionStatus.SUBSCRIBER }
+        data: { status: UserSubscriptionStatus.SUBSCRIBER }
       });
 
       this.logger.log(
         `구독 활성화 완료 - 사용자: ${userId}, ` +
-        `이전상태: ${user.subscriptionStatus} -> 현재상태: ${updatedUser.subscriptionStatus}`
+        `이전상태: ${user.status} -> 현재상태: ${updatedUser.status}`
       );
 
       return {
@@ -69,7 +69,7 @@ export class SubscriptionService {
         message: '구독이 활성화되었습니다',
         data: {
           userId: updatedUser.id,
-          subscriptionStatus: updatedUser.subscriptionStatus
+          status: updatedUser.status
         }
       };
     } catch (error) {
@@ -94,7 +94,7 @@ export class SubscriptionService {
           select: {
             id: true,
             email: true,
-            subscriptionStatus: true,
+            status: true,
             userChallenges: {
               where: { status: 'ACTIVE' },
               select: { id: true }
@@ -123,12 +123,12 @@ export class SubscriptionService {
         // 3. 상태 변경
         const updatedUser = await tx.user.update({
           where: { id: userId },
-          data: { subscriptionStatus: newStatus }
+          data: { status: newStatus }
         });
 
         this.logger.log(
           `구독 만료/취소 처리 완료 - 사용자: ${userId}, ` +
-          `이전상태: ${user.subscriptionStatus} -> 현재상태: ${updatedUser.subscriptionStatus}`
+          `이전상태: ${user.status} -> 현재상태: ${updatedUser.status}`
         );
 
         return {
@@ -136,7 +136,7 @@ export class SubscriptionService {
           message: '구독이 만료/취소되었습니다',
           data: {
             userId: updatedUser.id,
-            subscriptionStatus: updatedUser.subscriptionStatus,
+            status: updatedUser.status,
             hasActiveChallenge
           }
         };
@@ -160,7 +160,7 @@ export class SubscriptionService {
         select: {
           id: true,
           email: true,
-          subscriptionStatus: true,
+          status: true,
           userChallenges: {
             where: { status: 'ACTIVE' },
             select: {
@@ -182,7 +182,7 @@ export class SubscriptionService {
         data: {
           userId: user.id,
           email: user.email,
-          subscriptionStatus: user.subscriptionStatus,
+          status: user.status,
           hasActiveChallenge: user.userChallenges.length > 0,
           activeChallenges: user.userChallenges
         }

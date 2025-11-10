@@ -5,7 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class HomeDataDto {
   @ApiProperty({ description: '사용자 구독 상태', example: 'NEWCOMER' })
-  subscriptionStatus: string;
+  status: string;
 
   @ApiProperty({ description: '사용자 이름', example: '홍길동' })
   userName: string;
