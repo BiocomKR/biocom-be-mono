@@ -82,12 +82,13 @@ export class MissionCompletionService {
         // activatedAt 기준으로 현재 챌린지 일차 계산
         const currentDay = calculateChallengeDay(userChallenge.activatedAt);
 
-        if (challengeMission.day !== currentDay) {
-          throw new BadRequestException(`이 미션은 ${challengeMission.day}일차에만 수행할 수 있습니다 (현재: ${currentDay}일차)`);
+        // 미래 미션은 수행 불가 (과거/당일 미션만 가능)
+        if (challengeMission.day > currentDay) {
+          throw new BadRequestException(`아직 수행할 수 없는 미션입니다 (${challengeMission.day}일차 미션, 현재: ${currentDay}일차)`);
         }
 
         // 3️⃣ 오늘의 미션 시도 횟수 확인
-        const todayAttempts = await tx.missionAttempt.count({
+        const todayAttempts = await tx.userMission.count({
           where: {
             userId,
             challengeMissionId: challengeMission.id,
@@ -143,7 +144,7 @@ export class MissionCompletionService {
           }
 
           // 오늘 해당 기록 타입으로 이미 시도했는지 확인
-          const todayRecordAttempts = await tx.missionAttempt.count({
+          const todayRecordAttempts = await tx.userMission.count({
             where: {
               userId,
               challengeMissionId: challengeMission.id,
@@ -265,10 +266,13 @@ export class MissionCompletionService {
         // 7️⃣ 미션 시도 기록 생성
         const attemptNumber = todayAttempts + 1;
         const isCompleted = attemptNumber >= dailyLimit; // dailyLimit 달성 시에만 완료
-        const pointsEarned = isCompleted ? challengeMission.points : 0; // 최종 완료시에만 포인트 지급
+
+        // 포인트 지급 조건: 완료 + 지정된 일차에 수행한 경우만
+        const isOnScheduledDay = challengeMission.day === currentDay;
+        const pointsEarned = (isCompleted && isOnScheduledDay) ? challengeMission.points : 0;
 
         const now = getNowKST();
-        const missionAttempt = await tx.missionAttempt.create({
+        const userMission = await tx.userMission.create({
           data: {
             userId,
             challengeMissionId: challengeMission.id,
@@ -289,7 +293,7 @@ export class MissionCompletionService {
         let updatedProgress = dailyProgress;
         let user = await tx.user.findUnique({ where: { id: userId } });
 
-        if (isCompleted) {
+        if (isCompleted && isOnScheduledDay) {
           // DailyProgress 업데이트
           updatedProgress = await tx.dailyProgress.update({
             where: {
@@ -323,6 +327,8 @@ export class MissionCompletionService {
           );
 
           this.logger.log(`미션 최종 완료 - ${mission.name}, 획득 포인트: ${challengeMission.points}`);
+        } else if (isCompleted && !isOnScheduledDay) {
+          this.logger.log(`미션 완료 (지정 일차 아님) - ${mission.name}, 포인트 지급 없음 (${challengeMission.day}일차 미션, 현재: ${currentDay}일차)`);
         } else {
           this.logger.log(`미션 시도 기록 - ${mission.name} (${attemptNumber}/${dailyLimit})`);
         }
@@ -399,7 +405,7 @@ export class MissionCompletionService {
       // 3️⃣ 각 미션별 오늘의 시도 횟수 조회
       const missionsWithProgress = await Promise.all(
         todayMissions.map(async (cm) => {
-          const todayAttempts = await this.prisma.missionAttempt.count({
+          const todayAttempts = await this.prisma.userMission.count({
             where: {
               userId,
               challengeMissionId: cm.id,
@@ -429,8 +435,8 @@ export class MissionCompletionService {
         }
       });
 
-      // 완료된 미션 개수 (isCompleted = true인 MissionAttempt)
-      const completedMissions = await this.prisma.missionAttempt.count({
+      // 완료된 미션 개수 (isCompleted = true인 UserMission)
+      const completedMissions = await this.prisma.userMission.count({
         where: {
           userChallengeId: activeChallenge.id,
           isCompleted: true
@@ -524,7 +530,7 @@ export class MissionCompletionService {
       }
 
       // 4️⃣ 미션 완료 여부 조회
-      const todayAttempts = challengeMission ? await this.prisma.missionAttempt.count({
+      const todayAttempts = challengeMission ? await this.prisma.userMission.count({
         where: {
           userId,
           challengeMissionId: challengeMission.id,
@@ -559,6 +565,341 @@ export class MissionCompletionService {
 
     } catch (error) {
       this.logger.error('오늘의 1일 1미션 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 완료한 미션 목록 조회 (일자별)
+   * @param userId 사용자 ID
+   * @param startDate 시작일 (YYYY-MM-DD)
+   * @param endDate 종료일 (YYYY-MM-DD)
+   */
+  async getCompletedMissions(userId: number, startDate: string, endDate: string) {
+    try {
+      this.logger.log(`완료한 미션 목록 조회 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+
+      // 1️⃣ 활성화된 사용자 챌린지 조회
+      const activeChallenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE'
+        }
+      });
+
+      if (!activeChallenge) {
+        throw new NotFoundException('활성화된 챌린지가 없습니다');
+      }
+
+      // 2️⃣ 날짜 범위를 챌린지 일차로 변환
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const activatedAt = new Date(activeChallenge.activatedAt);
+
+      // 시작일의 챌린지 일차 계산
+      const startDay = Math.floor((start.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // 종료일의 챌린지 일차 계산
+      const endDay = Math.floor((end.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      this.logger.log(`날짜 범위 → 챌린지 일차: ${startDay}일차 ~ ${endDay}일차`);
+
+      // 3️⃣ 완료한 미션 조회 (isCompleted = true)
+      const completedMissions = await this.prisma.userMission.findMany({
+        where: {
+          userId,
+          userChallengeId: activeChallenge.id,
+          isCompleted: true,
+          day: {
+            gte: startDay,
+            lte: endDay
+          }
+        },
+        include: {
+          challengeMission: {
+            include: {
+              mission: true
+            }
+          }
+        },
+        orderBy: [
+          { day: 'asc' },
+          { createdAt: 'asc' }
+        ]
+      });
+
+      // 4️⃣ 일자별로 그룹핑
+      const missionsByDay = completedMissions.reduce((acc, um) => {
+        if (!acc[um.day]) {
+          acc[um.day] = [];
+        }
+
+        acc[um.day].push({
+          id: um.id,
+          missionId: um.challengeMission.mission.id,
+          missionName: um.challengeMission.mission.name,
+          missionType: um.challengeMission.mission.type,
+          pointsEarned: um.pointsEarned,
+          completedAt: um.createdAt
+        });
+
+        return acc;
+      }, {} as Record<number, any[]>);
+
+      this.logger.log(`완료한 미션 조회 완료 - 총 ${completedMissions.length}개`);
+
+      return {
+        success: true,
+        data: {
+          dateRange: { startDate, endDate },
+          dayRange: { startDay, endDay },
+          missions: missionsByDay,
+          totalCount: completedMissions.length
+        }
+      };
+
+    } catch (error) {
+      this.logger.error('완료한 미션 목록 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 놓친 미션 목록 조회 (일자별)
+   * @param userId 사용자 ID
+   * @param startDate 시작일 (YYYY-MM-DD)
+   * @param endDate 종료일 (YYYY-MM-DD)
+   */
+  async getMissedMissions(userId: number, startDate: string, endDate: string) {
+    try {
+      this.logger.log(`놓친 미션 목록 조회 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+
+      // 1️⃣ 활성화된 사용자 챌린지 조회
+      const activeChallenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE'
+        },
+        include: {
+          product: true
+        }
+      });
+
+      if (!activeChallenge) {
+        throw new NotFoundException('활성화된 챌린지가 없습니다');
+      }
+
+      // 2️⃣ 날짜 범위를 챌린지 일차로 변환
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const activatedAt = new Date(activeChallenge.activatedAt);
+
+      const startDay = Math.floor((start.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const endDay = Math.floor((end.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      // 현재 일차 계산
+      const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+
+      // 미래 일차는 제외 (과거 일차만 조회)
+      const adjustedEndDay = Math.min(endDay, currentDay - 1);
+
+      if (adjustedEndDay < startDay) {
+        return {
+          success: true,
+          data: {
+            dateRange: { startDate, endDate },
+            dayRange: { startDay, endDay: adjustedEndDay },
+            missions: {},
+            totalCount: 0,
+            message: '조회 가능한 과거 미션이 없습니다'
+          }
+        };
+      }
+
+      this.logger.log(`날짜 범위 → 챌린지 일차: ${startDay}일차 ~ ${adjustedEndDay}일차 (현재: ${currentDay}일차)`);
+
+      // 3️⃣ 해당 기간의 전체 챌린지 미션 조회
+      const allMissions = await this.prisma.challengeMission.findMany({
+        where: {
+          challengeId: activeChallenge.challengeId,
+          day: {
+            gte: startDay,
+            lte: adjustedEndDay
+          },
+          isActive: true
+        },
+        include: {
+          mission: true
+        },
+        orderBy: [
+          { day: 'asc' },
+          { sortOrder: 'asc' }
+        ]
+      });
+
+      // 4️⃣ 완료한 미션 ID 목록 조회
+      const completedMissionIds = await this.prisma.userMission.findMany({
+        where: {
+          userId,
+          userChallengeId: activeChallenge.id,
+          isCompleted: true,
+          day: {
+            gte: startDay,
+            lte: adjustedEndDay
+          }
+        },
+        select: {
+          challengeMissionId: true
+        }
+      });
+
+      const completedIds = new Set(completedMissionIds.map(cm => cm.challengeMissionId));
+
+      // 5️⃣ 놓친 미션 필터링 (완료하지 않은 미션)
+      const missedMissions = allMissions.filter(cm => !completedIds.has(cm.id));
+
+      // 6️⃣ 일자별로 그룹핑
+      const missionsByDay = missedMissions.reduce((acc, cm) => {
+        if (!acc[cm.day]) {
+          acc[cm.day] = [];
+        }
+
+        acc[cm.day].push({
+          challengeMissionId: cm.id,
+          missionId: cm.mission.id,
+          missionName: cm.mission.name,
+          missionType: cm.mission.type,
+          originalPoints: cm.points, // 원래 받을 수 있었던 포인트
+          currentPoints: 0, // 지금 완료하면 0점
+          dailyLimit: cm.mission.dailyLimit,
+          requireUpload: cm.mission.requireUpload
+        });
+
+        return acc;
+      }, {} as Record<number, any[]>);
+
+      this.logger.log(`놓친 미션 조회 완료 - 총 ${missedMissions.length}개`);
+
+      return {
+        success: true,
+        data: {
+          dateRange: { startDate, endDate },
+          dayRange: { startDay, endDay: adjustedEndDay },
+          missions: missionsByDay,
+          totalCount: missedMissions.length
+        }
+      };
+
+    } catch (error) {
+      this.logger.error('놓친 미션 목록 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 자기선언문/칭찬내역 조회
+   * @param userId 사용자 ID
+   * @description 활성화된 챌린지의 자기선언문(1일차), 칭찬내역(10일차) 조회
+   */
+  async getRecords(userId: number) {
+    try {
+      this.logger.log(`자기선언문/칭찬내역 조회 - 사용자: ${userId}`);
+
+      // 1️⃣ 활성화된 사용자 챌린지 조회
+      const activeChallenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE'
+        }
+      });
+
+      if (!activeChallenge) {
+        throw new NotFoundException('활성화된 챌린지가 없습니다');
+      }
+
+      // 2️⃣ missions 테이블에서 DECLARATION, SELF_PRAISE 타입 미션 조회
+      const recordMissions = await this.prisma.mission.findMany({
+        where: {
+          recordType: {
+            in: ['DECLARATION', 'SELF_PRAISE']
+          },
+          isActive: true
+        },
+        select: {
+          id: true,
+          recordType: true,
+          specificDay: true
+        }
+      });
+
+      if (recordMissions.length === 0) {
+        return {
+          success: true,
+          data: []
+        };
+      }
+
+      // 3️⃣ 각 미션에 대한 challenge_missions 조회 및 user_missions 조회
+      const results = await Promise.all(
+        recordMissions.map(async (mission) => {
+          // challenge_missions에서 해당 미션의 챌린지미션 조회
+          const challengeMission = await this.prisma.challengeMission.findFirst({
+            where: {
+              challengeId: activeChallenge.challengeId,
+              missionId: mission.id,
+              day: mission.specificDay,
+              isActive: true
+            }
+          });
+
+          if (!challengeMission) {
+            return null;
+          }
+
+          // user_missions에서 실제 기록 조회
+          const userMission = await this.prisma.userMission.findFirst({
+            where: {
+              userId,
+              userChallengeId: activeChallenge.id,
+              challengeMissionId: challengeMission.id,
+              isCompleted: true
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          });
+
+          if (!userMission) {
+            return null;
+          }
+
+          // metadata에서 contents 추출
+          const metadata = userMission.metadata as any;
+          const contents = metadata?.contents || null;
+
+          return {
+            type: mission.recordType,
+            day: mission.specificDay,
+            contents,
+            completedAt: userMission.createdAt,
+            pointsEarned: userMission.pointsEarned
+          };
+        })
+      );
+
+      // null 제거 및 타입별 정렬
+      const records = results
+        .filter(r => r !== null)
+        .sort((a, b) => a.day - b.day);
+
+      this.logger.log(`자기선언문/칭찬내역 조회 완료 - 총 ${records.length}개`);
+
+      return {
+        success: true,
+        data: records
+      };
+
+    } catch (error) {
+      this.logger.error('자기선언문/칭찬내역 조회 실패:', error);
       throw error;
     }
   }

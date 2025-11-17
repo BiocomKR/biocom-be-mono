@@ -10,6 +10,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaService } from '../common/services/prisma.service';
 import { ConfigService } from '../common/services/config.service';
 import { ImwebModule } from '@/imweb/imweb.module';
+import { PhoneVerificationModule } from '../phone-verification/phone-verification.module';
 
 /**
  * 인증 모듈
@@ -25,12 +26,13 @@ import { ImwebModule } from '@/imweb/imweb.module';
   imports: [
     HttpModule,
     ImwebModule,
+    PhoneVerificationModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         secret: configService.jwt.secret,
-        signOptions: { 
+        signOptions: {
           expiresIn: configService.jwt.expiresIn,
         },
       }),

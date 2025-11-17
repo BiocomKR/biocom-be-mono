@@ -4,6 +4,9 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
+import { PhoneLoginDto } from './dto/phone-login.dto';
+import { PhoneRegisterDto } from './dto/phone-register.dto';
+import { PhoneRequestDto } from './dto/phone-request.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { LoginRateLimit, SignupRateLimit } from '../common/decorators/throttle.decorator';
@@ -239,9 +242,9 @@ export class AuthController {
   @Get('test-token')
   @Public()
   @SkipThrottle()
-  @ApiOperation({ 
-    summary: '토큰 발행 테스트', 
-    description: '액세스 토큰 발행 및 저장 테스트' 
+  @ApiOperation({
+    summary: '토큰 발행 테스트',
+    description: '액세스 토큰 발행 및 저장 테스트'
   })
   async testToken() {
     console.log('[test-token] 메서드 진입');
@@ -249,7 +252,7 @@ export class AuthController {
       // 현재 저장된 토큰 확인
       const currentToken = await this.imwebAuthService.getValidAccessToken('S20190715619285c855898');
       console.log('[test-token] 새로운 액세스 토큰:', currentToken);
-      
+
       return {
         message: '토큰 발행 및 저장 테스트',
         accessToken: currentToken
@@ -263,5 +266,125 @@ export class AuthController {
       throw error;
     }
   }
-  
+
+  /**
+   * 휴대폰 간편 인증 요청 (간편 로그인용)
+   */
+  @Post('phone-request')
+  @LoginRateLimit() // 5분에 5번 제한
+  @ApiOperation({
+    summary: '휴대폰 간편 인증 요청',
+    description: '통신사 + 휴대폰번호로 사용자 조회 후 본인인증을 시작합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '본인인증 요청 성공',
+    schema: {
+      example: {
+        success: true,
+        message: 'SMS가 발송되었습니다. 인증번호를 확인해주세요.',
+        data: {
+          certNumber: 'PER2025111201234567',
+        },
+        timestamp: '2025-11-12T10:00:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: '입력값 검증 실패',
+    type: ValidationErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: '등록되지 않은 휴대폰 번호',
+    schema: {
+      example: {
+        success: false,
+        statusCode: 404,
+        message: '등록되지 않은 휴대폰 번호입니다. 회원가입을 먼저 진행해주세요.',
+      },
+    },
+  })
+  async phoneRequest(@Body() phoneRequestDto: PhoneRequestDto): Promise<ApiResponseDto> {
+    const result = await this.authService.phoneRequest(phoneRequestDto);
+
+    return {
+      success: true,
+      message: result.message,
+      data: { certNumber: result.certNumber },
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 휴대폰 로그인
+   */
+  @Post('phone-login')
+  @LoginRateLimit() // 5분에 5번 제한
+  @ApiOperation({
+    summary: '휴대폰 로그인',
+    description: '휴대폰 본인인증 완료 후 휴대폰 번호로 로그인합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '로그인 성공',
+    type: SignInResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: '입력값 검증 실패',
+    type: ValidationErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: '등록되지 않은 휴대폰 번호 또는 차단된 계정',
+    type: UnauthorizedResponseDto,
+  })
+  async phoneLogin(@Body() phoneLoginDto: PhoneLoginDto): Promise<ApiResponseDto> {
+    const result = await this.authService.phoneLogin(phoneLoginDto);
+
+    return {
+      success: true,
+      message: '로그인되었습니다.',
+      data: result,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 휴대폰 회원가입
+   */
+  @Post('phone-register')
+  @SignupRateLimit() // 1시간에 3번 제한
+  @ApiOperation({
+    summary: '휴대폰 회원가입',
+    description: '휴대폰 본인인증 완료 후 회원가입합니다.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '회원가입 성공',
+    type: SignUpResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: '입력값 검증 실패',
+    type: ValidationErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 409,
+    description: '이미 존재하는 휴대폰 번호',
+    type: ConflictErrorResponseDto,
+  })
+  async phoneRegister(@Body() phoneRegisterDto: PhoneRegisterDto): Promise<ApiResponseDto> {
+    const result = await this.authService.phoneRegister(phoneRegisterDto);
+
+    return {
+      success: true,
+      message: '회원가입이 완료되었습니다.',
+      data: result,
+      timestamp: getNowKST(),
+    };
+  }
+
 }

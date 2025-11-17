@@ -9,9 +9,9 @@ export interface JwtPayload {
   sub: number;
 
   /**
-   * 사용자 이메일
+   * 사용자 이름
    */
-  email: string;
+  name: string;
 
   /**
    * 발급 시간 (자동 생성)

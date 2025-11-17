@@ -7,6 +7,8 @@ import {
   SubscriberHomeDataDto,
 } from './dto/home.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * 홈 화면 서비스
@@ -16,7 +18,10 @@ import { getNowKST } from '../common/utils/kst-date.util';
 export class HomeService {
   private readonly logger = new Logger(HomeService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
+  ) {}
 
   /**
    * 사용자 구독 상태에 따른 홈 화면 데이터 조회
@@ -33,6 +38,7 @@ export class HomeService {
         select: {
           id: true,
           email: true,
+          mobile: true,
           status: true,
           userChallenges: {
             where: { status: 'ACTIVE' },
@@ -58,6 +64,9 @@ export class HomeService {
       if (!user) {
         throw new Error('사용자를 찾을 수 없습니다');
       }
+
+      // 공통 처리: 외부 API에서 차트 데이터 조회 및 저장
+      await this.fetchAndSaveChartData(userId, user.mobile);
 
       const baseData = {
         status: user.status,
@@ -314,5 +323,65 @@ export class HomeService {
     });
 
     return summary;
+  }
+
+  /**
+   * 외부 API에서 차트 데이터 조회 및 DB 저장
+   * @param userId 사용자 ID
+   * @param mobile 휴대폰 번호
+   */
+  private async fetchAndSaveChartData(userId: number, mobile: string): Promise<void> {
+    try {
+      this.logger.log(`외부 API 차트 데이터 조회 시작 - 사용자 ID: ${userId}, 휴대폰: ${mobile}`);
+
+      // 외부 API 호출
+      const url = `https://sib.codns.com:3001/api/challenge/chartIdByMobile?mobile=${mobile}`;
+      const response = await firstValueFrom(
+        this.httpService.get(url, { timeout: 10000 })
+      );
+
+      const chartData = response.data;
+
+      // 데이터가 없으면 종료
+      if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
+        this.logger.log(`차트 데이터 없음 - 사용자 ID: ${userId}`);
+        return;
+      }
+
+      this.logger.log(`차트 데이터 ${chartData.length}건 조회 - 사용자 ID: ${userId}`);
+
+      // 각 차트 데이터를 DB에 저장 (중복 제외)
+      for (const chart of chartData) {
+        const { chartID, receiptDate, resultYN, orderCode } = chart;
+
+        // 이미 존재하는 chartId인지 확인
+        const existingChart = await this.prisma.userChart.findUnique({
+          where: { chartId: chartID },
+        });
+
+        if (existingChart) {
+          this.logger.log(`이미 존재하는 차트 ID: ${chartID} - 스킵`);
+          continue;
+        }
+
+        // 새 차트 데이터 저장
+        await this.prisma.userChart.create({
+          data: {
+            userId,
+            chartId: chartID,
+            receiptDate: new Date(receiptDate),
+            resultYn: resultYN,
+            orderCode,
+          },
+        });
+
+        this.logger.log(`차트 데이터 저장 완료 - 차트 ID: ${chartID}`);
+      }
+
+      this.logger.log(`차트 데이터 처리 완료 - 사용자 ID: ${userId}`);
+    } catch (error) {
+      // 외부 API 호출 실패는 치명적이지 않으므로 로그만 남기고 계속 진행
+      this.logger.warn(`차트 데이터 조회 실패 - 사용자 ID: ${userId}`, error.message);
+    }
   }
 }

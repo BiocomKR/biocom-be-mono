@@ -86,7 +86,7 @@ export class PhoneVerificationService {
     this.logger.log('📝 1단계: 실명 확인 API 호출');
 
     const signatureData = this.kcpSignatureService.generateIdentitySignature({
-      phone_no: dto.phoneNumber,
+      phone_no: dto.mobile,
       birth_day: dto.birthDay,
       user_name: dto.userName,
       local_code: dto.localCode,
@@ -102,7 +102,7 @@ export class PhoneVerificationService {
       media_type: 'MC01',
       tx_type: TxType.IDENTITY_VERIFICATION,
       cert_type: '01',
-      phone_no: dto.phoneNumber,
+      phone_no: dto.mobile,
       comm_id: dto.telecom,
       per_cert_no: perCertNo,
       birth_day: dto.birthDay,
@@ -123,7 +123,7 @@ export class PhoneVerificationService {
       await this.saveLog({
         certNumber: step1Response.per_cert_no,
         orderId: orderId,
-        phoneNumber: dto.phoneNumber,
+        mobile: dto.mobile,
         userName: dto.userName,
         birthDay: dto.birthDay,
         telecom: dto.telecom,
@@ -204,7 +204,7 @@ export class PhoneVerificationService {
 
     this.logger.log(`📝 DB에서 찾은 로그:`);
     this.logger.log(`  - certNumber: ${log.certNumber}`);
-    this.logger.log(`  - phoneNumber: ${log.phoneNumber}`);
+    this.logger.log(`  - mobile: ${log.mobile}`);
     this.logger.log(`  - userName: ${log.userName}`);
     this.logger.log(`  - telecom: ${log.telecom}`);
 
@@ -261,7 +261,7 @@ export class PhoneVerificationService {
     this.logger.log(`MVNO 사업자조회 시작 - 통신사: ${dto.telecom}`);
 
     const signatureData = this.kcpSignatureService.generateIdentitySignature({
-      phone_no: dto.phoneNumber,
+      phone_no: dto.mobile,
       birth_day: dto.birthDay,
       user_name: dto.userName,
       local_code: dto.localCode,
@@ -276,7 +276,7 @@ export class PhoneVerificationService {
       ordr_idxx: orderId,
       tx_type: TxType.MVNO_INQUIRY as TxType.MVNO_INQUIRY,
       cert_type: '01' as const,
-      phone_no: dto.phoneNumber,
+      phone_no: dto.mobile,
       comm_id: dto.telecom as TelecomCode.KTM | TelecomCode.LGM,
       user_name: dto.userName,
       local_code: dto.localCode,
@@ -338,7 +338,7 @@ export class PhoneVerificationService {
   private async saveLog(data: {
     certNumber: string;
     orderId?: string;
-    phoneNumber: string;
+    mobile: string;
     userName: string;
     birthDay: string;
     telecom: string;
@@ -358,7 +358,7 @@ export class PhoneVerificationService {
       data: {
         certNumber: data.certNumber,
         orderId: data.orderId,
-        phoneNumber: data.phoneNumber,
+        mobile: data.mobile,
         userName: data.userName,
         birthDay: data.birthDay,
         telecom: data.telecom,

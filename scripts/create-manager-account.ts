@@ -21,7 +21,7 @@ async function createManagerAccount() {
     const mobile = '010-0000-0000';
 
     // 이미 존재하는지 확인
-    const existing = await prisma.user.findUnique({
+    const existing = await prisma.user.findFirst({
       where: { email }
     });
 
@@ -34,7 +34,7 @@ async function createManagerAccount() {
       // MANAGER 권한으로 업데이트
       if (existing.role !== 'MANAGER') {
         await prisma.user.update({
-          where: { email },
+          where: { id: existing.id },
           data: { role: 'MANAGER' }
         });
         console.log('✅ 권한을 MANAGER로 업데이트했습니다.\n');

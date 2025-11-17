@@ -108,10 +108,15 @@ export const isMonday = (date: Date): boolean => {
 
 /**
  * 신청일 기준 선택 가능한 시작일 범위 계산
- * 정책:
+ *
+ * 현재 정책:
+ * - 모든 요일 신청: 다음주 월요일부터 3주간의 월요일
+ *
+ * 이전 정책 (배송 준비 기간 확보):
  * - 월~수요일 신청: 다음주 월요일부터 3주간의 월요일
  * - 목~금요일 신청: 차차주 월요일부터 3주간의 월요일 (배송 준비 기간 확보)
  * - 토~일요일 신청: 다음주 월요일부터 3주간의 월요일
+ * ⚠️ 도시락 배송 정책 폐지로 인해 목~금 특별 조건 제거됨 (2025-11-14)
  *
  * @param applicationDate - 신청일 (오늘)
  * @returns 선택 가능한 월요일 목록 3개
@@ -121,7 +126,7 @@ export const isMonday = (date: Date): boolean => {
  * // 다음주 월요일: 2025-11-03, 2025-11-10, 2025-11-17
  *
  * // 신청일이 2025-12-26 (금요일)인 경우
- * // 차차주 월요일: 2026-01-05, 2026-01-12, 2026-01-19
+ * // 다음주 월요일: 2025-12-29, 2026-01-05, 2026-01-12
  */
 export const getAvailableStartDates = (applicationDate: Date): Date[] => {
   const result: Date[] = [];
@@ -135,8 +140,12 @@ export const getAvailableStartDates = (applicationDate: Date): Date[] => {
   const daysUntilNextMonday = (8 - dayOfWeek) % 7 || 7; // 다음주 월요일까지 남은 일수
   nextMonday.setDate(today.getDate() + daysUntilNextMonday);
 
-  // 목요일(4) 또는 금요일(5)에 신청하면 차차주 월요일부터 시작
-  const startWeekOffset = (dayOfWeek === 4 || dayOfWeek === 5) ? 7 : 0;
+  // ⚠️ 배송 준비 기간 확보 조건 제거됨 (도시락 배송 정책 폐지)
+  // 이전: 목요일(4) 또는 금요일(5)에 신청하면 차차주 월요일부터 시작
+  // const startWeekOffset = (dayOfWeek === 4 || dayOfWeek === 5) ? 7 : 0;
+
+  // 현재: 모든 요일 동일하게 다음주 월요일부터 시작
+  const startWeekOffset = 0;
 
   // 시작 월요일부터 3주간의 월요일 추가
   for (let i = 0; i < 3; i++) {

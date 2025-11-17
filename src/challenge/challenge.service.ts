@@ -2,8 +2,9 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { PrismaService } from '../common/services/prisma.service';
 import { Logger } from '@nestjs/common';
 import {
-  calculateDeliveryArrivalDate,
-  calculateDeliveryStartDate,
+  // ⚠️ 배송 관련 함수 import 제거됨 (도시락 배송 정책 폐지)
+  // calculateDeliveryArrivalDate,
+  // calculateDeliveryStartDate,
   calculateEndDate,
   formatDateToString,
   parseStringToDate,
@@ -1130,8 +1131,9 @@ export class ChallengeService {
       const responseData: ChallengeScheduleResponseDto = {
         id: userChallenge.id,
         startDate: userChallenge.startDate ? formatDateToString(userChallenge.startDate) : null,
-        deliveryStartDate: userChallenge.deliveryStartDate ? formatDateToString(userChallenge.deliveryStartDate) : null,
-        deliveryArrivalDate: userChallenge.deliveryArrivalDate ? formatDateToString(userChallenge.deliveryArrivalDate) : null,
+        // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
+        // deliveryStartDate: userChallenge.deliveryStartDate ? formatDateToString(userChallenge.deliveryStartDate) : null,
+        // deliveryArrivalDate: userChallenge.deliveryArrivalDate ? formatDateToString(userChallenge.deliveryArrivalDate) : null,
         endDate: userChallenge.endDate ? formatDateToString(userChallenge.endDate) : null,
         isConfirmed: true, // 일정 설정 시 바로 확정됨
         canModify: false,   // 설정 후 수정 불가
@@ -1225,29 +1227,31 @@ export class ChallengeService {
           );
         }
 
-        // 5. 배송일과 종료일 계산 (로컬 Date로 계산, 공휴일 체크 포함)
-        const deliveryArrivalDate = await calculateDeliveryArrivalDate(startDate); // 시작일 전주 금요일 (공휴일 체크)
-        const deliveryStartDate = await calculateDeliveryStartDate(deliveryArrivalDate); // 배송도착일 2일전 (공휴일 체크)
+        // 5. 종료일 계산 (로컬 Date로 계산)
+        // ⚠️ 배송 관련 계산 제거됨 (도시락 배송 정책 폐지)
+        // const deliveryArrivalDate = await calculateDeliveryArrivalDate(startDate); // 시작일 전주 금요일 (공휴일 체크)
+        // const deliveryStartDate = await calculateDeliveryStartDate(deliveryArrivalDate); // 배송도착일 2일전 (공휴일 체크)
         const endDate = calculateEndDate(startDate); // 시작일 +20일
 
         // 6. KST 날짜/시간 객체 생성 (Prisma 저장용)
         const startDateKST = stringToKSTDate(startDateString, 0, 0, 0); // 00:00:00
 
-        // 배송시작일 KST
-        const deliveryStartYear = deliveryStartDate.getFullYear();
-        const deliveryStartMonth = deliveryStartDate.getMonth() + 1;
-        const deliveryStartDay = deliveryStartDate.getDate();
-        const deliveryStartDateKST = stringToKSTDate(
-          `${deliveryStartYear}-${String(deliveryStartMonth).padStart(2, '0')}-${String(deliveryStartDay).padStart(2, '0')}`
-        );
+        // ⚠️ 배송 관련 KST 날짜 생성 제거됨 (도시락 배송 정책 폐지)
+        // // 배송시작일 KST
+        // const deliveryStartYear = deliveryStartDate.getFullYear();
+        // const deliveryStartMonth = deliveryStartDate.getMonth() + 1;
+        // const deliveryStartDay = deliveryStartDate.getDate();
+        // const deliveryStartDateKST = stringToKSTDate(
+        //   `${deliveryStartYear}-${String(deliveryStartMonth).padStart(2, '0')}-${String(deliveryStartDay).padStart(2, '0')}`
+        // );
 
-        // 배송도착예정일 KST
-        const deliveryArrivalYear = deliveryArrivalDate.getFullYear();
-        const deliveryArrivalMonth = deliveryArrivalDate.getMonth() + 1;
-        const deliveryArrivalDay = deliveryArrivalDate.getDate();
-        const deliveryArrivalDateKST = stringToKSTDate(
-          `${deliveryArrivalYear}-${String(deliveryArrivalMonth).padStart(2, '0')}-${String(deliveryArrivalDay).padStart(2, '0')}`
-        );
+        // // 배송도착예정일 KST
+        // const deliveryArrivalYear = deliveryArrivalDate.getFullYear();
+        // const deliveryArrivalMonth = deliveryArrivalDate.getMonth() + 1;
+        // const deliveryArrivalDay = deliveryArrivalDate.getDate();
+        // const deliveryArrivalDateKST = stringToKSTDate(
+        //   `${deliveryArrivalYear}-${String(deliveryArrivalMonth).padStart(2, '0')}-${String(deliveryArrivalDay).padStart(2, '0')}`
+        // );
 
         // 종료일 KST
         const endYear = endDate.getFullYear();
@@ -1271,8 +1275,9 @@ export class ChallengeService {
             ticket: { connect: { id: ticket.id } },
             activatedAt: nowKST,
             startDate: startDateKST,
-            deliveryStartDate: deliveryStartDateKST,
-            deliveryArrivalDate: deliveryArrivalDateKST,
+            // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
+            // deliveryStartDate: deliveryStartDateKST,
+            // deliveryArrivalDate: deliveryArrivalDateKST,
             endDate: endDateKST,
             expiresAt: endDateKST,
             purchasedAt: ticket.purchaseDate,
@@ -1291,8 +1296,9 @@ export class ChallengeService {
         const responseData: ChallengeScheduleResponseDto = {
           id: userChallenge.id,
           startDate: formatDateToString(userChallenge.startDate!),
-          deliveryStartDate: formatDateToString(userChallenge.deliveryStartDate!),
-          deliveryArrivalDate: formatDateToString(userChallenge.deliveryArrivalDate!),
+          // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
+          // deliveryStartDate: formatDateToString(userChallenge.deliveryStartDate!),
+          // deliveryArrivalDate: formatDateToString(userChallenge.deliveryArrivalDate!),
           endDate: formatDateToString(userChallenge.endDate!),
           isConfirmed: true,
           canModify: false,
@@ -1300,7 +1306,7 @@ export class ChallengeService {
           createdAt: userChallenge.createdAt
         };
 
-        this.logger.log(`챌린지 시작일 설정 완료 및 활성화 - 시작일: ${responseData.startDate}, 배송시작일: ${responseData.deliveryStartDate}, 배송도착일: ${responseData.deliveryArrivalDate}, 종료일: ${responseData.endDate}, 상태: ACTIVE`);
+        this.logger.log(`챌린지 시작일 설정 완료 및 활성화 - 시작일: ${responseData.startDate}, 종료일: ${responseData.endDate}, 상태: ACTIVE`);
         return { success: true, data: responseData };
       });
     } catch (error) {

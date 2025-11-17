@@ -1022,29 +1022,29 @@ export class RecordsService {
 
   /**
    * 간헐적 단식 메타데이터 변환
+   * 정책: 시간 단위를 분 단위로 변환
    */
   private transformFastingMetadata(metadata: any) {
     const fastingHours = metadata.fastingHours || 0;
-    const fastingMinutes = 0; // 현재 시간 단위만 저장됨
+    const fastingTime = Math.round(fastingHours * 60); // 분 단위로 변환
 
     return {
-      fastingHours: fastingHours,
-      fastingMinutes: fastingMinutes,
-      baseTime: 16, // TODO: 하드코딩 -> 실제 목표값으로 변경
+      fastingTime: fastingTime,
+      targetTime: 16 * 60, // 16시간 = 960분
     };
   }
 
   /**
    * 수면 메타데이터 변환
+   * 정책: 시간 단위를 분 단위로 변환
    */
   private transformSleepMetadata(metadata: any) {
     const sleepHours = metadata.sleepHours || 0;
-    const sleepMinutes = 0; // 현재 시간 단위만 저장됨
+    const sleepTime = Math.round(sleepHours * 60); // 분 단위로 변환
 
     return {
-      sleepHours: sleepHours,
-      sleepMinutes: sleepMinutes,
-      baseTime: 8, // TODO: 하드코딩 -> 실제 목표값으로 변경
+      sleepTime: sleepTime,
+      targetTime: 8 * 60, // 8시간 = 480분
     };
   }
 

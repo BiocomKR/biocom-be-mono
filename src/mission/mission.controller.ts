@@ -7,8 +7,9 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
+  Query,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MissionCompletionService } from './mission-completion.service';
 import { CompleteMissionDto } from './dto/mission-completion.dto';
@@ -92,5 +93,124 @@ export class MissionController {
       userId,
       dto
     );
+  }
+
+  /**
+   * 완료한 미션 목록 조회
+   * @description 지정한 기간 동안 완료한 미션들을 일자별로 조회합니다
+   */
+  @Get('completed')
+  @ApiOperation({
+    summary: '완료한 미션 목록 조회',
+    description: '지정한 기간 동안 완료한 미션들을 일자별로 조회합니다'
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-01-10',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '완료한 미션 목록 조회 성공'
+  })
+  @ApiResponse({
+    status: 404,
+    description: '활성화된 챌린지가 없음'
+  })
+  async getCompletedMissions(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.missionCompletionService.getCompletedMissions(userId, startDate, endDate);
+  }
+
+  /**
+   * 놓친 미션 목록 조회
+   * @description 지정한 기간 동안 놓친 미션들을 일자별로 조회합니다 (과거 미션만)
+   */
+  @Get('missed')
+  @ApiOperation({
+    summary: '놓친 미션 목록 조회',
+    description: '지정한 기간 동안 놓친 미션들을 일자별로 조회합니다. 미래 미션은 제외되며, 과거에 완료하지 못한 미션만 표시됩니다.'
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD)',
+    example: '2025-01-01',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD)',
+    example: '2025-01-10',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '놓친 미션 목록 조회 성공'
+  })
+  @ApiResponse({
+    status: 404,
+    description: '활성화된 챌린지가 없음'
+  })
+  async getMissedMissions(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.missionCompletionService.getMissedMissions(userId, startDate, endDate);
+  }
+
+  /**
+   * 자기선언문/칭찬내역 조회
+   * @description 활성화된 챌린지의 자기선언문(1일차), 칭찬내역(10일차) 조회
+   */
+  @Get('self-records')
+  @ApiOperation({
+    summary: '자기선언문/칭찬내역 조회',
+    description: '활성화된 챌린지의 자기선언문(DECLARATION)과 칭찬내역(SELF_PRAISE)을 조회합니다. 타입별로 구분되어 반환됩니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '자기선언문/칭찬내역 조회 성공',
+    schema: {
+      example: {
+        success: true,
+        data: [
+          {
+            type: 'DECLARATION',
+            day: 1,
+            contents: '자기 선언문 내용이 들어갑니다.',
+            completedAt: '2025-01-15T10:30:00Z',
+            pointsEarned: 100
+          },
+          {
+            type: 'SELF_PRAISE',
+            day: 10,
+            contents: '칭찬 내용이 들어갑니다.',
+            completedAt: '2025-01-24T14:20:00Z',
+            pointsEarned: 100
+          }
+        ]
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: '활성화된 챌린지가 없음'
+  })
+  async getRecords(@Request() req: any) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.missionCompletionService.getRecords(userId);
   }
 }

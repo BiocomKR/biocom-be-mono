@@ -49,23 +49,24 @@ export class ChallengeScheduleResponseDto {
   })
   startDate: string | null;
 
-  @ApiProperty({
-    description: '배송시작일 (배송도착일 2일전)',
-    example: '2024-09-05',
-    type: 'string',
-    format: 'date',
-    nullable: true
-  })
-  deliveryStartDate: string | null;
+  // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
+  // @ApiProperty({
+  //   description: '배송시작일 (배송도착일 2일전)',
+  //   example: '2024-09-05',
+  //   type: 'string',
+  //   format: 'date',
+  //   nullable: true
+  // })
+  // deliveryStartDate: string | null;
 
-  @ApiProperty({
-    description: '배송도착예정일 (시작일 전주 금요일)',
-    example: '2024-09-07',
-    type: 'string',
-    format: 'date',
-    nullable: true
-  })
-  deliveryArrivalDate: string | null;
+  // @ApiProperty({
+  //   description: '배송도착예정일 (시작일 전주 금요일)',
+  //   example: '2024-09-07',
+  //   type: 'string',
+  //   format: 'date',
+  //   nullable: true
+  // })
+  // deliveryArrivalDate: string | null;
 
   @ApiProperty({
     description: '종료일 (시작일 +20일)',

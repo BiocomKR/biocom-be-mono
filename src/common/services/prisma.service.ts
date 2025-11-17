@@ -103,20 +103,70 @@ function createExtendedPrismaClient() {
         mobile: {
           needs: { mobile: true },
           compute(user) {
-            return user.mobile ? CryptoUtil.decrypt(user.mobile) : user.mobile;
+            return user.mobile ? CryptoUtil.decryptDeterministic(user.mobile) : user.mobile;
+          },
+        },
+      },
+      phoneVerificationLog: {
+        mobile: {
+          needs: { mobile: true } as any,
+          compute(log) {
+            return (log as any).mobile ? CryptoUtil.decryptDeterministic((log as any).mobile) : (log as any).mobile;
+          },
+        },
+        userName: {
+          needs: { userName: true },
+          compute(log) {
+            return log.userName ? CryptoUtil.decrypt(log.userName) : log.userName;
+          },
+        },
+        birthDay: {
+          needs: { birthDay: true },
+          compute(log) {
+            return log.birthDay ? CryptoUtil.decrypt(log.birthDay) : log.birthDay;
+          },
+        },
+        ci: {
+          needs: { ci: true },
+          compute(log) {
+            return log.ci ? CryptoUtil.decrypt(log.ci) : log.ci;
+          },
+        },
+        di: {
+          needs: { di: true },
+          compute(log) {
+            return log.di ? CryptoUtil.decrypt(log.di) : log.di;
           },
         },
       },
     },
-    // 생성/수정 시 자동 암호화
+    // 생성/수정/조회 시 자동 암호화
     query: {
       user: {
+        async findUnique({ args, query }) {
+          if (args.where.mobile && typeof args.where.mobile === 'string') {
+            args.where.mobile = CryptoUtil.encryptDeterministic(args.where.mobile);
+          }
+          return query(args);
+        },
+        async findFirst({ args, query }) {
+          if (args.where?.mobile && typeof args.where.mobile === 'string') {
+            args.where.mobile = CryptoUtil.encryptDeterministic(args.where.mobile);
+          }
+          return query(args);
+        },
+        async findMany({ args, query }) {
+          if (args.where?.mobile && typeof args.where.mobile === 'string') {
+            args.where.mobile = CryptoUtil.encryptDeterministic(args.where.mobile);
+          }
+          return query(args);
+        },
         async create({ args, query }) {
           if (args.data.name && typeof args.data.name === 'string') {
             args.data.name = CryptoUtil.encrypt(args.data.name);
           }
           if (args.data.mobile && typeof args.data.mobile === 'string') {
-            args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+            args.data.mobile = CryptoUtil.encryptDeterministic(args.data.mobile);
           }
           return query(args);
         },
@@ -125,11 +175,11 @@ function createExtendedPrismaClient() {
             args.data = args.data.map(item => ({
               ...item,
               name: item.name ? CryptoUtil.encrypt(item.name) : item.name,
-              mobile: item.mobile ? CryptoUtil.encrypt(item.mobile) : item.mobile,
+              mobile: item.mobile ? CryptoUtil.encryptDeterministic(item.mobile) : item.mobile,
             }));
           } else if (args.data) {
             if (args.data.name) args.data.name = CryptoUtil.encrypt(args.data.name);
-            if (args.data.mobile) args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+            if (args.data.mobile) args.data.mobile = CryptoUtil.encryptDeterministic(args.data.mobile);
           }
           return query(args);
         },
@@ -138,7 +188,7 @@ function createExtendedPrismaClient() {
             args.data.name = CryptoUtil.encrypt(args.data.name);
           }
           if (args.data.mobile && typeof args.data.mobile === 'string') {
-            args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+            args.data.mobile = CryptoUtil.encryptDeterministic(args.data.mobile);
           }
           return query(args);
         },
@@ -147,7 +197,63 @@ function createExtendedPrismaClient() {
             args.data.name = CryptoUtil.encrypt(args.data.name);
           }
           if (args.data.mobile && typeof args.data.mobile === 'string') {
-            args.data.mobile = CryptoUtil.encrypt(args.data.mobile);
+            args.data.mobile = CryptoUtil.encryptDeterministic(args.data.mobile);
+          }
+          return query(args);
+        },
+      },
+      phoneVerificationLog: {
+        async create({ args, query }) {
+          if ((args.data as any).mobile && typeof (args.data as any).mobile === 'string') {
+            (args.data as any).mobile = CryptoUtil.encryptDeterministic((args.data as any).mobile);
+          }
+          if (args.data.userName && typeof args.data.userName === 'string') {
+            args.data.userName = CryptoUtil.encrypt(args.data.userName);
+          }
+          if (args.data.birthDay && typeof args.data.birthDay === 'string') {
+            args.data.birthDay = CryptoUtil.encrypt(args.data.birthDay);
+          }
+          if (args.data.ci && typeof args.data.ci === 'string') {
+            args.data.ci = CryptoUtil.encrypt(args.data.ci);
+          }
+          if (args.data.di && typeof args.data.di === 'string') {
+            args.data.di = CryptoUtil.encrypt(args.data.di);
+          }
+          return query(args);
+        },
+        async update({ args, query }) {
+          if ((args.data as any).mobile && typeof (args.data as any).mobile === 'string') {
+            (args.data as any).mobile = CryptoUtil.encryptDeterministic((args.data as any).mobile);
+          }
+          if (args.data.userName && typeof args.data.userName === 'string') {
+            args.data.userName = CryptoUtil.encrypt(args.data.userName);
+          }
+          if (args.data.birthDay && typeof args.data.birthDay === 'string') {
+            args.data.birthDay = CryptoUtil.encrypt(args.data.birthDay);
+          }
+          if (args.data.ci && typeof args.data.ci === 'string') {
+            args.data.ci = CryptoUtil.encrypt(args.data.ci);
+          }
+          if (args.data.di && typeof args.data.di === 'string') {
+            args.data.di = CryptoUtil.encrypt(args.data.di);
+          }
+          return query(args);
+        },
+        async updateMany({ args, query }) {
+          if ((args.data as any).mobile && typeof (args.data as any).mobile === 'string') {
+            (args.data as any).mobile = CryptoUtil.encryptDeterministic((args.data as any).mobile);
+          }
+          if (args.data.userName && typeof args.data.userName === 'string') {
+            args.data.userName = CryptoUtil.encrypt(args.data.userName);
+          }
+          if (args.data.birthDay && typeof args.data.birthDay === 'string') {
+            args.data.birthDay = CryptoUtil.encrypt(args.data.birthDay);
+          }
+          if (args.data.ci && typeof args.data.ci === 'string') {
+            args.data.ci = CryptoUtil.encrypt(args.data.ci);
+          }
+          if (args.data.di && typeof args.data.di === 'string') {
+            args.data.di = CryptoUtil.encrypt(args.data.di);
           }
           return query(args);
         },
@@ -206,7 +312,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get mission() { return this.prisma.mission; }
   get dailyMission() { return this.prisma.dailyMission; }
   get missionSchedule() { return this.prisma.missionSchedule; }
-  get missionAttempt() { return this.prisma.missionAttempt; }
+  get userMission() { return this.prisma.userMission; }
   get missionCompletion() { return this.prisma.missionCompletion; }
   get quiz() { return this.prisma.quiz; }
   get quizAnswer() { return this.prisma.quizAnswer; }
@@ -286,6 +392,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 구독 테이블
   get subscription() { return this.prisma.subscription; }
+
+  // 사용자 차트 테이블
+  get userChart() { return this.prisma.userChart; }
 
   // 메서드 바인딩
   $transaction(arg: any) {

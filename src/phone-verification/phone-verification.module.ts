@@ -4,6 +4,7 @@ import { KcpApiService } from './kcp/kcp-api.service';
 import { KcpSignatureService } from './kcp/kcp-signature.service';
 import { PhoneVerificationController } from './phone-verification.controller';
 import { PhoneVerificationService } from './phone-verification.service';
+import { PrismaService } from '../common/services/prisma.service';
 
 /**
  * 휴대폰 본인인증 모듈
@@ -21,6 +22,7 @@ import { PhoneVerificationService } from './phone-verification.service';
     PhoneVerificationService,
     KcpApiService,
     KcpSignatureService,
+    PrismaService,
   ],
   exports: [PhoneVerificationService], // 다른 모듈에서 사용 가능
 })

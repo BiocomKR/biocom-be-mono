@@ -560,14 +560,14 @@ export class StatisticsService {
         };
       });
 
-      // 평균 단식시간 계산
+      // 평균 단식시간 계산 (시간 단위)
       const totalHours = weekScore.reduce((sum, item) => sum + parseFloat(item.value), 0);
       const daysCount = weekDates.length;
-      const averageScore = daysCount > 0 ? Math.round(totalHours / daysCount) : 0;
+      const averageHours = daysCount > 0 ? totalHours / daysCount : 0;
+      const averageScore = Math.round(averageHours);
 
-      // 달성률 계산 (완료된 날 / 전체 날)
-      const completedDays = weekScore.filter(item => item.isCompleted).length;
-      const achievementScore = daysCount > 0 ? Math.round((completedDays / daysCount) * 100) : 0;
+      // 평균 단식시간 계산 (분 단위)
+      const averageMinutes = Math.round(averageHours * 60); // 1시간 = 60분
 
       const summary = {
         score: averageScore,
@@ -575,13 +575,13 @@ export class StatisticsService {
       };
 
       const detailData = {
-        score: achievementScore,
+        score: averageMinutes,
         targetHour: 16,
         weekScore,
         totalComment: '평균단식시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
       };
 
-      this.logger.log(`간헐적단식 통계 조회 완료 - 사용자: ${userId}, 평균: ${averageScore}시간, 달성률: ${achievementScore}%`);
+      this.logger.log(`간헐적단식 통계 조회 완료 - 사용자: ${userId}, 평균: ${averageScore}시간 (${averageMinutes}분)`);
 
       return {
         summary,
@@ -659,14 +659,14 @@ export class StatisticsService {
         };
       });
 
-      // 평균 수면 점수 계산 (평균 수면시간)
+      // 평균 수면시간 계산 (시간 단위)
       const totalHours = weekScore.reduce((sum, item) => sum + parseFloat(item.value), 0);
       const daysCount = weekDates.length;
-      const averageScore = daysCount > 0 ? Math.round(totalHours / daysCount) : 0;
+      const averageHours = daysCount > 0 ? totalHours / daysCount : 0;
+      const averageScore = Math.round(averageHours);
 
-      // 달성률 계산 (완료된 날 / 전체 날)
-      const completedDays = weekScore.filter(item => item.isCompleted).length;
-      const achievementScore = daysCount > 0 ? Math.round((completedDays / daysCount) * 100) : 0;
+      // 평균 수면시간 계산 (분 단위)
+      const averageMinutes = Math.round(averageHours * 60); // 1시간 = 60분
 
       const summary = {
         score: averageScore,
@@ -674,13 +674,13 @@ export class StatisticsService {
       };
 
       const detailData = {
-        score: achievementScore,
+        score: averageMinutes,
         targetHour: 8,
         weekScore,
         totalComment: '평균수면시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
       };
 
-      this.logger.log(`수면 통계 조회 완료 - 사용자: ${userId}, 평균: ${averageScore}시간, 달성률: ${achievementScore}%`);
+      this.logger.log(`수면 통계 조회 완료 - 사용자: ${userId}, 평균: ${averageScore}시간 (${averageMinutes}분)`);
 
       return {
         summary,

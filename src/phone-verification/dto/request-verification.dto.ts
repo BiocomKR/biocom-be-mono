@@ -22,7 +22,7 @@ export class RequestVerificationDto {
   @Matches(/^01[0-9]{8,9}$/, {
     message: '올바른 휴대폰 번호 형식이 아닙니다.',
   })
-  phoneNumber: string;
+  mobile: string;
 
   @ApiProperty({
     description: '생년월일 (YYYYMMDD)',

@@ -85,7 +85,7 @@ export class QuizCompletionService {
         }
 
         // 5️⃣ 이미 정답을 맞췄는지 확인 (정답 맞춘 경우만 차단)
-        const correctAttempt = await tx.missionAttempt.findFirst({
+        const correctAttempt = await tx.userMission.findFirst({
           where: {
             userId,
             challengeMissionId: challengeMission.id,
@@ -99,7 +99,7 @@ export class QuizCompletionService {
         }
 
         // 기존 오답 시도 횟수 확인
-        const attemptCount = await tx.missionAttempt.count({
+        const attemptCount = await tx.userMission.count({
           where: {
             userId,
             challengeMissionId: challengeMission.id,
@@ -149,8 +149,8 @@ export class QuizCompletionService {
           this.logger.log(`퀴즈 정답 기록 저장 완료 - user_records ID: ${userRecordId}`);
         }
 
-        // 8️⃣ mission_attempts에 모든 시도 기록 저장 (정답/오답 모두)
-        const missionAttempt = await tx.missionAttempt.create({
+        // 8️⃣ user_missions에 모든 시도 기록 저장 (정답/오답 모두)
+        const userMission = await tx.userMission.create({
           data: {
             userId,
             challengeMissionId: challengeMission.id,

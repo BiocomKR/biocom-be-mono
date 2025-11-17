@@ -375,7 +375,7 @@ export class ManagementMissionService {
       }
 
       // 미션 시도 통계
-      const attemptStats = await this.prisma.missionAttempt.groupBy({
+      const attemptStats = await this.prisma.userMission.groupBy({
         by: ['isCompleted'],
         where: {
           challengeMission: {
@@ -391,7 +391,7 @@ export class ManagementMissionService {
       const thirtyDaysAgo = getNowKST();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const dailyStats = await this.prisma.missionAttempt.groupBy({
+      const dailyStats = await this.prisma.userMission.groupBy({
         by: ['day'],
         where: {
           challengeMission: {
