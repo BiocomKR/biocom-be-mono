@@ -18,6 +18,10 @@ model User {
   points                 Int                         @default(0)
   mobile                 String
   name                   String
+  birthDate              String?                     @map("birth_date") @db.VarChar(8)
+  sex                    String?                     @db.VarChar(2)
+  localCode              String?                     @map("local_code") @db.VarChar(2)
+  telecom                String?                     @db.VarChar(10)
   isActive               Boolean                     @default(true) @map("is_active")
   deletedAt              DateTime?                   @map("deleted_at")
   aiPersonaId            Int?                        @map("ai_persona_id")
@@ -1227,7 +1231,7 @@ model UserMission {
   @@index([challengeMissionId])
   @@index([userChallengeId, day])
   @@index([createdAt])
-  @@map("mission_attempts")
+  @@map("user_missions")
 }
 
 /// ❌ DEPRECATED: 2025-10-28 삭제됨
@@ -1769,11 +1773,11 @@ model BeautyQuestion {
 model PhoneVerificationLog {
   id                 Int       @id @default(autoincrement())
   /// 본인확인 거래번호 (KCP 발급)
-  certNumber         String    @map("cert_number") @db.VarChar(50)
+  certNumber         String    @unique @map("cert_number") @db.VarChar(50)
   /// 주문번호 (우리 시스템에서 생성)
   orderId            String?   @map("order_id") @db.VarChar(50)
   /// 휴대폰 번호
-  phoneNumber        String    @map("phone_number") @db.VarChar(11)
+  mobile             String    @db.VarChar(255)
   /// 통신사 코드 (SKT, KTF, LGT, SKM, KTM, LGM)
   telecom            String    @db.VarChar(3)
   /// 사용자 이름
@@ -1812,7 +1816,7 @@ model PhoneVerificationLog {
   updatedAt          DateTime? @updatedAt @map("updated_at")
 
   @@index([certNumber])
-  @@index([phoneNumber])
+  @@index([mobile])
   @@index([verificationStatus])
   @@index([createdAt])
   @@map("phone_verification_logs")
