@@ -699,8 +699,8 @@ export class MissionCompletionService {
       // 현재 일차 계산
       const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
 
-      // 미래 일차는 제외 (과거 일차만 조회)
-      const adjustedEndDay = Math.min(endDay, currentDay - 1);
+      // 미래 일차는 제외 (오늘까지 포함)
+      const adjustedEndDay = Math.min(endDay, currentDay);
 
       if (adjustedEndDay < startDay) {
         return {

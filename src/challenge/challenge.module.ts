@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CommonModule } from '../common/common.module';
 import { ChallengeController } from './challenge.controller';
 import { ChallengeService } from './challenge.service';
+import { ChallengeSchedulerService } from './challenge-scheduler.service';
 
 /**
  * 챌린지 모듈
@@ -10,7 +11,7 @@ import { ChallengeService } from './challenge.service';
 @Module({
   imports: [CommonModule],
   controllers: [ChallengeController],
-  providers: [ChallengeService],
-  exports: [ChallengeService]
+  providers: [ChallengeService, ChallengeSchedulerService],
+  exports: [ChallengeService, ChallengeSchedulerService]
 })
 export class ChallengeModule {}

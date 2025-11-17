@@ -255,12 +255,10 @@ export const calculateEndDate = (startDate: Date): Date => {
  * @returns YYYY-MM-DD 형식의 문자열
  */
 export const formatDateToString = (date: Date): string => {
-  // Prisma 미들웨어가 UTC 날짜에 +9시간을 추가한 Date 객체를 제공합니다
-  // 하지만 Date 객체 내부는 여전히 UTC 타임스탬프이므로
-  // UTC 메서드를 사용해야 정확한 날짜를 추출할 수 있습니다
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(date.getUTCDate()).padStart(2, '0');
+  // 로컬 시간대 기준으로 날짜 추출 (KST)
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
 

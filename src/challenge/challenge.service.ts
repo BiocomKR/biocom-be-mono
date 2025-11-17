@@ -76,8 +76,7 @@ export class ChallengeService {
           categoryCode: 'CHALLENGE'
         },
         include: {
-          options: {
-            where: { isActive: true },
+          images: {
             orderBy: { sortOrder: 'asc' }
           }
         },
@@ -97,7 +96,8 @@ export class ChallengeService {
             products: [{
               id: product.id,
               name: product.name,
-              price: product.options[0]?.price || 0
+              price: product.price || 0,
+              imageUrl: product.images?.[0]?.imageUrl || null
             }]
           };
         });
@@ -315,8 +315,8 @@ export class ChallengeService {
 
         const challengeInfo = this.extractChallengeInfo(ticket.product);
 
-        // 3. 챌린지 활성화
-        const now = new Date();
+        // 3. 챌린지 활성화 (KST 기준)
+        const now = getNowKST();
         const expiresAt = new Date(now.getTime() + challengeInfo.totalDays * 24 * 60 * 60 * 1000);
 
         const userChallenge = await tx.userChallenge.create({
@@ -326,40 +326,15 @@ export class ChallengeService {
             ticketId,
             activatedAt: now,
             expiresAt,
-            currentDay: 1,
-            status: 'ACTIVE',
-            createdAt: getNowKST(),
+            purchasedAt: ticket.purchaseDate, // 티켓 구매 일시
+            status: 'PENDING', // 시작일 설정 전까지는 PENDING 상태
+            createdAt: now,
           },
           include: { product: true }
         });
 
-        // 4. 수행권 상태 변경 및 기간 설정 (KST 기준)
-        const startDate = getKoreanNow();
-        const endDate = new Date(startDate.getTime() + challengeInfo.totalDays * 24 * 60 * 60 * 1000);
-
-        await tx.challengeTicket.update({
-          where: { id: ticketId },
-          data: {
-            status: ChallengeTicketStatus.ACTIVATED,
-            startDate,
-            endDate
-          }
-        });
-
-        // 5. 사용자 구독 상태를 CHALLENGER로 변경 (무조건 CHALLENGER가 최우선)
-        await tx.user.update({
-          where: { id: userId },
-          data: { status: UserSubscriptionStatus.CHALLENGER }
-        });
-
-        // 6. 첫날(Day 1) 진행 상황 생성
-        await tx.dailyProgress.create({
-          data: {
-            userChallengeId: userChallenge.id,
-            day: 1,
-            date: new Date(now.getFullYear(), now.getMonth(), now.getDate())
-          }
-        });
+        // 4. 티켓 상태는 PURCHASED 유지 (start-date API에서 변경)
+        // DailyProgress와 CHALLENGER 상태 변경은 크론잡에서 처리 (시작일이 되면)
 
         const result = {
           userChallengeId: userChallenge.id,
@@ -1193,14 +1168,17 @@ export class ChallengeService {
           throw new BadRequestException('본인의 이용권만 사용할 수 있습니다');
         }
 
-        // 2-2. 이 티켓으로 이미 생성된 챌린지가 있는지 확인 (재사용 방지)
-        const existingChallengeWithTicket = await tx.userChallenge.findFirst({
-          where: { ticketId: ticket.id }
+        // 2-2. 이 티켓으로 생성된 PENDING 상태 챌린지 찾기
+        const pendingChallenge = await tx.userChallenge.findFirst({
+          where: {
+            ticketId: ticket.id,
+            status: 'PENDING'
+          }
         });
 
-        if (existingChallengeWithTicket) {
-          this.logger.error(`티켓 재사용 시도 - 티켓 ${ticket.id}는 이미 UserChallenge ${existingChallengeWithTicket.id}에서 사용됨`);
-          throw new ConflictException('이미 사용된 이용권입니다');
+        if (!pendingChallenge) {
+          this.logger.error(`PENDING 챌린지를 찾을 수 없음 - 티켓 ${ticket.id}`);
+          throw new NotFoundException('활성화된 챌린지를 찾을 수 없습니다. 먼저 챌린지를 활성화해주세요.');
         }
 
         // 3. 상품(챌린지) 정보 조회
@@ -1267,22 +1245,17 @@ export class ChallengeService {
           now.getSeconds()
         );
 
-        // 7. UserChallenge 생성 (티켓 활성화 + 일정 정보 포함)
-        const userChallenge = await tx.userChallenge.create({
+        // 7. UserChallenge 업데이트 (일정 정보 추가, PENDING 상태 유지)
+        const userChallenge = await tx.userChallenge.update({
+          where: { id: pendingChallenge.id },
           data: {
-            user: { connect: { id: userId } },
-            product: { connect: { id: productId } },
-            ticket: { connect: { id: ticket.id } },
-            activatedAt: nowKST,
             startDate: startDateKST,
             // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
             // deliveryStartDate: deliveryStartDateKST,
             // deliveryArrivalDate: deliveryArrivalDateKST,
             endDate: endDateKST,
             expiresAt: endDateKST,
-            purchasedAt: ticket.purchaseDate,
-            status: 'ACTIVE',
-            createdAt: nowKST,
+            // status는 PENDING 유지 (크론잡에서 ACTIVE로 변경)
           }
         });
 

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ChallengeService } from './challenge.service';
+import { ChallengeSchedulerService } from './challenge-scheduler.service';
 import { ActivateChallengeDto, ChallengeResponseDto } from './dto/challenge.dto';
 import {
   SetStartDateDto,
@@ -17,7 +18,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ChallengeController {
-  constructor(private readonly challengeService: ChallengeService) {}
+  constructor(
+    private readonly challengeService: ChallengeService,
+    private readonly challengeSchedulerService: ChallengeSchedulerService,
+  ) {}
 
   /**
    * 구매 가능한 챌린지 목록 조회
@@ -51,7 +55,8 @@ export class ChallengeController {
     description: '수행권 목록 조회 성공 (PURCHASED 상태만)'
   })
   async getMyTickets(@Request() req: any) {
-    return this.challengeService.getMyTickets(req.user.userId);
+    const userId = req.user?.userId || req.user?.sub;
+    return this.challengeService.getMyTickets(userId);
   }
 
   /**
@@ -68,7 +73,8 @@ export class ChallengeController {
     description: '활성 챌린지 조회 성공'
   })
   async getMyActiveChallenge(@Request() req: any) {
-    return this.challengeService.getMyActiveChallenge(req.user.userId);
+    const userId = req.user?.userId || req.user?.sub;
+    return this.challengeService.getMyActiveChallenge(userId);
   }
 
   /**
@@ -89,7 +95,8 @@ export class ChallengeController {
     description: '이미 활성 챌린지가 존재함'
   })
   async activateChallenge(@Body() dto: ActivateChallengeDto, @Request() req: any) {
-    return this.challengeService.activateChallenge(req.user.userId, dto.ticketId);
+    const userId = req.user?.userId || req.user?.sub;
+    return this.challengeService.activateChallenge(userId, dto.ticketId);
   }
 
   /**
@@ -109,7 +116,8 @@ export class ChallengeController {
     @Param('productId', ParseIntPipe) productId: number,
     @Request() req: any
   ) {
-    return this.challengeService.getChallengeSurveyComparison(req.user.userId, productId);
+    const userId = req.user?.userId || req.user?.sub;
+    return this.challengeService.getChallengeSurveyComparison(userId, productId);
   }
 
   // ==================== 시작일 설정 API ====================
@@ -136,7 +144,8 @@ export class ChallengeController {
     @Param('productId', ParseIntPipe) productId: number,
     @Request() req: any
   ) {
-    return this.challengeService.getChallengeSchedule(req.user.userId, productId);
+    const userId = req.user?.userId || req.user?.sub;
+    return this.challengeService.getChallengeSchedule(userId, productId);
   }
 
   /**
@@ -175,5 +184,26 @@ export class ChallengeController {
   // ⚠️ 시작일 수정 및 확정 API 제거됨
   // - 시작일은 한번 설정하면 수정 불가
   // - 시작일 설정 시 바로 확정 및 ACTIVE 상태로 변경됨
+
+  /**
+   * 챌린지 활성화 크론잡 수동 실행 (테스트용)
+   * @description PENDING 상태의 챌린지를 즉시 ACTIVE로 전환합니다
+   */
+  @Post('scheduler/run-activation')
+  @ApiOperation({
+    summary: '챌린지 활성화 크론잡 수동 실행 (테스트용)',
+    description: '오늘 시작일인 PENDING 챌린지들을 즉시 ACTIVE로 전환합니다'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '크론잡 실행 완료'
+  })
+  async runChallengeActivation() {
+    await this.challengeSchedulerService.runManually();
+    return {
+      success: true,
+      message: '챌린지 활성화 크론잡이 수동으로 실행되었습니다'
+    };
+  }
 
 }
