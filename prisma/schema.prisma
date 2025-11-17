@@ -11,8 +11,8 @@ datasource db {
 /// 애플리케이션의 모든 사용자 정보를 저장
 model User {
   id                     Int                         @id @default(autoincrement())
-  email                  String                      @unique
-  password               String
+  email                  String?
+  password               String?
   createdAt              DateTime                    @map("created_at")
   updatedAt              DateTime?                   @updatedAt @map("updated_at")
   points                 Int                         @default(0)
