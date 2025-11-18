@@ -28,19 +28,19 @@ export class BalanceGameService {
   async getTodayBalanceGame(userId: number): Promise<TodayBalanceGameResponseDto> {
     this.logger.log(`사용자 ${userId}의 오늘 밸런스게임 조회`);
 
-    // 사용자 정보 조회 (캐릭터 확인)
+    // 사용자 정보 조회 (AI 페르소나 확인)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { characterId: true }
+      select: { aiPersonaId: true }
     });
 
-    if (!user || !user.characterId) {
-      throw new NotFoundException('사용자에게 지정된 캐릭터가 없습니다');
+    if (!user || !user.aiPersonaId) {
+      throw new NotFoundException('사용자에게 지정된 AI 페르소나가 없습니다');
     }
 
     // 페르소나의 personaUrl, name 조회
     const aiPersona = await this.prisma.aiPersona.findUnique({
-      where: { id: user.characterId },
+      where: { id: user.aiPersonaId },
       select: {
         personaUrl: true,
         name: true
@@ -98,14 +98,14 @@ export class BalanceGameService {
   ): Promise<BalanceGameProgressResponseDto> {
     this.logger.log(`사용자 ${userId}가 게임 ${gameId}, ${stepNumber}단계 조회`);
 
-    // 사용자의 캐릭터 ID 조회
+    // 사용자의 AI 페르소나 ID 조회
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { characterId: true }
+      select: { aiPersonaId: true }
     });
 
-    if (!user || !user.characterId) {
-      throw new NotFoundException('사용자에게 지정된 캐릭터가 없습니다');
+    if (!user || !user.aiPersonaId) {
+      throw new NotFoundException('사용자에게 지정된 AI 페르소나가 없습니다');
     }
 
     let currentStep: any;
@@ -115,7 +115,7 @@ export class BalanceGameService {
       currentStep = await this.prisma.balanceGameStep.findFirst({
         where: {
           gameId,
-          characterId: user.characterId,
+          aiPersonaId: user.aiPersonaId,
           stepNumber: 1,
           isActive: true
         },
@@ -136,7 +136,7 @@ export class BalanceGameService {
       currentStep = await this.prisma.balanceGameStep.findFirst({
         where: {
           gameId,
-          characterId: user.characterId,
+          aiPersonaId: user.aiPersonaId,
           stepNumber,
           parentStepId: dto.parentStepId,
           selectedOption: dto.selectedOption,

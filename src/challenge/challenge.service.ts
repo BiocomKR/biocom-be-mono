@@ -1,6 +1,7 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
   // ⚠️ 배송 관련 함수 import 제거됨 (도시락 배송 정책 폐지)
   // calculateDeliveryArrivalDate,
@@ -1072,6 +1073,203 @@ export class ChallengeService {
   }
 
   // ==================== 시작일 설정 시스템 ====================
+
+  /**
+   * 빠른 챌린지 시작 (All-in-One)
+   * @description 챌린지 조회 → 구매 → 활성화 → 시작일 설정을 한 번에 처리합니다
+   * @param userId 사용자 ID
+   * @param startDate 시작일 (YYYY-MM-DD)
+   */
+  async quickStartChallenge(userId: number, startDate: string): Promise<{ success: boolean; data: ChallengeScheduleResponseDto }> {
+    try {
+      this.logger.log(`빠른 챌린지 시작 - 사용자: ${userId}, 시작일: ${startDate}`);
+
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. 이너뷰티 챌린지 조회
+        const product = await tx.product.findFirst({
+          where: {
+            name: '이너뷰티 챌린지',
+            categoryCode: 'CHALLENGE',
+            status: 'ACTIVE'
+          }
+        });
+
+        if (!product) {
+          throw new NotFoundException('이너뷰티 챌린지를 찾을 수 없습니다');
+        }
+
+        const productId = product.id;
+
+        // 2. 이미 활성 챌린지가 있는지 확인
+        const existingActive = await tx.userChallenge.findFirst({
+          where: { userId, status: 'ACTIVE' }
+        });
+
+        if (existingActive) {
+          throw new ConflictException('이미 활성화된 챌린지가 있습니다. 한 번에 하나의 챌린지만 진행할 수 있습니다.');
+        }
+
+        // 3. 이미 구매한 티켓이 있는지 확인
+        let ticket = await tx.challengeTicket.findFirst({
+          where: {
+            userId,
+            productId,
+            status: ChallengeTicketStatus.PURCHASED
+          }
+        });
+
+        // 4. 티켓이 없으면 0원 구매 처리
+        if (!ticket) {
+          // 주문번호 생성
+          const orderNumber = `Q${Date.now()}${Math.floor(Math.random() * 1000)}`;
+          const now = getNowKST();
+
+          // Order 생성 (0원 주문)
+          const order = await tx.order.create({
+            data: {
+              userId,
+              orderNumber,
+              totalProductPrice: new Prisma.Decimal(0),
+              totalDiscount: new Prisma.Decimal(0),
+              shippingFee: new Prisma.Decimal(0),
+              pointUsed: new Prisma.Decimal(0),
+              totalAmount: new Prisma.Decimal(0),
+              recipientName: 'QUICK_START',
+              recipientMobile: 'QUICK_START',
+              postalCode: '00000',
+              address: 'QUICK_START',
+              status: 'COMPLETED',
+              orderedAt: now,
+              createdAt: now
+            }
+          });
+
+          // OrderItem 생성
+          const orderItem = await tx.orderItem.create({
+            data: {
+              orderId: order.id,
+              productId,
+              productName: product.name,
+              productPrice: new Prisma.Decimal(0),
+              quantity: 1,
+              subtotal: new Prisma.Decimal(0),
+              createdAt: now
+            }
+          });
+
+          // ChallengeTicket 생성
+          ticket = await tx.challengeTicket.create({
+            data: {
+              userId,
+              productId,
+              orderItemId: orderItem.id,
+              ticketType: 'CHALLENGE',
+              status: ChallengeTicketStatus.PURCHASED,
+              purchaseDate: now,
+              createdAt: now
+            }
+          });
+
+          this.logger.log(`챌린지 티켓 자동 구매 완료 - 티켓 ID: ${ticket.id}`);
+        }
+
+        // 5. 티켓으로 UserChallenge 생성 (PENDING 상태)
+        const pendingChallenge = await tx.userChallenge.findFirst({
+          where: {
+            ticketId: ticket.id,
+            status: 'PENDING'
+          }
+        });
+
+        let userChallengeId: number;
+
+        if (!pendingChallenge) {
+          const challengeInfo = this.extractChallengeInfo(product);
+          const now = getNowKST();
+          const expiresAt = new Date(now.getTime() + challengeInfo.totalDays * 24 * 60 * 60 * 1000);
+
+          const newChallenge = await tx.userChallenge.create({
+            data: {
+              userId,
+              productId,
+              ticketId: ticket.id,
+              activatedAt: now,
+              expiresAt,
+              purchasedAt: ticket.purchaseDate,
+              status: 'PENDING',
+              createdAt: now
+            }
+          });
+
+          userChallengeId = newChallenge.id;
+          this.logger.log(`챌린지 활성화 완료 - UserChallenge ID: ${userChallengeId}`);
+        } else {
+          userChallengeId = pendingChallenge.id;
+        }
+
+        // 6. 시작일 설정 (기존 setStartDate 로직 재사용)
+        const startDateString = startDate;
+        const startDateObj = parseStringToDate(startDateString);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // 월요일 & 다음주부터 3주간 범위 검증
+        if (!isValidStartDate(startDateObj, today)) {
+          const availableDates = getAvailableStartDates(today);
+          const availableDatesStr = availableDates.map(d => formatDateToString(d)).join(', ');
+          throw new BadRequestException(
+            `시작일은 다음주부터 3주간의 월요일만 선택 가능합니다. 선택 가능한 날짜: ${availableDatesStr}`
+          );
+        }
+
+        // 종료일 계산
+        const endDateObj = calculateEndDate(startDateObj);
+
+        // KST 날짜/시간 객체 생성
+        const startDateKST = stringToKSTDate(startDateString, 0, 0, 0);
+        const endYear = endDateObj.getFullYear();
+        const endMonth = endDateObj.getMonth() + 1;
+        const endDay = endDateObj.getDate();
+        const endDateKST = stringToKSTDate(
+          `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`,
+          23, 59, 59
+        );
+
+        // UserChallenge 업데이트
+        const userChallenge = await tx.userChallenge.update({
+          where: { id: userChallengeId },
+          data: {
+            startDate: startDateKST,
+            endDate: endDateKST,
+            expiresAt: endDateKST
+          }
+        });
+
+        // 티켓 상태를 ACTIVATED로 변경
+        await tx.challengeTicket.update({
+          where: { id: ticket.id },
+          data: { status: ChallengeTicketStatus.ACTIVATED }
+        });
+
+        // 응답 데이터 생성
+        const responseData: ChallengeScheduleResponseDto = {
+          id: userChallenge.id,
+          startDate: formatDateToString(userChallenge.startDate!),
+          endDate: formatDateToString(userChallenge.endDate!),
+          isConfirmed: true,
+          canModify: false,
+          purchasedAt: ticket.purchaseDate,
+          createdAt: userChallenge.createdAt
+        };
+
+        this.logger.log(`빠른 챌린지 시작 완료 - 시작일: ${responseData.startDate}, 종료일: ${responseData.endDate}`);
+        return { success: true, data: responseData };
+      });
+    } catch (error) {
+      this.logger.error('빠른 챌린지 시작 실패:', error);
+      throw error;
+    }
+  }
 
   /**
    * 챌린지 일정 조회

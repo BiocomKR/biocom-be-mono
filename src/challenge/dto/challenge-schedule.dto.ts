@@ -113,3 +113,18 @@ export class ConfirmStartDateDto {
   @IsBoolean()
   confirm: boolean;
 }
+
+/**
+ * 빠른 시작 요청 DTO
+ * @description 챌린지 조회 → 구매 → 활성화 → 시작일 설정을 한 번에 처리
+ */
+export class QuickStartDto {
+  @ApiProperty({
+    description: '챌린지 시작일 (YYYY-MM-DD)',
+    example: '2025-01-20',
+    type: 'string',
+    format: 'date'
+  })
+  @IsDateString()
+  startDate: string;
+}

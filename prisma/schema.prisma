@@ -1348,10 +1348,6 @@ model BalanceGame {
   title         String                   @db.VarChar(200)
   /// 게임 설명
   description   String?
-  /// 대표 이미지 URL
-  thumbnailUrl  String?                  @map("thumbnail_url") @db.VarChar(500)
-  /// 배경 이미지 URL
-  backgroundUrl String?                  @map("background_url") @db.VarChar(500)
   /// 활성화 여부
   isActive      Boolean                  @default(true) @map("is_active")
   /// 생성일시
@@ -1398,14 +1394,14 @@ model BalanceGameStep {
   /// 수정일시
   updatedAt      DateTime?         @updatedAt @map("updated_at")
   /// AI 페르소나 ID (페르소나별 대사 구분용)
-  characterId    Int               @map("character_id")
-  character      AiPersona         @relation(fields: [characterId], references: [id])
+  aiPersonaId    Int               @map("ai_persona_id")
+  aiPersona      AiPersona         @relation(fields: [aiPersonaId], references: [id])
   coupon         Coupon?           @relation(fields: [couponId], references: [id])
   game           BalanceGame       @relation(fields: [gameId], references: [id], onDelete: Cascade)
   parentStep     BalanceGameStep?  @relation("StepHierarchy", fields: [parentStepId], references: [id])
   childSteps     BalanceGameStep[] @relation("StepHierarchy")
 
-  @@index([gameId, characterId, stepType])
+  @@index([gameId, aiPersonaId, stepType])
   @@index([parentStepId])
   @@map("balance_game_steps")
 }

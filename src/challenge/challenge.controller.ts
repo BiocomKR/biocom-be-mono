@@ -5,7 +5,8 @@ import { ChallengeSchedulerService } from './challenge-scheduler.service';
 import { ActivateChallengeDto, ChallengeResponseDto } from './dto/challenge.dto';
 import {
   SetStartDateDto,
-  ChallengeScheduleResponseDto
+  ChallengeScheduleResponseDto,
+  QuickStartDto
 } from './dto/challenge-schedule.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -121,6 +122,36 @@ export class ChallengeController {
   }
 
   // ==================== 시작일 설정 API ====================
+
+  /**
+   * 빠른 챌린지 시작 (All-in-One)
+   * @description 이너뷰티 챌린지 조회 → 구매 → 활성화 → 시작일 설정을 한 번에 처리합니다
+   */
+  @Post('quick-start')
+  @ApiOperation({
+    summary: '빠른 챌린지 시작',
+    description: '이너뷰티 챌린지를 한 번에 시작합니다 (조회 → 구매 → 활성화 → 시작일 설정)'
+  })
+  @ApiResponse({
+    status: 201,
+    description: '챌린지 시작 성공',
+    type: ChallengeScheduleResponseDto
+  })
+  @ApiResponse({
+    status: 400,
+    description: '잘못된 시작일'
+  })
+  @ApiResponse({
+    status: 409,
+    description: '이미 활성 챌린지가 존재함'
+  })
+  async quickStartChallenge(
+    @Body() quickStartDto: QuickStartDto,
+    @Request() req: any
+  ) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.challengeService.quickStartChallenge(userId, quickStartDto.startDate);
+  }
 
   /**
    * 챌린지 일정 조회

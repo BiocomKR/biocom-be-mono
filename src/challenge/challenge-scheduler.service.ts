@@ -32,11 +32,11 @@ export class ChallengeSchedulerService {
   async handleChallengeActivation() {
     this.logger.log('🕐 챌린지 활성화 스케줄러 시작...');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // 오늘 00:00:00
+    const today = getNowKST();
+    today.setHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
 
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00
+    tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00 (KST)
 
     // 오늘 시작해야 할 PENDING 챌린지 찾기
     const pendingChallenges = await this.prisma.userChallenge.findMany({
