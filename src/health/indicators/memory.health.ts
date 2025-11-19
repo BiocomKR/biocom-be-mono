@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { MemoryHealthIndicator as BaseMemoryHealthIndicator } from '@nestjs/terminus';
+import { MemoryHealthIndicator as BaseMemoryHealthIndicator, HealthIndicatorService } from '@nestjs/terminus';
 import { LoggerService } from '../../common/services/logger.service';
 
 /**
@@ -8,8 +8,11 @@ import { LoggerService } from '../../common/services/logger.service';
  */
 @Injectable()
 export class MemoryHealthIndicator extends BaseMemoryHealthIndicator {
-  constructor(private readonly logger: LoggerService) {
-    super();
+  constructor(
+    healthIndicatorService: HealthIndicatorService,
+    private readonly logger: LoggerService,
+  ) {
+    super(healthIndicatorService);
   }
 
   /**

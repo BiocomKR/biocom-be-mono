@@ -7,10 +7,10 @@ import {
   UseGuards,
   Request
 } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
   ApiBearerAuth,
   ApiParam
 } from '@nestjs/swagger';
@@ -19,6 +19,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { UsersService } from './users.service';
 import { ImwebApiService } from '../imweb/imweb-api.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdatePersonaDto } from './dto/update-persona.dto';
 import {
   SearchImwebMembersResponseDto,
   GetMyProfileResponseDto,
@@ -139,13 +140,15 @@ export class UsersController {
   /**
    * 현재 로그인한 사용자 정보 수정
    * AI 페르소나 선택 등 사용자 프로필 업데이트
+   * @deprecated 보안상 이유로 deprecated 처리. 신규 전용 API 사용 권장
    */
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '내 정보 수정',
-    description: '현재 로그인한 사용자의 정보를 수정합니다. AI 페르소나 선택, 이름/휴대폰 변경 등이 가능합니다.'
+    summary: '[Deprecated] 내 정보 수정',
+    description: '[Deprecated] 현재 로그인한 사용자의 정보를 수정합니다. AI 페르소나 선택, 이름/휴대폰 변경 등이 가능합니다.',
+    deprecated: true
   })
   @ApiResponse({
     status: 200,
@@ -189,6 +192,64 @@ export class UsersController {
     return {
       success: true,
       message: '사용자 정보가 수정되었습니다.',
+      data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 현재 로그인한 사용자의 AI 페르소나 업데이트
+   * 페르소나 식별자만 안전하게 변경
+   */
+  @Patch('me/persona')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'AI 페르소나 업데이트',
+    description: '현재 로그인한 사용자의 AI 페르소나 식별자를 업데이트합니다. 페르소나 ID만 변경 가능합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '페르소나 업데이트 성공',
+    schema: {
+      example: {
+        success: true,
+        message: 'AI 페르소나가 업데이트되었습니다.',
+        data: {
+          id: 1,
+          email: 'user1@example.com',
+          name: '김철수',
+          mobile: '01012345678',
+          points: 100,
+          aiPersonaId: 2,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z'
+        },
+        timestamp: '2024-01-02T00:00:00.000Z'
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: '페르소나를 찾을 수 없음',
+    type: ApiErrorResponseDto
+  })
+  @ApiResponse({
+    status: 409,
+    description: '비활성화된 페르소나',
+    type: ApiErrorResponseDto
+  })
+  async updatePersona(
+    @Request() req: any,
+    @Body() updatePersonaDto: UpdatePersonaDto
+  ): Promise<ApiResponseDto> {
+    // JWT payload에서 sub (user id) 추출
+    const userId = req.user.sub;
+    const user = await this.usersService.updatePersona(userId, updatePersonaDto.aiPersonaId);
+
+    return {
+      success: true,
+      message: 'AI 페르소나가 업데이트되었습니다.',
       data: user,
       timestamp: getNowKST(),
     };

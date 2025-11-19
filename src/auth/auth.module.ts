@@ -33,7 +33,7 @@ import { PhoneVerificationModule } from '../phone-verification/phone-verificatio
       useFactory: (configService: ConfigService) => ({
         secret: configService.jwt.secret,
         signOptions: {
-          expiresIn: configService.jwt.expiresIn,
+          expiresIn: configService.jwt.expiresIn as any,
         },
       }),
       inject: [ConfigService],

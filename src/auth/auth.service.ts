@@ -77,7 +77,7 @@ export class AuthService {
     // JWT 토큰 생성
     const payload: JwtPayload = { sub: user.id, name: user.name };
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.jwt.accessTokenExpiresIn,
+      expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
     });
     
     // Refresh Token 생성 및 저장
@@ -135,7 +135,7 @@ export class AuthService {
     // JWT 토큰 생성
     const payload: JwtPayload = { sub: user.id, name: user.name };
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.jwt.accessTokenExpiresIn,
+      expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
     });
     
     // Refresh Token 생성 및 저장
@@ -331,7 +331,7 @@ export class AuthService {
     // 새로운 Access Token 생성
     const payload: JwtPayload = { sub: user.id, name: user.name };
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.jwt.accessTokenExpiresIn,
+      expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
     });
     
     this.logger.log(`토큰 갱신 성공: 사용자 ID ${user.id}`);
@@ -403,7 +403,7 @@ export class AuthService {
     // JWT 토큰 생성
     const payload: JwtPayload = { sub: user.id, name: user.name };
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.jwt.accessTokenExpiresIn,
+      expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
     });
 
     // Refresh Token 생성 및 저장
@@ -520,7 +520,7 @@ export class AuthService {
     // JWT 토큰 생성
     const payload: JwtPayload = { sub: user.id, name: user.name };
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.jwt.accessTokenExpiresIn,
+      expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
     });
 
     // Refresh Token 생성 및 저장

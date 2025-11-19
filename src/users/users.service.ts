@@ -157,7 +157,7 @@ export class UsersService {
             where: { id },
             select: {
               id: true,
-              email: true,
+              // email: true,
               name: true,
               mobile: true,
               points: true,
@@ -364,6 +364,65 @@ export class UsersService {
       });
     } catch (error) {
       this.logger.error(`이메일 조회 실패 - 이메일: ${email}, ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * AI 페르소나 업데이트 전용 메서드
+   * 사용자의 AI 페르소나 식별자만 안전하게 업데이트
+   */
+  async updatePersona(userId: number, aiPersonaId: number) {
+    this.logger.log(`사용자 ${userId}의 페르소나 업데이트 시도 - 페르소나 ID: ${aiPersonaId}`);
+
+    try {
+      // 사용자 존재 확인
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new NotFoundException(`ID ${userId}인 사용자를 찾을 수 없습니다.`);
+      }
+
+      // AI 페르소나 유효성 확인
+      const persona = await this.prisma.aiPersona.findUnique({
+        where: { id: aiPersonaId },
+      });
+
+      if (!persona) {
+        throw new NotFoundException(`ID ${aiPersonaId}인 페르소나를 찾을 수 없습니다.`);
+      }
+
+      if (!persona.isActive) {
+        throw new ConflictException('비활성화된 페르소나는 선택할 수 없습니다.');
+      }
+
+      this.logger.log(`페르소나 변경 - 사용자: ${userId}, 기존: ${existingUser.aiPersonaId}, 새로운: ${aiPersonaId}`);
+
+      // 페르소나 업데이트
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data: { aiPersonaId },
+        select: {
+          id: true,
+          // email: true,
+          name: true,
+          mobile: true,
+          points: true,
+          aiPersonaId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      this.logger.log(`페르소나 업데이트 성공 - 사용자 ID: ${userId}, 페르소나 ID: ${aiPersonaId}`);
+      return user;
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof ConflictException) {
+        throw error;
+      }
+      this.logger.error(`페르소나 업데이트 실패 - 사용자 ID: ${userId}, ${error.message}`, error.stack);
       throw error;
     }
   }

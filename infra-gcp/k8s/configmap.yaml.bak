@@ -94,7 +94,7 @@ data:
       "colorize": false,
       "metadata": true,
       "fields": {
-        "service": "biocom-api",ㄷ
+        "service": "biocom-api",
         "environment": "dev",
         "version": "1.0.0"
       }
