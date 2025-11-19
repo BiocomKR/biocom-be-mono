@@ -19,7 +19,7 @@ import { PushTokenResponseDto } from '../dto/push-token-response.dto';
  *
  * 인증된 유저의 FCM 토큰 등록/조회/삭제 API
  */
-@ApiTags('Push Token')
+@ApiTags('푸시-토큰관리')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('push/tokens')

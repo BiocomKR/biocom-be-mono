@@ -8,7 +8,7 @@ import { SendTestPushDto } from '../dto/send-test-push.dto';
  *
  * FCM 푸시 발송 테스트용 API
  */
-@ApiTags('Push Test')
+@ApiTags('푸시-테스트')
 @Controller('push-test')
 export class PushTestController {
   constructor(private readonly pushTestService: PushTestService) {}
