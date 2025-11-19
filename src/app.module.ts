@@ -39,6 +39,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { AiPersonaModule } from './ai-persona/ai-persona.module';
 import { BannersModule } from './shop/banners.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
+import { PushModule } from './push/push.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -124,6 +125,7 @@ import { PhoneVerificationModule } from './phone-verification/phone-verification
     CouponsModule,    // 쿠폰 관리 모듈
     AiPersonaModule, // AI 페르소나 관리 모듈
     PhoneVerificationModule, // 휴대폰 본인인증 모듈 (NHN KCP SMS 인증)
+    PushModule,      // 푸시 알림 모듈 (FCM)
     // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
