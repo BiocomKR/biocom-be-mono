@@ -319,10 +319,31 @@ ensure_static_ip() {
     fi
 }
 
+# 민감정보 로드
+load_secrets() {
+    log_info "🔐 민감정보 로드 중..."
+
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    SECRETS_FILE="$SCRIPT_DIR/../.env.secrets"
+
+    if [[ ! -f "$SECRETS_FILE" ]]; then
+        log_error "민감정보 파일을 찾을 수 없습니다: $SECRETS_FILE"
+        log_error "infra-gcp/.env.secrets.example 파일을 복사하여 .env.secrets를 생성하고 실제 값을 입력하세요."
+        exit 1
+    fi
+
+    # .env.secrets 파일 로드
+    set -a
+    source "$SECRETS_FILE"
+    set +a
+
+    log_success "✅ 민감정보 로드 완료!"
+}
+
 # Kubernetes 리소스 배포
 deploy_kubernetes() {
     log_info "☸️ Kubernetes 리소스 배포 시작..."
-    
+
     # k8s 디렉토리로 이동 (프로젝트 구조에 맞게 경로 수정)
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     
@@ -360,15 +381,15 @@ deploy_kubernetes() {
     kubectl delete secret biocom-api-secrets -n "$NAMESPACE" --ignore-not-found
     kubectl create secret generic biocom-api-secrets \
         --namespace="$NAMESPACE" \
-        --from-literal=DB_PASSWORD='bico0825!@#' \
-        --from-literal=JWT_SECRET='i7SXN6XAwMKjz!vMjSvY+ZJj10&d7l=2Wsy1Y1^Qw7u*L' \
-        --from-literal=JWT_REFRESH_TOKEN_SECRET='r3Fr3$hT0k3n$ecReT!@#2025b10c0mK3y!' \
-        --from-literal=SESSION_SECRET='C+HwoTESUErMHRg5GhL3Cd*SqEJe6B9q5&n#R7fq&jFvA' \
-        --from-literal=ENCRYPTION_KEY='b!@c@m2@25!@#$@creTkEy!2E45bT8@' \
-        --from-literal=OPENAI_API_KEY='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' \
-        --from-literal=GOOGLE_API_KEY='AIzaSyC_RxjEbJyHoV5oHtWky7pEJS5Iw5toqPU' \
-        --from-literal=KCP_PRIVATE_KEY_PASSWORD='b!c0-pr!v@t2-0519!' \
-        --from-literal=TOSS_PAYMENTS_SECRET_KEY='test_sk_5OWRapdA8djDxdeGWGk9Vo1zEqZK'
+        --from-literal=DB_PASSWORD="$DB_PASSWORD" \
+        --from-literal=JWT_SECRET="$JWT_SECRET" \
+        --from-literal=JWT_REFRESH_TOKEN_SECRET="$JWT_REFRESH_TOKEN_SECRET" \
+        --from-literal=SESSION_SECRET="$SESSION_SECRET" \
+        --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+        --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+        --from-literal=GOOGLE_API_KEY="$GOOGLE_API_KEY" \
+        --from-literal=KCP_PRIVATE_KEY_PASSWORD="$KCP_PRIVATE_KEY_PASSWORD" \
+        --from-literal=TOSS_PAYMENTS_SECRET_KEY="$TOSS_PAYMENTS_SECRET_KEY"
     
     # Google Service Account Key Secret 확인/생성
     log_info "Google Service Account Key Secret 확인 중..."
@@ -504,15 +525,16 @@ check_deployment_status() {
 # 메인 실행 함수
 main() {
     log_info "🚀 BIOCOM API 애플리케이션 배포를 시작합니다!"
-    
+
     check_requirements
     setup_auth
     check_infrastructure
+    load_secrets
     build_and_push_docker
     run_db_migration
     deploy_kubernetes
     check_deployment_status
-    
+
     log_success "🎉 애플리케이션 배포가 완료되었습니다!"
 }
 
