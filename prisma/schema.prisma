@@ -1896,14 +1896,16 @@ model PushToken {
   /// 푸시 서비스 제공자 (FCM, ONESIGNAL, APNS 등)
   provider  String    @db.VarChar(20)
 
-  /// 토큰 데이터 (서비스별로 구조가 다름)
-  /// FCM: { token: "abc123..." }
-  /// OneSignal: { playerId: "xyz", appId: "..." }
-  /// APNs: { deviceToken: "...", bundleId: "..." }
-  tokenData Json      @map("token_data")
+  /// 푸시 토큰 (필수)
+  /// FCM, APNS, OneSignal 등 모든 서비스의 토큰
+  token     String    @db.VarChar(255)
+
+  /// 메타데이터 (선택적 부가 정보)
+  /// 예: { expiresAt: "2025-12-31", scope: ["notifications"], customData: {...} }
+  metadata  Json?
 
   /// 디바이스 고유 ID
-  deviceId   String?  @map("device_id") @db.VarChar(100)
+  deviceId   String?  @map("device_id") @db.VarChar(255)
 
   /// 플랫폼 (ios, android, web)
   platform   String?  @db.VarChar(20)

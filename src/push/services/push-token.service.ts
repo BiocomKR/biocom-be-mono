@@ -34,9 +34,6 @@ export class PushTokenService {
       `📝 [PushTokenService] 푸시 토큰 등록 시도: userId=${userId}, deviceId=${deviceId || 'auto'}, platform=${platform}`,
     );
 
-    // FCM 토큰 데이터 (JSON 저장)
-    const tokenData = { token };
-
     try {
       // upsert: userId + deviceId + provider 조합으로 중복 체크
       this.logger.debug(
@@ -52,7 +49,7 @@ export class PushTokenService {
           },
         },
         update: {
-          tokenData, // 토큰만 업데이트
+          token, // 토큰 업데이트
           platform,
           isActive: true,
           updatedAt: new Date(),
@@ -60,7 +57,7 @@ export class PushTokenService {
         create: {
           userId,
           provider: 'FCM',
-          tokenData,
+          token,
           deviceId: deviceId || token,
           platform,
           isActive: true,
