@@ -19,7 +19,11 @@ export class PushTestService {
    * @returns 발송 결과
    */
   async sendTestPush(token: string, title: string, body: string) {
-    console.log(`📤 테스트 푸시 발송 시도: ${title}`);
+    console.log('🧪 [PushTestService] 테스트 푸시 발송 시도:', {
+      title,
+      body: body?.substring(0, 50),
+      tokenPrefix: token?.substring(0, 20) + '...',
+    });
 
     const result = await this.fcmProvider.sendToToken(
       { token },
@@ -27,11 +31,16 @@ export class PushTestService {
     );
 
     if (result.success) {
-      console.log(`✅ 푸시 발송 성공: ${result.messageId}`);
+      console.log('✅ [PushTestService] 푸시 발송 성공:', {
+        messageId: result.messageId,
+        title,
+      });
     } else {
-      console.error(
-        `❌ 푸시 발송 실패: ${result.errorCode} - ${result.errorMessage}`,
-      );
+      console.error('❌ [PushTestService] 푸시 발송 실패:', {
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+        title,
+      });
     }
 
     return result;

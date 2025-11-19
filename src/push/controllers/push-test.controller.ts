@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { PushTestService } from '../services/push-test.service';
 import { SendTestPushDto } from '../dto/send-test-push.dto';
@@ -12,6 +12,20 @@ import { SendTestPushDto } from '../dto/send-test-push.dto';
 @Controller('push-test')
 export class PushTestController {
   constructor(private readonly pushTestService: PushTestService) {}
+
+  /**
+   * 테스트 엔드포인트
+   *
+   * 컨트롤러가 정상적으로 등록되었는지 확인
+   */
+  @Get('test')
+  @ApiOperation({
+    summary: '테스트 엔드포인트',
+    description: 'Push 컨트롤러가 정상 작동하는지 테스트',
+  })
+  test() {
+    return '테스트';
+  }
 
   /**
    * FCM 테스트 푸시 발송

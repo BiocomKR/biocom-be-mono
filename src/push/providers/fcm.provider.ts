@@ -37,7 +37,14 @@ export class FcmProvider implements IPushProvider {
   ): Promise<PushSendResult> {
     const { token } = tokenData;
 
+    console.log('📤 [FCM] 단일 토큰 발송 시작:', {
+      hasToken: !!token,
+      title: message.title,
+      body: message.body?.substring(0, 50),
+    });
+
     if (!token) {
+      console.error('❌ [FCM] 토큰 누락');
       return {
         success: false,
         errorCode: 'INVALID_TOKEN',
@@ -84,16 +91,24 @@ export class FcmProvider implements IPushProvider {
       };
 
       // FCM 발송
+      console.log('🚀 [FCM] Firebase로 메시지 전송 중...');
       const messageId = await this.admin.messaging().send(fcmMessage);
 
-      console.log(`✅ FCM 발송 성공: ${messageId}`);
+      console.log('✅ [FCM] 발송 성공:', {
+        messageId,
+        title: message.title,
+      });
 
       return {
         success: true,
         messageId,
       };
     } catch (error) {
-      console.error('❌ FCM 발송 실패:', error);
+      console.error('❌ [FCM] 발송 실패:', {
+        code: error.code,
+        message: error.message,
+        title: message.title,
+      });
 
       return {
         success: false,

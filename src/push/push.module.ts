@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { FirebaseAdminModule } from './firebase-admin.module';
 import { FcmProvider } from './providers/fcm.provider';
 import { PushTestService } from './services/push-test.service';
+import { PushTokenService } from './services/push-token.service';
 import { PushTestController } from './controllers/push-test.controller';
+import { PushTokenController } from './controllers/push-token.controller';
+import { PrismaService } from '../common/services/prisma.service';
 
 /**
  * 푸시 알림 모듈
@@ -11,8 +14,8 @@ import { PushTestController } from './controllers/push-test.controller';
  */
 @Module({
   imports: [FirebaseAdminModule],
-  controllers: [PushTestController],
-  providers: [FcmProvider, PushTestService],
-  exports: [FcmProvider, PushTestService],
+  controllers: [PushTestController, PushTokenController],
+  providers: [FcmProvider, PushTestService, PushTokenService, PrismaService],
+  exports: [FcmProvider, PushTestService, PushTokenService],
 })
 export class PushModule {}
