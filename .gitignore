@@ -39,3 +39,4 @@ yarn-error.log*
 # Google Service Account Keys (보안)
 google-service-account-key.json
 *service-account*.json
+*firebase*.json
