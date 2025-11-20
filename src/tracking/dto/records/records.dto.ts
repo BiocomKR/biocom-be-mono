@@ -153,96 +153,43 @@ export class CreateDietRecordDto {
 }
 
 /**
- * 영양제 선택 항목 DTO
- * 상품 테이블 영양제 또는 커스텀 영양제
- */
-export class SelectedSupplementDto {
-  @ApiProperty({ description: '영양제 타입', enum: ['PRODUCT', 'CUSTOM'], example: 'PRODUCT' })
-  @IsString()
-  type: 'PRODUCT' | 'CUSTOM';
-
-  @ApiProperty({ description: '상품 ID (type이 PRODUCT인 경우)', example: 1, required: false })
-  @IsOptional()
-  @IsNumber()
-  productId?: number;
-
-  @ApiProperty({ description: '커스텀 영양제 ID (type이 CUSTOM인 경우)', example: 1, required: false })
-  @IsOptional()
-  @IsNumber()
-  customSupplementId?: number;
-
-  @ApiProperty({ description: '영양제명', example: '비타민D' })
-  @IsString()
-  name: string;
-
-  @ApiProperty({ description: '용량/함량', example: '1000IU', required: false })
-  @IsOptional()
-  @IsString()
-  dosage?: string;
-
-  @ApiProperty({ description: '섭취 여부', example: true })
-  @IsNotEmpty()
-  taken: boolean;
-}
-
-/**
- * 영양제 섭취 기록 DTO (새로운 구조)
- * 복용시간 + 선택된 영양제 리스트 + 사진인증
+ * 영양제 섭취 기록 DTO (신규)
+ * 루틴 기반 영양제 기록
  */
 export class CreateSupplementRecordDto {
-  @ApiProperty({ description: '복용 시간', example: '09:00' })
-  @IsString()
-  time: string;
-
-  @ApiProperty({
-    description: '선택된 영양제 목록',
-    type: [SelectedSupplementDto],
-    example: [
-      { type: 'PRODUCT', productId: 1, name: '풍성한씨스', dosage: '1일 3정', taken: true },
-      { type: 'CUSTOM', customSupplementId: 1, name: '비타민D', dosage: '1000IU', taken: false }
-    ]
-  })
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => SelectedSupplementDto)
-  supplements: SelectedSupplementDto[];
-
-  @ApiProperty({
-    description: '사진인증 URL (필수)',
-    example: 'https://example.com/supplement-photo.jpg'
-  })
-  @IsString()
-  @IsNotEmpty()
-  imageUrl: string;
-
   @ApiProperty({
     description: '기록 날짜 (YYYY-MM-DD 형식)',
-    example: '2025-09-18',
+    example: '2025-11-19'
+  })
+  @IsDateString()
+  date: string;
+
+  @ApiProperty({
+    description: '영양제 상품 ID',
+    example: 1
+  })
+  @IsNumber()
+  productId: number;
+
+  @ApiProperty({
+    description: '회차 (1~10, 실제로는 1~3만 사용)',
+    example: 3,
+    minimum: 1,
+    maximum: 10
+  })
+  @IsNumber()
+  @Min(1)
+  @Max(10)
+  count: number;
+
+  @ApiProperty({
+    description: '사진인증 URL (당일 첫 기록시 필수, 이후 선택)',
+    example: 'https://example.com/supplement-photo.jpg',
     required: false
   })
   @IsOptional()
-  @IsDateString()
-  date?: string;
-}
-
-/**
- * 커스텀 영양제 생성 DTO
- */
-export class CreateCustomSupplementDto {
-  @ApiProperty({ description: '영양제명', example: '비타민D' })
   @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiProperty({ description: '용량/함량', example: '1000IU', required: false })
-  @IsOptional()
-  @IsString()
-  dosage?: string;
-
-  @ApiProperty({ description: '메모', example: '아침 식후 복용', required: false })
-  @IsOptional()
-  @IsString()
-  memo?: string;
+  imageUrl?: string;
 }
 
 /**
@@ -260,26 +207,6 @@ export class NutrientDto {
 
   @ApiProperty({ description: 'RDA 비율 (%)', example: 100, required: false })
   rda?: number;
-}
-
-/**
- * 커스텀 영양제 응답 DTO
- */
-export class CustomSupplementDto {
-  @ApiProperty({ description: '커스텀 영양제 ID', example: 1 })
-  id: number;
-
-  @ApiProperty({ description: '영양제명', example: '비타민D' })
-  name: string;
-
-  @ApiProperty({ description: '용량/함량', example: '1000IU' })
-  dosage?: string;
-
-  @ApiProperty({ description: '메모', example: '아침 식후 복용' })
-  memo?: string;
-
-  @ApiProperty({ description: '생성일시', example: '2025-09-18T09:00:00Z' })
-  createdAt: string;
 }
 
 /**

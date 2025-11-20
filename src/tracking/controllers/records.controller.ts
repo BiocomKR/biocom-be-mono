@@ -27,8 +27,6 @@ import {
   CreateFastingRecordDto,
   CreateSleepRecordDto,
   CreateActivityRecordDto,
-  CreateCustomSupplementDto,
-  CustomSupplementDto,
   RecordResponseDto,
   RecordListResponseDto,
 } from '../dto/records/records.dto';
@@ -239,13 +237,13 @@ export class RecordsController {
   }
 
   /**
-   * 영양제 목록 조회 (상품 + 커스텀)
+   * 영양제 목록 조회 (상품만)
    * @description 영양제 기록에서 선택할 수 있는 영양제 목록을 조회합니다
    */
   @Get('supplements')
   @ApiOperation({
     summary: '영양제 목록 조회',
-    description: '영양제 기록에서 선택할 수 있는 상품 영양제와 커스텀 영양제 목록을 조회합니다',
+    description: '영양제 기록에서 선택할 수 있는 상품 영양제 목록을 조회합니다',
   })
   @ApiResponse({
     status: 200,
@@ -253,48 +251,6 @@ export class RecordsController {
   })
   async getSupplementList(@Request() req: any) {
     return this.recordsService.getSupplementList(req.user.id);
-  }
-
-  /**
-   * 커스텀 영양제 생성
-   * @description 사용자가 직접 영양제를 추가합니다
-   */
-  @Post('supplements/custom')
-  @ApiOperation({
-    summary: '커스텀 영양제 생성',
-    description: '사용자가 직접 영양제를 추가합니다',
-  })
-  @ApiResponse({
-    status: 201,
-    description: '커스텀 영양제 생성 성공',
-    type: CustomSupplementDto,
-  })
-  async createCustomSupplement(
-    @Request() req: any,
-    @Body() createCustomSupplementDto: CreateCustomSupplementDto,
-  ) {
-    return this.recordsService.createCustomSupplement(req.user.id, createCustomSupplementDto);
-  }
-
-  /**
-   * 커스텀 영양제 삭제
-   * @description 사용자의 커스텀 영양제를 삭제합니다
-   */
-  @Delete('supplements/custom/:id')
-  @ApiOperation({
-    summary: '커스텀 영양제 삭제',
-    description: '사용자의 커스텀 영양제를 삭제합니다',
-  })
-  @ApiResponse({
-    status: 200,
-    description: '커스텀 영양제 삭제 성공',
-  })
-  async deleteCustomSupplement(
-    @Request() req: any,
-    @Param('id', ParseIntPipe) supplementId: number,
-  ) {
-    await this.recordsService.deleteCustomSupplement(req.user.id, supplementId);
-    return { success: true, message: '커스텀 영양제가 삭제되었습니다.' };
   }
 
   /**

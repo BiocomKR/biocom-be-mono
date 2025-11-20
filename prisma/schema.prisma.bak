@@ -19,13 +19,12 @@ model User {
   mobile                 String
   name                   String
   birthDate              String?                     @map("birth_date") @db.VarChar(8)
-  telecom                String?                     @map("telecom") @db.VarChar(3)
-  sex                    String?                     @map("sex") @db.VarChar(2)
+  sex                    String?                     @db.VarChar(2)
   localCode              String?                     @map("local_code") @db.VarChar(2)
+  telecom                String?                     @db.VarChar(10)
   isActive               Boolean                     @default(true) @map("is_active")
   deletedAt              DateTime?                   @map("deleted_at")
   aiPersonaId            Int?                        @map("ai_persona_id")
-  healthTypeAnimalId     Int?                        @map("health_type_animal_id")
   status                 String                      @default("NEWCOMER") @map("status") @db.VarChar(20)
   role                   String                      @default("USER") @db.VarChar(20)
   billingKey             String?                     @map("billing_key") @db.VarChar(200)
@@ -49,32 +48,10 @@ model User {
   customSupplements      UserCustomSupplement[]
   userRecords            UserRecord[]
   aiPersona              AiPersona?                  @relation(fields: [aiPersonaId], references: [id])
-  healthTypeAnimal       HealthTypeAnimal?           @relation(fields: [healthTypeAnimalId], references: [id])
   wishlist               Wishlist[]
   subscriptions          Subscription[]
-  userCharts             UserChart[]
-  userConsents           UserConsent[]
 
   @@map("users")
-}
-
-/// 사용자 약관 동의 테이블
-/// 회원가입 시 약관 동의 내역 저장
-model UserConsent {
-  id                 Int       @id @default(autoincrement())
-  userId             Int       @map("user_id")
-  agreeToTerms       Boolean   @map("agree_to_terms")
-  agreeToAge14       Boolean   @map("agree_to_age14")
-  agreeToPrivacy     Boolean   @map("agree_to_privacy")
-  agreeToThirdParty  Boolean   @map("agree_to_third_party")
-  agreeToMarketing   Boolean   @map("agree_to_marketing")
-  agreedAt           DateTime  @map("agreed_at")
-  createdAt          DateTime  @default(now()) @map("created_at")
-  updatedAt          DateTime? @updatedAt @map("updated_at")
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("user_consents")
 }
 
 /// Refresh Token 테이블
@@ -289,7 +266,6 @@ model HealthTypeAnimal {
   symptoms    String    @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @updatedAt @map("updated_at")
-  users       User[]
 
   @@map("health_type_animals")
 }
@@ -515,7 +491,7 @@ model UserChallenge {
   createdAt           DateTime         @map("created_at")
   updatedAt           DateTime?        @updatedAt @map("updated_at")
   dailyProgress       DailyProgress[]
-  missionAttempts     MissionAttempt[]
+  userMissions     UserMission[]
   surveyAnswers       SurveyAnswer[]
   product             Product          @relation(fields: [productId], references: [id])
   ticket              ChallengeTicket  @relation(fields: [ticketId], references: [id])
@@ -1372,10 +1348,6 @@ model BalanceGame {
   title         String                   @db.VarChar(200)
   /// 게임 설명
   description   String?
-  /// 대표 이미지 URL
-  thumbnailUrl  String?                  @map("thumbnail_url") @db.VarChar(500)
-  /// 배경 이미지 URL
-  backgroundUrl String?                  @map("background_url") @db.VarChar(500)
   /// 활성화 여부
   isActive      Boolean                  @default(true) @map("is_active")
   /// 생성일시
@@ -1422,14 +1394,14 @@ model BalanceGameStep {
   /// 수정일시
   updatedAt      DateTime?         @updatedAt @map("updated_at")
   /// AI 페르소나 ID (페르소나별 대사 구분용)
-  characterId    Int               @map("character_id")
-  character      AiPersona         @relation(fields: [characterId], references: [id])
+  aiPersonaId    Int               @map("ai_persona_id")
+  aiPersona      AiPersona         @relation(fields: [aiPersonaId], references: [id])
   coupon         Coupon?           @relation(fields: [couponId], references: [id])
   game           BalanceGame       @relation(fields: [gameId], references: [id], onDelete: Cascade)
   parentStep     BalanceGameStep?  @relation("StepHierarchy", fields: [parentStepId], references: [id])
   childSteps     BalanceGameStep[] @relation("StepHierarchy")
 
-  @@index([gameId, characterId, stepType])
+  @@index([gameId, aiPersonaId, stepType])
   @@index([parentStepId])
   @@map("balance_game_steps")
 }
@@ -1796,18 +1768,18 @@ model BeautyQuestion {
 /// NHN KCP SMS 인증 감사 로그 (법적 요구사항)
 model PhoneVerificationLog {
   id                 Int       @id @default(autoincrement())
-  /// 본인확인 거래번호 (KCP 발급, 유니크)
+  /// 본인확인 거래번호 (KCP 발급)
   certNumber         String    @unique @map("cert_number") @db.VarChar(50)
   /// 주문번호 (우리 시스템에서 생성)
   orderId            String?   @map("order_id") @db.VarChar(50)
-  /// 휴대폰 번호 (결정론적 암호화 - IV 제거)
-  mobile             String    @map("mobile") @db.VarChar(500)
+  /// 휴대폰 번호
+  mobile             String    @db.VarChar(255)
   /// 통신사 코드 (SKT, KTF, LGT, SKM, KTM, LGM)
   telecom            String    @db.VarChar(3)
-  /// 사용자 이름 (암호화)
-  userName           String    @map("user_name") @db.VarChar(500)
-  /// 생년월일 (YYYYMMDD, 암호화)
-  birthDay           String    @map("birth_day") @db.VarChar(500)
+  /// 사용자 이름
+  userName           String    @map("user_name") @db.VarChar(50)
+  /// 생년월일 (YYYYMMDD)
+  birthDay           String    @map("birth_day") @db.VarChar(8)
   /// 성별 코드 (1: 남, 2: 여)
   sex                String    @db.VarChar(2)
   /// CI (개인 고유 연계정보)
@@ -1904,40 +1876,4 @@ model Subscription {
   @@index([status])
   @@index([nextBillingDate])
   @@map("subscriptions")
-}
-
-/// 사용자 차트 테이블
-/// 외부 건강검진 시스템의 차트 정보를 저장
-/// 식단기록/통계 등 모든 기능의 기반이 되는 데이터
-model UserChart {
-  /// 자동 증가 ID
-  id          Int      @id @default(autoincrement())
-
-  /// 사용자 ID
-  userId      Int      @map("user_id")
-
-  /// 차트 ID (외부 시스템 고유 ID, 유니크)
-  chartId     String   @unique @map("chart_id") @db.VarChar(50)
-
-  /// 접수일
-  receiptDate DateTime @map("receipt_date")
-
-  /// 결과 여부 (Y/N)
-  resultYn    String   @map("result_yn") @db.VarChar(1)
-
-  /// 주문 코드
-  orderCode   String   @map("order_code") @db.VarChar(20)
-
-  /// 생성일시
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  /// 수정일시
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  /// 관계
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([chartId])
-  @@map("user_charts")
 }

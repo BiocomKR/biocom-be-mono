@@ -10,46 +10,47 @@ datasource db {
 /// 사용자 테이블
 /// 애플리케이션의 모든 사용자 정보를 저장
 model User {
-  id                     Int                         @id @default(autoincrement())
-  email                  String?
-  password               String?
-  createdAt              DateTime                    @map("created_at")
-  updatedAt              DateTime?                   @updatedAt @map("updated_at")
-  points                 Int                         @default(0)
-  mobile                 String
-  name                   String
-  birthDate              String?                     @map("birth_date") @db.VarChar(8)
-  sex                    String?                     @db.VarChar(2)
-  localCode              String?                     @map("local_code") @db.VarChar(2)
-  telecom                String?                     @db.VarChar(10)
-  isActive               Boolean                     @default(true) @map("is_active")
-  deletedAt              DateTime?                   @map("deleted_at")
-  aiPersonaId            Int?                        @map("ai_persona_id")
-  status                 String                      @default("NEWCOMER") @map("status") @db.VarChar(20)
-  role                   String                      @default("USER") @db.VarChar(20)
-  billingKey             String?                     @map("billing_key") @db.VarChar(200)
-  customerKey            String?                     @map("customer_key") @db.VarChar(200)
-  cart                   Cart?
-  challengeTickets       ChallengeTicket[]
-  userFiles              UserFile[]
-  userMissions           UserMission[]
-  quizAttempts           QuizAttempt[]
-  orders                 Order[]
-  pointHistories         PointHistory[]
-  productFeedback        ProductFeedback[]
-  recentlyViewed         RecentlyViewed[]
-  refreshTokens          RefreshToken[]
-  refundWarranties       RefundWarranty[]
-  surveyAnswers          SurveyAnswer[]
-  balanceGameHistories   UserBalanceGameHistory[]
-  challengeSurveyResults UserChallengeSurveyResult[]
-  userChallenges         UserChallenge[]
-  userCoupons            UserCoupon[]
-  customSupplements      UserCustomSupplement[]
-  userRecords            UserRecord[]
-  aiPersona              AiPersona?                  @relation(fields: [aiPersonaId], references: [id])
-  wishlist               Wishlist[]
-  subscriptions          Subscription[]
+  id                              Int                               @id @default(autoincrement())
+  email                           String?
+  password                        String?
+  createdAt                       DateTime                          @default(now()) @map("created_at")
+  updatedAt                       DateTime?                         @updatedAt @map("updated_at")
+  points                          Int                               @default(0)
+  mobile                          String
+  name                            String
+  isActive                        Boolean                           @default(true) @map("is_active")
+  deletedAt                       DateTime?                         @map("deleted_at")
+  aiPersonaId                     Int?                              @map("ai_persona_id")
+  status                          String                            @default("NEWCOMER") @map("status") @db.VarChar(20)
+  role                            String?                           @default("USER") @db.VarChar(20)
+  billingKey                      String?                           @map("billing_key") @db.VarChar(200)
+  customerKey                     String?                           @map("customer_key") @db.VarChar(200)
+  birthDate                       String?                           @map("birth_date") @db.VarChar(8)
+  telecom                         String?                           @db.VarChar(3)
+  sex                             String?                           @db.VarChar(2)
+  localCode                       String?                           @map("local_code") @db.VarChar(2)
+  health_type_animal_id           Int?
+  cart                            Cart?
+  challengeTickets                ChallengeTicket[]
+  orders                          Order[]
+  pointHistories                  PointHistory[]
+  productFeedback                 ProductFeedback[]
+  recentlyViewed                  RecentlyViewed[]
+  refreshTokens                   RefreshToken[]
+  refundWarranties                RefundWarranty[]
+  surveyAnswers                   SurveyAnswer[]
+  balanceGameHistories            UserBalanceGameHistory[]
+  challengeSurveyResults          UserChallengeSurveyResult[]
+  userChallenges                  UserChallenge[]
+  userCoupons                     UserCoupon[]
+  userFiles                        UserFile[]
+  userMissions                     UserMission[]
+  userRecords                      UserRecord[]
+  quizAttempts                     QuizAttempt[]
+  userSupplementRoutine            UserSupplementRoutine[]           @relation("UserSupplementRoutineUser")
+  userSupplementRoutineHistory     UserSupplementRoutineHistory[]    @relation("UserSupplementRoutineHistoryUser")
+  aiPersona                        AiPersona?                        @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
+  wishlist                         Wishlist[]
 
   @@map("users")
 }
@@ -73,56 +74,55 @@ model RefreshToken {
 /// 파일 마스터 테이블
 /// 모든 파일 정보를 중앙에서 관리
 model File {
-  id            Int           @id @default(autoincrement())
-  originalName  String        @map("original_name") @db.VarChar(255)
-  storedName    String        @unique @map("stored_name") @db.VarChar(255)
-  filePath      String        @map("file_path")
-  fileSize      Int           @map("file_size")
-  mimeType      String        @map("mime_type") @db.VarChar(100)
-  storageType   String        @default("local") @map("storage_type") @db.VarChar(50)
-  isActive      Boolean       @default(true) @map("is_active")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime?     @updatedAt @map("updated_at")
-  userFiles     UserFile[]
-  contentFiles  ContentFile[]
+  id           Int           @id @default(autoincrement())
+  originalName String        @map("original_name") @db.VarChar(255)
+  storedName   String        @unique(map: "uq_files_stored_name") @map("stored_name") @db.VarChar(255)
+  filePath     String        @map("file_path")
+  fileSize     Int           @map("file_size")
+  mimeType     String        @map("mime_type") @db.VarChar(100)
+  storageType  String        @default("local") @map("storage_type") @db.VarChar(50)
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime?     @updatedAt @map("updated_at")
+  contentFiles ContentFile[]
+  userFiles    UserFile[]
 
-  @@index([mimeType])
-  @@index([isActive])
-  @@index([createdAt])
+  @@index([createdAt], map: "idx_files_created_at")
+  @@index([isActive], map: "idx_files_is_active")
+  @@index([mimeType], map: "idx_files_mime_type")
   @@map("files")
 }
 
 /// 사용자 파일 관계 테이블
 model UserFile {
-  id              Int              @id @default(autoincrement())
-  userId          Int              @map("user_id")
-  fileId          Int              @map("file_id")
-  uploadedAt      DateTime         @map("uploaded_at")
-  fileType        String           @map("file_type")
-  uploadCategory  String           @map("upload_category")
-  user            User             @relation(fields: [userId], references: [id])
-  file            File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  userMissions UserMission[]
+  id             Int           @id(map: "file_uploads_pkey") @default(autoincrement())
+  userId         Int           @map("user_id")
+  uploadedAt     DateTime      @default(now()) @map("uploaded_at")
+  fileType       String        @map("file_type")
+  uploadCategory String        @map("upload_category")
+  fileId         Int           @map("file_id")
+  user           User          @relation(fields: [userId], references: [id], map: "file_uploads_user_id_fkey")
+  file           File          @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  userMissions   UserMission[]
 
-  @@index([fileId])
+  @@index([fileId], map: "idx_user_files_file_id")
   @@map("user_files")
 }
 
 model Content {
-  id              Int           @id @default(autoincrement())
-  title           String        @db.VarChar(255)
+  id              Int              @id @default(autoincrement())
+  title           String           @db.VarChar(255)
   content         String
-  type            String?       @db.VarChar(50)
-  weekNumber      Int?          @map("week_number")
-  dayNumber       Int?          @map("day_number")
-  sortOrder       Int           @default(0) @map("sort_order")
-  points          Int           @default(300)
-  viewCount       Int           @default(0) @map("view_count")
-  isActive        Boolean       @default(true) @map("is_active")
-  createdAt       DateTime      @map("created_at")
-  updatedAt       DateTime?     @updatedAt @map("updated_at")
-  challengeId     Int?          @map("challenge_id")
-  challenge       Product?      @relation("ChallengeContents", fields: [challengeId], references: [id])
+  type            String?          @db.VarChar(50)
+  weekNumber      Int?             @map("week_number")
+  dayNumber       Int?             @map("day_number")
+  sortOrder       Int              @default(0) @map("sort_order")
+  points          Int              @default(300)
+  viewCount       Int              @default(0) @map("view_count")
+  isActive        Boolean          @default(true) @map("is_active")
+  createdAt       DateTime         @map("created_at")
+  updatedAt       DateTime?        @updatedAt @map("updated_at")
+  challengeId     Int?             @map("challenge_id")
   contentFiles    ContentFile[]
   quizAttempts    QuizAttempt[]
   lectureProducts LectureProduct[]
@@ -131,7 +131,7 @@ model Content {
   @@index([type, isActive])
   @@index([weekNumber, dayNumber])
   @@index([sortOrder])
-  @@index([challengeId])
+  @@index([challengeId], map: "idx_contents_challenge_id")
   @@map("contents")
 }
 
@@ -139,14 +139,13 @@ model Content {
 model ContentFile {
   id        Int      @id @default(autoincrement())
   contentId Int      @map("content_id")
-  fileId    Int      @map("file_id")
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @map("created_at")
+  fileId    Int      @map("file_id")
   content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
   file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
-
   @@index([contentId])
-  @@index([fileId])
+  @@index([fileId], map: "idx_content_files_file_id")
   @@map("content_files")
 }
 
@@ -213,7 +212,7 @@ model SurveyQuestion {
   survey        Survey?        @relation(fields: [surveyId], references: [id])
 
   @@index([surveyId])
-  @@index([isActive])
+  @@index([isActive], map: "idx_survey_questions_is_active")
   @@map("survey_questions")
 }
 
@@ -227,7 +226,7 @@ model SurveyOption {
   isActive      Boolean        @default(true) @map("is_active")
   surveyAnswers SurveyAnswer[]
 
-  @@index([isActive])
+  @@index([isActive], map: "idx_survey_options_is_active")
   @@map("survey_options")
 }
 
@@ -259,11 +258,11 @@ model SurveyAnswer {
 /// 설문 결과에 따른 건강 유형별 동물 캐릭터 정보를 저장
 model HealthTypeAnimal {
   id          Int       @id @default(autoincrement())
-  healthType  String    @unique @map("health_type") @db.VarChar(50)
+  healthType  String    @unique(map: "category_details_category_code_key") @map("health_type") @db.VarChar(50)
   typeName    String    @map("type_name") @db.VarChar(50)
   animalName  String    @map("animal_name") @db.VarChar(50)
-  catchphrase String    @db.Text
-  symptoms    String    @db.Text
+  catchphrase String
+  symptoms    String
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @updatedAt @map("updated_at")
 
@@ -345,17 +344,17 @@ model DailyMission {
 /// 챌린지-미션 연결 테이블
 /// 각 상품(챌린지 이용권)에서 사용할 미션과 일차별 매핑
 model ChallengeMission {
-  id              Int              @id @default(autoincrement())
-  productId       Int              @map("product_id")
-  missionId       Int              @map("mission_id")
-  day             Int
-  points          Int              @default(100)
-  isActive        Boolean          @default(true) @map("is_active")
-  sortOrder       Int              @default(0) @map("sort_order")
-  createdAt       DateTime         @map("created_at")
-  updatedAt       DateTime?        @updatedAt @map("updated_at")
-  mission         Mission          @relation(fields: [missionId], references: [id])
-  product         Product          @relation(fields: [productId], references: [id])
+  id           Int           @id @default(autoincrement())
+  productId    Int           @map("product_id")
+  missionId    Int           @map("mission_id")
+  day          Int
+  points       Int           @default(100)
+  isActive     Boolean       @default(true) @map("is_active")
+  sortOrder    Int           @default(0) @map("sort_order")
+  createdAt    DateTime      @map("created_at")
+  updatedAt    DateTime?     @updatedAt @map("updated_at")
+  mission      Mission       @relation(fields: [missionId], references: [id])
+  product      Product       @relation(fields: [productId], references: [id])
   userMissions UserMission[]
 
   @@unique([productId, missionId, day])
@@ -387,18 +386,18 @@ model ChallengeSurvey {
 /// 순수 퀴즈 데이터만 관리 (종속성 없음)
 /// 강의 퀴즈, 미션 퀴즈 모두 MissionQuiz, LectureQuiz 관계 테이블로 매핑
 model Quiz {
-  id              Int            @id @default(autoincrement())
-  question        String
-  options         Json
-  correctAnswer   Int            @map("correct_answer")
-  points          Int?           @default(300)
-  isActive        Boolean?       @default(true) @map("is_active")
-  createdAt       DateTime?      @map("created_at") @db.Timestamp(6)
-  updatedAt       DateTime?      @updatedAt @map("updated_at") @db.Timestamp(6)
-  explanation     String?
-  missionQuizzes  MissionQuiz[]
-  lectureQuizzes  LectureQuiz[]
-  quizAttempts    QuizAttempt[]
+  id             Int           @id @default(autoincrement())
+  question       String
+  options        Json
+  correctAnswer  Int           @map("correct_answer")
+  points         Int?          @default(300)
+  isActive       Boolean?      @default(true) @map("is_active")
+  createdAt      DateTime?     @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime?     @updatedAt @map("updated_at") @db.Timestamp(6)
+  explanation    String?
+  lectureQuizzes LectureQuiz[]
+  missionQuizzes MissionQuiz[]
+  attempts       QuizAttempt[]
 
   @@map("quizzes")
 }
@@ -416,14 +415,13 @@ model QuizAttempt {
   isCorrect      Boolean  @map("is_correct")
   pointsEarned   Int      @map("points_earned")
   createdAt      DateTime @map("created_at")
+  content        Content? @relation(fields: [contentId], references: [id], onDelete: SetNull)
   quiz           Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content        Content? @relation(fields: [contentId], references: [id], onDelete: SetNull)
 
-  @@index([userId, quizId])
-  @@index([userId])
-  @@index([quizId])
-  @@index([contentId])
+  @@index([contentId], map: "idx_quiz_attempts_content_id")
+  @@index([quizId], map: "idx_quiz_attempts_quiz_id")
+  @@index([userId], map: "idx_quiz_attempts_user_id")
   @@map("quiz_attempts")
 }
 
@@ -442,10 +440,10 @@ model MissionQuiz {
   mission   Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
   quiz      Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
-  @@unique([missionId, quizId, day])
-  @@index([missionId])
-  @@index([quizId])
-  @@index([missionId, day])
+  @@unique([missionId, quizId, day], map: "uq_mission_quizzes_mission_quiz_day")
+  @@index([missionId, day], map: "idx_mission_quizzes_mission_day")
+  @@index([missionId], map: "idx_mission_quizzes_mission_id")
+  @@index([quizId], map: "idx_mission_quizzes_quiz_id")
   @@map("mission_quizzes")
 }
 
@@ -475,33 +473,32 @@ model ChallengeTicket {
 /// 사용자별 활성 챌린지
 /// 활성화된 챌린지 진행 상황 관리 (상품 기반)
 model UserChallenge {
-  id                  Int              @id @default(autoincrement())
-  userId              Int              @map("user_id")
-  productId           Int              @map("product_id")
-  ticketId            Int              @map("ticket_id")
-  activatedAt         DateTime         @map("activated_at")
-  startDate           DateTime?        @map("start_date") @db.Date
-  deliveryStartDate   DateTime?        @map("delivery_start_date") @db.Date
-  deliveryArrivalDate DateTime?        @map("delivery_arrival_date") @db.Date
-  endDate             DateTime?        @map("end_date") @db.Date
-  expiresAt           DateTime         @map("expires_at")
-  purchasedAt         DateTime         @map("purchased_at")
-  totalPoints         Int              @default(0) @map("total_points")
-  status              String           @default("ACTIVE") @db.VarChar(20)
-  createdAt           DateTime         @map("created_at")
-  updatedAt           DateTime?        @updatedAt @map("updated_at")
+  id                  Int             @id @default(autoincrement())
+  userId              Int             @map("user_id")
+  productId           Int             @map("product_id")
+  ticketId            Int             @map("ticket_id")
+  activatedAt         DateTime        @map("activated_at")
+  expiresAt           DateTime        @map("expires_at")
+  totalPoints         Int             @default(0) @map("total_points")
+  status              String          @default("ACTIVE") @db.VarChar(20)
+  createdAt           DateTime        @map("created_at")
+  updatedAt           DateTime?       @updatedAt @map("updated_at")
+  startDate           DateTime?       @map("start_date") @db.Date
+  deliveryArrivalDate DateTime?       @map("delivery_arrival_date") @db.Date
+  endDate             DateTime?       @map("end_date") @db.Date
+  purchasedAt         DateTime        @map("purchased_at")
+  deliveryStartDate   DateTime?       @map("delivery_start_date") @db.Date
   dailyProgress       DailyProgress[]
-  userMissions     UserMission[]
   surveyAnswers       SurveyAnswer[]
-  product             Product          @relation(fields: [productId], references: [id])
-  ticket              ChallengeTicket  @relation(fields: [ticketId], references: [id])
-  user                User             @relation(fields: [userId], references: [id])
+  product             Product         @relation(fields: [productId], references: [id])
+  ticket              ChallengeTicket @relation(fields: [ticketId], references: [id])
+  user                User            @relation(fields: [userId], references: [id])
+  userMissions        UserMission[]
   userRecords         UserRecord[]
 
   @@index([userId, status])
   @@map("user_challenges")
 }
-
 
 /// 일별 진행 상황
 /// 사용자 챌린지의 일차별 진행 상황 관리
@@ -530,10 +527,6 @@ model DailyProgress {
   @@map("daily_progress")
 }
 
-/// 기록 항목 마스터
-/// 기록 가능한 항목들의 메타데이터
-// RecordItem 테이블 삭제됨 - missions 테이블과 중복으로 불필요
-
 /// 운동 종목 마스터 테이블
 /// 활동 기록에서 사용할 운동 종목들
 model ExerciseType {
@@ -544,8 +537,6 @@ model ExerciseType {
   code        String    @unique @db.VarChar(50)
   /// 칼로리 계수 (10분당 소모 칼로리)
   calorieRate Float?    @map("calorie_rate")
-  /// 기준 시간 (분 단위, 기본값: 10분)
-  baseMinutes Int       @default(10) @map("base_minutes")
   /// 정렬 순서
   sortOrder   Int       @default(0) @map("sort_order")
   /// 활성화 여부
@@ -554,8 +545,9 @@ model ExerciseType {
   createdAt   DateTime  @map("created_at")
   /// 수정일시
   updatedAt   DateTime? @updatedAt @map("updated_at")
+  /// 기준 시간 (분 단위, 기본값: 10분)
+  baseMinutes Int       @default(10) @map("base_minutes")
 
-  @@index([isActive])
   @@index([sortOrder])
   @@map("exercise_types")
 }
@@ -563,19 +555,18 @@ model ExerciseType {
 /// 사용자 기록 데이터
 /// 사용자의 실제 기록 데이터 (수면, 식단, 운동 등)
 model UserRecord {
-  id              Int              @id @default(autoincrement())
-  userId          Int              @map("user_id")
-  userChallengeId Int?             @map("user_challenge_id")
-  recordType      String           @map("record_type") @db.VarChar(50)
-  date            DateTime         @db.Date
+  id              Int            @id @default(autoincrement())
+  userId          Int            @map("user_id")
+  userChallengeId Int?           @map("user_challenge_id")
+  recordType      String         @map("record_type") @db.VarChar(50)
   metadata        Json?
-  createdAt       DateTime         @map("created_at")
-  updatedAt       DateTime?        @updatedAt @map("updated_at")
-  userMissions UserMission[]
-  userChallenge   UserChallenge?   @relation(fields: [userChallengeId], references: [id])
-  user            User             @relation(fields: [userId], references: [id])
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime?      @updatedAt @map("updated_at")
+  date            DateTime       @db.Date
+  userMissions    UserMission[]
+  userChallenge   UserChallenge? @relation(fields: [userChallengeId], references: [id])
+  user            User           @relation(fields: [userId], references: [id])
 
-  @@index([userId, date])
   @@index([userChallengeId])
   @@index([userId, recordType, date])
   @@map("user_records")
@@ -599,71 +590,71 @@ model ApiKey {
 /// 상품 마스터 테이블
 /// 판매 상품의 기본 정보 관리
 model Product {
-  id                         Int                         @id @default(autoincrement())
+  id                              Int                               @id @default(autoincrement())
   /// 재고 관리 코드 (재고 API 연동용)
-  sku                        String                      @unique @db.VarChar(100)
+  sku                             String                            @unique @db.VarChar(100)
   /// 상품명
-  name                       String                      @db.VarChar(255)
+  name                            String                            @db.VarChar(255)
   /// 상품 설명
-  description                String?
+  description                     String?
   /// 상품 타입 (SINGLE: 단품, SET: 세트)
-  productType                String                      @default("SINGLE") @map("product_type") @db.VarChar(20)
+  productType                     String                            @default("SINGLE") @map("product_type") @db.VarChar(20)
   /// 세트 구성 정보 [{"sku": "P001", "name": "상품1", "qty": 2}]
-  setItems                   Json?                       @map("set_items")
+  setItems                        Json?                             @map("set_items")
   /// 상품 상세 정보 (성분, 사용법, 주의사항 등)
-  productInfo                Json?                       @map("product_info")
+  productInfo                     Json?                             @map("product_info")
   /// 상태 (ACTIVE: 활성, INACTIVE: 비활성, SOLD_OUT: 품절)
-  status                     String                      @default("ACTIVE") @db.VarChar(20)
+  status                          String                            @default("ACTIVE") @db.VarChar(20)
   /// 추천 상품 여부
-  isFeatured                 Boolean                     @default(false) @map("is_featured")
+  isFeatured                      Boolean                           @default(false) @map("is_featured")
   /// 조회수
-  viewCount                  Int                         @default(0) @map("view_count")
+  viewCount                       Int                               @default(0) @map("view_count")
   /// 생성일시
-  createdAt                  DateTime                    @map("created_at")
+  createdAt                       DateTime                          @map("created_at")
   /// 수정일시
-  updatedAt                  DateTime?                   @updatedAt @map("updated_at")
+  updatedAt                       DateTime?                         @updatedAt @map("updated_at")
   /// 카테고리 코드 (SUPPLEMENT, HEALTH_FOOD 등)
-  categoryCode               String                      @map("category_code") @db.VarChar(50)
+  categoryCode                    String                            @map("category_code") @db.VarChar(50)
   /// 카테고리명 (영양제, 건강 보조 식품 등)
-  categoryName               String                      @map("category_name") @db.VarChar(100)
+  categoryName                    String                            @map("category_name") @db.VarChar(100)
   /// 할인율 (%)
-  discountRate               Int?                        @default(0) @map("discount_rate")
+  discountRate                    Int?                              @default(0) @map("discount_rate")
   /// 무료배송 기준 금액
-  freeShippingAmount         Decimal?                    @map("free_shipping_amount") @db.Decimal(10, 0)
+  freeShippingAmount              Decimal?                          @map("free_shipping_amount") @db.Decimal(10, 0)
   /// 1인당 최대 주문 수량
-  maxOrderQty                Int                         @default(10) @map("max_order_qty")
+  maxOrderQty                     Int                               @default(10) @map("max_order_qty")
   /// 정가 (할인 전 가격)
-  originalPrice              Decimal?                    @map("original_price") @db.Decimal(10, 0)
+  originalPrice                   Decimal?                          @map("original_price") @db.Decimal(10, 0)
   /// 적립 포인트율 (%)
-  pointRate                  Int                         @default(1) @map("point_rate")
+  pointRate                       Int                               @default(1) @map("point_rate")
   /// 기본 판매 가격 (옵션 없는 경우)
-  price                      Decimal?                    @db.Decimal(10, 0)
+  price                           Decimal?                          @db.Decimal(10, 0)
   /// 배송비
-  shippingFee                Decimal                     @default(3000) @map("shipping_fee") @db.Decimal(10, 0)
+  shippingFee                     Decimal                           @default(3000) @map("shipping_fee") @db.Decimal(10, 0)
   /// 배송비 정책 (FREE: 무료, PAID: 유료, CONDITIONAL: 조건부)
-  shippingPolicy             String                      @default("CONDITIONAL") @map("shipping_policy") @db.VarChar(20)
+  shippingPolicy                  String                            @default("CONDITIONAL") @map("shipping_policy") @db.VarChar(20)
   /// 상품 무게 (배송비 계산용, g)
-  weight                     Int?                        @default(0)
+  weight                          Int?                              @default(0)
   /// 상품 태그 (검색용, 쉼표 구분)
-  tags                       String?
+  tags                            String?
   /// 챌린지 메타데이터 (challengeType, totalDays, description 등)
-  metadata                   Json?
-  cartItems                  CartItem[]
-  challengeContents          Content[]                   @relation("ChallengeContents")
-  challengeMissions          ChallengeMission[]
-  challengeSurveys           ChallengeSurvey[]
-  challengeTickets           ChallengeTicket[]
-  coupons                    Coupon[]
-  lectureProducts            LectureProduct[]
-  orderItems                 OrderItem[]
-  feedback                   ProductFeedback[]
-  images                     ProductImage[]
-  nutrients                  ProductNutrient[]
-  recentlyViewed             RecentlyViewed[]
-  userChallengeSurveyResults UserChallengeSurveyResult[]
-  userChallenges             UserChallenge[]
-  wishlistItems              Wishlist[]
-  subscriptions              Subscription[]
+  metadata                        Json?
+  cartItems                       CartItem[]
+  challengeMissions               ChallengeMission[]
+  challengeSurveys                ChallengeSurvey[]
+  challengeTickets                ChallengeTicket[]
+  coupons                         Coupon[]
+  lectureProducts                 LectureProduct[]
+  orderItems                      OrderItem[]
+  feedback                        ProductFeedback[]
+  images                          ProductImage[]
+  recentlyViewed                  RecentlyViewed[]
+  supplementNutrients              SupplementNutrient[]
+  userChallengeSurveyResults       UserChallengeSurveyResult[]
+  userChallenges                   UserChallenge[]
+  userSupplementRoutine            UserSupplementRoutine[]           @relation("UserSupplementRoutineProduct")
+  userSupplementRoutineHistory     UserSupplementRoutineHistory[]    @relation("UserSupplementRoutineHistoryProduct")
+  wishlistItems                    Wishlist[]
 
   @@index([sku])
   @@index([categoryCode, status])
@@ -690,31 +681,6 @@ model ProductImage {
 
   @@index([productId, sortOrder])
   @@map("product_images")
-}
-
-/// 상품 영양소 정보 테이블
-/// 영양제 상품의 영양소별 함량 정보 관리 (통계 집계용)
-model ProductNutrient {
-  id        Int      @id @default(autoincrement())
-  /// 상품 ID
-  productId Int      @map("product_id")
-  /// 영양소명 (비타민A, 엽산, 철분 등)
-  name      String   @db.VarChar(100)
-  /// 함량
-  amount    Decimal  @db.Decimal(10, 2)
-  /// 단위 (mg, mcg, g, IU 등)
-  unit      String   @db.VarChar(20)
-  /// RDA 비율 (%) - nullable
-  rda       Int?
-  /// 생성일시
-  createdAt DateTime @map("created_at")
-  /// 수정일시
-  updatedAt DateTime @updatedAt @map("updated_at")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId])
-  @@index([name])
-  @@map("product_nutrients")
 }
 
 /// 장바구니 테이블
@@ -1064,7 +1030,7 @@ model Wishlist {
   /// 상품 ID
   productId Int      @map("product_id")
   /// 생성일시
-  createdAt DateTime @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1103,32 +1069,6 @@ model AiPersona {
   personality      String?
   /// 페르소나 이미지 URL
   personaUrl       String?           @map("persona_url") @db.VarChar(500)
-  /// 페르소나 썸네일 이미지 URL
-  thumbnailUrl     String?           @map("thumbnail_url") @db.VarChar(500)
-  /// 페르소나 성별 (M: 남성, F: 여성)
-  gender           Gender?
-  /// 소개 제목
-  introTitle       String?           @map("intro_title") @db.VarChar(200)
-  /// 소개 내용
-  introContent     String?           @map("intro_content") @db.Text
-  /// 해시태그 (JSON 배열)
-  hashtags         String?           @db.Text
-  /// 특징 제목
-  featureTitle     String?           @map("feature_title") @db.VarChar(200)
-  /// 특징 내용
-  featureContent   String?           @map("feature_content") @db.Text
-  /// 말투 제목
-  speechTitle      String?           @map("speech_title") @db.VarChar(200)
-  /// 말투 내용
-  speechContent    String?           @map("speech_content") @db.Text
-  /// 말투 이미지 URL
-  speechImageUrl   String?           @map("speech_image_url") @db.VarChar(500)
-  /// 친밀도 제목
-  intimacyTitle    String?           @map("intimacy_title") @db.VarChar(200)
-  /// 친밀도 내용
-  intimacyContent  String?           @map("intimacy_content") @db.Text
-  /// 친밀도 이미지 URL
-  intimacyImageUrl String?           @map("intimacy_image_url") @db.VarChar(500)
   /// 활성화 여부
   isActive         Boolean           @default(true) @map("is_active")
   /// 정렬 순서
@@ -1137,6 +1077,32 @@ model AiPersona {
   createdAt        DateTime          @map("created_at")
   /// 수정일시
   updatedAt        DateTime?         @updatedAt @map("updated_at")
+  /// 페르소나 성별 (M: 남성, F: 여성)
+  gender           Gender?
+  /// 소개 제목
+  introTitle       String?           @map("intro_title") @db.VarChar(200)
+  /// 소개 내용
+  introContent     String?           @map("intro_content")
+  /// 해시태그 (JSON 배열)
+  hashtags         String?
+  /// 특징 제목
+  featureTitle     String?           @map("feature_title") @db.VarChar(200)
+  /// 특징 내용
+  featureContent   String?           @map("feature_content")
+  /// 말투 제목
+  speechTitle      String?           @map("speech_title") @db.VarChar(200)
+  /// 말투 내용
+  speechContent    String?           @map("speech_content")
+  /// 말투 이미지 URL
+  speechImageUrl   String?           @map("speech_image_url") @db.VarChar(500)
+  /// 친밀도 제목
+  intimacyTitle    String?           @map("intimacy_title") @db.VarChar(200)
+  /// 친밀도 내용
+  intimacyContent  String?           @map("intimacy_content")
+  /// 친밀도 이미지 URL
+  intimacyImageUrl String?           @map("intimacy_image_url") @db.VarChar(500)
+  /// 페르소나 썸네일 이미지 URL
+  thumbnailUrl     String?           @map("thumbnail_url") @db.VarChar(500)
   balanceGameSteps BalanceGameStep[]
   users            User[]
 
@@ -1147,45 +1113,45 @@ model AiPersona {
 /// 사용자별 챌린지별 설문 결과 테이블
 /// 챌린지마다 다른 사전/사후 설문 결과 저장
 model UserChallengeSurveyResult {
-  id                     Int       @id @default(autoincrement())
+  id                    Int       @id @default(autoincrement())
   /// 사용자 ID
-  userId                 Int       @map("user_id")
+  userId                Int       @map("user_id")
   /// 상품 ID (챌린지 이용권)
-  productId              Int       @map("product_id")
+  productId             Int       @map("product_id")
   /// 사전설문 건강 유형 (HealthTypeAnimal.healthType 참조)
-  beforeHealthType       String?   @map("before_health_type") @db.VarChar(50)
+  beforeHealthType      String?   @map("before_health_type") @db.VarChar(50)
   /// 사후설문 건강 유형 (HealthTypeAnimal.healthType 참조)
-  afterHealthType        String?   @map("after_health_type") @db.VarChar(50)
+  afterHealthType       String?   @map("after_health_type") @db.VarChar(50)
   /// 사전설문 피부건강 점수
-  beforeScoreSkinHealth  Int?      @map("before_score_skin_health")
+  beforeScoreSkinHealth Int?      @map("before_score_skin_health")
   /// 사전설문 대사 점수
-  beforeScoreMetabolism  Int?      @map("before_score_metabolism")
+  beforeScoreMetabolism Int?      @map("before_score_metabolism")
   /// 사전설문 면역 점수
-  beforeScoreImmune      Int?      @map("before_score_immune")
+  beforeScoreImmune     Int?      @map("before_score_immune")
   /// 사전설문 장건강 점수
-  beforeScoreGutHealth   Int?      @map("before_score_gut_health")
+  beforeScoreGutHealth  Int?      @map("before_score_gut_health")
   /// 사전설문 총점
-  beforeScoreTotal       Int?      @map("before_score_total")
+  beforeScoreTotal      Int?      @map("before_score_total")
   /// 사후설문 피부건강 점수
-  afterScoreSkinHealth   Int?      @map("after_score_skin_health")
+  afterScoreSkinHealth  Int?      @map("after_score_skin_health")
   /// 사후설문 대사 점수
-  afterScoreMetabolism   Int?      @map("after_score_metabolism")
+  afterScoreMetabolism  Int?      @map("after_score_metabolism")
   /// 사후설문 면역 점수
-  afterScoreImmune       Int?      @map("after_score_immune")
+  afterScoreImmune      Int?      @map("after_score_immune")
   /// 사후설문 장건강 점수
-  afterScoreGutHealth    Int?      @map("after_score_gut_health")
+  afterScoreGutHealth   Int?      @map("after_score_gut_health")
   /// 사후설문 총점
-  afterScoreTotal        Int?      @map("after_score_total")
+  afterScoreTotal       Int?      @map("after_score_total")
   /// 사전설문 완료일시
-  beforeCompletedAt      DateTime? @map("before_completed_at")
+  beforeCompletedAt     DateTime? @map("before_completed_at")
   /// 사후설문 완료일시
-  afterCompletedAt       DateTime? @map("after_completed_at")
+  afterCompletedAt      DateTime? @map("after_completed_at")
   /// 생성일시
-  createdAt              DateTime  @map("created_at")
+  createdAt             DateTime  @map("created_at")
   /// 수정일시
-  updatedAt              DateTime? @updatedAt @map("updated_at")
-  product                Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt             DateTime? @updatedAt @map("updated_at")
+  product               Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
   @@index([productId])
@@ -1195,7 +1161,7 @@ model UserChallengeSurveyResult {
 /// 미션 시도 기록 테이블
 /// 사용자의 미션 수행 시도를 기록하고, dailyLimit 기반 진행도 추적
 model UserMission {
-  id                 Int              @id @default(autoincrement())
+  id                 Int              @id(map: "mission_attempts_pkey") @default(autoincrement())
   /// 사용자 ID
   userId             Int              @map("user_id")
   /// 챌린지 미션 ID
@@ -1220,62 +1186,34 @@ model UserMission {
   createdAt          DateTime         @map("created_at")
   /// 수정일시
   updatedAt          DateTime?        @updatedAt @map("updated_at")
-  challengeMission   ChallengeMission @relation(fields: [challengeMissionId], references: [id], onDelete: Cascade)
-  userFile           UserFile?        @relation(fields: [fileUploadId], references: [id])
-  trackingRecord     UserRecord?      @relation(fields: [trackingRecordId], references: [id])
-  userChallenge      UserChallenge    @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
-  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeMission   ChallengeMission @relation(fields: [challengeMissionId], references: [id], onDelete: Cascade, map: "mission_attempts_challenge_mission_id_fkey")
+  userFile           UserFile?        @relation(fields: [fileUploadId], references: [id], map: "mission_attempts_file_upload_id_fkey")
+  trackingRecord     UserRecord?      @relation(fields: [trackingRecordId], references: [id], map: "mission_attempts_tracking_record_id_fkey")
+  userChallenge      UserChallenge    @relation(fields: [userChallengeId], references: [id], onDelete: Cascade, map: "mission_attempts_user_challenge_id_fkey")
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade, map: "mission_attempts_user_id_fkey")
 
-  @@unique([userId, challengeMissionId, day, attemptNumber])
-  @@index([userId, day])
-  @@index([challengeMissionId])
-  @@index([userChallengeId, day])
-  @@index([createdAt])
+  @@unique([userId, challengeMissionId, day, attemptNumber], map: "mission_attempts_user_id_challenge_mission_id_day_attempt_n_key")
+  @@index([challengeMissionId], map: "mission_attempts_challenge_mission_id_idx")
+  @@index([createdAt], map: "mission_attempts_created_at_idx")
+  @@index([userChallengeId, day], map: "mission_attempts_user_challenge_id_day_idx")
+  @@index([userId, day], map: "mission_attempts_user_id_day_idx")
   @@map("user_missions")
 }
-
-/// ❌ DEPRECATED: 2025-10-28 삭제됨
-/// 삭제 사유:
-/// 1. 컨텐츠 시청 완료 API 제거로 인해 사용처 없음
-/// 2. 조회수 중복 카운트는 비즈니스 임팩트가 작아 허용하기로 결정
-/// 3. 포인트 지급은 퀴즈 풀이로 이동 (시청 완료와 분리)
-///
-/// 기존 용도:
-/// - 일일 중복 조회수 증가 방지 (하루 1번만 카운트)
-/// - 컨텐츠 시청 완료 여부 체크 (최초 시청 판단)
-///
-/// 마이그레이션: 20251028_remove_content_views_and_access_level.sql
-// model ContentView {
-//   id              Int            @id @default(autoincrement())
-//   userId          Int            @map("user_id")
-//   contentId       Int            @map("content_id")
-//   userChallengeId Int?           @map("user_challenge_id")
-//   viewedAt        DateTime       @map("viewed_at")
-//   content         Content        @relation(fields: [contentId], references: [id], onDelete: Cascade)
-//   userChallenge   UserChallenge? @relation(fields: [userChallengeId], references: [id], onDelete: Cascade)
-//   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-//
-//   @@unique([userId, contentId])
-//   @@index([userId, viewedAt])
-//   @@index([contentId])
-//   @@index([userChallengeId])
-//   @@map("content_views")
-// }
 
 /// 강의-퀴즈 연결 테이블
 /// 각 강의에 연결된 퀴즈들 (일차별 매핑)
 model LectureQuiz {
-  id        Int     @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   /// 강의 컨텐츠 ID
-  contentId Int     @map("content_id")
+  contentId Int       @map("content_id")
   /// 퀴즈 ID
-  quizId    Int     @map("quiz_id")
-  /// 일차 (해당 강의가 몇일차인지)
-  day       Int?
+  quizId    Int       @map("quiz_id")
   /// 정렬 순서
   sortOrder Int       @default(0) @map("sort_order")
   /// 활성화 여부
   isActive  Boolean   @default(true) @map("is_active")
+  /// 일차 (해당 강의가 몇일차인지)
+  day       Int?
   /// 생성일시
   createdAt DateTime  @default(now()) @map("created_at")
   /// 수정일시
@@ -1286,7 +1224,6 @@ model LectureQuiz {
   @@unique([contentId, quizId])
   @@index([contentId])
   @@index([quizId])
-  @@index([contentId, day])
   @@map("lecture_quizzes")
 }
 
@@ -1313,31 +1250,6 @@ model LectureProduct {
   @@index([contentId])
   @@index([productId])
   @@map("lecture_products")
-}
-
-/// 사용자 커스텀 영양제 테이블
-/// 사용자가 직접 추가한 영양제 정보
-model UserCustomSupplement {
-  id        Int       @id @default(autoincrement())
-  /// 사용자 ID
-  userId    Int       @map("user_id")
-  /// 영양제명
-  name      String    @db.VarChar(100)
-  /// 용량/함량
-  dosage    String?   @db.VarChar(50)
-  /// 메모
-  memo      String?   @db.VarChar(255)
-  /// 활성화 여부
-  isActive  Boolean   @default(true) @map("is_active")
-  /// 생성일시
-  createdAt DateTime  @map("created_at")
-  /// 수정일시
-  updatedAt DateTime? @updatedAt @map("updated_at")
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([userId, isActive])
-  @@map("user_custom_supplements")
 }
 
 /// 밸런스게임 마스터 테이블
@@ -1395,14 +1307,15 @@ model BalanceGameStep {
   updatedAt      DateTime?         @updatedAt @map("updated_at")
   /// AI 페르소나 ID (페르소나별 대사 구분용)
   aiPersonaId    Int               @map("ai_persona_id")
-  aiPersona      AiPersona         @relation(fields: [aiPersonaId], references: [id])
+  aiPersona      AiPersona         @relation(fields: [aiPersonaId], references: [id], map: "balance_game_steps_character_id_fkey")
   coupon         Coupon?           @relation(fields: [couponId], references: [id])
   game           BalanceGame       @relation(fields: [gameId], references: [id], onDelete: Cascade)
   parentStep     BalanceGameStep?  @relation("StepHierarchy", fields: [parentStepId], references: [id])
   childSteps     BalanceGameStep[] @relation("StepHierarchy")
 
-  @@index([gameId, aiPersonaId, stepType])
   @@index([parentStepId])
+  @@index([gameId, aiPersonaId, stepType], map: "balance_game_steps_game_id_character_id_step_type_idx")
+  @@index([gameId, aiPersonaId, stepType], map: "balance_game_steps_gameid_aipersonaid_steptype_idx")
   @@map("balance_game_steps")
 }
 
@@ -1700,24 +1613,6 @@ model Banner {
   @@map("banners")
 }
 
-/// ❌ DEPRECATED: 2025-10-28 삭제됨
-/// 삭제 사유: 컨텐츠 접근 권한을 사용자 구독 상태(subscriptionStatus)로 단순화
-/// - 기존: accessLevel enum으로 세밀하게 제어
-/// - 변경: 챌린저(CHALLENGER) 또는 구독자(SUBSCRIBER)만 접근 가능
-/// 마이그레이션: 20251028_remove_content_views_and_access_level.sql
-// enum ContentAccessLevel {
-//   ALL
-//   CHALLENGE_ONLY
-//   SUBSCRIPTION_ONLY
-//   CHALLENGE_OR_SUB
-// }
-
-/// AI 페르소나 성별 Enum
-enum Gender {
-  M
-  F
-}
-
 /// 식품 카테고리 테이블
 /// 고포드맵 식품, 가공식품 등 식단 관련 식품 분류 정보 관리
 model FoodCategory {
@@ -1735,7 +1630,8 @@ model FoodCategory {
   /// 수정일시
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  @@index([category, isActive])
+  @@index([category, isActive], map: "idx_food_categories_category_active")
+  @@index([category, isActive], map: "idx_food_categories_category_is_active")
   @@map("food_categories")
 }
 
@@ -1748,7 +1644,7 @@ model BeautyQuestion {
   /// 구분 (장 건강, 대사 밸런스, 붓기, 수분감 등)
   category  String    @db.VarChar(50)
   /// 질문 문구
-  question  String    @db.Text
+  question  String
   /// 정렬 순서
   sortOrder Int       @map("sort_order")
   /// 활성화 여부 (false시 앱에서 안보임)
@@ -1758,9 +1654,9 @@ model BeautyQuestion {
   /// 수정일시
   updatedAt DateTime? @updatedAt @map("updated_at")
 
-  @@index([type])
-  @@index([sortOrder])
-  @@index([isActive])
+  @@index([isActive], map: "idx_beauty_questions_is_active")
+  @@index([sortOrder], map: "idx_beauty_questions_sort_order")
+  @@index([type], map: "idx_beauty_questions_type")
   @@map("beauty_questions")
 }
 
@@ -1770,22 +1666,32 @@ model PhoneVerificationLog {
   id                 Int       @id @default(autoincrement())
   /// 본인확인 거래번호 (KCP 발급)
   certNumber         String    @unique @map("cert_number") @db.VarChar(50)
-  /// 주문번호 (우리 시스템에서 생성)
-  orderId            String?   @map("order_id") @db.VarChar(50)
   /// 휴대폰 번호
-  mobile             String    @db.VarChar(255)
+  mobile             String    @db.VarChar(500)
   /// 통신사 코드 (SKT, KTF, LGT, SKM, KTM, LGM)
   telecom            String    @db.VarChar(3)
   /// 사용자 이름
-  userName           String    @map("user_name") @db.VarChar(50)
+  userName           String    @map("user_name") @db.VarChar(500)
   /// 생년월일 (YYYYMMDD)
-  birthDay           String    @map("birth_day") @db.VarChar(8)
+  birthDay           String    @map("birth_day") @db.VarChar(500)
   /// 성별 코드 (1: 남, 2: 여)
   sex                String    @db.VarChar(2)
   /// CI (개인 고유 연계정보)
   ci                 String?   @db.VarChar(500)
   /// DI (업체별 중복가입 확인정보)
   di                 String?   @db.VarChar(500)
+  /// 인증 상태 (pending: 대기, completed: 완료, failed: 실패)
+  verificationStatus String    @default("PENDING") @map("verification_status") @db.VarChar(50)
+  /// 진행 단계 (identity: 실명확인, sms_sent: SMS발송, verified: 인증완료)
+  step               String    @db.VarChar(50)
+  /// 실패 사유
+  failReason         String?   @map("fail_reason")
+  /// 생성일시
+  createdAt          DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt          DateTime? @updatedAt @map("updated_at")
+  /// 주문번호 (우리 시스템에서 생성)
+  orderId            String?   @map("order_id") @db.VarChar(50)
   /// KCP VAN Transaction ID
   vanTxId            String?   @map("van_tx_id") @db.VarChar(100)
   /// KCP SMS 발송 여부
@@ -1800,21 +1706,11 @@ model PhoneVerificationLog {
   certNumGuardYn     String?   @map("cert_num_guard_yn") @db.VarChar(1)
   /// KCP 기관 Transaction ID
   authTxId           String?   @map("auth_tx_id") @db.VarChar(100)
-  /// 인증 상태 (pending: 대기, completed: 완료, failed: 실패)
-  verificationStatus String    @default("PENDING") @map("verification_status") @db.VarChar(50)
-  /// 진행 단계 (identity: 실명확인, sms_sent: SMS발송, verified: 인증완료)
-  step               String    @db.VarChar(50)
-  /// 실패 사유
-  failReason         String?   @map("fail_reason")
-  /// 생성일시
-  createdAt          DateTime  @default(now()) @map("created_at")
-  /// 수정일시
-  updatedAt          DateTime? @updatedAt @map("updated_at")
 
-  @@index([certNumber])
-  @@index([mobile])
-  @@index([verificationStatus])
-  @@index([createdAt])
+  @@index([certNumber], map: "idx_phone_verification_logs_cert_number")
+  @@index([createdAt], map: "idx_phone_verification_logs_created_at")
+  @@index([mobile], map: "idx_phone_verification_logs_phone_number")
+  @@index([verificationStatus], map: "idx_phone_verification_logs_verification_status")
   @@map("phone_verification_logs")
 }
 
@@ -1823,19 +1719,14 @@ model PhoneVerificationLog {
 model Subscription {
   /// 구독 ID
   id              Int       @id @default(autoincrement())
-
   /// 사용자 ID
   userId          Int       @map("user_id")
-
   /// 구독 상품 ID (products 테이블 참조)
   productId       Int       @map("product_id")
-
   /// 빌링키 (토스페이먼츠 자동결제 키)
   billingKey      String    @map("billing_key") @db.VarChar(200)
-
   /// 고객키 (토스페이먼츠 고객 식별자)
   customerKey     String    @map("customer_key") @db.VarChar(200)
-
   /// 구독 상태
   /// - ACTIVE: 정상 구독 중
   /// - PAUSED: 일시정지
@@ -1844,36 +1735,147 @@ model Subscription {
   /// - PAYMENT_FAILED: 자동결제 실패로 중지
   /// - EXPIRED: 구독 기간 만료
   status          String    @default("ACTIVE") @db.VarChar(20)
-
   /// 구독 시작일
   startDate       DateTime  @map("start_date")
-
   /// 다음 결제일 (자동결제 예정일)
   nextBillingDate DateTime  @map("next_billing_date")
-
   /// 구독 종료일 (취소 시 설정)
   endDate         DateTime? @map("end_date")
-
   /// 결제 주기 (일 단위)
   /// 예: 30 (월 구독), 90 (3개월 구독), 365 (연 구독)
   billingCycle    Int       @default(30) @map("billing_cycle")
-
   /// 구독 가격 (매 결제 금액)
   price           Int
-
   /// 생성일시
   createdAt       DateTime  @default(now()) @map("created_at")
-
   /// 수정일시
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  /// 관계
-  user            User      @relation(fields: [userId], references: [id])
-  product         Product   @relation(fields: [productId], references: [id])
-
-  @@index([userId])
-  @@index([billingKey])
-  @@index([status])
-  @@index([nextBillingDate])
+  @@index([billingKey], map: "idx_subscriptions_billing_key")
+  @@index([nextBillingDate], map: "idx_subscriptions_next_billing_date")
+  @@index([status], map: "idx_subscriptions_status")
+  @@index([userId], map: "idx_subscriptions_user_id")
   @@map("subscriptions")
+}
+
+model datetime_tests {
+  id         Int      @id @default(autoincrement())
+  test_date  DateTime @db.Date
+  test_time  DateTime
+  memo       String?  @db.VarChar(200)
+  created_at DateTime @default(now())
+}
+
+model push_tokens {
+  id                 Int       @id @default(autoincrement())
+  user_id            Int
+  provider           String    @db.VarChar(20)
+  device_id          String?   @db.VarChar(255)
+  platform           String?   @db.VarChar(20)
+  device_model       String?   @db.VarChar(100)
+  os_version         String?   @db.VarChar(50)
+  app_version        String?   @db.VarChar(50)
+  is_active          Boolean   @default(true)
+  invalidated_at     DateTime?
+  invalid_reason     String?   @db.VarChar(100)
+  last_used_at       DateTime?
+  last_failed_at     DateTime?
+  failure_count      Int       @default(0)
+  success_count      Int       @default(0)
+  marketing_enabled  Boolean   @default(false)
+  night_push_enabled Boolean   @default(true)
+  user_agent         String?   @db.VarChar(500)
+  ip_address         String?   @db.VarChar(45)
+  timezone           String?   @default("Asia/Seoul") @db.VarChar(50)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime?
+  token              String    @db.VarChar(255)
+  metadata           Json?
+
+  @@unique([user_id, device_id, provider])
+  @@index([is_active])
+  @@index([platform])
+  @@index([provider])
+  @@index([token])
+  @@index([user_id])
+}
+
+model SupplementNutrient {
+  id           Int       @id @default(autoincrement())
+  productId    Int       @map("product_id")
+  nutrientName String    @map("nutrient_name") @db.VarChar(100)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime? @map("updated_at")
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, nutrientName])
+  @@index([nutrientName])
+  @@index([productId])
+  @@map("supplement_nutrients")
+}
+
+model UserChart {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  chartId     String   @unique @map("chart_id") @db.VarChar(50)
+  receiptDate DateTime @map("receipt_date")
+  resultYn    String   @map("result_yn") @db.VarChar(1)
+  orderCode   String   @map("order_code") @db.VarChar(20)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @map("updated_at")
+
+  @@index([chartId], map: "idx_user_charts_chart_id")
+  @@index([userId], map: "idx_user_charts_user_id")
+  @@map("user_charts")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model UserConsent {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @map("user_id")
+  agreeToTerms      Boolean   @map("agree_to_terms")
+  agreeToAge14      Boolean   @map("agree_to_age14")
+  agreeToPrivacy    Boolean   @map("agree_to_privacy")
+  agreeToThirdParty Boolean   @map("agree_to_third_party")
+  agreeToMarketing  Boolean   @map("agree_to_marketing")
+  agreedAt          DateTime  @map("agreed_at") @db.Timestamp(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime? @map("updated_at") @db.Timestamp(6)
+
+  @@index([userId], map: "idx_user_consents_user_id")
+  @@map("user_consents")
+}
+
+model UserSupplementRoutine {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  productId Int       @map("product_id")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+  product   Product   @relation("UserSupplementRoutineProduct", fields: [productId], references: [id], onDelete: Cascade)
+  user      User      @relation("UserSupplementRoutineUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("user_supplement_routine")
+}
+
+model UserSupplementRoutineHistory {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  productId Int      @map("product_id")
+  date      DateTime @db.Date
+  createdAt DateTime @default(now()) @map("created_at")
+  product   Product  @relation("UserSupplementRoutineHistoryProduct", fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation("UserSupplementRoutineHistoryUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, date])
+  @@index([userId, date])
+  @@map("user_supplement_routine_history")
+}
+
+/// AI 페르소나 성별 Enum
+enum Gender {
+  M
+  F
 }

@@ -396,6 +396,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 사용자 차트 테이블
   get userChart() { return this.prisma.userChart; }
 
+  // 영양제 루틴 테이블
+  get userSupplementRoutine() { return this.prisma.userSupplementRoutine; }
+  get userSupplementRoutineHistory() { return this.prisma.userSupplementRoutineHistory; }
+  get supplementNutrient() { return this.prisma.supplementNutrient; }
+
   // 메서드 바인딩
   $transaction(arg: any) {
     return (this.prisma as any).$transaction(arg);

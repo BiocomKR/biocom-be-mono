@@ -14,8 +14,6 @@ import {
   CreateFastingRecordDto,
   CreateSleepRecordDto,
   CreateActivityRecordDto,
-  CreateCustomSupplementDto,
-  CustomSupplementDto,
 } from '../dto/records/records.dto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -217,150 +215,69 @@ export class RecordsService {
   }
 
   /**
-   * 영양제 섭취 기록 저장 (새로운 구조)
-   * 복용시간 + 선택된 영양제 리스트 + 사진인증
+   * 영양제 섭취 기록 저장 (신규 - 루틴 기반)
    * @param userId 사용자 ID
    * @param dto 영양제 섭취 기록 데이터
    */
   async createSupplementRecord(userId: number, dto: CreateSupplementRecordDto) {
-    const targetDate = dto.date || getKoreanToday();
+    this.logger.log(`영양제 기록 시작 - 사용자: ${userId}, 날짜: ${dto.date}, 상품: ${dto.productId}, 회차: ${dto.count}`);
 
-    // 영양제 정보 검증 및 상세 정보 수집
-    const supplementDetails = await Promise.all(
-      dto.supplements.map(async (supplement) => {
-        if (supplement.type === 'PRODUCT' && supplement.productId) {
-          // 상품 테이블에서 영양제 정보 조회
-          const product = await this.prisma.product.findUnique({
-            where: { id: supplement.productId },
-            select: { id: true, name: true }
-          });
-
-          if (!product) {
-            throw new NotFoundException(`상품 ID ${supplement.productId}를 찾을 수 없습니다.`);
-          }
-
-          return {
-            ...supplement,
-            name: product.name, // 실제 상품명으로 업데이트
-          };
-        } else if (supplement.type === 'CUSTOM' && supplement.customSupplementId) {
-          // 커스텀 영양제 테이블에서 정보 조회
-          const customSupplement = await this.prisma.userCustomSupplement.findUnique({
-            where: {
-              id: supplement.customSupplementId,
-              userId: userId, // 본인의 커스텀 영양제만 조회 가능
-            },
-            select: { id: true, name: true, dosage: true }
-          });
-
-          if (!customSupplement) {
-            throw new NotFoundException(`커스텀 영양제 ID ${supplement.customSupplementId}를 찾을 수 없습니다.`);
-          }
-
-          return {
-            ...supplement,
-            name: customSupplement.name,
-            dosage: customSupplement.dosage || supplement.dosage,
-          };
-        }
-
-        return supplement;
-      })
-    );
-
-    return this.createRecord(userId, 'SUPPLEMENT', {
-      date: targetDate,
-      metadata: {
-        time: dto.time,
-        supplements: supplementDetails,
-        imageUrl: dto.imageUrl,
-        takenCount: supplementDetails.filter(s => s.taken).length,
-        totalCount: supplementDetails.length,
-      },
-    });
-  }
-
-  /**
-   * 사용자 커스텀 영양제 목록 조회
-   * @param userId 사용자 ID
-   */
-  async getCustomSupplements(userId: number): Promise<CustomSupplementDto[]> {
-    this.logger.log(`커스텀 영양제 목록 조회 - 사용자: ${userId}`);
-
-    const customSupplements = await this.prisma.userCustomSupplement.findMany({
+    // 1. 루틴에 등록된 영양제인지 검증
+    const routine = await this.prisma.userSupplementRoutine.findFirst({
       where: {
         userId,
-        isActive: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
+        productId: dto.productId,
       },
     });
 
-    return customSupplements.map(supplement => ({
-      id: supplement.id,
-      name: supplement.name,
-      dosage: supplement.dosage,
-      memo: supplement.memo,
-      createdAt: supplement.createdAt.toISOString(),
-    }));
-  }
+    if (!routine) {
+      throw new ForbiddenException('루틴에 등록되지 않은 영양제는 기록할 수 없습니다.');
+    }
 
-  /**
-   * 커스텀 영양제 생성
-   * @param userId 사용자 ID
-   * @param dto 커스텀 영양제 데이터
-   */
-  async createCustomSupplement(userId: number, dto: CreateCustomSupplementDto): Promise<CustomSupplementDto> {
-    this.logger.log(`커스텀 영양제 생성 - 사용자: ${userId}, 영양제명: ${dto.name}`);
+    // 2. 영양제 상품 정보 조회
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+      select: { id: true, name: true },
+    });
 
-    const customSupplement = await this.prisma.userCustomSupplement.create({
-      data: {
+    if (!product) {
+      throw new NotFoundException(`상품 ID ${dto.productId}를 찾을 수 없습니다.`);
+    }
+
+    // 3. 당일 SUPPLEMENT 기록 개수 확인 (최대 10회)
+    const todaySupplementCount = await this.prisma.userRecord.count({
+      where: {
         userId,
-        name: dto.name,
-        dosage: dto.dosage,
-        memo: dto.memo,
-        createdAt: getNowKST(),
+        recordType: 'SUPPLEMENT',
+        date: new Date(dto.date),
       },
     });
 
-    return {
-      id: customSupplement.id,
-      name: customSupplement.name,
-      dosage: customSupplement.dosage,
-      memo: customSupplement.memo,
-      createdAt: customSupplement.createdAt.toISOString(),
-    };
-  }
-
-  /**
-   * 커스텀 영양제 삭제 (비활성화)
-   * @param userId 사용자 ID
-   * @param supplementId 커스텀 영양제 ID
-   */
-  async deleteCustomSupplement(userId: number, supplementId: number): Promise<void> {
-    this.logger.log(`커스텀 영양제 삭제 - 사용자: ${userId}, 영양제 ID: ${supplementId}`);
-
-    const customSupplement = await this.prisma.userCustomSupplement.findUnique({
-      where: { id: supplementId },
-    });
-
-    if (!customSupplement) {
-      throw new NotFoundException('커스텀 영양제를 찾을 수 없습니다.');
+    if (todaySupplementCount >= 10) {
+      throw new BadRequestException('하루 최대 10회까지만 영양제를 기록할 수 있습니다.');
     }
 
-    if (customSupplement.userId !== userId) {
-      throw new ConflictException('본인의 커스텀 영양제만 삭제할 수 있습니다.');
+    // 4. 사진 필수 여부 체크
+    const hasTodayRecord = todaySupplementCount > 0;
+
+    if (!hasTodayRecord && !dto.imageUrl) {
+      throw new BadRequestException('당일 첫 영양제 기록 시 사진은 필수입니다.');
     }
 
-    await this.prisma.userCustomSupplement.update({
-      where: { id: supplementId },
-      data: { isActive: false },
+    // 5. 기록 저장
+    return this.createRecord(userId, 'SUPPLEMENT', {
+      date: dto.date,
+      metadata: {
+        productId: product.id,
+        productName: product.name,
+        count: dto.count,
+        imageUrl: dto.imageUrl || null,
+      },
     });
   }
 
   /**
-   * 영양제 목록 조회 (상품 + 커스텀)
+   * 영양제 목록 조회 (상품만)
    * @param userId 사용자 ID
    */
   async getSupplementList(userId: number) {
@@ -398,9 +315,6 @@ export class RecordsService {
       },
     });
 
-    // 사용자 커스텀 영양제 조회
-    const customSupplements = await this.getCustomSupplements(userId);
-
     return {
       success: true,
       data: {
@@ -411,13 +325,6 @@ export class RecordsService {
           description: product.description,
           imageUrl: product.images[0]?.imageUrl,
           nutrients: product.nutrients,
-        })),
-        customSupplements: customSupplements.map(supplement => ({
-          id: supplement.id,
-          type: 'CUSTOM',
-          name: supplement.name,
-          dosage: supplement.dosage,
-          memo: supplement.memo,
         })),
       },
     };
