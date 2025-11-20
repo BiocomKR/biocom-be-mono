@@ -2183,6 +2183,9 @@ model PushNotificationLog {
   /// 알림 클릭한 시간
   clickedAt DateTime? @map("clicked_at")
 
+  /// 테스트 발송 여부 (기본값: false)
+  isTest    Boolean   @default(false) @map("is_test")
+
   /// 관계
   user      User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
   pushToken PushToken?                   @relation(fields: [pushTokenId], references: [id], onDelete: SetNull)
@@ -2195,5 +2198,6 @@ model PushNotificationLog {
   @@index([type])
   @@index([success])
   @@index([sentAt])
+  @@index([isTest])
   @@map("push_notification_logs")
 }

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsBoolean } from 'class-validator';
 
 /**
  * 푸시 알림 전송 DTO
@@ -34,4 +34,12 @@ export class SendPushDto {
   @IsOptional()
   @IsObject()
   data?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: '테스트 발송 여부 (기본값: false)',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isTest?: boolean;
 }

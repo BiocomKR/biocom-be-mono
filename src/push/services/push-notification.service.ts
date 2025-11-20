@@ -31,9 +31,10 @@ export class PushNotificationService {
    *
    * @param userId - 유저 ID
    * @param message - 푸시 메시지
+   * @param isTest - 테스트 발송 여부 (기본값: false)
    * @returns 전송 결과
    */
-  async sendToUser(userId: number, message: PushMessage) {
+  async sendToUser(userId: number, message: PushMessage, isTest: boolean = false) {
     this.logger.log(
       `📤 [PushNotificationService] 유저에게 푸시 전송: userId=${userId}, title="${message.title}"`,
     );
@@ -77,6 +78,7 @@ export class PushNotificationService {
         pushToken,
         message,
         PushNotificationType.ETC,
+        isTest,
       );
 
       // 2-2. logId를 포함한 메시지 생성
@@ -132,15 +134,16 @@ export class PushNotificationService {
    *
    * @param userIds - 유저 ID 배열
    * @param message - 푸시 메시지
+   * @param isTest - 테스트 발송 여부 (기본값: false)
    * @returns 전송 결과
    */
-  async sendToUsers(userIds: number[], message: PushMessage) {
+  async sendToUsers(userIds: number[], message: PushMessage, isTest: boolean = false) {
     this.logger.log(
       `📤 [PushNotificationService] 다수 유저에게 푸시 전송: ${userIds.length}명, title="${message.title}"`,
     );
 
     const results = await Promise.all(
-      userIds.map((userId) => this.sendToUser(userId, message)),
+      userIds.map((userId) => this.sendToUser(userId, message, isTest)),
     );
 
     const totalSent = results.reduce((sum, r) => sum + r.sentCount, 0);
@@ -163,11 +166,13 @@ export class PushNotificationService {
    *
    * @param message - 푸시 메시지
    * @param filter - 선택적 필터 (예: 마케팅 동의 여부)
+   * @param isTest - 테스트 발송 여부 (기본값: false)
    * @returns 전송 결과
    */
   async sendToAll(
     message: PushMessage,
     filter?: { marketingEnabled?: boolean },
+    isTest: boolean = false,
   ) {
     this.logger.log(
       `📣 [PushNotificationService] 전체 푸시 전송: title="${message.title}"`,
@@ -209,6 +214,7 @@ export class PushNotificationService {
         pushToken,
         message,
         PushNotificationType.SYSTEM,
+        isTest,
       );
 
       const enrichedMessage: PushMessage = {
@@ -295,11 +301,11 @@ export class PushNotificationService {
    * @returns 푸시 로그 목록
    */
   async getPushLogs(query: PushLogQueryDto): Promise<PushLogListResponseDto> {
-    const { page = 1, limit = 100, userId, success, type, startDate, endDate } = query;
+    const { page = 1, limit = 100, userId, success, type, startDate, endDate, isTest } = query;
     const skip = (page - 1) * limit;
 
     this.logger.log(
-      `📋 [PushNotificationService] 푸시 로그 조회: page=${page}, limit=${limit}`,
+      `📋 [PushNotificationService] 푸시 로그 조회: page=${page}, limit=${limit}, isTest=${isTest}`,
     );
 
     // 필터 조건 구성
@@ -312,6 +318,10 @@ export class PushNotificationService {
     }
     if (type) {
       where.type = type;
+    }
+    // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
+    if (isTest !== undefined) {
+      where.isTest = isTest;
     }
 
     // 날짜 필터 추가
@@ -384,10 +394,11 @@ export class PushNotificationService {
    *
    * @param startDate - 시작 날짜 (YYYY-MM-DD)
    * @param endDate - 종료 날짜 (YYYY-MM-DD)
+   * @param isTest - 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
    * @returns 푸시 통계
    */
-  async getPushStats(startDate?: string, endDate?: string): Promise<PushStatsResponseDto> {
-    this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회`);
+  async getPushStats(startDate?: string, endDate?: string, isTest?: boolean): Promise<PushStatsResponseDto> {
+    this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회 (isTest=${isTest})`);
 
     // 날짜 필터 구성
     const dateFilter: any = {};
@@ -399,6 +410,11 @@ export class PushNotificationService {
       if (endDate) {
         dateFilter.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
       }
+    }
+
+    // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
+    if (isTest !== undefined) {
+      dateFilter.isTest = isTest;
     }
 
     // 1. 총 발송 건수
@@ -570,6 +586,7 @@ export class PushNotificationService {
     pushToken: any,
     message: PushMessage,
     type: PushNotificationType,
+    isTest: boolean = false,
   ): Promise<number | null> {
     try {
       const log = await this.prisma.pushNotificationLog.create({
@@ -582,6 +599,7 @@ export class PushNotificationService {
           data: message.data,
           success: true, // 기본값 true (실패 시 업데이트)
           sentAt: getNowKST(),
+          isTest, // 테스트 발송 여부
         },
       });
       return log.id;

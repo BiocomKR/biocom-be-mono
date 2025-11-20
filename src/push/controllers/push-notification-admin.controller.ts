@@ -7,7 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
+import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PushNotificationService } from '../services/push-notification.service';
 import { SendPushToUserDto } from '../dto/send-push-to-user.dto';
@@ -15,18 +15,18 @@ import { SendPushToUsersDto } from '../dto/send-push-to-users.dto';
 import { SendPushToAllDto } from '../dto/send-push-to-all.dto';
 import { PushLogQueryDto } from '../dto/push-log-query.dto';
 import { PushLogListResponseDto } from '../dto/push-log-response.dto';
-import { rateLimitConfig } from '../../common/config/throttler.config';
 
 /**
  * 푸시 알림 관리자 컨트롤러
  *
  * 관리자 전용 푸시 알림 전송 및 조회 API
- *
+ *                                                                                                
  * TODO: 관리자 권한 체크 추가 필요 (RolesGuard)
  */
 @ApiTags('푸시-관리자')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
+@SkipThrottle()
 @Controller('push/admin')
 export class PushNotificationAdminController {
   constructor(
@@ -40,7 +40,6 @@ export class PushNotificationAdminController {
    * @returns 전송 결과
    */
   @Post('send-to-user')
-  @Throttle({ short: { ttl: rateLimitConfig.pushBatch.ttl * 1000, limit: rateLimitConfig.pushBatch.limit } })
   @ApiOperation({
     summary: '특정 유저에게 푸시 전송 (관리자)',
     description: '지정한 유저의 모든 기기에 푸시를 전송합니다',
@@ -50,12 +49,16 @@ export class PushNotificationAdminController {
     description: '푸시 전송 성공',
   })
   async sendToUser(@Body() dto: SendPushToUserDto) {
-    const result = await this.pushNotificationService.sendToUser(dto.userId, {
-      title: dto.title,
-      body: dto.body,
-      imageUrl: dto.imageUrl,
-      data: dto.data,
-    });
+    const result = await this.pushNotificationService.sendToUser(
+      dto.userId,
+      {
+        title: dto.title,
+        body: dto.body,
+        imageUrl: dto.imageUrl,
+        data: dto.data,
+      },
+      dto.isTest ?? false,
+    );
 
     return {
       success: result.success,
@@ -74,7 +77,6 @@ export class PushNotificationAdminController {
    * @returns 전송 결과
    */
   @Post('send-to-users')
-  @Throttle({ short: { ttl: rateLimitConfig.pushBatch.ttl * 1000, limit: rateLimitConfig.pushBatch.limit } })
   @ApiOperation({
     summary: '여러 유저에게 푸시 전송 (관리자)',
     description: '지정한 여러 유저에게 푸시를 전송합니다',
@@ -92,6 +94,7 @@ export class PushNotificationAdminController {
         imageUrl: dto.imageUrl,
         data: dto.data,
       },
+      dto.isTest ?? false,
     );
 
     return {
@@ -111,7 +114,6 @@ export class PushNotificationAdminController {
    * @returns 전송 결과
    */
   @Post('send-to-all')
-  @Throttle({ short: { ttl: rateLimitConfig.pushBroadcast.ttl * 1000, limit: rateLimitConfig.pushBroadcast.limit } })
   @ApiOperation({
     summary: '전체 유저에게 푸시 전송 (관리자)',
     description: '모든 유저에게 푸시를 전송합니다 (공지사항 등)',
@@ -131,6 +133,7 @@ export class PushNotificationAdminController {
       {
         marketingEnabled: dto.marketingOnly,
       },
+      dto.isTest ?? false,
     );
 
     return {
@@ -184,7 +187,8 @@ export class PushNotificationAdminController {
   async getPushStats(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('isTest') isTest?: boolean,
   ) {
-    return await this.pushNotificationService.getPushStats(startDate, endDate);
+    return await this.pushNotificationService.getPushStats(startDate, endDate, isTest);
   }
 }

@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsInt, Min, Max, IsBoolean, IsString } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 /**
  * 푸시 로그 조회 쿼리 DTO
@@ -41,7 +41,11 @@ export class PushLogQueryDto {
    */
   @ApiPropertyOptional({ description: '성공 여부 필터', type: Boolean })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
   @IsBoolean()
   success?: boolean;
 
@@ -68,4 +72,17 @@ export class PushLogQueryDto {
   @IsOptional()
   @IsString()
   endDate?: string;
+
+  /**
+   * 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
+   */
+  @ApiPropertyOptional({ description: '테스트 발송 필터 (true: 테스트만, false: 실제 발송만, 생략: 전체)', type: Boolean })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  })
+  @IsBoolean()
+  isTest?: boolean;
 }

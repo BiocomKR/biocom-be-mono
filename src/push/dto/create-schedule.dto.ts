@@ -1,0 +1,114 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsIn, MaxLength, MinLength } from 'class-validator';
+
+/**
+ * 스케줄 생성 DTO
+ */
+export class CreateScheduleDto {
+  @ApiProperty({ description: '스케줄 이름', example: '매일 오전 9시 챌린지 알림' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  name: string;
+
+  @ApiPropertyOptional({ description: '스케줄 설명', example: '매일 오전 9시에 전체 유저에게 오늘의 챌린지 알림 발송' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @ApiProperty({
+    description: '스케줄 타입 (ONCE: 단발성, RECURRING: 반복)',
+    enum: ['ONCE', 'RECURRING'],
+    example: 'RECURRING'
+  })
+  @IsString()
+  @IsIn(['ONCE', 'RECURRING'])
+  scheduleType: string;
+
+  @ApiProperty({ description: '푸시 타입', example: 'REMIND' })
+  @IsString()
+  @MaxLength(50)
+  type: string;
+
+  @ApiProperty({
+    description: '카테고리',
+    enum: ['AUTO', 'MARKETING'],
+    example: 'AUTO'
+  })
+  @IsString()
+  @IsIn(['AUTO', 'MARKETING'])
+  category: string;
+
+  @ApiPropertyOptional({
+    description: '크론 표현식 (RECURRING 타입일 때 필수, 예: 0 9 * * *)',
+    example: '0 9 * * *'
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  cronExpression?: string;
+
+  @ApiPropertyOptional({
+    description: '단발성 예약 시간 (ONCE 타입일 때 필수, ISO 8601)',
+    example: '2025-01-25T09:00:00+09:00'
+  })
+  @IsOptional()
+  @IsDateString()
+  oneTimeScheduledAt?: string;
+
+  @ApiProperty({ description: '제목', example: '오늘의 챌린지를 확인하세요!' })
+  @IsString()
+  @MaxLength(100)
+  title: string;
+
+  @ApiProperty({
+    description: '본문 템플릿',
+    example: '새로운 챌린지가 등록되었습니다. 지금 바로 도전해보세요!'
+  })
+  @IsString()
+  bodyTemplate: string;
+
+  @ApiPropertyOptional({ description: '이미지 URL', example: 'https://example.com/image.png' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: '추가 데이터 (JSON)',
+    example: { screen: 'challenge', challengeId: 123 }
+  })
+  @IsOptional()
+  @IsObject()
+  data?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: '타겟팅 쿼리 조건 (JSON)',
+    example: { marketingEnabled: true }
+  })
+  @IsOptional()
+  @IsObject()
+  targetQuery?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: '반복 발송 시작일 (YYYY-MM-DD)',
+    example: '2025-01-20'
+  })
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional({
+    description: '반복 발송 종료일 (YYYY-MM-DD)',
+    example: '2025-12-31'
+  })
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ description: '활성화 여부', default: true })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}
