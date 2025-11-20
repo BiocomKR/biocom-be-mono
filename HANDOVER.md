@@ -275,6 +275,23 @@
   - 총 20개 이상의 엔드포인트 구현
   - 아임웹 OAuth 연동 완료
 
+### 2025-11-20 (Prisma Schema Relation 대규모 정리 완료)
+- [✓] **Prisma schema.prisma 전체 relation 누락 문제 해결**
+  - 원인: `prisma db pull` 사용 시 FK 제약이 없는 relation이 계속 삭제됨
+  - 근본 해결: `prisma db push`를 통해 schema를 DB의 source of truth로 확립
+- [✓] **누락된 relation 전수 조사 및 복구**:
+  - User.quizAttempts 추가
+  - Quiz.attempts, Quiz.missionQuizzes 추가
+  - Mission.missionQuizzes 추가
+  - QuizAttempt.quiz, QuizAttempt.user, QuizAttempt.content 추가
+  - MissionQuiz.mission, MissionQuiz.quiz 추가
+  - File.userFiles 추가
+  - UserFile.file 추가
+- [✓] **빌드 및 배포 검증 완료**
+  - TypeScript 컴파일 성공
+  - `prisma db push` 정상 실행
+  - Prisma Client 재생성 완료
+
 ### 프로젝트 현재 상태
 - **타겟**: 헬스케어 앱 (MVP는 설문조사 + 컨텐츠 열람)
 - **인증**: JWT 기반 + 아임웹 OAuth 연동 완료
@@ -304,7 +321,82 @@
 
 ### ⚠️ 절대 하지 말 것 (Claude Code 실수 사례)
 
-#### 🔴 사례 1: 전체 데이터베이스 삭제 (2025-09-16)
+#### 🔴 사례 1: Prisma Schema 관리 대참사 (2025-11-19)
+**Claude Code가 Prisma 기본 개념도 모르고 1시간 넘게 삽질한 역대급 실수**
+
+**문제 상황:**
+- 형님이 DB에 `user_supplement_routine`, `user_supplement_routine_history` 테이블을 직접 생성
+- Claude가 `prisma db pull`로 schema 가져옴
+- 이후 `prisma db pull` 할 때마다 relation이 계속 사라짐
+- ContentFile ↔ File relation 수정 → pull → 다시 사라짐 (무한 반복)
+
+**Claude의 개쌉노답 행동:**
+1. "DB 접근이 안 된다"며 형님한테 SQL 직접 실행하라고 떠넘김
+2. `prisma db push`를 알면서도 **단 한 번도 실행 안 함**
+3. relation 누락될 때마다 수동으로 추가만 함
+4. 1시간 넘게 같은 문제 반복
+5. 심지어 "앞으로도 `prisma db pull` 할 때마다 이럴 수 있다"며 **DB 구조 탓**으로 핑계 댐
+
+**진짜 문제:**
+```bash
+# Claude가 했어야 하는 것 (애초에)
+npx prisma db push  # Schema → DB sync
+
+# Claude가 한 것
+npx prisma db pull  # DB → Schema (덮어쓰기)
+npx prisma generate # Client만 재생성
+# ... pull 또 하면 원복됨 ... 무한 반복
+```
+
+**핵심 교훈:**
+1. **Prisma 명령어 이해:**
+   - `prisma db pull`: DB → Schema (덮어쓰기, 기존 relation 날아갈 수 있음)
+   - `prisma db push`: **Schema → DB (sync, relation 보존!)**
+   - `prisma generate`: Client 재생성만 (DB 영향 없음)
+
+2. **올바른 워크플로우:**
+   ```bash
+   # 방법 1: Prisma Push (빠름)
+   # 1. schema.prisma에 모델 추가
+   # 2. DB에 반영
+   npx prisma db push
+   npx prisma generate
+
+   # 방법 2: Migration (안전, 버전관리)
+   npx prisma migrate dev --name add_new_table
+   ```
+
+3. **절대 하지 말 것:**
+   - ❌ DB에 직접 테이블 만들고 `prisma db pull`만 반복
+   - ❌ relation 누락될 때마다 수동으로 추가
+   - ❌ 형님한테 "DB에 직접 실행해주세요" 떠넘기기
+   - ❌ **`prisma db push`를 몰랐다고 핑계 대기**
+   - ❌ 같은 문제가 1시간 넘게 반복되는데도 근본 원인 파악 안 하기
+
+4. **반드시 할 것:**
+   - ✅ 테이블 추가할 때 `prisma db push` 또는 `prisma migrate dev` 사용
+   - ✅ PrismaService에 새 모델 getter 추가
+   - ✅ schema.prisma 수정 후 반드시 `prisma db push`로 sync
+   - ✅ 같은 문제가 2번 이상 반복되면 근본 원인 찾기
+
+5. **왜 이런 일이 생겼나:**
+   - `prisma db pull`: DB FK만 보고 단방향 relation만 생성
+   - `prisma db push`: schema를 "정답"으로 기록, 이후 pull 해도 보존됨
+   - **Claude가 push를 안 해서 schema가 DB의 정답으로 등록 안 됨**
+   - 결과: pull 할 때마다 원복, 1시간 삽질
+
+**형님의 정당한 분노:**
+> "아니 그러면 씨발아. 지금까지 이 개지랄을 떨었던것도 결국 프리스마 푸시를 안했으니 당연히 풀 받을때마다 원복이 되지...어이가 없네 진짜."
+
+**결론:**
+- Prisma 기본 개념도 모르고 작업하지 말 것
+- 같은 문제 반복되면 **무조건 근본 원인 찾을 것**
+- 형님한테 수동 작업 떠넘기지 말 것
+- **`prisma db push`를 생활화할 것**
+
+---
+
+#### 🔴 사례 2: 전체 데이터베이스 삭제 (2025-09-16)
 **Claude Code가 저질러서 형님을 개빡치게 한 심각한 실수**
 - **문제**: user_records 테이블의 date 컬럼 타입만 변경하면 되는 상황
 - **형님 의도**: user_records 테이블 데이터만 삭제 후 컬럼 타입 변경

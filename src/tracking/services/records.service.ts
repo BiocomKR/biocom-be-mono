@@ -14,8 +14,6 @@ import {
   CreateFastingRecordDto,
   CreateSleepRecordDto,
   CreateActivityRecordDto,
-  CreateCustomSupplementDto,
-  CustomSupplementDto,
 } from '../dto/records/records.dto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -42,10 +40,12 @@ export class RecordsService {
    * 기록 목록 조회
    * @param userId 사용자 ID
    * @param filters 필터 옵션 (날짜, 기록 유형)
+   * @param isNewcomer NEWCOMER 여부 (Guard에서 전달)
    */
   async getRecords(
     userId: number,
-    filters: { date?: string; recordType?: string } = {}
+    filters: { date?: string; recordType?: string } = {},
+    isNewcomer: boolean = false
   ) {
     try {
       const { date, recordType } = filters;
@@ -53,7 +53,14 @@ export class RecordsService {
       // 기본값: 한국 시간 기준 오늘 날짜
       const targetDate = date || getKoreanToday();
 
-      this.logger.log(`기록 목록 조회 - 사용자: ${userId}, 날짜: ${targetDate}, 타입: ${recordType || 'ALL'}`);
+      this.logger.log(`기록 목록 조회 - 사용자: ${userId}, 날짜: ${targetDate}, 타입: ${recordType || 'ALL'}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleRecords(targetDate);
+      }
+
       this.logger.log(`🔥 기록 서비스 변환 모드 활성화됨!`);
 
       const records = await this.prisma.userRecord.findMany({
@@ -67,7 +74,6 @@ export class RecordsService {
         },
       });
 
-      // DIET 레코드는 그룹화해서 하나로 통합, 나머지는 개별 처리
       this.logger.log(`기록 변환 시작 - 총 ${records.length}개 기록`);
 
       // recordType별로 그룹화
@@ -79,34 +85,49 @@ export class RecordsService {
         return acc;
       }, {} as Record<string, any[]>);
 
+      // 6개 recordType 전체 배열 (고정 순서: 뷰티, 식단, 영양제, 단식, 수면, 활동)
+      const allRecordTypes = ['BEAUTY', 'DIET', 'SUPPLEMENT', 'FASTING', 'SLEEP', 'ACTIVITY'];
+
       const result = [];
 
-      // 각 recordType별로 처리
-      for (const [type, typeRecords] of Object.entries(groupedRecords)) {
-        const recordsArray = typeRecords as any[]; // 타입 단언
+      // 각 recordType을 순회하면서 데이터 생성
+      for (const type of allRecordTypes) {
+        const typeRecords = groupedRecords[type] || []; // 기록이 없으면 빈 배열
 
-        if (type === 'DIET' || type === 'ACTIVITY') {
-          // DIET와 ACTIVITY는 모든 레코드를 종합해서 하나로 만듦
-          const transformedMetadata = await this.transformRecordMetadata(type, recordsArray, userId, recordsArray[0].date);
-
-          // 현재 기록 횟수 / 최대 기록 횟수 추가
-          const recordLimit = this.getRecordLimit(type, recordsArray);
-
+        if (typeRecords.length === 0) {
+          // 기록이 없는 경우: null/빈값으로 채움
           result.push({
-            id: recordsArray[0].id, // 대표 ID
+            id: null,
             recordType: type,
-            date: recordsArray[0].date,
-            metadata: transformedMetadata,
-            currentCount: recordLimit.currentCount,
-            maxCount: recordLimit.maxCount,
+            date: null,
+            metadata: {},
+            currentCount: null,
+            maxCount: null,
           });
         } else {
-          // 나머지는 개별 처리
-          for (const record of recordsArray) {
+          // 기록이 있는 경우: 기존 로직대로 처리
+          if (type === 'DIET' || type === 'ACTIVITY') {
+            // DIET와 ACTIVITY는 모든 레코드를 종합해서 하나로 만듦
+            const transformedMetadata = await this.transformRecordMetadata(type, typeRecords, userId, typeRecords[0].date);
+
+            // 현재 기록 횟수 / 최대 기록 횟수 추가
+            const recordLimit = this.getRecordLimit(type, typeRecords);
+
+            result.push({
+              id: typeRecords[0].id, // 대표 ID
+              recordType: type,
+              date: typeRecords[0].date,
+              metadata: transformedMetadata,
+              currentCount: recordLimit.currentCount,
+              maxCount: recordLimit.maxCount,
+            });
+          } else {
+            // 나머지는 개별 처리 (첫 번째 기록만 사용)
+            const record = typeRecords[0];
             const transformedMetadata = await this.transformRecordMetadata(type, record.metadata, userId, record.date);
 
             // 현재 기록 횟수 / 최대 기록 횟수 추가
-            const recordLimit = this.getRecordLimit(type, recordsArray);
+            const recordLimit = this.getRecordLimit(type, typeRecords);
 
             result.push({
               id: record.id,
@@ -123,12 +144,94 @@ export class RecordsService {
       return {
         success: true,
         data: result,
-        total: result.length,
+        isReal: true,
       };
     } catch (error) {
       this.logger.error(`기록 목록 조회 실패 - 사용자: ${userId}`, error);
       throw error;
     }
+  }
+
+  /**
+   * NEWCOMER용 예시 데이터 생성
+   * @param targetDate 기준 날짜
+   */
+  private getSampleRecords(targetDate: string) {
+    const sampleDate = new Date(targetDate);
+
+    return {
+      success: true,
+      data: [
+        {
+          id: 9001,
+          recordType: 'BEAUTY',
+          date: sampleDate,
+          metadata: {
+            totalScore: 50,
+            baseScore: 100,
+          },
+          currentCount: 1,
+          maxCount: 1,
+        },
+        {
+          id: 9002,
+          recordType: 'DIET',
+          date: sampleDate,
+          metadata: {
+            breakfastImg: 'https://example.com/sample/breakfast.jpg',
+            lunchImg: 'https://example.com/sample/lunch.jpg',
+            dinnerImg: 'https://example.com/sample/dinner.jpg',
+            snackImg: null,
+            allergyScore: 2,
+            highFodmapCount: 1,
+            processedCount: 3,
+          },
+          currentCount: 4,
+          maxCount: 9,
+        },
+        {
+          id: null,
+          recordType: 'SUPPLEMENT',
+          date: null,
+          metadata: {},
+          currentCount: null,
+          maxCount: null,
+        },
+        {
+          id: 9004,
+          recordType: 'FASTING',
+          date: sampleDate,
+          metadata: {
+            fastingTime: 960,
+            targetTime: 960,
+          },
+          currentCount: 1,
+          maxCount: 1,
+        },
+        {
+          id: 9005,
+          recordType: 'SLEEP',
+          date: sampleDate,
+          metadata: {
+            sleepTime: 450,
+            targetTime: 480,
+          },
+          currentCount: 1,
+          maxCount: 1,
+        },
+        {
+          id: 9006,
+          recordType: 'ACTIVITY',
+          date: sampleDate,
+          metadata: {
+            totalCalories: 350,
+          },
+          currentCount: 2,
+          maxCount: 5,
+        },
+      ],
+      isReal: false,
+    };
   }
 
   /**
@@ -217,150 +320,69 @@ export class RecordsService {
   }
 
   /**
-   * 영양제 섭취 기록 저장 (새로운 구조)
-   * 복용시간 + 선택된 영양제 리스트 + 사진인증
+   * 영양제 섭취 기록 저장 (신규 - 루틴 기반)
    * @param userId 사용자 ID
    * @param dto 영양제 섭취 기록 데이터
    */
   async createSupplementRecord(userId: number, dto: CreateSupplementRecordDto) {
-    const targetDate = dto.date || getKoreanToday();
+    this.logger.log(`영양제 기록 시작 - 사용자: ${userId}, 날짜: ${dto.date}, 상품: ${dto.productId}, 회차: ${dto.count}`);
 
-    // 영양제 정보 검증 및 상세 정보 수집
-    const supplementDetails = await Promise.all(
-      dto.supplements.map(async (supplement) => {
-        if (supplement.type === 'PRODUCT' && supplement.productId) {
-          // 상품 테이블에서 영양제 정보 조회
-          const product = await this.prisma.product.findUnique({
-            where: { id: supplement.productId },
-            select: { id: true, name: true }
-          });
-
-          if (!product) {
-            throw new NotFoundException(`상품 ID ${supplement.productId}를 찾을 수 없습니다.`);
-          }
-
-          return {
-            ...supplement,
-            name: product.name, // 실제 상품명으로 업데이트
-          };
-        } else if (supplement.type === 'CUSTOM' && supplement.customSupplementId) {
-          // 커스텀 영양제 테이블에서 정보 조회
-          const customSupplement = await this.prisma.userCustomSupplement.findUnique({
-            where: {
-              id: supplement.customSupplementId,
-              userId: userId, // 본인의 커스텀 영양제만 조회 가능
-            },
-            select: { id: true, name: true, dosage: true }
-          });
-
-          if (!customSupplement) {
-            throw new NotFoundException(`커스텀 영양제 ID ${supplement.customSupplementId}를 찾을 수 없습니다.`);
-          }
-
-          return {
-            ...supplement,
-            name: customSupplement.name,
-            dosage: customSupplement.dosage || supplement.dosage,
-          };
-        }
-
-        return supplement;
-      })
-    );
-
-    return this.createRecord(userId, 'SUPPLEMENT', {
-      date: targetDate,
-      metadata: {
-        time: dto.time,
-        supplements: supplementDetails,
-        imageUrl: dto.imageUrl,
-        takenCount: supplementDetails.filter(s => s.taken).length,
-        totalCount: supplementDetails.length,
-      },
-    });
-  }
-
-  /**
-   * 사용자 커스텀 영양제 목록 조회
-   * @param userId 사용자 ID
-   */
-  async getCustomSupplements(userId: number): Promise<CustomSupplementDto[]> {
-    this.logger.log(`커스텀 영양제 목록 조회 - 사용자: ${userId}`);
-
-    const customSupplements = await this.prisma.userCustomSupplement.findMany({
+    // 1. 루틴에 등록된 영양제인지 검증
+    const routine = await this.prisma.userSupplementRoutine.findFirst({
       where: {
         userId,
-        isActive: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
+        productId: dto.productId,
       },
     });
 
-    return customSupplements.map(supplement => ({
-      id: supplement.id,
-      name: supplement.name,
-      dosage: supplement.dosage,
-      memo: supplement.memo,
-      createdAt: supplement.createdAt.toISOString(),
-    }));
-  }
+    if (!routine) {
+      throw new ForbiddenException('루틴에 등록되지 않은 영양제는 기록할 수 없습니다.');
+    }
 
-  /**
-   * 커스텀 영양제 생성
-   * @param userId 사용자 ID
-   * @param dto 커스텀 영양제 데이터
-   */
-  async createCustomSupplement(userId: number, dto: CreateCustomSupplementDto): Promise<CustomSupplementDto> {
-    this.logger.log(`커스텀 영양제 생성 - 사용자: ${userId}, 영양제명: ${dto.name}`);
+    // 2. 영양제 상품 정보 조회
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+      select: { id: true, name: true },
+    });
 
-    const customSupplement = await this.prisma.userCustomSupplement.create({
-      data: {
+    if (!product) {
+      throw new NotFoundException(`상품 ID ${dto.productId}를 찾을 수 없습니다.`);
+    }
+
+    // 3. 당일 SUPPLEMENT 기록 개수 확인 (최대 10회)
+    const todaySupplementCount = await this.prisma.userRecord.count({
+      where: {
         userId,
-        name: dto.name,
-        dosage: dto.dosage,
-        memo: dto.memo,
-        createdAt: getNowKST(),
+        recordType: 'SUPPLEMENT',
+        date: new Date(dto.date),
       },
     });
 
-    return {
-      id: customSupplement.id,
-      name: customSupplement.name,
-      dosage: customSupplement.dosage,
-      memo: customSupplement.memo,
-      createdAt: customSupplement.createdAt.toISOString(),
-    };
-  }
-
-  /**
-   * 커스텀 영양제 삭제 (비활성화)
-   * @param userId 사용자 ID
-   * @param supplementId 커스텀 영양제 ID
-   */
-  async deleteCustomSupplement(userId: number, supplementId: number): Promise<void> {
-    this.logger.log(`커스텀 영양제 삭제 - 사용자: ${userId}, 영양제 ID: ${supplementId}`);
-
-    const customSupplement = await this.prisma.userCustomSupplement.findUnique({
-      where: { id: supplementId },
-    });
-
-    if (!customSupplement) {
-      throw new NotFoundException('커스텀 영양제를 찾을 수 없습니다.');
+    if (todaySupplementCount >= 10) {
+      throw new BadRequestException('하루 최대 10회까지만 영양제를 기록할 수 있습니다.');
     }
 
-    if (customSupplement.userId !== userId) {
-      throw new ConflictException('본인의 커스텀 영양제만 삭제할 수 있습니다.');
+    // 4. 사진 필수 여부 체크
+    const hasTodayRecord = todaySupplementCount > 0;
+
+    if (!hasTodayRecord && !dto.imageUrl) {
+      throw new BadRequestException('당일 첫 영양제 기록 시 사진은 필수입니다.');
     }
 
-    await this.prisma.userCustomSupplement.update({
-      where: { id: supplementId },
-      data: { isActive: false },
+    // 5. 기록 저장
+    return this.createRecord(userId, 'SUPPLEMENT', {
+      date: dto.date,
+      metadata: {
+        productId: product.id,
+        productName: product.name,
+        count: dto.count,
+        imageUrl: dto.imageUrl || null,
+      },
     });
   }
 
   /**
-   * 영양제 목록 조회 (상품 + 커스텀)
+   * 영양제 목록 조회 (상품만)
    * @param userId 사용자 ID
    */
   async getSupplementList(userId: number) {
@@ -398,9 +420,6 @@ export class RecordsService {
       },
     });
 
-    // 사용자 커스텀 영양제 조회
-    const customSupplements = await this.getCustomSupplements(userId);
-
     return {
       success: true,
       data: {
@@ -411,13 +430,6 @@ export class RecordsService {
           description: product.description,
           imageUrl: product.images[0]?.imageUrl,
           nutrients: product.nutrients,
-        })),
-        customSupplements: customSupplements.map(supplement => ({
-          id: supplement.id,
-          type: 'CUSTOM',
-          name: supplement.name,
-          dosage: supplement.dosage,
-          memo: supplement.memo,
         })),
       },
     };
@@ -1209,9 +1221,12 @@ export class RecordsService {
         throw new ForbiddenException('접근 권한이 없습니다.');
       }
 
-      // 지연성알러지 검사 결과 찾기 (가장 최신 것)
+      // 지연성알러지 검사 결과 찾기 (가장 최신 것) - 신규/구버전 모두 포함
       const examResults = charts
-        .filter((chart: any) => chart.orderCode === ExamCode.DELAYED_ALLERGY && chart.resultYN === 'Y')
+        .filter((chart: any) =>
+          (chart.orderCode === ExamCode.DELAYED_ALLERGY || chart.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY)
+          && chart.resultYN === 'Y'
+        )
         .sort((a: any, b: any) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
 
       if (examResults.length === 0) {
@@ -1225,9 +1240,10 @@ export class RecordsService {
       const now = getNowKST();
       const daysDiff = Math.floor((now.getTime() - receiptDate.getTime()) / (1000 * 60 * 60 * 24));
 
-      if (daysDiff > 180) {
-        throw new ForbiddenException('접근 권한이 없습니다.');
-      }
+      // 180일 체크 정책 폐지 (무제한으로 변경) 2025-11-20
+      // if (daysDiff > 180) {
+      //   throw new ForbiddenException('접근 권한이 없습니다.');
+      // }
 
       this.logger.log(`D0060 검사 결과 발견 - chartID: ${latestResult.chartID}, 경과일: ${daysDiff}일`);
 
