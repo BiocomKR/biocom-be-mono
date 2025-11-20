@@ -27,16 +27,14 @@ export class FcmProvider implements IPushProvider {
   /**
    * 단일 FCM 토큰으로 푸시 발송
    *
-   * @param tokenData - FCM 토큰 데이터 { token: string }
+   * @param token - FCM 토큰 문자열
    * @param message - 발송할 메시지
    * @returns 발송 결과
    */
   async sendToToken(
-    tokenData: any,
+    token: string,
     message: PushMessage,
   ): Promise<PushSendResult> {
-    const { token } = tokenData;
-
     console.log('📤 [FCM] 단일 토큰 발송 시작:', {
       hasToken: !!token,
       title: message.title,
@@ -245,5 +243,120 @@ export class FcmProvider implements IPushProvider {
     // FCM 토큰 형식 기본 검증 (길이 체크)
     // 실제 유효성은 발송 시도 시 확인됨
     return token.length > 50;
+  }
+
+  /**
+   * FCM Topic 구독
+   *
+   * @param tokens - FCM 토큰 배열
+   * @param topic - 토픽 이름
+   * @returns 구독 성공 여부
+   */
+  async subscribeToTopic(tokens: string[], topic: string): Promise<boolean> {
+    console.log(`📌 [FCM] Topic 구독 시작: topic=${topic}, tokens=${tokens.length}개`);
+
+    try {
+      const response = await this.admin.messaging().subscribeToTopic(tokens, topic);
+
+      console.log(`✅ [FCM] Topic 구독 성공: ${response.successCount}/${tokens.length}`);
+
+      if (response.failureCount > 0) {
+        console.warn(`⚠️ [FCM] Topic 구독 실패: ${response.failureCount}개`, response.errors);
+      }
+
+      return response.successCount > 0;
+    } catch (error) {
+      console.error(`❌ [FCM] Topic 구독 실패:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * FCM Topic 구독 해제
+   *
+   * @param tokens - FCM 토큰 배열
+   * @param topic - 토픽 이름
+   * @returns 구독 해제 성공 여부
+   */
+  async unsubscribeFromTopic(tokens: string[], topic: string): Promise<boolean> {
+    console.log(`🔕 [FCM] Topic 구독 해제 시작: topic=${topic}, tokens=${tokens.length}개`);
+
+    try {
+      const response = await this.admin.messaging().unsubscribeFromTopic(tokens, topic);
+
+      console.log(`✅ [FCM] Topic 구독 해제 성공: ${response.successCount}/${tokens.length}`);
+
+      if (response.failureCount > 0) {
+        console.warn(`⚠️ [FCM] Topic 구독 해제 실패: ${response.failureCount}개`, response.errors);
+      }
+
+      return response.successCount > 0;
+    } catch (error) {
+      console.error(`❌ [FCM] Topic 구독 해제 실패:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * FCM Topic으로 푸시 발송
+   *
+   * @param topic - 토픽 이름
+   * @param message - 발송할 메시지
+   * @returns 발송 결과
+   */
+  async sendToTopic(topic: string, message: PushMessage): Promise<PushSendResult> {
+    console.log(`📣 [FCM] Topic 푸시 발송 시작: topic=${topic}, title=${message.title}`);
+
+    try {
+      const fcmMessage: admin.messaging.Message = {
+        topic,
+        notification: {
+          title: message.title,
+          body: message.body,
+          ...(message.imageUrl && { imageUrl: message.imageUrl }),
+        },
+        data: message.data
+          ? Object.entries(message.data).reduce(
+              (acc, [key, value]) => ({
+                ...acc,
+                [key]: String(value),
+              }),
+              {},
+            )
+          : undefined,
+        android: {
+          priority: 'high',
+          notification: {
+            sound: 'default',
+            channelId: 'default',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+            },
+          },
+        },
+      };
+
+      const messageId = await this.admin.messaging().send(fcmMessage);
+
+      console.log(`✅ [FCM] Topic 푸시 발송 성공: messageId=${messageId}`);
+
+      return {
+        success: true,
+        messageId,
+      };
+    } catch (error) {
+      console.error(`❌ [FCM] Topic 푸시 발송 실패:`, error);
+
+      return {
+        success: false,
+        errorCode: error.code || 'UNKNOWN_ERROR',
+        errorMessage: error.message,
+      };
+    }
   }
 }

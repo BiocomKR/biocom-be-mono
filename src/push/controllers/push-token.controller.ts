@@ -9,10 +9,12 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PushTokenService } from '../services/push-token.service';
 import { RegisterPushTokenDto } from '../dto/register-push-token.dto';
 import { PushTokenResponseDto } from '../dto/push-token-response.dto';
+import { rateLimitConfig } from '../../common/config/throttler.config';
 
 /**
  * 푸시 토큰 관리 컨트롤러
@@ -36,6 +38,7 @@ export class PushTokenController {
    * @returns 등록된 토큰 정보
    */
   @Post()
+  @Throttle({ short: { ttl: rateLimitConfig.pushTokenRegister.ttl * 1000, limit: rateLimitConfig.pushTokenRegister.limit } })
   @ApiOperation({
     summary: '푸시 토큰 등록/업데이트',
     description: '유저의 디바이스 FCM 토큰을 등록하거나 업데이트합니다',

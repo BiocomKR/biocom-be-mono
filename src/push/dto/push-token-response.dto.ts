@@ -55,4 +55,23 @@ export class PushTokenResponseDto {
     example: '2025-11-19T15:30:00.000Z',
   })
   updatedAt: Date;
+
+  @ApiProperty({
+    description: '마지막 사용 일시',
+    example: '2025-11-19T16:00:00.000Z',
+    required: false,
+  })
+  lastUsedAt?: Date | null;
+
+  @ApiProperty({
+    description: '성공 횟수',
+    example: 42,
+  })
+  successCount: number;
+
+  @ApiProperty({
+    description: '실패 횟수',
+    example: 2,
+  })
+  failureCount: number;
 }

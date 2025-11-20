@@ -1,28 +1,31 @@
 /**
- * 푸시 알림 타입
+ * 푸시 알림 타입 (비즈니스 관점 분류)
+ *
+ * 통계 및 분석을 위한 대분류 타입입니다.
+ * 세부 타입은 message.data 내에 별도로 저장하세요.
+ *
+ * @example
+ * // 챌린지 시작 알림
+ * type: PushNotificationType.REMIND
+ * data: { subType: 'CHALLENGE_START', challengeId: 123 }
+ *
+ * // 이벤트 마케팅 푸시
+ * type: PushNotificationType.MARKETING
+ * data: { subType: 'EVENT', eventId: 456 }
  */
 export enum PushNotificationType {
-  /** 수동 발송 (관리자가 직접 특정 유저에게) */
-  MANUAL = 'MANUAL',
+  /** 시스템 알림 (점검, 업데이트, 서비스 공지) */
+  SYSTEM = 'SYSTEM',
 
-  /** 전체 발송 (공지사항 등) */
-  BROADCAST = 'BROADCAST',
+  /** 리마인더 (챌린지, 미션, 활동 독려) */
+  REMIND = 'REMIND',
 
-  /** 자동 발송 (시스템 트리거) */
-  AUTO = 'AUTO',
-
-  /** 마케팅 */
+  /** 마케팅 (이벤트, 쿠폰, 프로모션) */
   MARKETING = 'MARKETING',
 
-  /** 챌린지 관련 */
-  CHALLENGE = 'CHALLENGE',
+  /** 거래 알림 (주문, 배송, 결제) */
+  TRANSACTIONAL = 'TRANSACTIONAL',
 
-  /** 미션 관련 */
-  MISSION = 'MISSION',
-
-  /** 알림 */
-  NOTIFICATION = 'NOTIFICATION',
-
-  /** 테스트 */
-  TEST = 'TEST',
+  /** 기타 */
+  ETC = 'ETC',
 }

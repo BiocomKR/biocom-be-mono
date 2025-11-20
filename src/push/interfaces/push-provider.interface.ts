@@ -74,7 +74,7 @@ export interface IPushProvider {
   /**
    * 단일 토큰으로 푸시 발송
    *
-   * @param tokenData - 서비스별 토큰 데이터 (FCM: {token}, OneSignal: {playerId, appId} 등)
+   * @param token - FCM 토큰 문자열
    * @param message - 발송할 메시지
    * @returns 발송 결과
    *
@@ -82,18 +82,12 @@ export interface IPushProvider {
    * ```typescript
    * // FCM
    * await provider.sendToToken(
-   *   { token: 'abc123...' },
-   *   { title: '주문 완료', body: '주문이 완료되었습니다' }
-   * );
-   *
-   * // OneSignal
-   * await provider.sendToToken(
-   *   { playerId: 'xyz', appId: 'app-123' },
+   *   'abc123...',
    *   { title: '주문 완료', body: '주문이 완료되었습니다' }
    * );
    * ```
    */
-  sendToToken(tokenData: any, message: PushMessage): Promise<PushSendResult>;
+  sendToToken(token: string, message: PushMessage): Promise<PushSendResult>;
 
   /**
    * 여러 토큰으로 배치 발송

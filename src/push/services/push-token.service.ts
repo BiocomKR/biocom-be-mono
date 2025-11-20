@@ -35,7 +35,39 @@ export class PushTokenService {
     );
 
     try {
-      // upsert: userId + deviceId + provider 조합으로 중복 체크
+      // 1. 동일한 토큰이 다른 deviceId에 등록되어 있는지 확인
+      const existingTokenWithSameValue = await this.prisma.pushToken.findFirst({
+        where: {
+          token,
+          provider: 'FCM',
+          isActive: true,
+          NOT: {
+            deviceId: deviceId || token,
+          },
+        },
+      });
+
+      if (existingTokenWithSameValue) {
+        this.logger.warn(
+          `⚠️ [PushTokenService] 동일 토큰이 다른 디바이스에 존재: tokenId=${existingTokenWithSameValue.id}, oldDeviceId=${existingTokenWithSameValue.deviceId}, newDeviceId=${deviceId || token}`,
+        );
+
+        // 기존 토큰을 비활성화 (토큰은 한 디바이스에만 유효)
+        await this.prisma.pushToken.update({
+          where: { id: existingTokenWithSameValue.id },
+          data: {
+            isActive: false,
+            invalidatedAt: new Date(),
+            invalidReason: 'TOKEN_REASSIGNED_TO_NEW_DEVICE',
+          },
+        });
+
+        this.logger.log(
+          `✅ [PushTokenService] 기존 토큰 비활성화 완료: tokenId=${existingTokenWithSameValue.id}`,
+        );
+      }
+
+      // 2. upsert: userId + deviceId + provider 조합으로 중복 체크
       this.logger.debug(
         `🔍 [PushTokenService] DB upsert 시작 (userId=${userId}, deviceId=${deviceId || token.substring(0, 10)}...)`,
       );
@@ -166,6 +198,9 @@ export class PushTokenService {
       isActive: token.isActive,
       createdAt: token.createdAt,
       updatedAt: token.updatedAt,
+      lastUsedAt: token.lastUsedAt,
+      successCount: token.successCount || 0,
+      failureCount: token.failureCount || 0,
     };
   }
 }

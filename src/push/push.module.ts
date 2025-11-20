@@ -4,9 +4,11 @@ import { FcmProvider } from './providers/fcm.provider';
 import { PushTestService } from './services/push-test.service';
 import { PushTokenService } from './services/push-token.service';
 import { PushNotificationService } from './services/push-notification.service';
+import { PushTopicService } from './services/push-topic.service';
 import { PushTestController } from './controllers/push-test.controller';
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
+import { PushTopicController } from './controllers/push-topic.controller';
 import { PrismaService } from '../common/services/prisma.service';
 
 /**
@@ -20,14 +22,22 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTestController,
     PushTokenController,
     PushNotificationController,
+    PushTopicController,
   ],
   providers: [
     FcmProvider,
     PushTestService,
     PushTokenService,
     PushNotificationService,
+    PushTopicService,
     PrismaService,
   ],
-  exports: [FcmProvider, PushTestService, PushTokenService, PushNotificationService],
+  exports: [
+    FcmProvider,
+    PushTestService,
+    PushTokenService,
+    PushNotificationService,
+    PushTopicService,
+  ],
 })
 export class PushModule {}

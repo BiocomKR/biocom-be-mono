@@ -6,6 +6,9 @@ import {
   PushSendResult,
 } from '../interfaces/push-provider.interface';
 import { PushNotificationType } from '../enums/push-notification-type.enum';
+import { PushLogQueryDto } from '../dto/push-log-query.dto';
+import { PushLogListResponseDto, PushLogResponseDto } from '../dto/push-log-response.dto';
+import { SendPushToTopicDto } from '../dto/send-push-to-topic.dto';
 
 /**
  * 푸시 알림 전송 서비스
@@ -57,22 +60,62 @@ export class PushNotificationService {
       `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
     );
 
-    // 2. FCM 토큰 추출
-    const fcmTokens = pushTokens.map((pt) => ({ token: pt.token }));
+    // 2. 각 토큰별로 로그 생성 후 전송
+    const results: PushSendResult[] = [];
+    let successCount = 0;
+    let failureCount = 0;
 
-    // 3. FCM 발송
-    const results = await this.fcmProvider.sendToMultiple(fcmTokens, message);
+    for (const pushToken of pushTokens) {
+      this.logger.debug(
+        `🔍 [PushNotificationService] 토큰 확인: tokenId=${pushToken.id}, token=${pushToken.token?.substring(0, 20)}..., deviceId=${pushToken.deviceId}`,
+      );
 
-    // 4. 결과 집계
-    const successCount = results.filter((r) => r.success).length;
-    const failureCount = results.length - successCount;
+      // 2-1. 로그 미리 생성 (success=true로 가정)
+      const logId = await this.createPendingLog(
+        pushToken,
+        message,
+        PushNotificationType.ETC,
+      );
+
+      // 2-2. logId를 포함한 메시지 생성
+      const enrichedMessage: PushMessage = {
+        ...message,
+        data: {
+          ...message.data,
+          logId: logId?.toString(),
+        },
+      };
+
+      // 2-3. FCM 전송
+      this.logger.debug(
+        `📤 [PushNotificationService] FCM 전송 시도: token=${pushToken.token ? '있음' : '없음'}`,
+      );
+      const result = await this.fcmProvider.sendToToken(
+        pushToken.token,
+        enrichedMessage,
+      );
+      results.push(result);
+
+      // 2-4. 로그 업데이트 (실패 시)
+      if (logId && !result.success) {
+        await this.updateLogWithFailure(logId, result);
+      }
+
+      // 2-5. PushToken 상태 업데이트
+      await this.updateTokenStats(pushToken.id, result.success);
+
+      // 2-6. 실패한 토큰 비활성화
+      if (this.shouldInvalidateToken(result)) {
+        await this.invalidateToken(pushToken, result.errorCode);
+      }
+
+      if (result.success) successCount++;
+      else failureCount++;
+    }
 
     this.logger.log(
-      `✅ [PushNotificationService] 전송 완료: 성공 ${successCount}/${results.length}`,
+      `✅ [PushNotificationService] 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
     );
-
-    // 5. 로그 저장 및 실패한 토큰 처리
-    await this.processResults(pushTokens, results, message, PushNotificationType.MANUAL);
 
     return {
       success: successCount > 0,
@@ -154,22 +197,49 @@ export class PushNotificationService {
       `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
     );
 
-    // FCM 토큰 추출
-    const fcmTokens = pushTokens.map((pt) => ({ token: pt.token }));
+    // 각 토큰별로 로그 생성 후 전송
+    const results: PushSendResult[] = [];
+    let successCount = 0;
+    let failureCount = 0;
 
-    // FCM 발송 (500개씩 자동 분할)
-    const results = await this.fcmProvider.sendToMultiple(fcmTokens, message);
+    for (const pushToken of pushTokens) {
+      const logId = await this.createPendingLog(
+        pushToken,
+        message,
+        PushNotificationType.SYSTEM,
+      );
 
-    // 결과 집계
-    const successCount = results.filter((r) => r.success).length;
-    const failureCount = results.length - successCount;
+      const enrichedMessage: PushMessage = {
+        ...message,
+        data: {
+          ...message.data,
+          logId: logId?.toString(),
+        },
+      };
+
+      const result = await this.fcmProvider.sendToToken(
+        pushToken.token,
+        enrichedMessage,
+      );
+      results.push(result);
+
+      if (logId && !result.success) {
+        await this.updateLogWithFailure(logId, result);
+      }
+
+      await this.updateTokenStats(pushToken.id, result.success);
+
+      if (this.shouldInvalidateToken(result)) {
+        await this.invalidateToken(pushToken, result.errorCode);
+      }
+
+      if (result.success) successCount++;
+      else failureCount++;
+    }
 
     this.logger.log(
-      `✅ [PushNotificationService] 전체 전송 완료: 성공 ${successCount}/${results.length}`,
+      `✅ [PushNotificationService] 전체 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
     );
-
-    // 로그 저장 및 실패한 토큰 처리
-    await this.processResults(pushTokens, results, message, PushNotificationType.BROADCAST);
 
     return {
       success: successCount > 0,
@@ -177,73 +247,6 @@ export class PushNotificationService {
       sentCount: successCount,
       failureCount,
     };
-  }
-
-  /**
-   * 푸시 전송 결과 처리 (로그 저장 + 실패 토큰 비활성화)
-   *
-   * @param pushTokens - 푸시 토큰 목록
-   * @param results - FCM 전송 결과
-   * @param message - 푸시 메시지
-   * @param type - 푸시 타입
-   * @private
-   */
-  private async processResults(
-    pushTokens: any[],
-    results: PushSendResult[],
-    message: PushMessage,
-    type: PushNotificationType,
-  ) {
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i];
-      const pushToken = pushTokens[i];
-
-      // 1. 푸시 전송 로그 저장
-      await this.savePushLog(pushToken, result, message, type);
-
-      // 2. 실패한 토큰 비활성화
-      if (this.shouldInvalidateToken(result)) {
-        await this.invalidateToken(pushToken, result.errorCode);
-      }
-    }
-  }
-
-  /**
-   * 푸시 전송 로그 저장
-   *
-   * @param pushToken - 푸시 토큰
-   * @param result - 전송 결과
-   * @param message - 푸시 메시지
-   * @param type - 푸시 타입
-   * @private
-   */
-  private async savePushLog(
-    pushToken: any,
-    result: PushSendResult,
-    message: PushMessage,
-    type: PushNotificationType,
-  ) {
-    try {
-      await this.prisma.pushNotificationLog.create({
-        data: {
-          userId: pushToken.userId,
-          pushTokenId: pushToken.id,
-          title: message.title,
-          body: message.body,
-          type: (message.data?.type as string) || type,
-          data: message.data,
-          success: result.success,
-          errorCode: result.errorCode,
-          errorMessage: result.errorMessage,
-          sentAt: new Date(),
-        },
-      });
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] 로그 저장 실패: ${error.message}`,
-      );
-      // 로그 저장 실패는 전체 프로세스를 중단하지 않음
-    }
   }
 
   /**
@@ -281,5 +284,286 @@ export class PushNotificationService {
         invalidReason: errorCode,
       },
     });
+  }
+
+  /**
+   * 푸시 로그 조회 (관리자용)
+   *
+   * @param query - 조회 조건 (페이지네이션, 필터)
+   * @returns 푸시 로그 목록
+   */
+  async getPushLogs(query: PushLogQueryDto): Promise<PushLogListResponseDto> {
+    const { page = 1, limit = 100, userId, success, type } = query;
+    const skip = (page - 1) * limit;
+
+    this.logger.log(
+      `📋 [PushNotificationService] 푸시 로그 조회: page=${page}, limit=${limit}`,
+    );
+
+    // 필터 조건 구성
+    const where: any = {};
+    if (userId !== undefined) {
+      where.userId = userId;
+    }
+    if (success !== undefined) {
+      where.success = success;
+    }
+    if (type) {
+      where.type = type;
+    }
+
+    // 전체 개수 조회
+    const total = await this.prisma.pushNotificationLog.count({ where });
+
+    // 로그 조회 (최신순)
+    const logs = await this.prisma.pushNotificationLog.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: {
+        sentAt: 'desc',
+      },
+    });
+
+    this.logger.log(
+      `✅ [PushNotificationService] 로그 조회 완료: ${logs.length}개 (전체: ${total}개)`,
+    );
+
+    return {
+      logs: logs.map((log) => this.mapToLogResponseDto(log)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * PushNotificationLog 엔티티를 ResponseDto로 변환
+   *
+   * @param log - Prisma PushNotificationLog 엔티티
+   * @returns PushLogResponseDto
+   * @private
+   */
+  private mapToLogResponseDto(log: any): PushLogResponseDto {
+    return {
+      id: log.id,
+      campaignId: log.campaignId,
+      userId: log.userId,
+      pushTokenId: log.pushTokenId,
+      title: log.title,
+      body: log.body,
+      type: log.type,
+      data: log.data,
+      success: log.success,
+      errorCode: log.errorCode,
+      errorMessage: log.errorMessage,
+      sentAt: log.sentAt,
+      readAt: log.readAt,
+      clickedAt: log.clickedAt,
+    };
+  }
+
+  /**
+   * 푸시 로그 상태 업데이트 (readAt 또는 clickedAt)
+   *
+   * @param userId - 유저 ID (권한 검증용)
+   * @param logId - 로그 ID
+   * @param status - 업데이트할 상태 (READ 또는 CLICKED)
+   * @returns 업데이트 결과
+   */
+  async updatePushLogStatus(
+    userId: number,
+    logId: number,
+    status: 'READ' | 'CLICKED',
+  ) {
+    this.logger.log(
+      `📝 [PushNotificationService] 푸시 로그 상태 업데이트: logId=${logId}, status=${status}`,
+    );
+
+    // 1. 로그 조회 및 권한 확인
+    const log = await this.prisma.pushNotificationLog.findFirst({
+      where: {
+        id: logId,
+        userId,
+      },
+    });
+
+    if (!log) {
+      this.logger.warn(
+        `⚠️ [PushNotificationService] 로그를 찾을 수 없거나 권한 없음: logId=${logId}, userId=${userId}`,
+      );
+      return {
+        success: false,
+        message: '푸시 알림을 찾을 수 없습니다',
+      };
+    }
+
+    // 2. 상태에 따라 업데이트
+    const updateData: any = {};
+    if (status === 'READ' && !log.readAt) {
+      updateData.readAt = new Date();
+    } else if (status === 'CLICKED' && !log.clickedAt) {
+      updateData.clickedAt = new Date();
+      // CLICKED는 READ를 포함하므로 readAt도 함께 설정
+      if (!log.readAt) {
+        updateData.readAt = new Date();
+      }
+    }
+
+    // 이미 업데이트된 경우
+    if (Object.keys(updateData).length === 0) {
+      this.logger.log(
+        `ℹ️ [PushNotificationService] 이미 업데이트됨: logId=${logId}, status=${status}`,
+      );
+      return {
+        success: true,
+        message: '이미 처리된 상태입니다',
+      };
+    }
+
+    // 3. 업데이트 실행
+    await this.prisma.pushNotificationLog.update({
+      where: { id: logId },
+      data: updateData,
+    });
+
+    this.logger.log(
+      `✅ [PushNotificationService] 푸시 로그 상태 업데이트 완료: logId=${logId}`,
+    );
+
+    return {
+      success: true,
+      message: '푸시 상태가 업데이트되었습니다',
+    };
+  }
+
+  /**
+   * 마케팅 푸시 전송 (래퍼 메서드)
+   *
+   * Topic 기반으로 마케팅 동의한 유저에게만 푸시 전송
+   * 향후 UserConsent.agreeToMarketing 필드 추가시 필터링 로직 보강 예정
+   *
+   * @param message - 마케팅 푸시 메시지
+   * @returns 전송 결과
+   */
+  async sendMarketingBroadcast(message: {
+    title: string;
+    body: string;
+    imageUrl?: string;
+    data?: Record<string, any>;
+  }) {
+    this.logger.log(
+      `📣 [PushNotificationService] 마케팅 푸시 전송: title="${message.title}"`,
+    );
+
+    // 마케팅 Topic으로 전송 (marketing Topic 구독자 = 마케팅 동의자)
+    const result = await this.fcmProvider.sendToTopic('marketing', {
+      title: message.title,
+      body: message.body,
+      imageUrl: message.imageUrl,
+      data: {
+        ...message.data,
+        subType: 'MARKETING_BROADCAST', // 세부 타입
+      },
+    });
+
+    this.logger.log(
+      `✅ [PushNotificationService] 마케팅 푸시 전송 완료: success=${result.success}`,
+    );
+
+    return {
+      success: result.success,
+      message: result.success
+        ? '마케팅 푸시가 전송되었습니다'
+        : '마케팅 푸시 전송에 실패했습니다',
+      messageId: result.messageId,
+      errorCode: result.errorCode,
+      errorMessage: result.errorMessage,
+    };
+  }
+
+  /**
+   * 푸시 로그 미리 생성 (전송 전)
+   *
+   * @param pushToken - 푸시 토큰
+   * @param message - 푸시 메시지
+   * @param type - 푸시 타입
+   * @returns 생성된 로그 ID (실패 시 null)
+   * @private
+   */
+  private async createPendingLog(
+    pushToken: any,
+    message: PushMessage,
+    type: PushNotificationType,
+  ): Promise<number | null> {
+    try {
+      const log = await this.prisma.pushNotificationLog.create({
+        data: {
+          userId: pushToken.userId,
+          pushTokenId: pushToken.id,
+          title: message.title,
+          body: message.body,
+          type,
+          data: message.data,
+          success: true, // 기본값 true (실패 시 업데이트)
+          sentAt: new Date(),
+        },
+      });
+      return log.id;
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 로그 생성 실패: ${error.message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * 푸시 로그를 실패로 업데이트
+   *
+   * @param logId - 로그 ID
+   * @param result - FCM 전송 결과
+   * @private
+   */
+  private async updateLogWithFailure(logId: number, result: PushSendResult) {
+    try {
+      await this.prisma.pushNotificationLog.update({
+        where: { id: logId },
+        data: {
+          success: false,
+          errorCode: result.errorCode,
+          errorMessage: result.errorMessage,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 로그 업데이트 실패: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * PushToken 상태 업데이트 (lastUsedAt, successCount, failureCount)
+   *
+   * @param tokenId - 토큰 ID
+   * @param success - 전송 성공 여부
+   * @private
+   */
+  private async updateTokenStats(tokenId: number, success: boolean) {
+    try {
+      await this.prisma.pushToken.update({
+        where: { id: tokenId },
+        data: {
+          lastUsedAt: new Date(),
+          successCount: success ? { increment: 1 } : undefined,
+          failureCount: success ? undefined : { increment: 1 },
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 토큰 상태 업데이트 실패: ${error.message}`,
+      );
+    }
   }
 }

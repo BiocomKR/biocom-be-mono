@@ -26,7 +26,7 @@ export class PushTestService {
     });
 
     const result = await this.fcmProvider.sendToToken(
-      { token },
+      token,
       { title, body },
     );
 
