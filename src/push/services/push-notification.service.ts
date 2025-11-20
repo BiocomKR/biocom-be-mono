@@ -9,6 +9,8 @@ import { PushNotificationType } from '../enums/push-notification-type.enum';
 import { PushLogQueryDto } from '../dto/push-log-query.dto';
 import { PushLogListResponseDto, PushLogResponseDto } from '../dto/push-log-response.dto';
 import { SendPushToTopicDto } from '../dto/send-push-to-topic.dto';
+import { PushStatsResponseDto } from '../dto/push-stats-response.dto';
+import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
 
 /**
  * 푸시 알림 전송 서비스
@@ -280,7 +282,7 @@ export class PushNotificationService {
       where: { id: pushToken.id },
       data: {
         isActive: false,
-        invalidatedAt: new Date(),
+        invalidatedAt: getNowKST(),
         invalidReason: errorCode,
       },
     });
@@ -293,7 +295,7 @@ export class PushNotificationService {
    * @returns 푸시 로그 목록
    */
   async getPushLogs(query: PushLogQueryDto): Promise<PushLogListResponseDto> {
-    const { page = 1, limit = 100, userId, success, type } = query;
+    const { page = 1, limit = 100, userId, success, type, startDate, endDate } = query;
     const skip = (page - 1) * limit;
 
     this.logger.log(
@@ -310,6 +312,17 @@ export class PushNotificationService {
     }
     if (type) {
       where.type = type;
+    }
+
+    // 날짜 필터 추가
+    if (startDate || endDate) {
+      where.sentAt = {};
+      if (startDate) {
+        where.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+      }
+      if (endDate) {
+        where.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
+      }
     }
 
     // 전체 개수 조회
@@ -365,6 +378,67 @@ export class PushNotificationService {
   }
 
   /**
+   * 푸시 통계 조회 (관리자용)
+   *
+   * 데이터베이스에서 집계된 통계를 반환합니다
+   *
+   * @param startDate - 시작 날짜 (YYYY-MM-DD)
+   * @param endDate - 종료 날짜 (YYYY-MM-DD)
+   * @returns 푸시 통계
+   */
+  async getPushStats(startDate?: string, endDate?: string): Promise<PushStatsResponseDto> {
+    this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회`);
+
+    // 날짜 필터 구성
+    const dateFilter: any = {};
+    if (startDate || endDate) {
+      dateFilter.sentAt = {};
+      if (startDate) {
+        dateFilter.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+      }
+      if (endDate) {
+        dateFilter.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
+      }
+    }
+
+    // 1. 총 발송 건수
+    const totalSent = await this.prisma.pushNotificationLog.count({
+      where: dateFilter,
+    });
+
+    // 2. 성공 건수
+    const successCount = await this.prisma.pushNotificationLog.count({
+      where: { success: true, ...dateFilter },
+    });
+
+    // 3. 실패 건수
+    const failureCount = await this.prisma.pushNotificationLog.count({
+      where: { success: false, ...dateFilter },
+    });
+
+    // 4. 읽음 건수 (readAt이 null이 아닌 경우)
+    const readCount = await this.prisma.pushNotificationLog.count({
+      where: {
+        readAt: {
+          not: null,
+        },
+        ...dateFilter,
+      },
+    });
+
+    this.logger.log(
+      `✅ [PushNotificationService] 통계 조회 완료: 총 ${totalSent}건, 성공 ${successCount}건, 실패 ${failureCount}건, 읽음 ${readCount}건`,
+    );
+
+    return {
+      totalSent,
+      successCount,
+      failureCount,
+      readCount,
+    };
+  }
+
+  /**
    * 푸시 로그 상태 업데이트 (readAt 또는 clickedAt)
    *
    * @param userId - 유저 ID (권한 검증용)
@@ -402,12 +476,12 @@ export class PushNotificationService {
     // 2. 상태에 따라 업데이트
     const updateData: any = {};
     if (status === 'READ' && !log.readAt) {
-      updateData.readAt = new Date();
+      updateData.readAt = getNowKST();
     } else if (status === 'CLICKED' && !log.clickedAt) {
-      updateData.clickedAt = new Date();
+      updateData.clickedAt = getNowKST();
       // CLICKED는 READ를 포함하므로 readAt도 함께 설정
       if (!log.readAt) {
-        updateData.readAt = new Date();
+        updateData.readAt = getNowKST();
       }
     }
 
@@ -507,7 +581,7 @@ export class PushNotificationService {
           type,
           data: message.data,
           success: true, // 기본값 true (실패 시 업데이트)
-          sentAt: new Date(),
+          sentAt: getNowKST(),
         },
       });
       return log.id;
@@ -555,7 +629,7 @@ export class PushNotificationService {
       await this.prisma.pushToken.update({
         where: { id: tokenId },
         data: {
-          lastUsedAt: new Date(),
+          lastUsedAt: getNowKST(),
           successCount: success ? { increment: 1 } : undefined,
           failureCount: success ? undefined : { increment: 1 },
         },

@@ -1,10 +1,8 @@
 import {
   Controller,
   Post,
-  Get,
   Patch,
   Body,
-  Query,
   UseGuards,
   Req,
 } from '@nestjs/common';
@@ -13,23 +11,19 @@ import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PushNotificationService } from '../services/push-notification.service';
 import { SendPushDto } from '../dto/send-push.dto';
-import { SendPushToUserDto } from '../dto/send-push-to-user.dto';
-import { SendPushToUsersDto } from '../dto/send-push-to-users.dto';
-import { SendPushToAllDto } from '../dto/send-push-to-all.dto';
-import { PushLogQueryDto } from '../dto/push-log-query.dto';
-import { PushLogListResponseDto } from '../dto/push-log-response.dto';
 import { UpdatePushLogStatusDto } from '../dto/update-push-log-status.dto';
 import { rateLimitConfig } from '../../common/config/throttler.config';
 
 /**
- * 푸시 알림 전송 컨트롤러
+ * 푸시 알림 유저 컨트롤러
  *
- * 푸시 알림 전송 API
+ * 일반 유저용 푸시 알림 API
+ * - 테스트 푸시 전송
+ * - 푸시 로그 상태 업데이트 (읽음/클릭)
  *
- * TODO: 푸시 알림 전송 UI 구현 필요
- * TODO: 관리자 권한 체크 추가 필요 (RolesGuard)
+ * 관리자용 API는 PushNotificationAdminController 참고
  */
-@ApiTags('푸시-알림전송')
+@ApiTags('푸시-유저')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('push/notifications')
@@ -73,139 +67,6 @@ export class PushNotificationController {
         failureCount: result.failureCount,
       },
     };
-  }
-
-  /**
-   * 특정 유저에게 푸시 전송 (관리자 전용)
-   *
-   * @param req - JWT 인증된 요청
-   * @param dto - 푸시 메시지 + 대상 유저 ID
-   * @returns 전송 결과
-   */
-  @Post('send-to-user')
-  @Throttle({ short: { ttl: rateLimitConfig.pushBatch.ttl * 1000, limit: rateLimitConfig.pushBatch.limit } })
-  @ApiOperation({
-    summary: '특정 유저에게 푸시 전송 (관리자)',
-    description: '지정한 유저의 모든 기기에 푸시를 전송합니다',
-  })
-  @ApiResponse({
-    status: 201,
-    description: '푸시 전송 성공',
-  })
-  async sendToUser(@Body() dto: SendPushToUserDto) {
-    const result = await this.pushNotificationService.sendToUser(dto.userId, {
-      title: dto.title,
-      body: dto.body,
-      imageUrl: dto.imageUrl,
-      data: dto.data,
-    });
-
-    return {
-      success: result.success,
-      message: result.message,
-      data: {
-        sentCount: result.sentCount,
-        failureCount: result.failureCount,
-      },
-    };
-  }
-
-  /**
-   * 여러 유저에게 푸시 전송 (관리자 전용)
-   *
-   * @param req - JWT 인증된 요청
-   * @param dto - 푸시 메시지 + 대상 유저 ID 배열
-   * @returns 전송 결과
-   */
-  @Post('send-to-users')
-  @Throttle({ short: { ttl: rateLimitConfig.pushBatch.ttl * 1000, limit: rateLimitConfig.pushBatch.limit } })
-  @ApiOperation({
-    summary: '여러 유저에게 푸시 전송 (관리자)',
-    description: '지정한 여러 유저에게 푸시를 전송합니다',
-  })
-  @ApiResponse({
-    status: 201,
-    description: '푸시 전송 성공',
-  })
-  async sendToUsers(@Body() dto: SendPushToUsersDto) {
-    const result = await this.pushNotificationService.sendToUsers(
-      dto.userIds,
-      {
-        title: dto.title,
-        body: dto.body,
-        imageUrl: dto.imageUrl,
-        data: dto.data,
-      },
-    );
-
-    return {
-      success: result.success,
-      message: result.message,
-      data: {
-        sentCount: result.sentCount,
-        failureCount: result.failureCount,
-      },
-    };
-  }
-
-  /**
-   * 전체 유저에게 푸시 전송 (관리자 전용)
-   *
-   * @param req - JWT 인증된 요청
-   * @param dto - 푸시 메시지 + 필터
-   * @returns 전송 결과
-   */
-  @Post('send-to-all')
-  @Throttle({ short: { ttl: rateLimitConfig.pushBroadcast.ttl * 1000, limit: rateLimitConfig.pushBroadcast.limit } })
-  @ApiOperation({
-    summary: '전체 유저에게 푸시 전송 (관리자)',
-    description: '모든 유저에게 푸시를 전송합니다 (공지사항 등)',
-  })
-  @ApiResponse({
-    status: 201,
-    description: '푸시 전송 성공',
-  })
-  async sendToAll(@Body() dto: SendPushToAllDto) {
-    const result = await this.pushNotificationService.sendToAll(
-      {
-        title: dto.title,
-        body: dto.body,
-        imageUrl: dto.imageUrl,
-        data: dto.data,
-      },
-      {
-        marketingEnabled: dto.marketingOnly,
-      },
-    );
-
-    return {
-      success: result.success,
-      message: result.message,
-      data: {
-        sentCount: result.sentCount,
-        failureCount: result.failureCount,
-      },
-    };
-  }
-
-  /**
-   * 푸시 로그 조회 (관리자 전용)
-   *
-   * @param query - 조회 조건 (페이지네이션, 필터)
-   * @returns 푸시 로그 목록
-   */
-  @Get('logs')
-  @ApiOperation({
-    summary: '푸시 로그 조회 (관리자)',
-    description: '푸시 알림 발송 로그를 조회합니다 (페이지네이션 지원)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: '로그 조회 성공',
-    type: PushLogListResponseDto,
-  })
-  async getPushLogs(@Query() query: PushLogQueryDto): Promise<PushLogListResponseDto> {
-    return await this.pushNotificationService.getPushLogs(query);
   }
 
   /**

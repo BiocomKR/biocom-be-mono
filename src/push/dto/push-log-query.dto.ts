@@ -52,4 +52,20 @@ export class PushLogQueryDto {
   @IsOptional()
   @IsString()
   type?: string;
+
+  /**
+   * 시작 날짜 필터 (YYYY-MM-DD)
+   */
+  @ApiPropertyOptional({ description: '시작 날짜 (YYYY-MM-DD)', type: String, example: '2025-01-01' })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  /**
+   * 종료 날짜 필터 (YYYY-MM-DD)
+   */
+  @ApiPropertyOptional({ description: '종료 날짜 (YYYY-MM-DD)', type: String, example: '2025-12-31' })
+  @IsOptional()
+  @IsString()
+  endDate?: string;
 }

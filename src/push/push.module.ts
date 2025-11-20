@@ -8,6 +8,7 @@ import { PushTopicService } from './services/push-topic.service';
 import { PushTestController } from './controllers/push-test.controller';
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
+import { PushNotificationAdminController } from './controllers/push-notification-admin.controller';
 import { PushTopicController } from './controllers/push-topic.controller';
 import { PrismaService } from '../common/services/prisma.service';
 
@@ -22,6 +23,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTestController,
     PushTokenController,
     PushNotificationController,
+    PushNotificationAdminController,
     PushTopicController,
   ],
   providers: [

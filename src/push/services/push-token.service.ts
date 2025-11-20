@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { RegisterPushTokenDto } from '../dto/register-push-token.dto';
 import { PushTokenResponseDto } from '../dto/push-token-response.dto';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 푸시 토큰 관리 서비스
@@ -57,7 +58,7 @@ export class PushTokenService {
           where: { id: existingTokenWithSameValue.id },
           data: {
             isActive: false,
-            invalidatedAt: new Date(),
+            invalidatedAt: getNowKST(),
             invalidReason: 'TOKEN_REASSIGNED_TO_NEW_DEVICE',
           },
         });
@@ -84,7 +85,7 @@ export class PushTokenService {
           token, // 토큰 업데이트
           platform,
           isActive: true,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
         create: {
           userId,
@@ -152,7 +153,7 @@ export class PushTokenService {
       },
       data: {
         isActive: false,
-        updatedAt: new Date(),
+        updatedAt: getNowKST(),
       },
     });
 
@@ -175,7 +176,7 @@ export class PushTokenService {
       },
       data: {
         isActive: false,
-        updatedAt: new Date(),
+        updatedAt: getNowKST(),
       },
     });
 
