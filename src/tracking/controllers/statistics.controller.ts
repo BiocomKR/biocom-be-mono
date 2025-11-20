@@ -43,12 +43,12 @@ export class StatisticsController {
 
   /**
    * 통계 목록 (요약) 조회
-   * @description 6가지 기록 유형의 1주일 요약 통계를 조회합니다
+   * @description 6가지 기록 유형의 1주일 요약 통계를 조회합니다. NEWCOMER는 예시 데이터 제공
    */
   @Get('summary')
   @ApiOperation({
     summary: '통계 목록 (요약) 조회',
-    description: '6가지 기록 유형(이너뷰티, 식단, 영양제, 간헐적단식, 수면, 활동)의 1주일 요약 통계를 조회합니다.',
+    description: '6가지 기록 유형(이너뷰티, 식단, 영양제, 간헐적단식, 수면, 활동)의 1주일 요약 통계를 조회합니다. NEWCOMER는 예시 데이터 제공',
   })
   @ApiQuery({
     name: 'startDate',
@@ -72,11 +72,16 @@ export class StatisticsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    const data = await this.statisticsService.getStatisticsSummary(req.user.id, startDate, endDate);
+    const data = await this.statisticsService.getStatisticsSummary(
+      req.user.id,
+      startDate,
+      endDate,
+      req.isNewcomer || false, // Guard에서 설정한 플래그 전달
+    );
     return {
       success: true,
       data,
-      message: '통계 목록 조회 성공',
+      isReal: req.isNewcomer ? false : true, // NEWCOMER는 false, 실제 사용자는 true
     };
   }
 

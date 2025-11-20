@@ -51,7 +51,7 @@ export class RecordsController {
   @Get()
   @ApiOperation({
     summary: '기록 목록 조회',
-    description: '사용자의 기록 목록을 날짜별로 조회합니다. 특정 날짜나 기록 유형으로 필터링 가능합니다.',
+    description: '사용자의 기록 목록을 날짜별로 조회합니다. 특정 날짜나 기록 유형으로 필터링 가능합니다. NEWCOMER는 예시 데이터 제공',
   })
   @ApiQuery({
     name: 'date',
@@ -73,7 +73,11 @@ export class RecordsController {
     @Query('date') date?: string,
     @Query('recordType') recordType?: string,
   ) {
-    return this.recordsService.getRecords(req.user.id, { date, recordType });
+    return this.recordsService.getRecords(
+      req.user.id,
+      { date, recordType },
+      req.isNewcomer || false, // Guard에서 설정한 플래그 전달
+    );
   }
 
   /**

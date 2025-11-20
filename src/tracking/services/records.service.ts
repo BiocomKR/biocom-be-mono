@@ -40,10 +40,12 @@ export class RecordsService {
    * 기록 목록 조회
    * @param userId 사용자 ID
    * @param filters 필터 옵션 (날짜, 기록 유형)
+   * @param isNewcomer NEWCOMER 여부 (Guard에서 전달)
    */
   async getRecords(
     userId: number,
-    filters: { date?: string; recordType?: string } = {}
+    filters: { date?: string; recordType?: string } = {},
+    isNewcomer: boolean = false
   ) {
     try {
       const { date, recordType } = filters;
@@ -51,7 +53,14 @@ export class RecordsService {
       // 기본값: 한국 시간 기준 오늘 날짜
       const targetDate = date || getKoreanToday();
 
-      this.logger.log(`기록 목록 조회 - 사용자: ${userId}, 날짜: ${targetDate}, 타입: ${recordType || 'ALL'}`);
+      this.logger.log(`기록 목록 조회 - 사용자: ${userId}, 날짜: ${targetDate}, 타입: ${recordType || 'ALL'}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleRecords(targetDate);
+      }
+
       this.logger.log(`🔥 기록 서비스 변환 모드 활성화됨!`);
 
       const records = await this.prisma.userRecord.findMany({
@@ -65,7 +74,6 @@ export class RecordsService {
         },
       });
 
-      // DIET 레코드는 그룹화해서 하나로 통합, 나머지는 개별 처리
       this.logger.log(`기록 변환 시작 - 총 ${records.length}개 기록`);
 
       // recordType별로 그룹화
@@ -77,34 +85,49 @@ export class RecordsService {
         return acc;
       }, {} as Record<string, any[]>);
 
+      // 6개 recordType 전체 배열 (고정 순서: 뷰티, 식단, 영양제, 단식, 수면, 활동)
+      const allRecordTypes = ['BEAUTY', 'DIET', 'SUPPLEMENT', 'FASTING', 'SLEEP', 'ACTIVITY'];
+
       const result = [];
 
-      // 각 recordType별로 처리
-      for (const [type, typeRecords] of Object.entries(groupedRecords)) {
-        const recordsArray = typeRecords as any[]; // 타입 단언
+      // 각 recordType을 순회하면서 데이터 생성
+      for (const type of allRecordTypes) {
+        const typeRecords = groupedRecords[type] || []; // 기록이 없으면 빈 배열
 
-        if (type === 'DIET' || type === 'ACTIVITY') {
-          // DIET와 ACTIVITY는 모든 레코드를 종합해서 하나로 만듦
-          const transformedMetadata = await this.transformRecordMetadata(type, recordsArray, userId, recordsArray[0].date);
-
-          // 현재 기록 횟수 / 최대 기록 횟수 추가
-          const recordLimit = this.getRecordLimit(type, recordsArray);
-
+        if (typeRecords.length === 0) {
+          // 기록이 없는 경우: null/빈값으로 채움
           result.push({
-            id: recordsArray[0].id, // 대표 ID
+            id: null,
             recordType: type,
-            date: recordsArray[0].date,
-            metadata: transformedMetadata,
-            currentCount: recordLimit.currentCount,
-            maxCount: recordLimit.maxCount,
+            date: null,
+            metadata: {},
+            currentCount: null,
+            maxCount: null,
           });
         } else {
-          // 나머지는 개별 처리
-          for (const record of recordsArray) {
+          // 기록이 있는 경우: 기존 로직대로 처리
+          if (type === 'DIET' || type === 'ACTIVITY') {
+            // DIET와 ACTIVITY는 모든 레코드를 종합해서 하나로 만듦
+            const transformedMetadata = await this.transformRecordMetadata(type, typeRecords, userId, typeRecords[0].date);
+
+            // 현재 기록 횟수 / 최대 기록 횟수 추가
+            const recordLimit = this.getRecordLimit(type, typeRecords);
+
+            result.push({
+              id: typeRecords[0].id, // 대표 ID
+              recordType: type,
+              date: typeRecords[0].date,
+              metadata: transformedMetadata,
+              currentCount: recordLimit.currentCount,
+              maxCount: recordLimit.maxCount,
+            });
+          } else {
+            // 나머지는 개별 처리 (첫 번째 기록만 사용)
+            const record = typeRecords[0];
             const transformedMetadata = await this.transformRecordMetadata(type, record.metadata, userId, record.date);
 
             // 현재 기록 횟수 / 최대 기록 횟수 추가
-            const recordLimit = this.getRecordLimit(type, recordsArray);
+            const recordLimit = this.getRecordLimit(type, typeRecords);
 
             result.push({
               id: record.id,
@@ -121,12 +144,94 @@ export class RecordsService {
       return {
         success: true,
         data: result,
-        total: result.length,
+        isReal: true,
       };
     } catch (error) {
       this.logger.error(`기록 목록 조회 실패 - 사용자: ${userId}`, error);
       throw error;
     }
+  }
+
+  /**
+   * NEWCOMER용 예시 데이터 생성
+   * @param targetDate 기준 날짜
+   */
+  private getSampleRecords(targetDate: string) {
+    const sampleDate = new Date(targetDate);
+
+    return {
+      success: true,
+      data: [
+        {
+          id: 9001,
+          recordType: 'BEAUTY',
+          date: sampleDate,
+          metadata: {
+            totalScore: 50,
+            baseScore: 100,
+          },
+          currentCount: 1,
+          maxCount: 1,
+        },
+        {
+          id: 9002,
+          recordType: 'DIET',
+          date: sampleDate,
+          metadata: {
+            breakfastImg: 'https://example.com/sample/breakfast.jpg',
+            lunchImg: 'https://example.com/sample/lunch.jpg',
+            dinnerImg: 'https://example.com/sample/dinner.jpg',
+            snackImg: null,
+            allergyScore: 2,
+            highFodmapCount: 1,
+            processedCount: 3,
+          },
+          currentCount: 4,
+          maxCount: 9,
+        },
+        {
+          id: null,
+          recordType: 'SUPPLEMENT',
+          date: null,
+          metadata: {},
+          currentCount: null,
+          maxCount: null,
+        },
+        {
+          id: 9004,
+          recordType: 'FASTING',
+          date: sampleDate,
+          metadata: {
+            fastingTime: 960,
+            targetTime: 960,
+          },
+          currentCount: 1,
+          maxCount: 1,
+        },
+        {
+          id: 9005,
+          recordType: 'SLEEP',
+          date: sampleDate,
+          metadata: {
+            sleepTime: 450,
+            targetTime: 480,
+          },
+          currentCount: 1,
+          maxCount: 1,
+        },
+        {
+          id: 9006,
+          recordType: 'ACTIVITY',
+          date: sampleDate,
+          metadata: {
+            totalCalories: 350,
+          },
+          currentCount: 2,
+          maxCount: 5,
+        },
+      ],
+      isReal: false,
+    };
   }
 
   /**
@@ -1116,9 +1221,12 @@ export class RecordsService {
         throw new ForbiddenException('접근 권한이 없습니다.');
       }
 
-      // 지연성알러지 검사 결과 찾기 (가장 최신 것)
+      // 지연성알러지 검사 결과 찾기 (가장 최신 것) - 신규/구버전 모두 포함
       const examResults = charts
-        .filter((chart: any) => chart.orderCode === ExamCode.DELAYED_ALLERGY && chart.resultYN === 'Y')
+        .filter((chart: any) =>
+          (chart.orderCode === ExamCode.DELAYED_ALLERGY || chart.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY)
+          && chart.resultYN === 'Y'
+        )
         .sort((a: any, b: any) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
 
       if (examResults.length === 0) {
@@ -1132,9 +1240,10 @@ export class RecordsService {
       const now = getNowKST();
       const daysDiff = Math.floor((now.getTime() - receiptDate.getTime()) / (1000 * 60 * 60 * 24));
 
-      if (daysDiff > 180) {
-        throw new ForbiddenException('접근 권한이 없습니다.');
-      }
+      // 180일 체크 정책 폐지 (무제한으로 변경) 2025-11-20
+      // if (daysDiff > 180) {
+      //   throw new ForbiddenException('접근 권한이 없습니다.');
+      // }
 
       this.logger.log(`D0060 검사 결과 발견 - chartID: ${latestResult.chartID}, 경과일: ${daysDiff}일`);
 

@@ -808,11 +808,20 @@ export class StatisticsService {
   /**
    * 통계 목록 (요약) 조회
    * @param userId 사용자 ID
+   * @param startDate 시작일
+   * @param endDate 종료일
+   * @param isNewcomer NEWCOMER 여부 (Guard에서 전달)
    */
-  async getStatisticsSummary(userId: number, startDate: string, endDate: string): Promise<StatisticsSummaryDto> {
+  async getStatisticsSummary(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<any> {
     try {
-      this.logger.log(`통계 목록 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
-      
+      this.logger.log(`통계 목록 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 통계 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleStatisticsSummary(startDate, endDate);
+      }
+
       // 각 통계 조회 (병렬 처리) - 완성된 5개 통계 API 응답을 그대로 묶어서 반환
       const [beauty, diet, fasting, sleep, activity] = await Promise.all([
         this.getBeautyStatistics(userId, startDate, endDate),
@@ -822,21 +831,371 @@ export class StatisticsService {
         this.getActivityStatistics(userId, startDate, endDate)
       ]);
 
+      // comment, totalComment 제거 처리
+      const cleanedBeauty = this.removeComments(beauty);
+      const cleanedDiet = this.removeComments(diet);
+      const cleanedFasting = this.removeComments(fasting);
+      const cleanedSleep = this.removeComments(sleep);
+      const cleanedActivity = this.removeComments(activity);
+
       this.logger.log(`통계 목록 조회 완료 - 사용자: ${userId}`);
 
       // 5개 통계 응답을 그대로 반환 (프론트엔드에서 알아서 처리)
       return {
         dateRange: { startDate, endDate },
-        beauty,
-        diet,
-        fasting,
-        sleep,
-        activity
+        beauty: cleanedBeauty,
+        diet: cleanedDiet,
+        supplement: { summary: {}, detailData: {} }, // 영양제 기획 미확정
+        fasting: cleanedFasting,
+        sleep: cleanedSleep,
+        activity: cleanedActivity
       };
     } catch (error) {
       this.logger.error(`통계 목록 조회 실패 - 사용자: ${userId}`, error);
       throw error;
     }
+  }
+
+  /**
+   * comment, totalComment 필드 제거 헬퍼
+   */
+  private removeComments(data: any): any {
+    const cleaned = JSON.parse(JSON.stringify(data)); // Deep copy
+
+    // summary.comment 제거
+    if (cleaned.summary && 'comment' in cleaned.summary) {
+      delete cleaned.summary.comment;
+    }
+
+    // detailData.totalComment 제거
+    if (cleaned.detailData && 'totalComment' in cleaned.detailData) {
+      delete cleaned.detailData.totalComment;
+    }
+
+    return cleaned;
+  }
+
+  /**
+   * NEWCOMER용 예시 통계 데이터 생성
+   */
+  private getSampleStatisticsSummary(startDate: string, endDate: string) {
+    const weekDates = this.generateWeekDates(startDate);
+
+    return {
+      dateRange: { startDate, endDate },
+      beauty: {
+        summary: {
+          score: 61,
+          weekScore: weekDates.map((date, i) => ({
+            date,
+            value: (75 - i * 5).toString()
+          }))
+        },
+        detailData: {
+          innerBeauty: {
+            score: 61,
+            weekScore: weekDates.map((date, i) => ({
+              date,
+              value: (80 - i * 5).toString()
+            })),
+            answer: [
+              { no: 1, score: 16 },
+              { no: 2, score: 13 },
+              { no: 3, score: 16 },
+              { no: 4, score: 17 }
+            ]
+          },
+          outerBeauty: {
+            score: 61,
+            weekScore: weekDates.map((date, i) => ({
+              date,
+              value: (70 - i * 5).toString()
+            })),
+            answer: [
+              { no: 1, score: 14 },
+              { no: 2, score: 16 },
+              { no: 3, score: 12 },
+              { no: 4, score: 19 }
+            ]
+          }
+        }
+      },
+      diet: {
+        summary: {
+          score: 64
+        },
+        detailData: {
+          allergyFoods: {
+            score: 13,
+            weekScore: [
+              { date: weekDates[0], value: "1" },
+              { date: weekDates[1], value: "1" },
+              { date: weekDates[2], value: "2" },
+              { date: weekDates[3], value: "2" },
+              { date: weekDates[4], value: "3" },
+              { date: weekDates[5], value: "1" },
+              { date: weekDates[6], value: "3" }
+            ]
+          },
+          highFodmapFoods: {
+            score: 22,
+            weekScore: [
+              { date: weekDates[0], value: "2" },
+              { date: weekDates[1], value: "2" },
+              { date: weekDates[2], value: "3" },
+              { date: weekDates[3], value: "3" },
+              { date: weekDates[4], value: "4" },
+              { date: weekDates[5], value: "5" },
+              { date: weekDates[6], value: "3" }
+            ]
+          },
+          processedFoods: {
+            score: 29,
+            weekScore: [
+              { date: weekDates[0], value: "1" },
+              { date: weekDates[1], value: "0" },
+              { date: weekDates[2], value: "4" },
+              { date: weekDates[3], value: "4" },
+              { date: weekDates[4], value: "4" },
+              { date: weekDates[5], value: "8" },
+              { date: weekDates[6], value: "8" }
+            ]
+          }
+        }
+      },
+      supplement: {
+        summary: {},
+        detailData: {}
+      },
+      fasting: {
+        summary: {
+          score: 16
+        },
+        detailData: {
+          score: 977,
+          targetHour: 16,
+          weekScore: [
+            {
+              date: weekDates[0],
+              startDateTime: `${this.getPreviousDate(weekDates[0])} 20:00:00`,
+              endDateTime: `${weekDates[0]} 12:00:00`,
+              value: "16",
+              targetHour: 16,
+              isCompleted: true
+            },
+            {
+              date: weekDates[1],
+              startDateTime: `${weekDates[0]} 19:00:00`,
+              endDateTime: `${weekDates[1]} 12:00:00`,
+              value: "17",
+              targetHour: 16,
+              isCompleted: true
+            },
+            {
+              date: weekDates[2],
+              startDateTime: `${weekDates[1]} 19:30:00`,
+              endDateTime: `${weekDates[2]} 09:00:00`,
+              value: "13.5",
+              targetHour: 16,
+              isCompleted: false
+            },
+            {
+              date: weekDates[3],
+              startDateTime: `${weekDates[2]} 18:00:00`,
+              endDateTime: `${weekDates[3]} 12:00:00`,
+              value: "18",
+              targetHour: 16,
+              isCompleted: true
+            },
+            {
+              date: weekDates[4],
+              startDateTime: `${weekDates[3]} 20:00:00`,
+              endDateTime: `${weekDates[4]} 12:00:00`,
+              value: "16",
+              targetHour: 16,
+              isCompleted: true
+            },
+            {
+              date: weekDates[5],
+              startDateTime: `${weekDates[4]} 18:30:00`,
+              endDateTime: `${weekDates[5]} 12:00:00`,
+              value: "17.5",
+              targetHour: 16,
+              isCompleted: true
+            },
+            {
+              date: weekDates[6],
+              startDateTime: `${weekDates[5]} 20:00:00`,
+              endDateTime: `${weekDates[6]} 12:00:00`,
+              value: "16",
+              targetHour: 16,
+              isCompleted: true
+            }
+          ]
+        }
+      },
+      sleep: {
+        summary: {
+          score: 8
+        },
+        detailData: {
+          score: 463,
+          targetHour: 8,
+          weekScore: [
+            {
+              date: weekDates[0],
+              bedDateTime: `${this.getPreviousDate(weekDates[0])} 23:30:00`,
+              wakeDateTime: `${weekDates[0]} 07:00:00`,
+              value: "7.5",
+              targetHour: 8,
+              isCompleted: false
+            },
+            {
+              date: weekDates[1],
+              bedDateTime: `${weekDates[0]} 23:00:00`,
+              wakeDateTime: `${weekDates[1]} 07:00:00`,
+              value: "8",
+              targetHour: 8,
+              isCompleted: true
+            },
+            {
+              date: weekDates[2],
+              bedDateTime: `${weekDates[2]} 00:30:00`,
+              wakeDateTime: `${weekDates[2]} 07:00:00`,
+              value: "6.5",
+              targetHour: 8,
+              isCompleted: false
+            },
+            {
+              date: weekDates[3],
+              bedDateTime: `${weekDates[3]} 00:00:00`,
+              wakeDateTime: `${weekDates[3]} 07:00:00`,
+              value: "7",
+              targetHour: 8,
+              isCompleted: false
+            },
+            {
+              date: weekDates[4],
+              bedDateTime: `${weekDates[3]} 22:30:00`,
+              wakeDateTime: `${weekDates[4]} 07:00:00`,
+              value: "8.5",
+              targetHour: 8,
+              isCompleted: true
+            },
+            {
+              date: weekDates[5],
+              bedDateTime: `${weekDates[4]} 23:30:00`,
+              wakeDateTime: `${weekDates[5]} 07:00:00`,
+              value: "7.5",
+              targetHour: 8,
+              isCompleted: false
+            },
+            {
+              date: weekDates[6],
+              bedDateTime: `${weekDates[5]} 22:00:00`,
+              wakeDateTime: `${weekDates[6]} 07:00:00`,
+              value: "9",
+              targetHour: 8,
+              isCompleted: true
+            }
+          ]
+        }
+      },
+      activity: {
+        summary: {
+          score: 1339
+        },
+        detailData: {
+          score: 1339,
+          complianceRate: 100,
+          weekScore: [
+            { date: weekDates[0], value: 500, hasRecord: true },
+            { date: weekDates[1], value: 1030, hasRecord: true },
+            { date: weekDates[2], value: 1235, hasRecord: true },
+            { date: weekDates[3], value: 1405, hasRecord: true },
+            { date: weekDates[4], value: 2200, hasRecord: true },
+            { date: weekDates[5], value: 1470, hasRecord: true },
+            { date: weekDates[6], value: 1530, hasRecord: true }
+          ],
+          weekActivity: [
+            {
+              date: weekDates[0],
+              dayOfWeek: "월",
+              activity: [
+                { code: "WALKING", name: "걷기", calorie_burned: "140" },
+                { code: "YOGA", name: "요가", calorie_burned: "210" },
+                { code: "PILATES", name: "필라테스", calorie_burned: "150" }
+              ]
+            },
+            {
+              date: weekDates[1],
+              dayOfWeek: "화",
+              activity: [
+                { code: "RUNNING", name: "달리기", calorie_burned: "400" },
+                { code: "WEIGHT_TRAINING", name: "웨이트 트레이닝", calorie_burned: "630" }
+              ]
+            },
+            {
+              date: weekDates[2],
+              dayOfWeek: "수",
+              activity: [
+                { code: "INDOOR_CYCLING", name: "실내 자전거", calorie_burned: "350" },
+                { code: "SWIMMING", name: "수영", calorie_burned: "600" },
+                { code: "WALKING", name: "걷기", calorie_burned: "105" },
+                { code: "JUMP_ROPE", name: "줄넘기", calorie_burned: "180" }
+              ]
+            },
+            {
+              date: weekDates[3],
+              dayOfWeek: "목",
+              activity: [
+                { code: "RUNNING", name: "달리기", calorie_burned: "300" },
+                { code: "BODYWEIGHT_EXERCISE", name: "맨몸 운동 / 홈트", calorie_burned: "320" },
+                { code: "WALKING", name: "걷기", calorie_burned: "70" },
+                { code: "OUTDOOR_CYCLING", name: "야외 자전거", calorie_burned: "540" },
+                { code: "YOGA", name: "요가", calorie_burned: "175" }
+              ]
+            },
+            {
+              date: weekDates[4],
+              dayOfWeek: "금",
+              activity: [
+                { code: "BOXING", name: "복싱", calorie_burned: "660" },
+                { code: "CLIMBING", name: "클라이밍", calorie_burned: "640" },
+                { code: "HIKING", name: "등산 / 하이킹", calorie_burned: "900" }
+              ]
+            },
+            {
+              date: weekDates[5],
+              dayOfWeek: "토",
+              activity: [
+                { code: "F45_CROSSFIT", name: "F45 / 크로스핏", calorie_burned: "660" },
+                { code: "TENNIS_SQUASH", name: "테니스 / 스쿼시", calorie_burned: "810" }
+              ]
+            },
+            {
+              date: weekDates[6],
+              dayOfWeek: "일",
+              activity: [
+                { code: "ZUMBA_GX", name: "줌바 / GX", calorie_burned: "400" },
+                { code: "GOLF", name: "골프", calorie_burned: "750" },
+                { code: "STAIR_CLIMBING", name: "계단 오르기", calorie_burned: "240" },
+                { code: "WALKING", name: "걷기", calorie_burned: "140" }
+              ]
+            }
+          ]
+        }
+      }
+    };
+  }
+
+  /**
+   * 이전 날짜 계산 헬퍼 함수
+   */
+  private getPreviousDate(dateString: string): string {
+    const date = new Date(dateString);
+    date.setDate(date.getDate() - 1);
+    return date.toISOString().split('T')[0];
   }
 
 }

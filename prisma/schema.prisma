@@ -1822,11 +1822,35 @@ model UserChart {
   resultYn    String   @map("result_yn") @db.VarChar(1)
   orderCode   String   @map("order_code") @db.VarChar(20)
   createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @map("updated_at")
+  updatedAt   DateTime? @map("updated_at")
 
   @@index([chartId], map: "idx_user_charts_chart_id")
   @@index([userId], map: "idx_user_charts_user_id")
   @@map("user_charts")
+}
+
+model PushNotificationLog {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  pushTokenId  Int?      @map("push_token_id")
+  title        String?   @db.VarChar(255)
+  body         String
+  imageUrl     String?   @map("image_url") @db.VarChar(500)
+  data         Json?
+  type         String?   @db.VarChar(50)
+  success      Boolean
+  messageId    String?   @map("message_id") @db.VarChar(255)
+  errorCode    String?   @map("error_code") @db.VarChar(100)
+  errorMessage String?   @map("error_message")
+  sentAt       DateTime? @map("sent_at") @db.Timestamp(3)
+  readAt       DateTime? @map("read_at") @db.Timestamp(3)
+  clickedAt    DateTime? @map("clicked_at") @db.Timestamp(3)
+  createdAt    DateTime? @map("created_at") @db.Timestamp(3)
+  campaignId   Int?      @map("campaign_id")
+  isTest       Boolean   @map("is_test")
+
+  @@index([userId], map: "idx_push_notification_logs_user_id")
+  @@map("push_notification_logs")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
