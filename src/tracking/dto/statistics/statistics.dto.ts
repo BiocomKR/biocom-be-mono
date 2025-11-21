@@ -53,7 +53,6 @@ export interface AnswerScore {
 export interface BeautySummary {
   score: number; // 주간 이너뷰티,아우터뷰티의 평균값의 합
   weekScore: DailyScore[]; // 지난7일의 일자별 이너뷰티,아우터뷰티의 평균값
-  comment: string; // 하드코딩 멘트
 }
 
 /**
@@ -80,7 +79,6 @@ export interface OuterBeautyDetail {
 export interface BeautyDetailData {
   innerBeauty: InnerBeautyDetail;
   outerBeauty: OuterBeautyDetail;
-  totalComment: string; // 하드코딩 멘트
 }
 
 /**
@@ -126,6 +124,12 @@ export class BeautyStatisticsDto {
     }
   })
   detailData: BeautyDetailData;
+
+  @ApiProperty({ description: '현재 기록 수', example: 5 })
+  currentCount: number;
+
+  @ApiProperty({ description: '최대 기록 수 (1일 1회)', example: 1 })
+  maxCount: number;
 }
 
 // ========================================  
@@ -169,12 +173,6 @@ export class DietDetailDataDto {
 
   @ApiProperty({ description: '가공식품 통계', type: DietCategoryScoreDto })
   processedFoods: DietCategoryScoreDto;
-
-  @ApiProperty({
-    description: '총합 코멘트',
-    example: '평균점수, 과민식품섭취횟수, 고포드맵섭취횟수를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
-  })
-  totalComment: string;
 }
 
 /**
@@ -183,12 +181,6 @@ export class DietDetailDataDto {
 export class DietSummaryDto {
   @ApiProperty({ description: '요약 점수', example: 15 })
   score: number;
-
-  @ApiProperty({
-    description: '요약 코멘트',
-    example: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
-  })
-  comment: string;
 }
 
 /**
@@ -200,6 +192,12 @@ export class DietStatisticsDto {
 
   @ApiProperty({ description: '상세 데이터', type: DietDetailDataDto })
   detailData: DietDetailDataDto;
+
+  @ApiProperty({ description: '현재 기록 수', example: 18 })
+  currentCount: number;
+
+  @ApiProperty({ description: '최대 기록 수 (1일 9회: 아침1+점심1+저녁1+간식3+야식3)', example: 9 })
+  maxCount: number;
 }
 
 // ========================================
@@ -238,12 +236,6 @@ export class SupplementSummaryDto {
     example: 71
   })
   score: number;
-
-  @ApiProperty({
-    description: '요약 코멘트',
-    example: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)준수율이 80%이면 80%에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
-  })
-  comment: string;
 }
 
 /**
@@ -270,6 +262,12 @@ export class SupplementStatisticsDto {
     type: SupplementSummaryDto
   })
   summary: SupplementSummaryDto;
+
+  @ApiProperty({ description: '현재 기록 수', example: 8 })
+  currentCount: number;
+
+  @ApiProperty({ description: '최대 기록 수 (무제한)', example: -1 })
+  maxCount: number;
 
   // TODO: 영양소 섭취율 분석 (영양소 정보 기록 시스템 구축 후 활성화)
   // @ApiProperty({
@@ -321,12 +319,6 @@ export class FastingDetailDataDto {
 
   @ApiProperty({ description: '주간 점수 배열', type: [FastingWeekScoreDto] })
   weekScore: FastingWeekScoreDto[];
-
-  @ApiProperty({
-    description: '총합 코멘트',
-    example: '평균단식시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
-  })
-  totalComment: string;
 }
 
 /**
@@ -335,12 +327,6 @@ export class FastingDetailDataDto {
 export class FastingSummaryDto {
   @ApiProperty({ description: '평균 단식시간', example: 10 })
   score: number;
-
-  @ApiProperty({
-    description: '요약 코멘트',
-    example: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
-  })
-  comment: string;
 }
 
 /**
@@ -352,6 +338,12 @@ export class FastingStatisticsDto {
 
   @ApiProperty({ description: '상세 데이터', type: FastingDetailDataDto })
   detailData: FastingDetailDataDto;
+
+  @ApiProperty({ description: '현재 기록 수', example: 5 })
+  currentCount: number;
+
+  @ApiProperty({ description: '최대 기록 수 (1일 1회)', example: 1 })
+  maxCount: number;
 }
 
 // ========================================
@@ -393,12 +385,6 @@ export class SleepDetailDataDto {
 
   @ApiProperty({ description: '주간 점수 배열', type: [SleepWeekScoreDto] })
   weekScore: SleepWeekScoreDto[];
-
-  @ApiProperty({
-    description: '총합 코멘트',
-    example: '평균수면시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
-  })
-  totalComment: string;
 }
 
 /**
@@ -407,12 +393,6 @@ export class SleepDetailDataDto {
 export class SleepSummaryDto {
   @ApiProperty({ description: '평균 수면시간', example: 10 })
   score: number;
-
-  @ApiProperty({
-    description: '요약 코멘트',
-    example: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
-  })
-  comment: string;
 }
 
 /**
@@ -424,6 +404,12 @@ export class SleepStatisticsDto {
 
   @ApiProperty({ description: '상세 데이터', type: SleepDetailDataDto })
   detailData: SleepDetailDataDto;
+
+  @ApiProperty({ description: '현재 기록 수', example: 6 })
+  currentCount: number;
+
+  @ApiProperty({ description: '최대 기록 수 (1일 1회)', example: 1 })
+  maxCount: number;
 }
 
 // ========================================
@@ -515,12 +501,6 @@ export class ActivityDetailData {
     type: [DailyActivity]
   })
   weekActivity: DailyActivity[];
-
-  @ApiProperty({
-    description: '총 평가 메시지',
-    example: '평균칼로리(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
-  })
-  totalComment: string;
 }
 
 /**
@@ -532,12 +512,6 @@ export class ActivitySummary {
     example: 483
   })
   score: number;
-
-  @ApiProperty({
-    description: '코멘트',
-    example: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
-  })
-  comment: string;
 }
 
 /**
@@ -555,6 +529,12 @@ export class ActivityStatisticsDto {
     type: ActivityDetailData
   })
   detailData: ActivityDetailData;
+
+  @ApiProperty({ description: '현재 기록 수', example: 12 })
+  currentCount: number;
+
+  @ApiProperty({ description: '최대 기록 수 (1일 5회)', example: 5 })
+  maxCount: number;
 }
 
 // ========================================

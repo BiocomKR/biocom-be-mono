@@ -9,10 +9,16 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiExtraModels,
 } from '@nestjs/swagger';
 import { HomeService } from './home.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { HomeResponseDto } from './dto/home.dto';
+import {
+  HomeResponseDto,
+  NewcomerHomeDataDto,
+  ChallengerHomeDataDto,
+  SubscriberHomeDataDto,
+} from './dto/home.dto';
 
 /**
  * 홈 화면 컨트롤러
@@ -27,6 +33,7 @@ import { HomeResponseDto } from './dto/home.dto';
 @Controller('home')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
+@ApiExtraModels(NewcomerHomeDataDto, ChallengerHomeDataDto, SubscriberHomeDataDto)
 export class HomeController {
   constructor(private readonly homeService: HomeService) {}
 

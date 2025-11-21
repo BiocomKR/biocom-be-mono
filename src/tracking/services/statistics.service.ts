@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { getDayOfWeek } from '../../common/utils/korea-date.util';
@@ -17,6 +19,7 @@ import {
   DailyActivity,
   ActivityDetail
 } from '../dto/statistics/statistics.dto';
+import { AiAgentStatisticsDto } from '../dto/statistics/ai-agent-statistics.dto';
 
 /**
  * 통계 서비스
@@ -31,6 +34,7 @@ export class StatisticsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly httpService: HttpService,
   ) {}
 
   /**
@@ -151,9 +155,15 @@ export class StatisticsService {
    * @param startDate 시작일 (YYYY-MM-DD)
    * @param endDate 종료일 (YYYY-MM-DD)
    */
-  async getBeautyStatistics(userId: number, startDate: string, endDate: string): Promise<BeautyStatisticsDto> {
+  async getBeautyStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<BeautyStatisticsDto> {
     try {
-      this.logger.log(`이너뷰티 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+      this.logger.log(`이너뷰티 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 이너뷰티 통계 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleBeautyStatistics(startDate, endDate);
+      }
 
       // 뷰티 기록 조회
       const currentWeekRecords = await this.prisma.userRecord.findMany({
@@ -175,12 +185,14 @@ export class StatisticsService {
 
       this.logger.log(`이너뷰티 통계 조회 완료 - 사용자: ${userId}, 종합점수: ${currentWeekAnalysis.summaryScore}`);
 
+      // 당일 기록 제한 정보 계산 (오늘 날짜 기준)
+      const recordLimit = await this.getTodayRecordLimit(userId, 'BEAUTY');
+
       // 형님이 정확히 요청한 데이터셋 구조
       return {
         summary: {
           score: currentWeekAnalysis.summaryScore,
-          weekScore: currentWeekAnalysis.summaryWeekScore,
-          comment: "평균점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다."
+          weekScore: currentWeekAnalysis.summaryWeekScore
         },
         detailData: {
           innerBeauty: {
@@ -192,9 +204,10 @@ export class StatisticsService {
             score: currentWeekAnalysis.outerScore,
             weekScore: currentWeekAnalysis.outerWeekScore,
             answer: currentWeekAnalysis.outerAnswers
-          },
-          totalComment: "평균점수, 이너뷰티점수, 아우터뷰티점수를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다."
-        }
+          }
+        },
+        currentCount: recordLimit.currentCount,
+        maxCount: recordLimit.maxCount
       };
     } catch (error) {
       this.logger.error(`이너뷰티 통계 조회 실패 - 사용자: ${userId}`, error);
@@ -316,9 +329,15 @@ export class StatisticsService {
    * 식단 통계 조회 (새로운 구조)
    * @param userId 사용자 ID
    */
-  async getDietStatistics(userId: number, startDate: string, endDate: string): Promise<DietStatisticsDto> {
+  async getDietStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<DietStatisticsDto> {
     try {
-      this.logger.log(`식단 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+      this.logger.log(`식단 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 식단 통계 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleDietStatistics(startDate, endDate);
+      }
 
       // 식단 기록 조회
       const dietRecords = await this.prisma.userRecord.findMany({
@@ -377,11 +396,13 @@ export class StatisticsService {
 
       this.logger.log(`식단 통계 조회 완료 - 사용자: ${userId}, 요약점수: ${summaryScore}`);
 
+      // 당일 기록 제한 정보 계산 (오늘 날짜 기준)
+      const recordLimit = await this.getTodayRecordLimit(userId, 'DIET');
+
       // 형님이 정확히 요청한 데이터셋 구조
       return {
         summary: {
-          score: summaryScore,
-          comment: "점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다."
+          score: summaryScore
         },
         detailData: {
           allergyFoods: {
@@ -395,9 +416,10 @@ export class StatisticsService {
           processedFoods: {
             score: totalProcessedCount,
             weekScore: processedWeekScore
-          },
-          totalComment: "평균점수, 과민식품섭취횟수, 고포드맵섭취횟수를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다."
-        }
+          }
+        },
+        currentCount: recordLimit.currentCount,
+        maxCount: recordLimit.maxCount
       };
     } catch (error) {
       this.logger.error(`식단 통계 조회 실패 - 사용자: ${userId}`, error);
@@ -413,10 +435,16 @@ export class StatisticsService {
    * 영양제 통계 조회
    * @param userId 사용자 ID
    */
-  async getSupplementStatistics(userId: number): Promise<SupplementStatisticsDto> {
+  async getSupplementStatistics(userId: number, isNewcomer: boolean = false): Promise<SupplementStatisticsDto> {
     try {
-      this.logger.log(`영양제 통계 조회 시작 - 사용자: ${userId}`);
-      
+      this.logger.log(`영양제 통계 조회 시작 - 사용자: ${userId}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 영양제 통계 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleSupplementStatistics();
+      }
+
       const { startDate, endDate } = this.getWeekDateRange();
 
       // 1주일간 영양제 기록 조회
@@ -481,12 +509,16 @@ export class StatisticsService {
 
       this.logger.log(`영양제 통계 조회 완료 - 사용자: ${userId}, 준수율: ${complianceRate}%`);
 
+      // 당일 기록 제한 정보 계산 (오늘 날짜 기준)
+      const recordLimit = await this.getTodayRecordLimit(userId, 'SUPPLEMENT');
+
       return {
         weeklySupplements,
         summary: {
-          score: complianceRate,
-          comment: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)준수율이 80%이면 80%에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
-        }
+          score: complianceRate
+        },
+        currentCount: recordLimit.currentCount,
+        maxCount: recordLimit.maxCount
         // TODO: nutritionAnalysis 영양소 정보 기록 시스템 구축 후 활성화
       };
     } catch (error) {
@@ -503,9 +535,15 @@ export class StatisticsService {
    * 간헐적단식 통계 조회 (형님 데이터셋 기준)
    * @param userId 사용자 ID
    */
-  async getFastingStatistics(userId: number, startDate: string, endDate: string): Promise<FastingStatisticsDto> {
+  async getFastingStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<FastingStatisticsDto> {
     try {
-      this.logger.log(`간헐적단식 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+      this.logger.log(`간헐적단식 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 간헐적단식 통계 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleFastingStatistics(startDate, endDate);
+      }
 
       // 간헐적단식 기록 조회 (FASTING)
       const fastingRecords = await this.prisma.userRecord.findMany({
@@ -570,22 +608,25 @@ export class StatisticsService {
       const averageMinutes = Math.round(averageHours * 60); // 1시간 = 60분
 
       const summary = {
-        score: averageScore,
-        comment: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
+        score: averageScore
       };
 
       const detailData = {
         score: averageMinutes,
         targetHour: 16,
-        weekScore,
-        totalComment: '평균단식시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
+        weekScore
       };
 
       this.logger.log(`간헐적단식 통계 조회 완료 - 사용자: ${userId}, 평균: ${averageScore}시간 (${averageMinutes}분)`);
 
+      // 당일 기록 제한 정보 계산 (오늘 날짜 기준)
+      const recordLimit = await this.getTodayRecordLimit(userId, 'FASTING');
+
       return {
         summary,
-        detailData
+        detailData,
+        currentCount: recordLimit.currentCount,
+        maxCount: recordLimit.maxCount
       };
 
     } catch (error) {
@@ -602,9 +643,15 @@ export class StatisticsService {
    * 수면 통계 조회 (형님 데이터셋 기준)
    * @param userId 사용자 ID
    */
-  async getSleepStatistics(userId: number, startDate: string, endDate: string): Promise<SleepStatisticsDto> {
+  async getSleepStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<SleepStatisticsDto> {
     try {
-      this.logger.log(`수면 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+      this.logger.log(`수면 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 수면 통계 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleSleepStatistics(startDate, endDate);
+      }
 
       // 수면 기록 조회 (SLEEP)
       const sleepRecords = await this.prisma.userRecord.findMany({
@@ -669,22 +716,25 @@ export class StatisticsService {
       const averageMinutes = Math.round(averageHours * 60); // 1시간 = 60분
 
       const summary = {
-        score: averageScore,
-        comment: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
+        score: averageScore
       };
 
       const detailData = {
         score: averageMinutes,
         targetHour: 8,
-        weekScore,
-        totalComment: '평균수면시간(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
+        weekScore
       };
 
       this.logger.log(`수면 통계 조회 완료 - 사용자: ${userId}, 평균: ${averageScore}시간 (${averageMinutes}분)`);
 
+      // 당일 기록 제한 정보 계산 (오늘 날짜 기준)
+      const recordLimit = await this.getTodayRecordLimit(userId, 'SLEEP');
+
       return {
         summary,
-        detailData
+        detailData,
+        currentCount: recordLimit.currentCount,
+        maxCount: recordLimit.maxCount
       };
 
     } catch (error) {
@@ -703,9 +753,15 @@ export class StatisticsService {
    * @param startDate 시작일 (YYYY-MM-DD)
    * @param endDate 종료일 (YYYY-MM-DD)
    */
-  async getActivityStatistics(userId: number, startDate: string, endDate: string): Promise<ActivityStatisticsDto> {
+  async getActivityStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<ActivityStatisticsDto> {
     try {
-      this.logger.log(`활동 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}`);
+      this.logger.log(`활동 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
+
+      // NEWCOMER는 예시 데이터 반환
+      if (isNewcomer) {
+        this.logger.log(`예시 활동 통계 데이터 생성 - 사용자: ${userId}`);
+        return this.getSampleActivityStatistics(startDate, endDate);
+      }
 
       // 기준 소모칼로리 (400kcal)
       const TARGET_CALORIES = 400;
@@ -782,18 +838,21 @@ export class StatisticsService {
 
       this.logger.log(`활동 통계 조회 완료 - 사용자: ${userId}, 총 칼로리: ${totalCalories}kcal, 평균 칼로리: ${weekAverageScore}kcal, 준수율: ${complianceRate}%`);
 
+      // 당일 기록 제한 정보 계산 (오늘 날짜 기준)
+      const recordLimit = await this.getTodayRecordLimit(userId, 'ACTIVITY');
+
       return {
         summary: {
-          score: weekAverageScore,
-          comment: '점수를 룰베이스에 대입해서 멘트 보여줌. ex)평균점수가50점이면 50점에 해당하는 메세지 노출. 일단 여긴 하드코딩한다.'
+          score: weekAverageScore
         },
         detailData: {
           score: weekAverageScore,
           complianceRate,
           weekScore,
-          weekActivity,
-          totalComment: '평균칼로리(점수)를 룰베이스에 대입해서 멘트 보여줌. 마찬가지로 일단 여긴 하드코딩한다.'
-        }
+          weekActivity
+        },
+        currentCount: recordLimit.currentCount,
+        maxCount: recordLimit.maxCount
       };
     } catch (error) {
       this.logger.error(`활동 통계 조회 실패 - 사용자: ${userId}`, error);
@@ -1196,6 +1255,441 @@ export class StatisticsService {
     const date = new Date(dateString);
     date.setDate(date.getDate() - 1);
     return date.toISOString().split('T')[0];
+  }
+
+  /**
+   * 당일 기록 제한 정보 조회 (통계용)
+   * @param userId 사용자 ID
+   * @param recordType 기록 타입
+   * @returns { currentCount, maxCount }
+   * @description 통계 API는 기간 데이터이므로 당일 기준으로 currentCount 계산
+   */
+  private async getTodayRecordLimit(userId: number, recordType: string): Promise<{ currentCount: number; maxCount: number }> {
+    // 오늘 날짜 (KST)
+    const today = getNowKST();
+    const todayStr = today.toISOString().split('T')[0];
+
+    // 오늘 날짜의 기록 개수 조회
+    const todayRecordCount = await this.prisma.userRecord.count({
+      where: {
+        userId,
+        recordType,
+        date: new Date(todayStr)
+      }
+    });
+
+    // 기록 타입별 최대 기록 수
+    let maxCount: number;
+    switch (recordType) {
+      case 'BEAUTY':
+        maxCount = 1;
+        break;
+      case 'DIET':
+        maxCount = 9; // 아침1+점심1+저녁1+간식3+야식3
+        break;
+      case 'SUPPLEMENT':
+        maxCount = -1; // 무제한
+        break;
+      case 'FASTING':
+        maxCount = 1;
+        break;
+      case 'SLEEP':
+        maxCount = 1;
+        break;
+      case 'ACTIVITY':
+        maxCount = 5;
+        break;
+      default:
+        maxCount = -1;
+    }
+
+    return {
+      currentCount: todayRecordCount,
+      maxCount
+    };
+  }
+
+  // ========================================
+  // 📊 NEWCOMER용 예시 통계 데이터 추출 헬퍼 함수들
+  // ========================================
+
+  /**
+   * NEWCOMER용 예시 이너뷰티 통계 데이터 (getSampleStatisticsSummary에서 추출)
+   */
+  private getSampleBeautyStatistics(startDate: string, endDate: string): BeautyStatisticsDto {
+    const sampleData = this.getSampleStatisticsSummary(startDate, endDate);
+    return {
+      ...sampleData.beauty,
+      currentCount: 0,
+      maxCount: 1
+    };
+  }
+
+  /**
+   * NEWCOMER용 예시 식단 통계 데이터 (getSampleStatisticsSummary에서 추출)
+   */
+  private getSampleDietStatistics(startDate: string, endDate: string): DietStatisticsDto {
+    const sampleData = this.getSampleStatisticsSummary(startDate, endDate);
+    return {
+      ...sampleData.diet,
+      currentCount: 0,
+      maxCount: 9
+    };
+  }
+
+  /**
+   * NEWCOMER용 예시 영양제 통계 데이터
+   */
+  private getSampleSupplementStatistics(): SupplementStatisticsDto {
+    const { startDate, endDate } = this.getWeekDateRange();
+    const weekDates = this.generateWeekDates(startDate);
+
+    return {
+      weeklySupplements: weekDates.map(date => ({
+        date,
+        supplements: [],
+        taken: 0
+      })),
+      summary: {
+        score: 0
+      },
+      currentCount: 0,
+      maxCount: -1
+    };
+  }
+
+  /**
+   * NEWCOMER용 예시 간헐적단식 통계 데이터 (getSampleStatisticsSummary에서 추출)
+   */
+  private getSampleFastingStatistics(startDate: string, endDate: string): FastingStatisticsDto {
+    const sampleData = this.getSampleStatisticsSummary(startDate, endDate);
+    return {
+      ...sampleData.fasting,
+      currentCount: 0,
+      maxCount: 1
+    };
+  }
+
+  /**
+   * NEWCOMER용 예시 수면 통계 데이터 (getSampleStatisticsSummary에서 추출)
+   */
+  private getSampleSleepStatistics(startDate: string, endDate: string): SleepStatisticsDto {
+    const sampleData = this.getSampleStatisticsSummary(startDate, endDate);
+    return {
+      ...sampleData.sleep,
+      currentCount: 0,
+      maxCount: 1
+    };
+  }
+
+  /**
+   * NEWCOMER용 예시 활동 통계 데이터 (getSampleStatisticsSummary에서 추출)
+   */
+  private getSampleActivityStatistics(startDate: string, endDate: string): ActivityStatisticsDto {
+    const sampleData = this.getSampleStatisticsSummary(startDate, endDate);
+    return {
+      ...sampleData.activity,
+      currentCount: 0,
+      maxCount: 5
+    };
+  }
+
+  // ========================================
+  // 🤖 AI Agent 통계 API
+  // ========================================
+
+  /**
+   * AI Agent용 통합 통계 데이터 조회
+   *
+   * @param chartId 결과지 ID (암호화된 토큰에서 복호화된 값)
+   * @returns AI Agent가 분석에 필요한 모든 데이터
+   *
+   * 처리 순서:
+   * 1. chartId로 userId 조회
+   * 2. 외부 API(getIggLevels)로 음식물과민증 검사 결과 조회
+   * 3. users 테이블에서 이름, 이너뷰티유형, AI코치유형, MBTI 조회
+   * 4. user_records 테이블에서 자기선언문, 칭찬하기, 1일1미션 조회
+   * 5. user_balance_game_histories 테이블에서 밸런스게임 이력 조회
+   * 6. 6대 기록 데이터 조회 (뷰티, 식단, 영양제, 간헐적단식, 수면, 활동)
+   */
+  async getAiAgentStatistics(chartId: string): Promise<AiAgentStatisticsDto> {
+    this.logger.log(`AI Agent 통계 조회 시작: chartId=${chartId}`);
+
+    try {
+      // 1. chartId로 userId 조회
+      const userChart = await this.prisma.userChart.findUnique({
+        where: { chartId }
+      });
+
+      if (!userChart) {
+        throw new Error(`chartId에 해당하는 사용자를 찾을 수 없습니다: ${chartId}`);
+      }
+
+      const userId = userChart.userId;
+      this.logger.log(`userId 조회 완료: ${userId}`);
+
+      // 2. 외부 API: 음식물과민증 검사 결과 조회
+      let iggLevels = [];
+      try {
+        const iggResponse = await firstValueFrom(
+          this.httpService.get(`https://sib.codns.com:3001/api/report/getIggLevels`, {
+            params: { chartId },
+            timeout: 10000 // 10초 타임아웃
+          })
+        );
+
+        if (iggResponse.data && Array.isArray(iggResponse.data)) {
+          iggLevels = iggResponse.data;
+        }
+
+        this.logger.log(`음식물과민증 검사 결과 조회 완료: ${iggLevels.length}건`);
+      } catch (error) {
+        this.logger.warn(`음식물과민증 검사 결과 조회 실패: ${error.message}`);
+        // 실패해도 계속 진행 (빈 배열)
+      }
+
+      // 3. users 테이블: 이름, 이너뷰티유형, AI코치유형, MBTI 조회
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          healthTypeAnimal: true, // 이너뷰티유형
+          aiPersona: true,        // AI코치유형
+        }
+      });
+
+      if (!user) {
+        throw new Error(`사용자를 찾을 수 없습니다: userId=${userId}`);
+      }
+
+      const 이름 = user.name || '없음';
+      const 이너뷰티유형 = user.healthTypeAnimal?.animalName || '없음';
+      const AI코치유형 = user.aiPersona?.name || '없음';
+      const MBTI = '없음'; // MBTI 필드는 아직 미구현
+
+      this.logger.log(`사용자 정보 조회 완료: ${이름}, ${이너뷰티유형}, ${AI코치유형}`);
+
+      // 4. user_records: 자기선언문, 칭찬하기, 1일1미션 조회
+      const records = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: { in: ['DECLARATION', 'SELF_PRAISE', 'DAILY_MISSION'] }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      let 자기선언문 = '없음';
+      let 칭찬하기 = '없음';
+      const missions: string[] = [];
+
+      for (const record of records) {
+        if (record.recordType === 'DECLARATION') {
+          자기선언문 = (record.metadata as any)?.contents || '없음';
+        } else if (record.recordType === 'SELF_PRAISE') {
+          칭찬하기 = (record.metadata as any)?.contents || '없음';
+        } else if (record.recordType === 'DAILY_MISSION') {
+          const mission = (record.metadata as any)?.missionTitle || (record.metadata as any)?.title;
+          if (mission) {
+            missions.push(mission);
+          }
+        }
+      }
+
+      this.logger.log(`미션 데이터 조회 완료: 자기선언문=${자기선언문 !== '없음'}, 칭찬하기=${칭찬하기 !== '없음'}, 미션=${missions.length}건`);
+
+      // 5. user_balance_game_histories: 밸런스게임 이력 조회
+      const balanceGameHistories = await this.prisma.userBalanceGameHistory.findMany({
+        where: { userId },
+        include: {
+          game: true // 밸런스게임 마스터 정보 포함
+        },
+        orderBy: { playDate: 'asc' }
+      });
+
+      // 밸런스게임 응답 생성 (step 1의 선택만 의미있음)
+      const 밸런스게임: Array<{
+        title: string;
+        description: string;
+        option: string;
+        keyword: string;
+        linkedProduct: string;
+        createdAt: string;
+      }> = [];
+
+      for (const history of balanceGameHistories) {
+        const options = history.selectedOptions as Array<{ step: number; option: number }>;
+        if (!Array.isArray(options) || options.length === 0) continue;
+
+        // step 1의 선택만 사용
+        const step1 = options.find(opt => opt.step === 1);
+        if (!step1) continue;
+
+        const game = history.game;
+        const selectedOption = step1.option; // 1 또는 2
+
+        // 선택한 옵션에 따라 텍스트/키워드/연결제품 추출
+        const optionText = selectedOption === 1 ? game.option1Text : game.option2Text;
+        const keyword = selectedOption === 1 ? game.option1Keyword : game.option2Keyword;
+        const linkedProduct = selectedOption === 1 ? game.option1LinkedProduct : game.option2LinkedProduct;
+
+        밸런스게임.push({
+          title: game.title,
+          description: game.description || '',
+          option: optionText || '',
+          keyword: keyword || '',
+          linkedProduct: linkedProduct || '',
+          createdAt: history.completedAt.toISOString()
+        });
+      }
+
+      this.logger.log(`밸런스게임 이력 조회 완료: ${밸런스게임.length}건`);
+
+      // 6. 6대 기록 데이터 조회
+      // 6-1. 뷰티 기록
+      const beautyRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'BEAUTY'
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      const 뷰티 = beautyRecords.map(record => {
+        const metadata = record.metadata as any || {};
+        const innerBeauty = metadata.innerBeauty || [];
+        const outerBeauty = metadata.outerBeauty || [];
+
+        const innerBeautyScore = innerBeauty.reduce((sum: number, item: any) => sum + (item.score || 0), 0);
+        const outerBeautyScore = outerBeauty.reduce((sum: number, item: any) => sum + (item.score || 0), 0);
+
+        return {
+          date: record.date.toISOString().split('T')[0],
+          totalScore: innerBeautyScore + outerBeautyScore,
+          innerBeautyScore,
+          outerBeautyScore,
+          innerBeauty: innerBeauty.map((item: any) => ({ no: item.no, score: item.score })),
+          outerBeauty: outerBeauty.map((item: any) => ({ no: item.no, score: item.score }))
+        };
+      });
+
+      // 6-2. 식단 기록
+      const dietRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'DIET'
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      const 식단 = dietRecords.map(record => {
+        const metadata = record.metadata as any || {};
+        return {
+          date: record.date.toISOString().split('T')[0],
+          diet: metadata.dietType || 'UNKNOWN',
+          foodName: metadata.foodName || null,
+          imageUrl: record.imageUrl || null,
+          isFasting: metadata.isFasting || false,
+          allergyFoods: metadata.allergyFoods || [],
+          allergyScore: metadata.allergyScore || 0,
+          processedCount: metadata.processedCount || 0,
+          processedFoods: metadata.processedFoods || [],
+          highFodmapCount: metadata.highFodmapCount || 0,
+          highFodmapFoods: metadata.highFodmapFoods || []
+        };
+      });
+
+      // 6-3. 영양제 기록 (현재는 "없음"으로 고정)
+      const 영양제 = '없음';
+
+      // 6-4. 간헐적단식 기록
+      const fastingRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'FASTING'
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      const 간헐적단식 = fastingRecords.map(record => {
+        const metadata = record.metadata as any || {};
+        return {
+          date: record.date.toISOString().split('T')[0],
+          startDateTime: metadata.startDateTime || '',
+          endDateTime: metadata.endDateTime || '',
+          fastingHours: metadata.fastingHours || 0
+        };
+      });
+
+      // 6-5. 수면 기록
+      const sleepRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'SLEEP'
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      const 수면 = sleepRecords.map(record => {
+        const metadata = record.metadata as any || {};
+        return {
+          date: record.date.toISOString().split('T')[0],
+          bedDateTime: metadata.bedDateTime || '',
+          wakeDateTime: metadata.wakeDateTime || '',
+          sleepHours: metadata.sleepHours || 0
+        };
+      });
+
+      // 6-6. 활동 기록
+      const activityRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'ACTIVITY'
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      const 활동 = activityRecords.map(record => {
+        const metadata = record.metadata as any || {};
+        return {
+          date: record.date.toISOString().split('T')[0],
+          imageUrl: record.imageUrl || null,
+          activityTime: metadata.activityTime || '00:00:00',
+          activityType: {
+            code: metadata.activityType?.code || 'UNKNOWN',
+            name: metadata.activityType?.name || '알 수 없음',
+            base_minutes: metadata.activityType?.base_minutes || 0,
+            calorie_rate: metadata.activityType?.calorie_rate || 0
+          },
+          totalDuration: metadata.totalDuration || 0,
+          durationInMinutes: metadata.durationInMinutes || 0,
+          estimatedCalories: metadata.estimatedCalories || 0
+        };
+      });
+
+      this.logger.log(`6대 기록 조회 완료: 뷰티=${뷰티.length}, 식단=${식단.length}, 단식=${간헐적단식.length}, 수면=${수면.length}, 활동=${활동.length}`);
+
+      // 최종 응답 생성
+      return {
+        음식물과민증검사결과: iggLevels,
+        이름,
+        이너뷰티유형,
+        AI코치유형,
+        MBTI,
+        자기선언문,
+        칭찬하기,
+        '1일1미션': missions,
+        밸런스게임,
+        뷰티,
+        식단,
+        영양제,
+        간헐적단식,
+        수면,
+        활동
+      };
+
+    } catch (error) {
+      this.logger.error(`AI Agent 통계 조회 실패: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
 }
