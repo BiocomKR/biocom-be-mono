@@ -25,13 +25,72 @@ export class FcmProvider implements IPushProvider {
   }
 
   /**
-   * 단일 FCM 토큰으로 푸시 발송
+   * 단일 FCM 토큰으로 푸시 발송 (재시도 포함)
+   *
+   * @param token - FCM 토큰 문자열
+   * @param message - 발송할 메시지
+   * @param maxRetries - 최대 재시도 횟수 (기본값: 3)
+   * @returns 발송 결과
+   */
+  async sendToToken(
+    token: string,
+    message: PushMessage,
+    maxRetries: number = 3,
+  ): Promise<PushSendResult> {
+    // 재시도 로직
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const result = await this.sendToTokenOnce(token, message);
+
+      // 성공하거나 재시도 불가능한 에러면 즉시 반환
+      if (result.success || !this.isRetryableError(result.errorCode)) {
+        if (attempt > 0) {
+          console.log(`✅ [FCM] 재시도 성공: ${attempt + 1}번째 시도에서 성공`);
+        }
+        return result;
+      }
+
+      // 마지막 시도가 아니면 대기 후 재시도
+      if (attempt < maxRetries - 1) {
+        const delay = 1000 * Math.pow(2, attempt); // 1초, 2초, 4초
+        console.warn(`🔄 [FCM] 재시도 ${attempt + 1}/${maxRetries - 1} - ${delay}ms 후 재시도`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    // 모든 재시도 실패 시 마지막 결과 반환
+    return await this.sendToTokenOnce(token, message);
+  }
+
+  /**
+   * 재시도 가능한 에러인지 판단
+   *
+   * @param errorCode - FCM 에러 코드
+   * @returns 재시도 가능 여부
+   * @private
+   */
+  private isRetryableError(errorCode?: string): boolean {
+    if (!errorCode) return false;
+
+    // FCM 서버 일시 장애 에러들
+    const retryableErrors = [
+      'messaging/server-unavailable',
+      'messaging/internal-error',
+      'messaging/unavailable',
+    ];
+
+    // 5xx 에러나 정의된 재시도 가능 에러
+    return retryableErrors.includes(errorCode) || errorCode.startsWith('5');
+  }
+
+  /**
+   * 단일 FCM 토큰으로 푸시 발송 (재시도 없이 1회만)
    *
    * @param token - FCM 토큰 문자열
    * @param message - 발송할 메시지
    * @returns 발송 결과
+   * @private
    */
-  async sendToToken(
+  private async sendToTokenOnce(
     token: string,
     message: PushMessage,
   ): Promise<PushSendResult> {
