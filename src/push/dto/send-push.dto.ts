@@ -42,4 +42,15 @@ export class SendPushDto {
   @IsOptional()
   @IsBoolean()
   isTest?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Silent Push 여부 (기본값: false)\n' +
+      'true: 알림 표시 없이 data만 전송 (백그라운드 처리용)\n' +
+      'false: 일반 푸시 알림으로 전송',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  silent?: boolean;
 }

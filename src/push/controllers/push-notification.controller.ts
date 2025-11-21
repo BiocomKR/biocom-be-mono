@@ -43,7 +43,7 @@ export class PushNotificationController {
   @Throttle({ short: { ttl: rateLimitConfig.pushTest.ttl * 1000, limit: rateLimitConfig.pushTest.limit } })
   @ApiOperation({
     summary: '자신에게 테스트 푸시 전송',
-    description: '현재 로그인한 유저의 모든 기기에 테스트 푸시를 전송합니다',
+    description: '현재 로그인한 유저의 모든 기기에 테스트 푸시를 전송합니다.\nsilent: true로 설정 시 Silent Push (알림 없이 data만 전송)',
   })
   @ApiResponse({
     status: 201,
@@ -57,6 +57,7 @@ export class PushNotificationController {
       body: dto.body,
       imageUrl: dto.imageUrl,
       data: dto.data,
+      silent: dto.silent,
     });
 
     return {

@@ -15,6 +15,21 @@ export interface PushMessage {
 
   /// 이미지 URL (선택사항)
   imageUrl?: string;
+
+  /**
+   * Silent Push 여부 (선택사항)
+   *
+   * true: 알림 표시 없이 data만 전송 (백그라운드 처리용)
+   * false (기본값): 일반 푸시 알림으로 전송
+   *
+   * @example
+   * // Silent Push - 사용자에게 알림 표시 없음
+   * { title: '', body: '', silent: true, data: { action: 'sync_data' } }
+   *
+   * // 일반 Push - 사용자에게 알림 표시
+   * { title: '새 메시지', body: '확인하세요', silent: false }
+   */
+  silent?: boolean;
 }
 
 /**

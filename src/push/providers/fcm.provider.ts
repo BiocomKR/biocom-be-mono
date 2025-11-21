@@ -52,41 +52,74 @@ export class FcmProvider implements IPushProvider {
 
     try {
       // FCM 메시지 구성
-      const fcmMessage: admin.messaging.Message = {
-        token,
-        notification: {
-          title: message.title,
-          body: message.body,
-          ...(message.imageUrl && { imageUrl: message.imageUrl }),
-        },
-        // data는 문자열만 가능 (FCM 제약)
-        data: message.data
-          ? Object.entries(message.data).reduce(
-              (acc, [key, value]) => ({
-                ...acc,
-                [key]: String(value),
-              }),
-              {},
-            )
-          : undefined,
-        // Android 설정
-        android: {
-          priority: 'high',
-          notification: {
-            sound: 'default',
-            channelId: 'default',
-          },
-        },
-        // iOS 설정
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1,
+      const fcmMessage: admin.messaging.Message = message.silent
+        ? // Silent Push: 알림 없이 data만 전송
+          {
+            token,
+            // data는 문자열만 가능 (FCM 제약)
+            data: message.data
+              ? Object.entries(message.data).reduce(
+                  (acc, [key, value]) => ({
+                    ...acc,
+                    [key]: String(value),
+                  }),
+                  {},
+                )
+              : undefined,
+            // Android 설정 (Silent Push)
+            android: {
+              priority: 'normal', // Silent은 normal priority
             },
-          },
-        },
-      };
+            // iOS 설정 (Silent Push)
+            apns: {
+              headers: {
+                'apns-priority': '5', // Silent push priority
+                'apns-push-type': 'background',
+              },
+              payload: {
+                aps: {
+                  contentAvailable: true, // 백그라운드 처리 활성화
+                  // sound, badge 없음
+                },
+              },
+            },
+          }
+        : // 일반 Push: 알림과 data 모두 전송
+          {
+            token,
+            notification: {
+              title: message.title,
+              body: message.body,
+              ...(message.imageUrl && { imageUrl: message.imageUrl }),
+            },
+            // data는 문자열만 가능 (FCM 제약)
+            data: message.data
+              ? Object.entries(message.data).reduce(
+                  (acc, [key, value]) => ({
+                    ...acc,
+                    [key]: String(value),
+                  }),
+                  {},
+                )
+              : undefined,
+            // Android 설정
+            android: {
+              priority: 'high',
+              notification: {
+                sound: 'default',
+                channelId: 'default',
+              },
+            },
+            // iOS 설정
+            apns: {
+              payload: {
+                aps: {
+                  sound: 'default',
+                  badge: 1,
+                },
+              },
+            },
+          };
 
       // FCM 발송
       console.log('🚀 [FCM] Firebase로 메시지 전송 중...');
