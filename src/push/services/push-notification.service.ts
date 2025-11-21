@@ -442,8 +442,32 @@ export class PushNotificationService {
       },
     });
 
+    // 5. 클릭 건수 (clickedAt이 null이 아닌 경우)
+    const clickedCount = await this.prisma.pushNotificationLog.count({
+      where: {
+        clickedAt: {
+          not: null,
+        },
+        ...dateFilter,
+      },
+    });
+
+    // 6. 타입별 통계
+    const logsByType = await this.prisma.pushNotificationLog.groupBy({
+      by: ['type'],
+      where: dateFilter,
+      _count: {
+        id: true,
+      },
+    });
+
+    const byType: Record<string, number> = {};
+    logsByType.forEach((item) => {
+      byType[item.type] = item._count.id;
+    });
+
     this.logger.log(
-      `✅ [PushNotificationService] 통계 조회 완료: 총 ${totalSent}건, 성공 ${successCount}건, 실패 ${failureCount}건, 읽음 ${readCount}건`,
+      `✅ [PushNotificationService] 통계 조회 완료: 총 ${totalSent}건, 성공 ${successCount}건, 실패 ${failureCount}건, 읽음 ${readCount}건, 클릭 ${clickedCount}건`,
     );
 
     return {
@@ -451,6 +475,8 @@ export class PushNotificationService {
       successCount,
       failureCount,
       readCount,
+      clickedCount,
+      byType,
     };
   }
 

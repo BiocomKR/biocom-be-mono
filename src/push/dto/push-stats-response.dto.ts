@@ -29,4 +29,22 @@ export class PushStatsResponseDto {
     example: 800,
   })
   readCount: number;
+
+  @ApiProperty({
+    description: '클릭 건수',
+    example: 500,
+  })
+  clickedCount: number;
+
+  @ApiProperty({
+    description: '타입별 통계',
+    example: {
+      SYSTEM: 100,
+      REMIND: 200,
+      MARKETING: 50,
+      TRANSACTIONAL: 30,
+      ETC: 20,
+    },
+  })
+  byType: Record<string, number>;
 }

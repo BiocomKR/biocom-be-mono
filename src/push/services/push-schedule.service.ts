@@ -3,7 +3,7 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { CreateScheduleDto } from '../dto/create-schedule.dto';
 import { UpdateScheduleDto } from '../dto/update-schedule.dto';
 import { ScheduleQueryDto } from '../dto/schedule-query.dto';
-import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
+import { getNowKST, stringToKSTDate, parseKSTDateTime } from '../../common/utils/kst-date.util';
 
 /**
  * 푸시 알림 스케줄 서비스
@@ -33,7 +33,7 @@ export class PushScheduleService {
         type: dto.type,
         category: dto.category,
         cronExpression: dto.cronExpression,
-        oneTimeScheduledAt: dto.oneTimeScheduledAt ? new Date(dto.oneTimeScheduledAt) : null,
+        oneTimeScheduledAt: dto.oneTimeScheduledAt ? parseKSTDateTime(dto.oneTimeScheduledAt) : null,
         title: dto.title,
         bodyTemplate: dto.bodyTemplate,
         imageUrl: dto.imageUrl,
@@ -76,10 +76,35 @@ export class PushScheduleService {
       this.prisma.pushNotificationSchedule.count({ where }),
     ]);
 
+    // 각 스케줄의 캠페인 통계 계산
+    const schedulesWithStats = await Promise.all(
+      schedules.map(async (schedule) => {
+        const campaigns = await this.prisma.pushNotificationCampaign.findMany({
+          where: { scheduleId: schedule.id },
+          select: {
+            status: true,
+            sentCount: true,
+            failCount: true,
+          },
+        });
+
+        const totalExecutions = campaigns.length;
+        const successfulExecutions = campaigns.filter(c => c.status === 'COMPLETED').length;
+        const failedExecutions = campaigns.filter(c => c.status === 'FAILED').length;
+
+        return {
+          ...schedule,
+          totalExecutions,
+          successfulExecutions,
+          failedExecutions,
+        };
+      })
+    );
+
     this.logger.log(`✅ [PushScheduleService] 조회 완료: ${schedules.length}개 (전체: ${total}개)`);
 
     return {
-      schedules,
+      schedules: schedulesWithStats,
       total,
       page,
       limit,
@@ -135,7 +160,7 @@ export class PushScheduleService {
         ...(dto.category && { category: dto.category }),
         ...(dto.cronExpression !== undefined && { cronExpression: dto.cronExpression }),
         ...(dto.oneTimeScheduledAt !== undefined && {
-          oneTimeScheduledAt: dto.oneTimeScheduledAt ? new Date(dto.oneTimeScheduledAt) : null,
+          oneTimeScheduledAt: dto.oneTimeScheduledAt ? parseKSTDateTime(dto.oneTimeScheduledAt) : null,
         }),
         ...(dto.title && { title: dto.title }),
         ...(dto.bodyTemplate && { bodyTemplate: dto.bodyTemplate }),

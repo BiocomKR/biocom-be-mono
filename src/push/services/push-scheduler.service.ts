@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PushScheduleService } from './push-schedule.service';
 import { PushCampaignService } from './push-campaign.service';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 푸시 알림 배치 스케줄러
@@ -46,7 +47,7 @@ export class PushSchedulerService {
           // ONCE 타입인 경우 실행 조건 확인
           if (schedule.scheduleType === 'ONCE') {
             const scheduledTime = new Date(schedule.oneTimeScheduledAt);
-            const now = new Date();
+            const now = getNowKST();
 
             // 예약 시간이 현재 시간보다 이후면 건너뜀
             if (scheduledTime > now) {

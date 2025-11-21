@@ -50,11 +50,11 @@ export class CreateScheduleDto {
   cronExpression?: string;
 
   @ApiPropertyOptional({
-    description: '단발성 예약 시간 (ONCE 타입일 때 필수, ISO 8601)',
-    example: '2025-01-25T09:00:00+09:00'
+    description: '단발성 예약 시간 (ONCE 타입일 때 필수, KST 기준 YYYY-MM-DD HH:mm:ss)',
+    example: '2025-01-25 09:00:00'
   })
   @IsOptional()
-  @IsDateString()
+  @IsString()
   oneTimeScheduledAt?: string;
 
   @ApiProperty({ description: '제목', example: '오늘의 챌린지를 확인하세요!' })
