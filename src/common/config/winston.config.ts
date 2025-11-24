@@ -1,6 +1,7 @@
 import * as winston from 'winston';
 import * as DailyRotateFile from 'winston-daily-rotate-file';
 import { join } from 'path';
+import { createSlackTransport } from './slack-transport.config';
 
 /**
  * Winston Logger 설정
@@ -50,31 +51,43 @@ const dailyRotateOptions = {
   auditFile: join(LOG_PATH, 'audit', 'log-audit.json'),
 };
 
+// Transports 배열 생성
+const transports: winston.transport[] = [
+  // 콘솔 출력 (개발 환경)
+  new winston.transports.Console({
+    format: process.env.NODE_ENV === 'production' ? logFormat : consoleFormat,
+  }),
+
+  // 전체 로그 파일 (info 레벨 이상)
+  new DailyRotateFile({
+    ...dailyRotateOptions,
+    filename: 'application-%DATE%.log',
+    level: 'info',
+  }),
+
+  // 에러 로그 파일 (error 레벨만)
+  new DailyRotateFile({
+    ...dailyRotateOptions,
+    filename: 'error-%DATE%.log',
+    level: 'error',
+  }),
+];
+
+// Slack Transport 추가 (설정되어 있을 경우)
+const slackTransport = createSlackTransport();
+if (slackTransport) {
+  transports.push(slackTransport);
+  if (process.env.NODE_ENV !== 'test') {
+    console.log('✅ Slack 에러 알림이 활성화되었습니다.');
+  }
+}
+
 // Winston Logger 인스턴스 생성
 export const winstonLogger = winston.createLogger({
   level: LOG_LEVEL,
   format: logFormat,
   defaultMeta: { service: 'nestjs-app' },
-  transports: [
-    // 콘솔 출력 (개발 환경)
-    new winston.transports.Console({
-      format: process.env.NODE_ENV === 'production' ? logFormat : consoleFormat,
-    }),
-    
-    // 전체 로그 파일 (info 레벨 이상)
-    new DailyRotateFile({
-      ...dailyRotateOptions,
-      filename: 'application-%DATE%.log',
-      level: 'info',
-    }),
-    
-    // 에러 로그 파일 (error 레벨만)
-    new DailyRotateFile({
-      ...dailyRotateOptions,
-      filename: 'error-%DATE%.log',
-      level: 'error',
-    }),
-  ],
+  transports,
   
   // 처리되지 않은 예외 처리
   exceptionHandlers: [
@@ -102,7 +115,23 @@ if (process.env.NODE_ENV !== 'test') {
 
 /**
  * NestJS용 Winston 설정 옵션
+ * instance 방식 대신 transports, format 등을 직접 전달
  */
 export const winstonConfig = {
-  instance: winstonLogger,
+  level: LOG_LEVEL,
+  format: logFormat,
+  defaultMeta: { service: 'nestjs-app' },
+  transports,
+  exceptionHandlers: [
+    new DailyRotateFile({
+      ...dailyRotateOptions,
+      filename: 'exceptions-%DATE%.log',
+    }),
+  ],
+  rejectionHandlers: [
+    new DailyRotateFile({
+      ...dailyRotateOptions,
+      filename: 'rejections-%DATE%.log',
+    }),
+  ],
 };

@@ -4,26 +4,29 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
-  Logger,
+  Injectable,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { getNowKST } from '../utils/kst-date.util';
+import { LoggerService } from '../services/logger.service';
 
 /**
  * 전역 예외 필터
  * 모든 예외를 캐치하여 일관된 형식으로 응답
- * 
+ *
  * 처리하는 예외 유형:
  * - HttpException: NestJS 표준 HTTP 예외
  * - PrismaClientKnownRequestError: Prisma ORM 예외
  * - 기타 모든 예외
  */
+@Injectable()
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new Logger(AllExceptionsFilter.name);
-
-  constructor(private readonly httpAdapterHost: HttpAdapterHost) {}
+  constructor(
+    private readonly httpAdapterHost: HttpAdapterHost,
+    private readonly logger: LoggerService,
+  ) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const { httpAdapter } = this.httpAdapterHost;
@@ -85,17 +88,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error = exception.name;
     }
 
-    // 에러 로깅
-    this.logger.error(
+    // 에러 로깅 (Winston + Slack으로 전송)
+    const responseTime = (request as any).responseTime;
+    this.logger.logException(
       `[${request.method}] ${request.url} - ${statusCode} ${error}: ${message}`,
+      exception instanceof Error ? exception.stack : String(exception),
       {
-        exception: exception instanceof Error ? exception.stack : exception,
-        request: {
-          method: request.method,
-          url: request.url,
-          ip: request.ip,
-          userAgent: request.headers['user-agent'],
-        },
+        statusCode,
+        error,
+        message,
+        details,
+        method: request.method,
+        url: request.url,
+        ip: request.ip,
+        userAgent: request.headers['user-agent'],
+        userId: (request as any).user?.id,
+        requestId: (request as any).id,
+        body: request.body,
+        requestDuration: responseTime,
       },
     );
 

@@ -46,11 +46,14 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   logger.log('글로벌 API 접두사 설정 완료: /api');
 
+  // ConfigService와 LoggerService 가져오기 (재사용)
+  const configService = app.get(ConfigService);
+  const loggerService = app.get(LoggerService);
 
   // 글로벌 Exception Filter 설정
   // 모든 예외를 일관된 형식으로 처리
   const httpAdapter = app.get(HttpAdapterHost);
-  app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));
+  app.useGlobalFilters(new AllExceptionsFilter(httpAdapter, loggerService));
   logger.log('글로벌 Exception Filter 설정 완료');
 
   // 글로벌 Validation Pipe 설정
@@ -78,10 +81,6 @@ async function bootstrap() {
     }),
   );
   logger.log('글로벌 Validation Pipe 설정 완료');
-
-  // ConfigService와 LoggerService 가져오기
-  const configService = app.get(ConfigService);
-  const loggerService = app.get(LoggerService);
 
   // 글로벌 인터셉터 설정
   // 순서 중요: RequestId -> Timeout -> Transform 순으로 실행
