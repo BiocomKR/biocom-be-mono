@@ -4,6 +4,7 @@ import { CreateScheduleDto } from '../dto/create-schedule.dto';
 import { UpdateScheduleDto } from '../dto/update-schedule.dto';
 import { ScheduleQueryDto } from '../dto/schedule-query.dto';
 import { getNowKST, stringToKSTDate, parseKSTDateTime } from '../../common/utils/kst-date.util';
+import { PushScheduleType, PushCampaignStatus } from '../enums';
 
 /**
  * 푸시 알림 스케줄 서비스
@@ -89,8 +90,8 @@ export class PushScheduleService {
         });
 
         const totalExecutions = campaigns.length;
-        const successfulExecutions = campaigns.filter(c => c.status === 'COMPLETED').length;
-        const failedExecutions = campaigns.filter(c => c.status === 'FAILED').length;
+        const successfulExecutions = campaigns.filter(c => c.status === PushCampaignStatus.COMPLETED).length;
+        const failedExecutions = campaigns.filter(c => c.status === PushCampaignStatus.FAILED).length;
 
         return {
           ...schedule,
@@ -223,11 +224,11 @@ export class PushScheduleService {
    * 스케줄 DTO 유효성 검증
    */
   private validateScheduleDto(dto: CreateScheduleDto | any) {
-    if (dto.scheduleType === 'ONCE') {
+    if (dto.scheduleType === PushScheduleType.ONCE) {
       if (!dto.oneTimeScheduledAt) {
         throw new BadRequestException('ONCE 타입 스케줄은 oneTimeScheduledAt이 필수입니다');
       }
-    } else if (dto.scheduleType === 'RECURRING') {
+    } else if (dto.scheduleType === PushScheduleType.RECURRING) {
       if (!dto.cronExpression) {
         throw new BadRequestException('RECURRING 타입 스케줄은 cronExpression이 필수입니다');
       }
@@ -246,7 +247,7 @@ export class PushScheduleService {
     const onceSchedules = await this.prisma.pushNotificationSchedule.findMany({
       where: {
         isActive: true,
-        scheduleType: 'ONCE',
+        scheduleType: PushScheduleType.ONCE,
         oneTimeScheduledAt: {
           lte: now,
         },
@@ -257,7 +258,7 @@ export class PushScheduleService {
     const recurringSchedules = await this.prisma.pushNotificationSchedule.findMany({
       where: {
         isActive: true,
-        scheduleType: 'RECURRING',
+        scheduleType: PushScheduleType.RECURRING,
         OR: [
           { startDate: null, endDate: null },
           { startDate: { lte: now }, endDate: null },

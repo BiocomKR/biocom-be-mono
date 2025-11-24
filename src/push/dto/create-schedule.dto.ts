@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsIn, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength } from 'class-validator';
+import { PushScheduleType, PushCategory } from '../enums';
 
 /**
  * 스케줄 생성 DTO
@@ -19,12 +20,11 @@ export class CreateScheduleDto {
 
   @ApiProperty({
     description: '스케줄 타입 (ONCE: 단발성, RECURRING: 반복)',
-    enum: ['ONCE', 'RECURRING'],
-    example: 'RECURRING'
+    enum: PushScheduleType,
+    example: PushScheduleType.RECURRING
   })
-  @IsString()
-  @IsIn(['ONCE', 'RECURRING'])
-  scheduleType: string;
+  @IsEnum(PushScheduleType)
+  scheduleType: PushScheduleType;
 
   @ApiProperty({ description: '푸시 타입', example: 'REMIND' })
   @IsString()
@@ -33,12 +33,11 @@ export class CreateScheduleDto {
 
   @ApiProperty({
     description: '카테고리',
-    enum: ['AUTO', 'MARKETING'],
-    example: 'AUTO'
+    enum: PushCategory,
+    example: PushCategory.AUTO
   })
-  @IsString()
-  @IsIn(['AUTO', 'MARKETING'])
-  category: string;
+  @IsEnum(PushCategory)
+  category: PushCategory;
 
   @ApiPropertyOptional({
     description: '크론 표현식 (RECURRING 타입일 때 필수, 예: 0 9 * * *)',

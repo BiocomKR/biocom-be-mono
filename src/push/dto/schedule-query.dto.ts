@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsInt, Min, Max, IsBoolean, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsBoolean, IsEnum } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+import { PushScheduleType, PushCategory } from '../enums';
 
 /**
  * 스케줄 조회 쿼리 DTO
@@ -23,21 +24,19 @@ export class ScheduleQueryDto {
 
   @ApiPropertyOptional({
     description: '스케줄 타입 필터',
-    enum: ['ONCE', 'RECURRING']
+    enum: PushScheduleType
   })
   @IsOptional()
-  @IsString()
-  @IsIn(['ONCE', 'RECURRING'])
-  scheduleType?: string;
+  @IsEnum(PushScheduleType)
+  scheduleType?: PushScheduleType;
 
   @ApiPropertyOptional({
     description: '카테고리 필터',
-    enum: ['AUTO', 'MARKETING']
+    enum: PushCategory
   })
   @IsOptional()
-  @IsString()
-  @IsIn(['AUTO', 'MARKETING'])
-  category?: string;
+  @IsEnum(PushCategory)
+  category?: PushCategory;
 
   @ApiPropertyOptional({ description: '활성화 여부 필터', type: Boolean })
   @IsOptional()

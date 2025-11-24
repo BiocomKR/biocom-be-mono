@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsInt, Min, Max, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsString, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PushCampaignType, PushCampaignStatus } from '../enums';
 
 /**
  * 캠페인 조회 쿼리 DTO
@@ -29,21 +30,19 @@ export class CampaignQueryDto {
 
   @ApiPropertyOptional({
     description: '캠페인 타입 필터',
-    enum: ['MANUAL', 'SCHEDULED', 'RECURRING']
+    enum: PushCampaignType
   })
   @IsOptional()
-  @IsString()
-  @IsIn(['MANUAL', 'SCHEDULED', 'RECURRING'])
-  campaignType?: string;
+  @IsEnum(PushCampaignType)
+  campaignType?: PushCampaignType;
 
   @ApiPropertyOptional({
     description: '상태 필터',
-    enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED']
+    enum: PushCampaignStatus
   })
   @IsOptional()
-  @IsString()
-  @IsIn(['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', 'CANCELLED'])
-  status?: string;
+  @IsEnum(PushCampaignStatus)
+  status?: PushCampaignStatus;
 
   @ApiPropertyOptional({ description: '시작 날짜 (YYYY-MM-DD)', example: '2025-01-01' })
   @IsOptional()

@@ -4,6 +4,7 @@ import { PushNotificationService } from './push-notification.service';
 import { CampaignQueryDto } from '../dto/campaign-query.dto';
 import { CampaignResponseDto } from '../dto/campaign-response.dto';
 import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
+import { PushScheduleType, PushCampaignType, PushCampaignStatus } from '../enums';
 
 /**
  * 푸시 알림 캠페인 서비스
@@ -121,14 +122,14 @@ export class PushCampaignService {
       data: {
         scheduleId: schedule.id,
         campaignKey,
-        campaignType: schedule.scheduleType === 'ONCE' ? 'SCHEDULED' : 'RECURRING',
+        campaignType: schedule.scheduleType === PushScheduleType.ONCE ? PushCampaignType.SCHEDULED : PushCampaignType.RECURRING,
         title: schedule.title,
         body: schedule.bodyTemplate,
         imageUrl: schedule.imageUrl,
         data: schedule.data,
         type: schedule.type,
         category: schedule.category,
-        status: 'PENDING',
+        status: PushCampaignStatus.PENDING,
         targetCount: targetUsers.length,
         scheduledAt: now,
         createdAt: now,
@@ -141,7 +142,7 @@ export class PushCampaignService {
     await this.prisma.pushNotificationCampaign.update({
       where: { id: campaign.id },
       data: {
-        status: 'PROCESSING',
+        status: PushCampaignStatus.PROCESSING,
         startedAt: getNowKST(),
       },
     });
@@ -175,7 +176,7 @@ export class PushCampaignService {
     }
 
     // 5. 캠페인 상태 → COMPLETED/FAILED
-    const finalStatus = successCount > 0 ? 'COMPLETED' : 'FAILED';
+    const finalStatus = successCount > 0 ? PushCampaignStatus.COMPLETED : PushCampaignStatus.FAILED;
     await this.prisma.pushNotificationCampaign.update({
       where: { id: campaign.id },
       data: {
@@ -183,12 +184,12 @@ export class PushCampaignService {
         sentCount: successCount,
         failCount: failureCount,
         completedAt: getNowKST(),
-        errorMessage: finalStatus === 'FAILED' ? '발송에 실패했습니다' : null,
+        errorMessage: finalStatus === PushCampaignStatus.FAILED ? '발송에 실패했습니다' : null,
       },
     });
 
     // 6. ONCE 타입 스케줄이면 자동 비활성화
-    if (schedule.scheduleType === 'ONCE') {
+    if (schedule.scheduleType === PushScheduleType.ONCE) {
       await this.prisma.pushNotificationSchedule.update({
         where: { id: schedule.id },
         data: { isActive: false },

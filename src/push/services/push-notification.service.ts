@@ -5,7 +5,7 @@ import {
   PushMessage,
   PushSendResult,
 } from '../interfaces/push-provider.interface';
-import { PushNotificationType } from '../enums/push-notification-type.enum';
+import { PushNotificationType, PushLogStatus } from '../enums';
 import { PushLogQueryDto } from '../dto/push-log-query.dto';
 import { PushLogListResponseDto, PushLogResponseDto } from '../dto/push-log-response.dto';
 import { SendPushToTopicDto } from '../dto/send-push-to-topic.dto';
@@ -502,7 +502,7 @@ export class PushNotificationService {
   async updatePushLogStatus(
     userId: number,
     logId: number,
-    status: 'READ' | 'CLICKED',
+    status: PushLogStatus,
   ) {
     this.logger.log(
       `📝 [PushNotificationService] 푸시 로그 상태 업데이트: logId=${logId}, status=${status}`,
@@ -528,9 +528,9 @@ export class PushNotificationService {
 
     // 2. 상태에 따라 업데이트
     const updateData: any = {};
-    if (status === 'READ' && !log.readAt) {
+    if (status === PushLogStatus.READ && !log.readAt) {
       updateData.readAt = getNowKST();
-    } else if (status === 'CLICKED' && !log.clickedAt) {
+    } else if (status === PushLogStatus.CLICKED && !log.clickedAt) {
       updateData.clickedAt = getNowKST();
       // CLICKED는 READ를 포함하므로 readAt도 함께 설정
       if (!log.readAt) {
