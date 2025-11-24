@@ -116,10 +116,16 @@ export class StatisticsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    const data = await this.statisticsService.getBeautyStatistics(req.user.id, startDate, endDate);
+    const data = await this.statisticsService.getBeautyStatistics(
+      req.user.id,
+      startDate,
+      endDate,
+      req.isNewcomer || false
+    );
     return {
       success: true,
       data,
+      isReal: req.isNewcomer ? false : true,
       message: '이너뷰티 통계 조회 성공',
     };
   }
@@ -155,10 +161,16 @@ export class StatisticsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    const data = await this.statisticsService.getDietStatistics(req.user.id, startDate, endDate);
+    const data = await this.statisticsService.getDietStatistics(
+      req.user.id,
+      startDate,
+      endDate,
+      req.isNewcomer || false
+    );
     return {
       success: true,
       data,
+      isReal: req.isNewcomer ? false : true,
       message: '식단 통계 조회 성공',
     };
   }
@@ -178,10 +190,14 @@ export class StatisticsController {
     type: SupplementStatisticsResponseDto,
   })
   async getSupplementStatistics(@Request() req: any) {
-    const data = await this.statisticsService.getSupplementStatistics(req.user.id);
+    const data = await this.statisticsService.getSupplementStatistics(
+      req.user.id,
+      req.isNewcomer || false
+    );
     return {
       success: true,
       data,
+      isReal: req.isNewcomer ? false : true,
       message: '영양제 통계 조회 성공',
     };
   }
@@ -217,10 +233,16 @@ export class StatisticsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    const data = await this.statisticsService.getFastingStatistics(req.user.id, startDate, endDate);
+    const data = await this.statisticsService.getFastingStatistics(
+      req.user.id,
+      startDate,
+      endDate,
+      req.isNewcomer || false
+    );
     return {
       success: true,
       data,
+      isReal: req.isNewcomer ? false : true,
       message: '간헐적단식 통계 조회 성공',
     };
   }
@@ -256,10 +278,16 @@ export class StatisticsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    const data = await this.statisticsService.getSleepStatistics(req.user.id, startDate, endDate);
+    const data = await this.statisticsService.getSleepStatistics(
+      req.user.id,
+      startDate,
+      endDate,
+      req.isNewcomer || false
+    );
     return {
       success: true,
       data,
+      isReal: req.isNewcomer ? false : true,
       message: '수면 통계 조회 성공',
     };
   }
@@ -295,10 +323,16 @@ export class StatisticsController {
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
   ) {
-    const data = await this.statisticsService.getActivityStatistics(req.user.id, startDate, endDate);
+    const data = await this.statisticsService.getActivityStatistics(
+      req.user.id,
+      startDate,
+      endDate,
+      req.isNewcomer || false
+    );
     return {
       success: true,
       data,
+      isReal: req.isNewcomer ? false : true,
       message: '활동 통계 조회 성공',
     };
   }
