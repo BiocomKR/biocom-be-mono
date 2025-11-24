@@ -118,21 +118,29 @@ export class PushTokenService {
    * @returns 활성화된 토큰 목록
    */
   async getUserTokens(userId: number): Promise<PushTokenResponseDto[]> {
-    this.logger.log(`유저 토큰 조회: userId=${userId}`);
+    this.logger.log(`📋 [PushTokenService] 유저 토큰 조회: userId=${userId}`);
 
-    const tokens = await this.prisma.pushToken.findMany({
-      where: {
-        userId,
-        isActive: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    try {
+      const tokens = await this.prisma.pushToken.findMany({
+        where: {
+          userId,
+          isActive: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
 
-    this.logger.log(`✅ 토큰 조회 완료: ${tokens.length}개`);
+      this.logger.log(`✅ [PushTokenService] 토큰 조회 완료: ${tokens.length}개`);
 
-    return tokens.map((token) => this.mapToResponseDto(token));
+      return tokens.map((token) => this.mapToResponseDto(token));
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushTokenService] 유저 토큰 조회 실패: userId=${userId}, ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -146,20 +154,28 @@ export class PushTokenService {
       `🗑️ [PushTokenService] 토큰 비활성화 시작: userId=${userId}, deviceId=${deviceId}`,
     );
 
-    const result = await this.prisma.pushToken.updateMany({
-      where: {
-        userId,
-        deviceId,
-      },
-      data: {
-        isActive: false,
-        updatedAt: getNowKST(),
-      },
-    });
+    try {
+      const result = await this.prisma.pushToken.updateMany({
+        where: {
+          userId,
+          deviceId,
+        },
+        data: {
+          isActive: false,
+          updatedAt: getNowKST(),
+        },
+      });
 
-    this.logger.log(
-      `✅ [PushTokenService] 토큰 비활성화 완료: ${result.count}개 업데이트됨`,
-    );
+      this.logger.log(
+        `✅ [PushTokenService] 토큰 비활성화 완료: ${result.count}개 업데이트됨`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushTokenService] 토큰 비활성화 실패: userId=${userId}, deviceId=${deviceId}, ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -168,19 +184,27 @@ export class PushTokenService {
    * @param userId - 유저 ID
    */
   async deleteAllUserTokens(userId: number): Promise<void> {
-    this.logger.log(`유저의 모든 토큰 비활성화: userId=${userId}`);
+    this.logger.log(`🗑️ [PushTokenService] 유저의 모든 토큰 비활성화: userId=${userId}`);
 
-    await this.prisma.pushToken.updateMany({
-      where: {
-        userId,
-      },
-      data: {
-        isActive: false,
-        updatedAt: getNowKST(),
-      },
-    });
+    try {
+      const result = await this.prisma.pushToken.updateMany({
+        where: {
+          userId,
+        },
+        data: {
+          isActive: false,
+          updatedAt: getNowKST(),
+        },
+      });
 
-    this.logger.log(`✅ 유저 모든 토큰 비활성화 완료`);
+      this.logger.log(`✅ [PushTokenService] 유저 모든 토큰 비활성화 완료: ${result.count}개 업데이트됨`);
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushTokenService] 유저 모든 토큰 비활성화 실패: userId=${userId}, ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**

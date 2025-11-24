@@ -39,94 +39,102 @@ export class PushNotificationService {
       `📤 [PushNotificationService] 유저에게 푸시 전송: userId=${userId}, title="${message.title}"`,
     );
 
-    // 1. 활성화된 푸시 토큰 조회
-    const pushTokens = await this.prisma.pushToken.findMany({
-      where: {
-        userId,
-        isActive: true,
-      },
-    });
-
-    if (pushTokens.length === 0) {
-      this.logger.warn(
-        `⚠️ [PushNotificationService] 활성 푸시 토큰 없음: userId=${userId}`,
-      );
-      return {
-        success: false,
-        message: '활성화된 푸시 토큰이 없습니다',
-        sentCount: 0,
-        failureCount: 0,
-      };
-    }
-
-    this.logger.log(
-      `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
-    );
-
-    // 2. 각 토큰별로 로그 생성 후 전송
-    const results: PushSendResult[] = [];
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (const pushToken of pushTokens) {
-      this.logger.debug(
-        `🔍 [PushNotificationService] 토큰 확인: tokenId=${pushToken.id}, token=${pushToken.token?.substring(0, 20)}..., deviceId=${pushToken.deviceId}`,
-      );
-
-      // 2-1. 로그 미리 생성 (success=true로 가정)
-      const logId = await this.createPendingLog(
-        pushToken,
-        message,
-        PushNotificationType.ETC,
-        isTest,
-      );
-
-      // 2-2. logId를 포함한 메시지 생성
-      const enrichedMessage: PushMessage = {
-        ...message,
-        data: {
-          ...message.data,
-          logId: logId?.toString(),
+    try {
+      // 1. 활성화된 푸시 토큰 조회
+      const pushTokens = await this.prisma.pushToken.findMany({
+        where: {
+          userId,
+          isActive: true,
         },
+      });
+
+      if (pushTokens.length === 0) {
+        this.logger.warn(
+          `⚠️ [PushNotificationService] 활성 푸시 토큰 없음: userId=${userId}`,
+        );
+        return {
+          success: false,
+          message: '활성화된 푸시 토큰이 없습니다',
+          sentCount: 0,
+          failureCount: 0,
+        };
+      }
+
+      this.logger.log(
+        `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
+      );
+
+      // 2. 각 토큰별로 로그 생성 후 전송
+      const results: PushSendResult[] = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const pushToken of pushTokens) {
+        this.logger.debug(
+          `🔍 [PushNotificationService] 토큰 확인: tokenId=${pushToken.id}, token=${pushToken.token?.substring(0, 20)}..., deviceId=${pushToken.deviceId}`,
+        );
+
+        // 2-1. 로그 미리 생성 (success=true로 가정)
+        const logId = await this.createPendingLog(
+          pushToken,
+          message,
+          PushNotificationType.ETC,
+          isTest,
+        );
+
+        // 2-2. logId를 포함한 메시지 생성
+        const enrichedMessage: PushMessage = {
+          ...message,
+          data: {
+            ...message.data,
+            logId: logId?.toString(),
+          },
+        };
+
+        // 2-3. FCM 전송
+        this.logger.debug(
+          `📤 [PushNotificationService] FCM 전송 시도: token=${pushToken.token ? '있음' : '없음'}`,
+        );
+        const result = await this.fcmProvider.sendToToken(
+          pushToken.token,
+          enrichedMessage,
+        );
+        results.push(result);
+
+        // 2-4. 로그 업데이트 (실패 시)
+        if (logId && !result.success) {
+          await this.updateLogWithFailure(logId, result);
+        }
+
+        // 2-5. PushToken 상태 업데이트
+        await this.updateTokenStats(pushToken.id, result.success);
+
+        // 2-6. 실패한 토큰 비활성화
+        if (this.shouldInvalidateToken(result)) {
+          await this.invalidateToken(pushToken, result.errorCode);
+        }
+
+        if (result.success) successCount++;
+        else failureCount++;
+      }
+
+      this.logger.log(
+        `✅ [PushNotificationService] 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
+      );
+
+      return {
+        success: successCount > 0,
+        message: `${successCount}개 기기에 전송 성공`,
+        sentCount: successCount,
+        failureCount,
       };
-
-      // 2-3. FCM 전송
-      this.logger.debug(
-        `📤 [PushNotificationService] FCM 전송 시도: token=${pushToken.token ? '있음' : '없음'}`,
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 유저 푸시 전송 실패: userId=${userId}, ${error.message}`,
+        error.stack,
       );
-      const result = await this.fcmProvider.sendToToken(
-        pushToken.token,
-        enrichedMessage,
-      );
-      results.push(result);
-
-      // 2-4. 로그 업데이트 (실패 시)
-      if (logId && !result.success) {
-        await this.updateLogWithFailure(logId, result);
-      }
-
-      // 2-5. PushToken 상태 업데이트
-      await this.updateTokenStats(pushToken.id, result.success);
-
-      // 2-6. 실패한 토큰 비활성화
-      if (this.shouldInvalidateToken(result)) {
-        await this.invalidateToken(pushToken, result.errorCode);
-      }
-
-      if (result.success) successCount++;
-      else failureCount++;
+      throw error;
     }
-
-    this.logger.log(
-      `✅ [PushNotificationService] 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
-    );
-
-    return {
-      success: successCount > 0,
-      message: `${successCount}개 기기에 전송 성공`,
-      sentCount: successCount,
-      failureCount,
-    };
   }
 
   /**
@@ -142,23 +150,31 @@ export class PushNotificationService {
       `📤 [PushNotificationService] 다수 유저에게 푸시 전송: ${userIds.length}명, title="${message.title}"`,
     );
 
-    const results = await Promise.all(
-      userIds.map((userId) => this.sendToUser(userId, message, isTest)),
-    );
+    try {
+      const results = await Promise.all(
+        userIds.map((userId) => this.sendToUser(userId, message, isTest)),
+      );
 
-    const totalSent = results.reduce((sum, r) => sum + r.sentCount, 0);
-    const totalFailed = results.reduce((sum, r) => sum + (r.failureCount || 0), 0);
+      const totalSent = results.reduce((sum, r) => sum + r.sentCount, 0);
+      const totalFailed = results.reduce((sum, r) => sum + (r.failureCount || 0), 0);
 
-    this.logger.log(
-      `✅ [PushNotificationService] 배치 전송 완료: 성공 ${totalSent}, 실패 ${totalFailed}`,
-    );
+      this.logger.log(
+        `✅ [PushNotificationService] 배치 전송 완료: 성공 ${totalSent}, 실패 ${totalFailed}`,
+      );
 
-    return {
-      success: totalSent > 0,
-      message: `${totalSent}개 기기에 전송 성공`,
-      sentCount: totalSent,
-      failureCount: totalFailed,
-    };
+      return {
+        success: totalSent > 0,
+        message: `${totalSent}개 기기에 전송 성공`,
+        sentCount: totalSent,
+        failureCount: totalFailed,
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 배치 전송 실패: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -178,83 +194,91 @@ export class PushNotificationService {
       `📣 [PushNotificationService] 전체 푸시 전송: title="${message.title}"`,
     );
 
-    // 활성화된 모든 푸시 토큰 조회
-    const pushTokens = await this.prisma.pushToken.findMany({
-      where: {
-        isActive: true,
-        ...(filter?.marketingEnabled !== undefined && {
-          marketingEnabled: filter.marketingEnabled,
-        }),
-      },
-    });
-
-    if (pushTokens.length === 0) {
-      this.logger.warn(
-        `⚠️ [PushNotificationService] 전송 대상 없음 (필터 적용됨)`,
-      );
-      return {
-        success: false,
-        message: '전송 대상이 없습니다',
-        sentCount: 0,
-        failureCount: 0,
-      };
-    }
-
-    this.logger.log(
-      `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
-    );
-
-    // 각 토큰별로 로그 생성 후 전송
-    const results: PushSendResult[] = [];
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (const pushToken of pushTokens) {
-      const logId = await this.createPendingLog(
-        pushToken,
-        message,
-        PushNotificationType.SYSTEM,
-        isTest,
-      );
-
-      const enrichedMessage: PushMessage = {
-        ...message,
-        data: {
-          ...message.data,
-          logId: logId?.toString(),
+    try {
+      // 활성화된 모든 푸시 토큰 조회
+      const pushTokens = await this.prisma.pushToken.findMany({
+        where: {
+          isActive: true,
+          ...(filter?.marketingEnabled !== undefined && {
+            marketingEnabled: filter.marketingEnabled,
+          }),
         },
-      };
+      });
 
-      const result = await this.fcmProvider.sendToToken(
-        pushToken.token,
-        enrichedMessage,
+      if (pushTokens.length === 0) {
+        this.logger.warn(
+          `⚠️ [PushNotificationService] 전송 대상 없음 (필터 적용됨)`,
+        );
+        return {
+          success: false,
+          message: '전송 대상이 없습니다',
+          sentCount: 0,
+          failureCount: 0,
+        };
+      }
+
+      this.logger.log(
+        `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
       );
-      results.push(result);
 
-      if (logId && !result.success) {
-        await this.updateLogWithFailure(logId, result);
+      // 각 토큰별로 로그 생성 후 전송
+      const results: PushSendResult[] = [];
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const pushToken of pushTokens) {
+        const logId = await this.createPendingLog(
+          pushToken,
+          message,
+          PushNotificationType.SYSTEM,
+          isTest,
+        );
+
+        const enrichedMessage: PushMessage = {
+          ...message,
+          data: {
+            ...message.data,
+            logId: logId?.toString(),
+          },
+        };
+
+        const result = await this.fcmProvider.sendToToken(
+          pushToken.token,
+          enrichedMessage,
+        );
+        results.push(result);
+
+        if (logId && !result.success) {
+          await this.updateLogWithFailure(logId, result);
+        }
+
+        await this.updateTokenStats(pushToken.id, result.success);
+
+        if (this.shouldInvalidateToken(result)) {
+          await this.invalidateToken(pushToken, result.errorCode);
+        }
+
+        if (result.success) successCount++;
+        else failureCount++;
       }
 
-      await this.updateTokenStats(pushToken.id, result.success);
+      this.logger.log(
+        `✅ [PushNotificationService] 전체 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
+      );
 
-      if (this.shouldInvalidateToken(result)) {
-        await this.invalidateToken(pushToken, result.errorCode);
-      }
-
-      if (result.success) successCount++;
-      else failureCount++;
+      return {
+        success: successCount > 0,
+        message: `${successCount}개 기기에 전송 성공`,
+        sentCount: successCount,
+        failureCount,
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 전체 전송 실패: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    this.logger.log(
-      `✅ [PushNotificationService] 전체 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
-    );
-
-    return {
-      success: successCount > 0,
-      message: `${successCount}개 기기에 전송 성공`,
-      sentCount: successCount,
-      failureCount,
-    };
   }
 
   /**
@@ -308,57 +332,65 @@ export class PushNotificationService {
       `📋 [PushNotificationService] 푸시 로그 조회: page=${page}, limit=${limit}, isTest=${isTest}`,
     );
 
-    // 필터 조건 구성
-    const where: any = {};
-    if (userId !== undefined) {
-      where.userId = userId;
-    }
-    if (success !== undefined) {
-      where.success = success;
-    }
-    if (type) {
-      where.type = type;
-    }
-    // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
-    if (isTest !== undefined) {
-      where.isTest = isTest;
-    }
-
-    // 날짜 필터 추가
-    if (startDate || endDate) {
-      where.sentAt = {};
-      if (startDate) {
-        where.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+    try {
+      // 필터 조건 구성
+      const where: any = {};
+      if (userId !== undefined) {
+        where.userId = userId;
       }
-      if (endDate) {
-        where.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
+      if (success !== undefined) {
+        where.success = success;
       }
+      if (type) {
+        where.type = type;
+      }
+      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
+      if (isTest !== undefined) {
+        where.isTest = isTest;
+      }
+
+      // 날짜 필터 추가
+      if (startDate || endDate) {
+        where.sentAt = {};
+        if (startDate) {
+          where.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+        }
+        if (endDate) {
+          where.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
+        }
+      }
+
+      // 전체 개수 조회
+      const total = await this.prisma.pushNotificationLog.count({ where });
+
+      // 로그 조회 (최신순)
+      const logs = await this.prisma.pushNotificationLog.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: {
+          sentAt: 'desc',
+        },
+      });
+
+      this.logger.log(
+        `✅ [PushNotificationService] 로그 조회 완료: ${logs.length}개 (전체: ${total}개)`,
+      );
+
+      return {
+        logs: logs.map((log) => this.mapToLogResponseDto(log)),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 푸시 로그 조회 실패: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    // 전체 개수 조회
-    const total = await this.prisma.pushNotificationLog.count({ where });
-
-    // 로그 조회 (최신순)
-    const logs = await this.prisma.pushNotificationLog.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: {
-        sentAt: 'desc',
-      },
-    });
-
-    this.logger.log(
-      `✅ [PushNotificationService] 로그 조회 완료: ${logs.length}개 (전체: ${total}개)`,
-    );
-
-    return {
-      logs: logs.map((log) => this.mapToLogResponseDto(log)),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
   }
 
   /**
@@ -400,91 +432,97 @@ export class PushNotificationService {
   async getPushStats(startDate?: string, endDate?: string, isTest?: boolean): Promise<PushStatsResponseDto> {
     this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회 (isTest=${isTest})`);
 
-    // 날짜 필터 구성
-    const dateFilter: any = {};
-    if (startDate || endDate) {
-      dateFilter.sentAt = {};
+    try {
+      // 날짜 필터 구성
+      const dateFilter: any = {};
+      if (startDate || endDate) {
+        dateFilter.sentAt = {};
+        if (startDate) {
+          dateFilter.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+        }
+        if (endDate) {
+          dateFilter.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
+        }
+      }
+
+      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
+      if (isTest !== undefined) {
+        dateFilter.isTest = isTest;
+      }
+
+      // WHERE 조건 생성
+      // WHERE 조건 구성
+      const whereFilter: any = {};
+
       if (startDate) {
-        dateFilter.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+        whereFilter.sentAt = {
+          ...whereFilter.sentAt,
+          gte: stringToKSTDate(startDate, 0, 0, 0),
+        };
       }
       if (endDate) {
-        dateFilter.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
+        whereFilter.sentAt = {
+          ...whereFilter.sentAt,
+          lte: stringToKSTDate(endDate, 23, 59, 59),
+        };
       }
-    }
+      if (isTest !== undefined) {
+        whereFilter.isTest = isTest;
+      }
 
-    // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
-    if (isTest !== undefined) {
-      dateFilter.isTest = isTest;
-    }
+      // Prisma ORM을 사용한 통계 조회 (병렬 실행)
+      const [totalSent, successCount, failureCount, readCount, clickedCount, typeStats] = await Promise.all([
+        // 전체 전송 수
+        this.prisma.pushNotificationLog.count({ where: whereFilter }),
+        // 성공 수
+        this.prisma.pushNotificationLog.count({
+          where: { ...whereFilter, success: true },
+        }),
+        // 실패 수
+        this.prisma.pushNotificationLog.count({
+          where: { ...whereFilter, success: false },
+        }),
+        // 읽음 수
+        this.prisma.pushNotificationLog.count({
+          where: { ...whereFilter, readAt: { not: null } },
+        }),
+        // 클릭 수
+        this.prisma.pushNotificationLog.count({
+          where: { ...whereFilter, clickedAt: { not: null } },
+        }),
+        // 타입별 집계
+        this.prisma.pushNotificationLog.groupBy({
+          by: ['type'],
+          where: whereFilter,
+          _count: { type: true },
+        }),
+      ]);
 
-    // WHERE 조건 생성
-    // WHERE 조건 구성
-    const whereFilter: any = {};
+      // 타입별 통계를 Record 형태로 변환
+      const byType: Record<string, number> = {};
+      typeStats.forEach((item: { type: string; _count: { type: number } }) => {
+        byType[item.type] = item._count.type;
+      });
 
-    if (startDate) {
-      whereFilter.sentAt = {
-        ...whereFilter.sentAt,
-        gte: stringToKSTDate(startDate, 0, 0, 0),
+      this.logger.log(
+        `✅ [PushNotificationService] 통계 조회 완료: 총 ${totalSent}건, 성공 ${successCount}건, 실패 ${failureCount}건, 읽음 ${readCount}건, 클릭 ${clickedCount}건`,
+      );
+
+      return {
+        totalSent,
+        successCount,
+        failureCount,
+        readCount,
+        clickedCount,
+        byType,
       };
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 푸시 통계 조회 실패: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-    if (endDate) {
-      whereFilter.sentAt = {
-        ...whereFilter.sentAt,
-        lte: stringToKSTDate(endDate, 23, 59, 59),
-      };
-    }
-    if (isTest !== undefined) {
-      whereFilter.isTest = isTest;
-    }
-
-    // Prisma ORM을 사용한 통계 조회 (병렬 실행)
-    const [totalSent, successCount, failureCount, readCount, clickedCount, typeStats] = await Promise.all([
-      // 전체 전송 수
-      this.prisma.pushNotificationLog.count({ where: whereFilter }),
-      // 성공 수
-      this.prisma.pushNotificationLog.count({
-        where: { ...whereFilter, success: true },
-      }),
-      // 실패 수
-      this.prisma.pushNotificationLog.count({
-        where: { ...whereFilter, success: false },
-      }),
-      // 읽음 수
-      this.prisma.pushNotificationLog.count({
-        where: { ...whereFilter, readAt: { not: null } },
-      }),
-      // 클릭 수
-      this.prisma.pushNotificationLog.count({
-        where: { ...whereFilter, clickedAt: { not: null } },
-      }),
-      // 타입별 집계
-      this.prisma.pushNotificationLog.groupBy({
-        by: ['type'],
-        where: whereFilter,
-        _count: { type: true },
-      }),
-    ]);
-
-    // 타입별 통계를 Record 형태로 변환
-    const byType: Record<string, number> = {};
-    typeStats.forEach((item: { type: string; _count: { type: number } }) => {
-      byType[item.type] = item._count.type;
-    });
-
-    this.logger.log(
-      `✅ [PushNotificationService] 통계 조회 완료: 총 ${totalSent}건, 성공 ${successCount}건, 실패 ${failureCount}건, 읽음 ${readCount}건, 클릭 ${clickedCount}건`,
-    );
-
-    return {
-      totalSent,
-      successCount,
-      failureCount,
-      readCount,
-      clickedCount,
-      byType,
-    };
-
-
   }
 
   /**
@@ -504,61 +542,69 @@ export class PushNotificationService {
       `📝 [PushNotificationService] 푸시 로그 상태 업데이트: logId=${logId}, status=${status}`,
     );
 
-    // 1. 로그 조회 및 권한 확인
-    const log = await this.prisma.pushNotificationLog.findFirst({
-      where: {
-        id: logId,
-        userId,
-      },
-    });
+    try {
+      // 1. 로그 조회 및 권한 확인
+      const log = await this.prisma.pushNotificationLog.findFirst({
+        where: {
+          id: logId,
+          userId,
+        },
+      });
 
-    if (!log) {
-      this.logger.warn(
-        `⚠️ [PushNotificationService] 로그를 찾을 수 없거나 권한 없음: logId=${logId}, userId=${userId}`,
-      );
-      return {
-        success: false,
-        message: '푸시 알림을 찾을 수 없습니다',
-      };
-    }
-
-    // 2. 상태에 따라 업데이트
-    const updateData: any = {};
-    if (status === PushLogStatus.READ && !log.readAt) {
-      updateData.readAt = getNowKST();
-    } else if (status === PushLogStatus.CLICKED && !log.clickedAt) {
-      updateData.clickedAt = getNowKST();
-      // CLICKED는 READ를 포함하므로 readAt도 함께 설정
-      if (!log.readAt) {
-        updateData.readAt = getNowKST();
+      if (!log) {
+        this.logger.warn(
+          `⚠️ [PushNotificationService] 로그를 찾을 수 없거나 권한 없음: logId=${logId}, userId=${userId}`,
+        );
+        return {
+          success: false,
+          message: '푸시 알림을 찾을 수 없습니다',
+        };
       }
-    }
 
-    // 이미 업데이트된 경우
-    if (Object.keys(updateData).length === 0) {
+      // 2. 상태에 따라 업데이트
+      const updateData: any = {};
+      if (status === PushLogStatus.READ && !log.readAt) {
+        updateData.readAt = getNowKST();
+      } else if (status === PushLogStatus.CLICKED && !log.clickedAt) {
+        updateData.clickedAt = getNowKST();
+        // CLICKED는 READ를 포함하므로 readAt도 함께 설정
+        if (!log.readAt) {
+          updateData.readAt = getNowKST();
+        }
+      }
+
+      // 이미 업데이트된 경우
+      if (Object.keys(updateData).length === 0) {
+        this.logger.log(
+          `ℹ️ [PushNotificationService] 이미 업데이트됨: logId=${logId}, status=${status}`,
+        );
+        return {
+          success: true,
+          message: '이미 처리된 상태입니다',
+        };
+      }
+
+      // 3. 업데이트 실행
+      await this.prisma.pushNotificationLog.update({
+        where: { id: logId },
+        data: updateData,
+      });
+
       this.logger.log(
-        `ℹ️ [PushNotificationService] 이미 업데이트됨: logId=${logId}, status=${status}`,
+        `✅ [PushNotificationService] 푸시 로그 상태 업데이트 완료: logId=${logId}`,
       );
+
       return {
         success: true,
-        message: '이미 처리된 상태입니다',
+        message: '푸시 상태가 업데이트되었습니다',
       };
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 푸시 로그 상태 업데이트 실패: logId=${logId}, ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    // 3. 업데이트 실행
-    await this.prisma.pushNotificationLog.update({
-      where: { id: logId },
-      data: updateData,
-    });
-
-    this.logger.log(
-      `✅ [PushNotificationService] 푸시 로그 상태 업데이트 완료: logId=${logId}`,
-    );
-
-    return {
-      success: true,
-      message: '푸시 상태가 업데이트되었습니다',
-    };
   }
 
   /**
@@ -580,30 +626,38 @@ export class PushNotificationService {
       `📣 [PushNotificationService] 마케팅 푸시 전송: title="${message.title}"`,
     );
 
-    // 마케팅 Topic으로 전송 (marketing Topic 구독자 = 마케팅 동의자)
-    const result = await this.fcmProvider.sendToTopic('marketing', {
-      title: message.title,
-      body: message.body,
-      imageUrl: message.imageUrl,
-      data: {
-        ...message.data,
-        subType: 'MARKETING_BROADCAST', // 세부 타입
-      },
-    });
+    try {
+      // 마케팅 Topic으로 전송 (marketing Topic 구독자 = 마케팅 동의자)
+      const result = await this.fcmProvider.sendToTopic('marketing', {
+        title: message.title,
+        body: message.body,
+        imageUrl: message.imageUrl,
+        data: {
+          ...message.data,
+          subType: 'MARKETING_BROADCAST', // 세부 타입
+        },
+      });
 
-    this.logger.log(
-      `✅ [PushNotificationService] 마케팅 푸시 전송 완료: success=${result.success}`,
-    );
+      this.logger.log(
+        `✅ [PushNotificationService] 마케팅 푸시 전송 완료: success=${result.success}`,
+      );
 
-    return {
-      success: result.success,
-      message: result.success
-        ? '마케팅 푸시가 전송되었습니다'
-        : '마케팅 푸시 전송에 실패했습니다',
-      messageId: result.messageId,
-      errorCode: result.errorCode,
-      errorMessage: result.errorMessage,
-    };
+      return {
+        success: result.success,
+        message: result.success
+          ? '마케팅 푸시가 전송되었습니다'
+          : '마케팅 푸시 전송에 실패했습니다',
+        messageId: result.messageId,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] 마케팅 푸시 전송 실패: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
   }
 
   /**

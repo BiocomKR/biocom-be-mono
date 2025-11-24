@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import * as admin from 'firebase-admin';
 import {
   IPushProvider,
@@ -15,6 +15,7 @@ import {
 @Injectable()
 export class FcmProvider implements IPushProvider {
   readonly name = 'FCM';
+  private readonly logger = new Logger(FcmProvider.name);
 
   private readonly admin: typeof admin;
 
@@ -44,7 +45,7 @@ export class FcmProvider implements IPushProvider {
       // 성공하거나 재시도 불가능한 에러면 즉시 반환
       if (result.success || !this.isRetryableError(result.errorCode)) {
         if (attempt > 0) {
-          console.log(`✅ [FCM] 재시도 성공: ${attempt + 1}번째 시도에서 성공`);
+          this.logger.log(`✅ [FCM] 재시도 성공: ${attempt + 1}번째 시도에서 성공`);
         }
         return result;
       }
@@ -52,7 +53,7 @@ export class FcmProvider implements IPushProvider {
       // 마지막 시도가 아니면 대기 후 재시도
       if (attempt < maxRetries - 1) {
         const delay = 1000 * Math.pow(2, attempt); // 1초, 2초, 4초
-        console.warn(`🔄 [FCM] 재시도 ${attempt + 1}/${maxRetries - 1} - ${delay}ms 후 재시도`);
+        this.logger.warn(`🔄 [FCM] 재시도 ${attempt + 1}/${maxRetries - 1} - ${delay}ms 후 재시도`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -94,14 +95,14 @@ export class FcmProvider implements IPushProvider {
     token: string,
     message: PushMessage,
   ): Promise<PushSendResult> {
-    console.log('📤 [FCM] 단일 토큰 발송 시작:', {
+    this.logger.log('📤 [FCM] 단일 토큰 발송 시작:', {
       hasToken: !!token,
       title: message.title,
       body: message.body?.substring(0, 50),
     });
 
     if (!token) {
-      console.error('❌ [FCM] 토큰 누락');
+      this.logger.error('❌ [FCM] 토큰 누락');
       return {
         success: false,
         errorCode: 'INVALID_TOKEN',
@@ -181,10 +182,10 @@ export class FcmProvider implements IPushProvider {
           };
 
       // FCM 발송
-      console.log('🚀 [FCM] Firebase로 메시지 전송 중...');
+      this.logger.log('🚀 [FCM] Firebase로 메시지 전송 중...');
       const messageId = await this.admin.messaging().send(fcmMessage);
 
-      console.log('✅ [FCM] 발송 성공:', {
+      this.logger.log('✅ [FCM] 발송 성공:', {
         messageId,
         title: message.title,
       });
@@ -194,7 +195,7 @@ export class FcmProvider implements IPushProvider {
         messageId,
       };
     } catch (error) {
-      console.error('❌ [FCM] 발송 실패:', {
+      this.logger.error('❌ [FCM] 발송 실패:', {
         code: error.code,
         message: error.message,
         title: message.title,
@@ -229,7 +230,7 @@ export class FcmProvider implements IPushProvider {
 
     // FCM 제약: 최대 500개
     if (tokens.length > 500) {
-      console.warn(
+      this.logger.warn(
         `⚠️ FCM 배치 발송 제한 초과: ${tokens.length}개 (최대 500개)`,
       );
       // 500개씩 나눠서 발송
@@ -296,7 +297,7 @@ export class FcmProvider implements IPushProvider {
         .messaging()
         .sendEachForMulticast(multicastMessage);
 
-      console.log(
+      this.logger.log(
         `✅ FCM 배치 발송 완료: 성공 ${response.successCount}/${tokens.length}`,
       );
 
@@ -308,7 +309,7 @@ export class FcmProvider implements IPushProvider {
         errorMessage: r.error?.message,
       }));
     } catch (error) {
-      console.error('❌ FCM 배치 발송 실패:', error);
+      this.logger.error('❌ FCM 배치 발송 실패:', error);
 
       // 전체 실패
       return tokens.map(() => ({
@@ -345,20 +346,20 @@ export class FcmProvider implements IPushProvider {
    * @returns 구독 성공 여부
    */
   async subscribeToTopic(tokens: string[], topic: string): Promise<boolean> {
-    console.log(`📌 [FCM] Topic 구독 시작: topic=${topic}, tokens=${tokens.length}개`);
+    this.logger.log(`📌 [FCM] Topic 구독 시작: topic=${topic}, tokens=${tokens.length}개`);
 
     try {
       const response = await this.admin.messaging().subscribeToTopic(tokens, topic);
 
-      console.log(`✅ [FCM] Topic 구독 성공: ${response.successCount}/${tokens.length}`);
+      this.logger.log(`✅ [FCM] Topic 구독 성공: ${response.successCount}/${tokens.length}`);
 
       if (response.failureCount > 0) {
-        console.warn(`⚠️ [FCM] Topic 구독 실패: ${response.failureCount}개`, response.errors);
+        this.logger.warn(`⚠️ [FCM] Topic 구독 실패: ${response.failureCount}개`, response.errors);
       }
 
       return response.successCount > 0;
     } catch (error) {
-      console.error(`❌ [FCM] Topic 구독 실패:`, error);
+      this.logger.error(`❌ [FCM] Topic 구독 실패:`, error);
       return false;
     }
   }
@@ -371,20 +372,20 @@ export class FcmProvider implements IPushProvider {
    * @returns 구독 해제 성공 여부
    */
   async unsubscribeFromTopic(tokens: string[], topic: string): Promise<boolean> {
-    console.log(`🔕 [FCM] Topic 구독 해제 시작: topic=${topic}, tokens=${tokens.length}개`);
+    this.logger.log(`🔕 [FCM] Topic 구독 해제 시작: topic=${topic}, tokens=${tokens.length}개`);
 
     try {
       const response = await this.admin.messaging().unsubscribeFromTopic(tokens, topic);
 
-      console.log(`✅ [FCM] Topic 구독 해제 성공: ${response.successCount}/${tokens.length}`);
+      this.logger.log(`✅ [FCM] Topic 구독 해제 성공: ${response.successCount}/${tokens.length}`);
 
       if (response.failureCount > 0) {
-        console.warn(`⚠️ [FCM] Topic 구독 해제 실패: ${response.failureCount}개`, response.errors);
+        this.logger.warn(`⚠️ [FCM] Topic 구독 해제 실패: ${response.failureCount}개`, response.errors);
       }
 
       return response.successCount > 0;
     } catch (error) {
-      console.error(`❌ [FCM] Topic 구독 해제 실패:`, error);
+      this.logger.error(`❌ [FCM] Topic 구독 해제 실패:`, error);
       return false;
     }
   }
@@ -397,7 +398,7 @@ export class FcmProvider implements IPushProvider {
    * @returns 발송 결과
    */
   async sendToTopic(topic: string, message: PushMessage): Promise<PushSendResult> {
-    console.log(`📣 [FCM] Topic 푸시 발송 시작: topic=${topic}, title=${message.title}`);
+    this.logger.log(`📣 [FCM] Topic 푸시 발송 시작: topic=${topic}, title=${message.title}`);
 
     try {
       const fcmMessage: admin.messaging.Message = {
@@ -435,14 +436,14 @@ export class FcmProvider implements IPushProvider {
 
       const messageId = await this.admin.messaging().send(fcmMessage);
 
-      console.log(`✅ [FCM] Topic 푸시 발송 성공: messageId=${messageId}`);
+      this.logger.log(`✅ [FCM] Topic 푸시 발송 성공: messageId=${messageId}`);
 
       return {
         success: true,
         messageId,
       };
     } catch (error) {
-      console.error(`❌ [FCM] Topic 푸시 발송 실패:`, error);
+      this.logger.error(`❌ [FCM] Topic 푸시 발송 실패:`, error);
 
       return {
         success: false,

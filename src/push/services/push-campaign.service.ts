@@ -29,42 +29,47 @@ export class PushCampaignService {
 
     this.logger.log(`📋 [PushCampaignService] 캠페인 목록 조회: page=${page}, limit=${limit}`);
 
-    // 필터 조건
-    const where: any = {};
-    if (scheduleId !== undefined) where.scheduleId = scheduleId;
-    if (campaignType) where.campaignType = campaignType;
-    if (status) where.status = status;
+    try {
+      // 필터 조건
+      const where: any = {};
+      if (scheduleId !== undefined) where.scheduleId = scheduleId;
+      if (campaignType) where.campaignType = campaignType;
+      if (status) where.status = status;
 
-    // 날짜 필터
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+      // 날짜 필터
+      if (startDate || endDate) {
+        where.createdAt = {};
+        if (startDate) {
+          where.createdAt.gte = stringToKSTDate(startDate, 0, 0, 0);
+        }
+        if (endDate) {
+          where.createdAt.lte = stringToKSTDate(endDate, 23, 59, 59);
+        }
       }
-      if (endDate) {
-        where.createdAt.lte = stringToKSTDate(endDate, 23, 59, 59);
-      }
+
+      const [campaigns, total] = await Promise.all([
+        this.prisma.pushNotificationCampaign.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.pushNotificationCampaign.count({ where }),
+      ]);
+
+      this.logger.log(`✅ [PushCampaignService] 조회 완료: ${campaigns.length}개 (전체: ${total}개)`);
+
+      return {
+        campaigns: campaigns.map((c) => this.mapToCampaignResponseDto(c)),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      this.logger.error(`❌ [PushCampaignService] 캠페인 목록 조회 실패: ${error.message}`, error.stack);
+      throw error;
     }
-
-    const [campaigns, total] = await Promise.all([
-      this.prisma.pushNotificationCampaign.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.pushNotificationCampaign.count({ where }),
-    ]);
-
-    this.logger.log(`✅ [PushCampaignService] 조회 완료: ${campaigns.length}개 (전체: ${total}개)`);
-
-    return {
-      campaigns: campaigns.map((c) => this.mapToCampaignResponseDto(c)),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
   }
 
   /**
@@ -73,22 +78,30 @@ export class PushCampaignService {
   async getCampaignById(id: number) {
     this.logger.log(`📋 [PushCampaignService] 캠페인 상세 조회: id=${id}`);
 
-    const campaign = await this.prisma.pushNotificationCampaign.findUnique({
-      where: { id },
-      include: {
-        schedule: true,
-        logs: {
-          take: 100,
-          orderBy: { sentAt: 'desc' },
+    try {
+      const campaign = await this.prisma.pushNotificationCampaign.findUnique({
+        where: { id },
+        include: {
+          schedule: true,
+          logs: {
+            take: 100,
+            orderBy: { sentAt: 'desc' },
+          },
         },
-      },
-    });
+      });
 
-    if (!campaign) {
-      throw new NotFoundException(`캠페인을 찾을 수 없습니다: id=${id}`);
+      if (!campaign) {
+        throw new NotFoundException(`캠페인을 찾을 수 없습니다: id=${id}`);
+      }
+
+      return campaign;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`❌ [PushCampaignService] 캠페인 조회 실패: id=${id}, ${error.message}`, error.stack);
+      throw error;
     }
-
-    return campaign;
   }
 
   /**
@@ -103,120 +116,128 @@ export class PushCampaignService {
 
     this.logger.log(`🚀 [PushCampaignService] 스케줄 캠페인 실행: scheduleId=${schedule.id}, key=${campaignKey}`);
 
-    // 중복 실행 방지
-    const existing = await this.prisma.pushNotificationCampaign.findUnique({
-      where: { campaignKey },
-    });
+    try {
+      // 중복 실행 방지
+      const existing = await this.prisma.pushNotificationCampaign.findUnique({
+        where: { campaignKey },
+      });
 
-    if (existing) {
-      this.logger.warn(`⚠️ [PushCampaignService] 이미 실행됨: campaignKey=${campaignKey}`);
-      return { success: false, message: '이미 실행된 캠페인입니다', campaignId: existing.id };
-    }
-
-    // 1. 대상 유저 조회
-    const targetQuery = schedule.targetQuery || {};
-    const targetUsers = await this.getTargetUsers(targetQuery);
-
-    // 2. 캠페인 생성 (PENDING 상태)
-    const campaign = await this.prisma.pushNotificationCampaign.create({
-      data: {
-        scheduleId: schedule.id,
-        campaignKey,
-        campaignType: schedule.scheduleType === PushScheduleType.ONCE ? PushCampaignType.SCHEDULED : PushCampaignType.RECURRING,
-        title: schedule.title,
-        body: schedule.bodyTemplate,
-        imageUrl: schedule.imageUrl,
-        data: schedule.data,
-        type: schedule.type,
-        category: schedule.category,
-        status: PushCampaignStatus.PENDING,
-        targetCount: targetUsers.length,
-        scheduledAt: now,
-        createdAt: now,
-      },
-    });
-
-    this.logger.log(`📦 [PushCampaignService] 캠페인 생성 완료: id=${campaign.id}, target=${targetUsers.length}명`);
-
-    // 3. 캠페인 상태 → PROCESSING
-    await this.prisma.pushNotificationCampaign.update({
-      where: { id: campaign.id },
-      data: {
-        status: PushCampaignStatus.PROCESSING,
-        startedAt: getNowKST(),
-      },
-    });
-
-    // 4. 푸시 발송 (각 유저별)
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (const userId of targetUsers) {
-      try {
-        const result = await this.pushNotificationService.sendToUser(
-          userId,
-          {
-            title: schedule.title,
-            body: schedule.bodyTemplate,
-            imageUrl: schedule.imageUrl,
-            data: {
-              ...schedule.data,
-              campaignId: campaign.id,
-            },
-          },
-          false, // 실제 발송
-        );
-
-        successCount += result.sentCount;
-        failureCount += result.failureCount || 0;
-      } catch (error) {
-        this.logger.error(`❌ [PushCampaignService] 발송 실패: userId=${userId}, error=${error.message}`);
-        failureCount++;
+      if (existing) {
+        this.logger.warn(`⚠️ [PushCampaignService] 이미 실행됨: campaignKey=${campaignKey}`);
+        return { success: false, message: '이미 실행된 캠페인입니다', campaignId: existing.id };
       }
-    }
 
-    // 5. 캠페인 상태 → COMPLETED/FAILED
-    const finalStatus = successCount > 0 ? PushCampaignStatus.COMPLETED : PushCampaignStatus.FAILED;
-    await this.prisma.pushNotificationCampaign.update({
-      where: { id: campaign.id },
-      data: {
-        status: finalStatus,
-        sentCount: successCount,
-        failCount: failureCount,
-        completedAt: getNowKST(),
-        errorMessage: finalStatus === PushCampaignStatus.FAILED ? '발송에 실패했습니다' : null,
-      },
-    });
+      // 1. 대상 유저 조회
+      const targetQuery = schedule.targetQuery || {};
+      const targetUsers = await this.getTargetUsers(targetQuery);
 
-    // 6. ONCE 타입 스케줄이면 자동 비활성화
-    if (schedule.scheduleType === PushScheduleType.ONCE) {
+      // 2. 캠페인 생성 (PENDING 상태)
+      const campaign = await this.prisma.pushNotificationCampaign.create({
+        data: {
+          scheduleId: schedule.id,
+          campaignKey,
+          campaignType: schedule.scheduleType === PushScheduleType.ONCE ? PushCampaignType.SCHEDULED : PushCampaignType.RECURRING,
+          title: schedule.title,
+          body: schedule.bodyTemplate,
+          imageUrl: schedule.imageUrl,
+          data: schedule.data,
+          type: schedule.type,
+          category: schedule.category,
+          status: PushCampaignStatus.PENDING,
+          targetCount: targetUsers.length,
+          scheduledAt: now,
+          createdAt: now,
+        },
+      });
+
+      this.logger.log(`📦 [PushCampaignService] 캠페인 생성 완료: id=${campaign.id}, target=${targetUsers.length}명`);
+
+      // 3. 캠페인 상태 → PROCESSING
+      await this.prisma.pushNotificationCampaign.update({
+        where: { id: campaign.id },
+        data: {
+          status: PushCampaignStatus.PROCESSING,
+          startedAt: getNowKST(),
+        },
+      });
+
+      // 4. 푸시 발송 (각 유저별)
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const userId of targetUsers) {
+        try {
+          const result = await this.pushNotificationService.sendToUser(
+            userId,
+            {
+              title: schedule.title,
+              body: schedule.bodyTemplate,
+              imageUrl: schedule.imageUrl,
+              data: {
+                ...schedule.data,
+                campaignId: campaign.id,
+              },
+            },
+            false, // 실제 발송
+          );
+
+          successCount += result.sentCount;
+          failureCount += result.failureCount || 0;
+        } catch (error) {
+          this.logger.error(`❌ [PushCampaignService] 발송 실패: userId=${userId}, error=${error.message}`);
+          failureCount++;
+        }
+      }
+
+      // 5. 캠페인 상태 → COMPLETED/FAILED
+      const finalStatus = successCount > 0 ? PushCampaignStatus.COMPLETED : PushCampaignStatus.FAILED;
+      await this.prisma.pushNotificationCampaign.update({
+        where: { id: campaign.id },
+        data: {
+          status: finalStatus,
+          sentCount: successCount,
+          failCount: failureCount,
+          completedAt: getNowKST(),
+          errorMessage: finalStatus === PushCampaignStatus.FAILED ? '발송에 실패했습니다' : null,
+        },
+      });
+
+      // 6. ONCE 타입 스케줄이면 자동 비활성화
+      if (schedule.scheduleType === PushScheduleType.ONCE) {
+        await this.prisma.pushNotificationSchedule.update({
+          where: { id: schedule.id },
+          data: { isActive: false },
+        });
+        this.logger.log(`🔒 [PushCampaignService] ONCE 스케줄 비활성화: scheduleId=${schedule.id}`);
+      }
+
+      // 7. 스케줄 실행 통계 업데이트
       await this.prisma.pushNotificationSchedule.update({
         where: { id: schedule.id },
-        data: { isActive: false },
+        data: {
+          lastExecutedAt: now,
+          executionCount: { increment: 1 },
+        },
       });
-      this.logger.log(`🔒 [PushCampaignService] ONCE 스케줄 비활성화: scheduleId=${schedule.id}`);
+
+      this.logger.log(
+        `✅ [PushCampaignService] 캠페인 실행 완료: campaignId=${campaign.id}, status=${finalStatus}, sent=${successCount}, failed=${failureCount}`,
+      );
+
+      return {
+        success: true,
+        message: `캠페인이 실행되었습니다 (성공: ${successCount}, 실패: ${failureCount})`,
+        campaignId: campaign.id,
+        sentCount: successCount,
+        failureCount,
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushCampaignService] 스케줄 캠페인 실행 실패: scheduleId=${schedule.id}, ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    // 7. 스케줄 실행 통계 업데이트
-    await this.prisma.pushNotificationSchedule.update({
-      where: { id: schedule.id },
-      data: {
-        lastExecutedAt: now,
-        executionCount: { increment: 1 },
-      },
-    });
-
-    this.logger.log(
-      `✅ [PushCampaignService] 캠페인 실행 완료: campaignId=${campaign.id}, status=${finalStatus}, sent=${successCount}, failed=${failureCount}`,
-    );
-
-    return {
-      success: true,
-      message: `캠페인이 실행되었습니다 (성공: ${successCount}, 실패: ${failureCount})`,
-      campaignId: campaign.id,
-      sentCount: successCount,
-      failureCount,
-    };
   }
 
   /**
