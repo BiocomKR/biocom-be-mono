@@ -2025,7 +2025,7 @@ model PushNotificationLog {
   pushTokenId Int? @map("push_token_id")
 
   /// 제목
-  title String @db.VarChar(100)
+  title String @db.VarChar(255)
 
   /// 본문
   body String @db.Text
@@ -2040,7 +2040,7 @@ model PushNotificationLog {
   success Boolean
 
   /// 에러 코드
-  errorCode String? @map("error_code") @db.VarChar(50)
+  errorCode String? @map("error_code") @db.VarChar(100)
 
   /// 에러 메시지
   errorMessage String? @map("error_message") @db.Text
@@ -2062,7 +2062,7 @@ model PushNotificationLog {
   pushToken PushToken?                @relation(fields: [pushTokenId], references: [id], onDelete: SetNull)
   campaign  PushNotificationCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
 
-  @@unique([campaignId, userId])
+  @@unique([campaignId, userId, pushTokenId])
   @@index([userId])
   @@index([campaignId])
   @@index([pushTokenId])
