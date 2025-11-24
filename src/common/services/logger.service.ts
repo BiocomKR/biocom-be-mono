@@ -115,4 +115,15 @@ export class LoggerService implements NestLoggerService {
       details,
     });
   }
+
+  /**
+   * 예외 로깅 (메타데이터 포함)
+   * AllExceptionsFilter에서 사용
+   */
+  logException(message: string, trace: string, meta: any): void {
+    this.logger.error(message, {
+      trace,
+      ...meta,
+    });
+  }
 }

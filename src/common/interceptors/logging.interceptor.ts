@@ -51,7 +51,7 @@ export class LoggingInterceptor implements NestInterceptor {
           // 성공 응답 로깅
           const responseTime = Date.now() - startTime;
           const { statusCode } = response;
-          
+
           this.logger.logRequest(
             method,
             url,
@@ -62,26 +62,11 @@ export class LoggingInterceptor implements NestInterceptor {
             userId,
           );
         },
-        error: (error) => {
-          // 에러 응답 로깅
+        error: () => {
+          // 에러는 AllExceptionsFilter에서 처리
+          // 여기서는 응답 시간만 측정하여 필터로 전달
           const responseTime = Date.now() - startTime;
-          const statusCode = error.status || 500;
-          
-          this.logger.error(
-            `Request failed: ${error.message}`,
-            error.stack,
-            'HTTP',
-          );
-          
-          this.logger.logRequest(
-            method,
-            url,
-            statusCode,
-            responseTime,
-            ip,
-            userAgent.substring(0, 100),
-            userId,
-          );
+          (request as any).responseTime = responseTime;
         },
       }),
     );
