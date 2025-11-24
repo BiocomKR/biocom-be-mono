@@ -418,63 +418,57 @@ export class PushNotificationService {
     }
 
     // WHERE 조건 생성
-    const whereConditions: string[] = [];
-    const params: any[] = [];
-    let paramIndex = 1;
+    // WHERE 조건 구성
+    const whereFilter: any = {};
 
     if (startDate) {
-      whereConditions.push(`"sentAt" >= $${paramIndex}`);
-      params.push(stringToKSTDate(startDate, 0, 0, 0));
-      paramIndex++;
+      whereFilter.sentAt = {
+        ...whereFilter.sentAt,
+        gte: stringToKSTDate(startDate, 0, 0, 0),
+      };
     }
     if (endDate) {
-      whereConditions.push(`"sentAt" <= $${paramIndex}`);
-      params.push(stringToKSTDate(endDate, 23, 59, 59));
-      paramIndex++;
+      whereFilter.sentAt = {
+        ...whereFilter.sentAt,
+        lte: stringToKSTDate(endDate, 23, 59, 59),
+      };
     }
     if (isTest !== undefined) {
-      whereConditions.push(`"isTest" = $${paramIndex}`);
-      params.push(isTest);
-      paramIndex++;
+      whereFilter.isTest = isTest;
     }
 
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-
-    // 단일 쿼리로 모든 통계 조회 (6개 쿼리 -> 1개 쿼리)
-    const statsQuery = `
-      SELECT
-        COUNT(*) as "totalSent",
-        COUNT(*) FILTER (WHERE success = true) as "successCount",
-        COUNT(*) FILTER (WHERE success = false) as "failureCount",
-        COUNT(*) FILTER (WHERE "readAt" IS NOT NULL) as "readCount",
-        COUNT(*) FILTER (WHERE "clickedAt" IS NOT NULL) as "clickedCount"
-      FROM "PushNotificationLog"
-      ${whereClause}
-    `;
-
-    const typeQuery = `
-      SELECT type, COUNT(*) as count
-      FROM "PushNotificationLog"
-      ${whereClause}
-      GROUP BY type
-    `;
-
-    // 병렬로 실행
-    const [statsResult, typeResult] = await Promise.all([
-      this.prisma.$queryRawUnsafe(statsQuery, ...params) as Promise<any[]>,
-      this.prisma.$queryRawUnsafe(typeQuery, ...params) as Promise<any[]>,
+    // Prisma ORM을 사용한 통계 조회 (병렬 실행)
+    const [totalSent, successCount, failureCount, readCount, clickedCount, typeStats] = await Promise.all([
+      // 전체 전송 수
+      this.prisma.pushNotificationLog.count({ where: whereFilter }),
+      // 성공 수
+      this.prisma.pushNotificationLog.count({
+        where: { ...whereFilter, success: true },
+      }),
+      // 실패 수
+      this.prisma.pushNotificationLog.count({
+        where: { ...whereFilter, success: false },
+      }),
+      // 읽음 수
+      this.prisma.pushNotificationLog.count({
+        where: { ...whereFilter, readAt: { not: null } },
+      }),
+      // 클릭 수
+      this.prisma.pushNotificationLog.count({
+        where: { ...whereFilter, clickedAt: { not: null } },
+      }),
+      // 타입별 집계
+      this.prisma.pushNotificationLog.groupBy({
+        by: ['type'],
+        where: whereFilter,
+        _count: { type: true },
+      }),
     ]);
 
-    const stats = statsResult[0];
-    const totalSent = Number(stats.totalSent);
-    const successCount = Number(stats.successCount);
-    const failureCount = Number(stats.failureCount);
-    const readCount = Number(stats.readCount);
-    const clickedCount = Number(stats.clickedCount);
-
+    // 타입별 통계를 Record 형태로 변환
     const byType: Record<string, number> = {};
-    typeResult.forEach((item: any) => {
-      byType[item.type] = Number(item.count);
+    typeStats.forEach((item: { type: string; _count: { type: number } }) => {
+      byType[item.type] = item._count.type;
     });
 
     this.logger.log(
@@ -489,6 +483,8 @@ export class PushNotificationService {
       clickedCount,
       byType,
     };
+
+
   }
 
   /**
