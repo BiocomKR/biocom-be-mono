@@ -461,8 +461,8 @@ export class PushNotificationService {
 
     // 병렬로 실행
     const [statsResult, typeResult] = await Promise.all([
-      this.prisma.$queryRawUnsafe<any[]>(statsQuery, ...params),
-      this.prisma.$queryRawUnsafe<any[]>(typeQuery, ...params),
+      this.prisma.$queryRawUnsafe(statsQuery, ...params) as Promise<any[]>,
+      this.prisma.$queryRawUnsafe(typeQuery, ...params) as Promise<any[]>,
     ]);
 
     const stats = statsResult[0];

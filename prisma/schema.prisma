@@ -2102,60 +2102,6 @@ model UserChart {
   @@map("user_charts")
 }
 
-/// 푸시 알림 발송 로그 테이블
-/// 개별 유저별 발송 상세 이력
-model PushNotificationLog {
-  /// 고유 ID
-  id           Int                       @id @default(autoincrement())
-  /// 유저 ID
-  userId       Int                       @map("user_id")
-  /// 푸시 토큰 ID
-  pushTokenId  Int?                      @map("push_token_id")
-  /// 제목
-  title        String?                   @db.VarChar(255)
-  /// 본문
-  body         String
-  /// 추가 데이터 (주문번호, 미션ID, 딥링크 등)
-  data         Json?
-  /// 푸시 타입
-  type         String?                   @db.VarChar(50)
-  /// 발송 성공 여부
-  success      Boolean
-  /// 에러 코드
-  errorCode    String?                   @map("error_code") @db.VarChar(100)
-  /// 에러 메시지
-  errorMessage String?                   @map("error_message")
-  /// 발송 시간
-  sentAt       DateTime?                 @map("sent_at")
-  /// 알림 읽은 시간
-  readAt       DateTime?                 @map("read_at")
-  /// 알림 클릭한 시간
-  clickedAt    DateTime?                 @map("clicked_at")
-  /// 캠페인 ID
-  campaignId   Int?                      @map("campaign_id")
-  /// 테스트 발송 여부
-  isTest       Boolean                   @map("is_test")
-  /// 생성일시
-  createdAt    DateTime?                 @map("created_at")
-  /// 이미지 URL
-  imageUrl     String?                   @map("image_url") @db.VarChar(500)
-  /// 메시지 ID
-  messageId    String?                   @map("message_id") @db.VarChar(255)
-  campaign     PushNotificationCampaign? @relation(fields: [campaignId], references: [id])
-  pushToken    PushToken?                @relation(fields: [pushTokenId], references: [id])
-  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([campaignId, userId, pushTokenId])
-  @@index([userId], map: "idx_push_notification_logs_user_id")
-  @@index([campaignId])
-  @@index([pushTokenId])
-  @@index([type])
-  @@index([success])
-  @@index([isTest])
-  @@map("push_notification_logs")
-}
-
-
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model UserConsent {
   id                Int       @id @default(autoincrement())
