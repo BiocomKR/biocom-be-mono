@@ -25,7 +25,7 @@ export class ConfigService {
       port: this.nestConfigService.get('PORT', { infer: true }),
       isProduction: this.nestConfigService.get('NODE_ENV') === 'production',
       isDevelopment: this.nestConfigService.get('NODE_ENV') === 'development',
-      isTest: this.nestConfigService.get('NODE_ENV') === 'test',
+      isTest: this.nestConfigService.get('NODE_ENV') === 'local',
     };
   }
 

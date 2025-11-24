@@ -37,8 +37,9 @@ export class HomeService {
         where: { id: userId },
         select: {
           id: true,
-          email: true,
+          // email: true,
           mobile: true,
+          name: true,
           status: true,
           userChallenges: {
             where: { status: 'ACTIVE' },
@@ -65,13 +66,15 @@ export class HomeService {
         throw new Error('사용자를 찾을 수 없습니다');
       }
 
-      // 공통 처리: 외부 API에서 차트 데이터 조회 및 저장
-      await this.fetchAndSaveChartData(userId, user.mobile);
+      // 공통 처리: 외부 API에서 차트 데이터 조회 및 저장 (백그라운드 실행)
+      this.fetchAndSaveChartData(userId, user.mobile).catch(err => {
+        this.logger.warn(`차트 데이터 백그라운드 저장 실패 - 사용자 ID: ${userId}`, err);
+      });
 
       const baseData = {
         status: user.status,
-        userName: user.email, // TODO: 실제 이름 필드가 있으면 변경
-        welcomeMessage: `안녕하세요, ${user.email}님!`,
+        userName: user.name, // TODO: 실제 이름 필드가 있으면 변경
+        welcomeMessage: `안녕하세요, ${user.name}님!`,
       };
 
       // 구독 상태에 따른 홈 화면 데이터 반환

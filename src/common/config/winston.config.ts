@@ -77,7 +77,7 @@ const transports: winston.transport[] = [
 const slackTransport = createSlackTransport();
 if (slackTransport) {
   transports.push(slackTransport);
-  if (process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV !== 'local') {
     console.log('✅ Slack 에러 알림이 활성화되었습니다.');
   }
 }
@@ -107,7 +107,7 @@ export const winstonLogger = winston.createLogger({
 });
 
 // 로그 디렉토리 생성 확인 메시지
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'local') {
   console.log(`📝 로그 파일 저장 경로: ${LOG_PATH}`);
   console.log(`📊 로그 레벨: ${LOG_LEVEL}`);
   console.log(`📅 로그 보관 기간: ${LOG_MAX_DAYS}일`);

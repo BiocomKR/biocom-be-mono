@@ -9,7 +9,7 @@ import * as Joi from 'joi';
 export const validationSchema = Joi.object({
   // 애플리케이션 설정
   NODE_ENV: Joi.string()
-    .valid('development', 'production', 'test')
+    .valid('development', 'production', 'local')
     .default('development')
     .description('애플리케이션 실행 환경'),
     
@@ -134,7 +134,7 @@ export const validationSchema = Joi.object({
  */
 export interface EnvironmentVariables {
   // 애플리케이션
-  NODE_ENV: 'development' | 'production' | 'test';
+  NODE_ENV: 'development' | 'production' | 'local';
   PORT: number;
   
   // 데이터베이스

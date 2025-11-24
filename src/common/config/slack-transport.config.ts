@@ -251,11 +251,14 @@ class SlackTransport extends Transport {
  * Slack Transport 인스턴스 생성
  */
 export function createSlackTransport(): winston.transport | null {
+  // local 환경에서는 슬랙 알림 비활성화
+  if (NODE_ENV === 'local') {
+    return null;
+  }
+
   // Slack 알림이 비활성화되었거나 Webhook URL이 없으면 null 반환
   if (!SLACK_ENABLED || !SLACK_WEBHOOK_URL) {
-    if (NODE_ENV !== 'test') {
-      console.log('⚠️  Slack 알림이 비활성화되어 있습니다.');
-    }
+    console.log('⚠️  Slack 알림이 비활성화되어 있습니다.');
     return null;
   }
 

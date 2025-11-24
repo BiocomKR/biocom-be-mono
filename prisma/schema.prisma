@@ -35,6 +35,9 @@ model User {
   orders                       Order[]
   pointHistories               PointHistory[]
   productFeedback              ProductFeedback[]
+  pushNotificationLogs         PushNotificationLog[]
+  pushTokens                   PushToken[]
+  quizAttempts                 QuizAttempt[]
   recentlyViewed               RecentlyViewed[]
   refreshTokens                RefreshToken[]
   refundWarranties             RefundWarranty[]
@@ -46,14 +49,12 @@ model User {
   userFiles                    UserFile[]
   userMissions                 UserMission[]
   userRecords                  UserRecord[]
-  quizAttempts                 QuizAttempt[]
   userSupplementRoutine        UserSupplementRoutine[]        @relation("UserSupplementRoutineUser")
   userSupplementRoutineHistory UserSupplementRoutineHistory[] @relation("UserSupplementRoutineHistoryUser")
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
+  healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
   subscriptions                Subscription[]
-  pushTokens                   PushToken[]
-  pushNotificationLogs         PushNotificationLog[]
 
   @@map("users")
 }
@@ -127,9 +128,9 @@ model Content {
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   challengeId     Int?             @map("challenge_id")
   contentFiles    ContentFile[]
-  quizAttempts    QuizAttempt[]
   lectureProducts LectureProduct[]
   lectureQuizzes  LectureQuiz[]
+  quizAttempts    QuizAttempt[]
 
   @@index([type, isActive])
   @@index([weekNumber, dayNumber])
@@ -269,6 +270,7 @@ model HealthTypeAnimal {
   symptoms    String
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @updatedAt @map("updated_at")
+  users       User[]
 
   @@map("health_type_animals")
 }
@@ -419,7 +421,7 @@ model QuizAttempt {
   isCorrect      Boolean  @map("is_correct")
   pointsEarned   Int      @map("points_earned")
   createdAt      DateTime @map("created_at")
-  content        Content? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  content        Content? @relation(fields: [contentId], references: [id])
   quiz           Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1259,21 +1261,33 @@ model LectureProduct {
 /// 밸런스게임 마스터 테이블
 /// 밸런스게임 기본 정보 관리
 model BalanceGame {
-  id            Int                      @id @default(autoincrement())
+  id                   Int                      @id @default(autoincrement())
   /// 게임명
-  title         String                   @db.VarChar(200)
+  title                String                   @db.VarChar(200)
   /// 게임 설명
-  description   String?
+  description          String?
   /// 활성화 여부
-  isActive      Boolean                  @default(true) @map("is_active")
+  isActive             Boolean                  @default(true) @map("is_active")
   /// 생성일시
-  createdAt     DateTime                 @map("created_at")
+  createdAt            DateTime                 @map("created_at")
   /// 수정일시
-  updatedAt     DateTime?                @updatedAt @map("updated_at")
+  updatedAt            DateTime?                @updatedAt @map("updated_at")
   /// 챌린지 일차 (1~21일차)
-  challengeDay  Int                      @unique @map("challenge_day")
-  steps         BalanceGameStep[]
-  userHistories UserBalanceGameHistory[]
+  challengeDay         Int                      @unique @map("challenge_day")
+  /// 선택지 1 키워드
+  option1Keyword       String?                  @map("option1_keyword") @db.VarChar(100)
+  /// 선택지 1 연결 제품
+  option1LinkedProduct String?                  @map("option1_linked_product") @db.VarChar(100)
+  /// 선택지 1 텍스트
+  option1Text          String?                  @map("option1_text") @db.VarChar(200)
+  /// 선택지 2 키워드
+  option2Keyword       String?                  @map("option2_keyword") @db.VarChar(100)
+  /// 선택지 2 연결 제품
+  option2LinkedProduct String?                  @map("option2_linked_product") @db.VarChar(100)
+  /// 선택지 2 텍스트
+  option2Text          String?                  @map("option2_text") @db.VarChar(200)
+  steps                BalanceGameStep[]
+  userHistories        UserBalanceGameHistory[]
 
   @@index([isActive, challengeDay])
   @@map("balance_games")
@@ -1771,88 +1785,62 @@ model Subscription {
 /// 모든 푸시 서비스(FCM, OneSignal, APNs 등)의 토큰 관리
 model PushToken {
   /// 고유 ID
-  id Int @id @default(autoincrement())
-
+  id               Int                   @id @default(autoincrement())
   /// 유저 ID
-  userId Int @map("user_id")
-
+  userId           Int                   @map("user_id")
   /// 푸시 서비스 제공자 (FCM, ONESIGNAL, APNS 등)
-  provider String @db.VarChar(20)
-
-  /// 푸시 토큰 (필수)
-  /// FCM, APNS, OneSignal 등 모든 서비스의 토큰
-  token String @db.VarChar(255)
-
-  /// 메타데이터 (선택적 부가 정보)
-  /// 예: { expiresAt: "2025-12-31", scope: ["notifications"], customData: {...} }
-  metadata Json?
-
+  provider         String                @db.VarChar(20)
   /// 디바이스 고유 ID
-  deviceId String? @map("device_id") @db.VarChar(255)
-
+  deviceId         String?               @map("device_id") @db.VarChar(255)
   /// 플랫폼 (ios, android, web)
-  platform String? @db.VarChar(20)
-
+  platform         String?               @db.VarChar(20)
   /// 디바이스 모델명
-  deviceModel String? @map("device_model") @db.VarChar(100)
-
+  deviceModel      String?               @map("device_model") @db.VarChar(100)
   /// OS 버전
-  osVersion String? @map("os_version") @db.VarChar(50)
-
+  osVersion        String?               @map("os_version") @db.VarChar(50)
   /// 앱 버전
-  appVersion String? @map("app_version") @db.VarChar(50)
-
+  appVersion       String?               @map("app_version") @db.VarChar(50)
   /// 활성화 여부
-  isActive Boolean @default(true) @map("is_active")
-
+  isActive         Boolean               @default(true) @map("is_active")
   /// 토큰 무효화 시간
-  invalidatedAt DateTime? @map("invalidated_at")
-
+  invalidatedAt    DateTime?             @map("invalidated_at")
   /// 무효화 이유
-  invalidReason String? @map("invalid_reason") @db.VarChar(100)
-
+  invalidReason    String?               @map("invalid_reason") @db.VarChar(100)
   /// 마지막 사용 시간 (발송 성공)
-  lastUsedAt DateTime? @map("last_used_at")
-
+  lastUsedAt       DateTime?             @map("last_used_at")
   /// 마지막 실패 시간
-  lastFailedAt DateTime? @map("last_failed_at")
-
+  lastFailedAt     DateTime?             @map("last_failed_at")
   /// 연속 실패 횟수
-  failureCount Int @default(0) @map("failure_count")
-
+  failureCount     Int                   @default(0) @map("failure_count")
   /// 총 성공 횟수
-  successCount Int @default(0) @map("success_count")
-
+  successCount     Int                   @default(0) @map("success_count")
   /// 마케팅 알림 수신 동의
-  marketingEnabled Boolean @default(false) @map("marketing_enabled")
-
+  marketingEnabled Boolean               @default(false) @map("marketing_enabled")
   /// 야간 푸시 수신 동의
-  nightPushEnabled Boolean @default(true) @map("night_push_enabled")
-
+  nightPushEnabled Boolean               @default(true) @map("night_push_enabled")
   /// User Agent
-  userAgent String? @map("user_agent") @db.VarChar(500)
-
+  userAgent        String?               @map("user_agent") @db.VarChar(500)
   /// IP 주소
-  ipAddress String? @map("ip_address") @db.VarChar(45)
-
+  ipAddress        String?               @map("ip_address") @db.VarChar(45)
   /// 타임존
-  timezone String? @default("Asia/Seoul") @db.VarChar(50)
-
+  timezone         String?               @default("Asia/Seoul") @db.VarChar(50)
   /// 생성일시
-  createdAt DateTime @default(now()) @map("created_at")
-
+  createdAt        DateTime              @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt DateTime? @updatedAt @map("updated_at")
-
-  /// 관계
-  user User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  logs PushNotificationLog[]
+  updatedAt        DateTime?             @updatedAt @map("updated_at")
+  /// 푸시 토큰 (필수)
+  token            String                @db.VarChar(255)
+  /// 메타데이터 (선택적 부가 정보)
+  metadata         Json?
+  logs             PushNotificationLog[]
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deviceId, provider])
   @@index([userId])
   @@index([provider])
   @@index([isActive])
   @@index([platform])
+  @@index([token])
   @@map("push_tokens")
 }
 
