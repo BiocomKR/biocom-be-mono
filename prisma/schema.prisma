@@ -1918,6 +1918,7 @@ model PushNotificationLog {
   pushToken    PushToken?                @relation(fields: [pushTokenId], references: [id])
   user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([campaignId, userId, pushTokenId])
   @@index([userId], map: "idx_push_notification_logs_user_id")
   @@index([campaignId])
   @@index([pushTokenId])
