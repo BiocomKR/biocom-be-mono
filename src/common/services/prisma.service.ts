@@ -415,9 +415,17 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   $queryRaw(query: TemplateStringsArray, ...values: any[]) {
     return (this.prisma as any).$queryRaw(query, ...values);
   }
-  
+
+  $queryRawUnsafe(query: string, ...values: any[]) {
+    return (this.prisma as any).$queryRawUnsafe(query, ...values);
+  }
+
   $executeRaw(query: TemplateStringsArray, ...values: any[]) {
     return (this.prisma as any).$executeRaw(query, ...values);
+  }
+
+  $executeRawUnsafe(query: string, ...values: any[]) {
+    return (this.prisma as any).$executeRawUnsafe(query, ...values);
   }
   
   $connect() {
