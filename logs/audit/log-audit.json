@@ -364,6 +364,26 @@
             "date": 1763955881367,
             "name": "logs/rejections-2025-11-24.log",
             "hash": "179f71787223206f8056cfcf097004e330d8d148b7c443bda90c1eee497044d2"
+        },
+        {
+            "date": 1764033095205,
+            "name": "logs/application-2025-11-25.log",
+            "hash": "3b9675dfd2a02d878e42f9a506e76529b2d9b7057524a2a320bddffe13c81dc5"
+        },
+        {
+            "date": 1764033095206,
+            "name": "logs/error-2025-11-25.log",
+            "hash": "5e8e86083f549da8d365728d0c5bdcbceb6959be5521066ab52673ff097f9b5b"
+        },
+        {
+            "date": 1764033095206,
+            "name": "logs/exceptions-2025-11-25.log",
+            "hash": "b08759f29c232d94ead8d30e904d479f66a4e9d3fd795c6b733fcbc387ea1be9"
+        },
+        {
+            "date": 1764033095206,
+            "name": "logs/rejections-2025-11-25.log",
+            "hash": "97dd0c3689197f347c7c72252d593a194fafdf7780e59949df936729515ca1a8"
         }
     ],
     "hashType": "sha256"

@@ -12,10 +12,7 @@ import { PushSchedulerService } from './services/push-scheduler.service';
 import { PushTestController } from './controllers/push-test.controller';
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
-import { PushNotificationAdminController } from './controllers/push-notification-admin.controller';
 import { PushTopicController } from './controllers/push-topic.controller';
-import { PushScheduleController } from './controllers/push-schedule.controller';
-import { PushCampaignController } from './controllers/push-campaign.controller';
 import { PrismaService } from '../common/services/prisma.service';
 
 /**
@@ -35,10 +32,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTestController,
     PushTokenController,
     PushNotificationController,
-    PushNotificationAdminController,
     PushTopicController,
-    PushScheduleController,
-    PushCampaignController,
   ],
   providers: [
     FcmProvider,

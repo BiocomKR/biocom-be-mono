@@ -19,6 +19,9 @@ import { ManagementShippingController } from './controllers/management-shipping.
 import { ManagementRefundController } from './controllers/management-refund.controller';
 import { ManagementChallengeController } from './controllers/management-challenge.controller';
 import { ManagementMissionController } from './controllers/management-mission.controller';
+import { ManagementPushNotificationController } from './controllers/management-push-notification.controller';
+import { ManagementPushCampaignController } from './controllers/management-push-campaign.controller';
+import { ManagementPushScheduleController } from './controllers/management-push-schedule.controller';
 import { ManagementShopService } from './services/management-shop.service';
 import { ManagementDashboardService } from './services/management-dashboard.service';
 import { ManagementShippingService } from './services/management-shipping.service';
@@ -28,6 +31,7 @@ import { ManagementMissionService } from './services/management-mission.service'
 import { PointModule } from '../point/point.module';
 import { ChallengeModule } from '../challenge/challenge.module';
 import { PaymentModule } from '../shop/payment.module';
+import { PushModule } from '../push/push.module';
 
 /**
  * Management 모듈
@@ -45,6 +49,7 @@ import { PaymentModule } from '../shop/payment.module';
     PointModule,
     ChallengeModule,
     PaymentModule,
+    PushModule,
   ],
   controllers: [
     ManagementUsersController,
@@ -59,6 +64,9 @@ import { PaymentModule } from '../shop/payment.module';
     ManagementRefundController,
     ManagementChallengeController,
     ManagementMissionController,
+    ManagementPushNotificationController,
+    ManagementPushCampaignController,
+    ManagementPushScheduleController,
   ],
   providers: [
     ApiKeyGuard,
