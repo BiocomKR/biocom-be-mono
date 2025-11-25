@@ -278,11 +278,67 @@ export class SurveyService {
 
     // 동물 캐릭터 매칭
     let animalCharacter: string | undefined;
+    let healthTypeAnimalId: number | undefined;
+
     if (dominantCategory) {
       const healthTypeAnimal = await prismaClient.healthTypeAnimal.findUnique({
         where: { healthType: dominantCategory },
       });
-      animalCharacter = healthTypeAnimal?.animalName;
+
+      if (healthTypeAnimal) {
+        animalCharacter = healthTypeAnimal.animalName;
+        healthTypeAnimalId = healthTypeAnimal.id;
+
+        // 1. users 테이블의 health_type_animal_id에 동물id 업데이트
+        await prismaClient.user.update({
+          where: { id: userId },
+          data: {
+            health_type_animal_id: healthTypeAnimalId,
+          },
+        });
+
+        this.logger.log(`사용자 ${userId}에게 동물 ${animalCharacter} (ID: ${healthTypeAnimalId}) 할당 완료`);
+
+        // 2. health_type_animal_products 테이블에서 동물id로 조회
+        const animalProducts = await prismaClient.healthTypeAnimalProduct.findMany({
+          where: {
+            healthTypeAnimalId: healthTypeAnimalId,
+            isActive: true,
+          },
+          orderBy: {
+            displayOrder: 'asc', // 1, 2, 3 순서대로
+          },
+        });
+
+        this.logger.log(`동물 ${animalCharacter}의 맞춤 영양제 ${animalProducts.length}개 조회 완료`);
+
+        // 3. userSupplementRoutine 테이블에 기본 영양제 3종 insert
+        if (animalProducts.length > 0) {
+          const now = getNowKST();
+
+          // 기존 영양제 루틴 삭제 (중복 방지)
+          await prismaClient.userSupplementRoutine.deleteMany({
+            where: {
+              userId,
+              isDefault: true, // 기본 영양제만 삭제
+            },
+          });
+
+          // 새로운 기본 영양제 루틴 생성
+          await prismaClient.userSupplementRoutine.createMany({
+            data: animalProducts.map((product, index) => ({
+              userId,
+              productId: product.productId,
+              isDefault: true, // 기본 영양제 표시
+              displayOrder: index + 1, // 1, 2, 3
+              isActive: true,
+              createdAt: now,
+            })),
+          });
+
+          this.logger.log(`사용자 ${userId}의 영양제 루틴 ${animalProducts.length}개 생성 완료`);
+        }
+      }
     }
 
     return {
@@ -400,63 +456,63 @@ export class SurveyService {
     });
   }
 
-  // 질문별 답변 조회는 management로 이동
+  // // 질문별 답변 조회는 management로 이동
 
-  /**
-   * 챌린지별 설문 완료 처리 (Product 기반)
-   * CategoryDetail 기반 동물 배정 및 Before/After 결과 저장
-   */
-  async completeChallengeSurvey(
-    userId: number,
-    productId: number,
-    type: 'BEFORE' | 'AFTER',
-    answers: Array<{ questionId: number; optionId: number }>
-  ) {
-    this.logger.log(`챌린지 설문 완료 처리 - 사용자: ${userId}, 상품: ${productId}, 타입: ${type}`);
+  // /**
+  //  * 챌린지별 설문 완료 처리 (Product 기반)
+  //  * CategoryDetail 기반 동물 배정 및 Before/After 결과 저장
+  //  */
+  // async completeChallengeSurvey(
+  //   userId: number,
+  //   productId: number,
+  //   type: 'BEFORE' | 'AFTER',
+  //   answers: Array<{ questionId: number; optionId: number }>
+  // ) {
+  //   this.logger.log(`챌린지 설문 완료 처리 - 사용자: ${userId}, 상품: ${productId}, 타입: ${type}`);
 
-    return await this.prisma.$transaction(async (tx) => {
-      // 1. 설문 답변 저장
-      const now = getNowKST();
-      for (const answer of answers) {
-        await tx.surveyAnswer.create({
-          data: {
-            userId,
-            type,
-            surveyQuestionId: answer.questionId,
-            surveyOptionId: answer.optionId,
-            createdAt: now,
-          },
-        });
-      }
+  //   return await this.prisma.$transaction(async (tx) => {
+  //     // 1. 설문 답변 저장
+  //     const now = getNowKST();
+  //     for (const answer of answers) {
+  //       await tx.surveyAnswer.create({
+  //         data: {
+  //           userId,
+  //           type,
+  //           surveyQuestionId: answer.questionId,
+  //           surveyOptionId: answer.optionId,
+  //           createdAt: now,
+  //         },
+  //       });
+  //     }
 
-      // 2. 카테고리별 점수 계산 (old-survey.service.ts 로직 적용)
-      const categoryScores = await this.calculateCategoryScores(answers, tx);
-      this.logger.debug(`카테고리별 점수: ${JSON.stringify(categoryScores)}`);
+  //     // 2. 카테고리별 점수 계산 (old-survey.service.ts 로직 적용)
+  //     const categoryScores = await this.calculateCategoryScores(answers, tx);
+  //     this.logger.debug(`카테고리별 점수: ${JSON.stringify(categoryScores)}`);
 
-      // 3. 최저점수 카테고리 찾기
-      const lowestCategory = this.findLowestScoreCategory(categoryScores);
-      this.logger.log(`최저점수 카테고리: ${lowestCategory}`);
+  //     // 3. 최저점수 카테고리 찾기
+  //     const lowestCategory = this.findLowestScoreCategory(categoryScores);
+  //     this.logger.log(`최저점수 카테고리: ${lowestCategory}`);
 
-      // 4. UserChallengeSurveyResult 저장/업데이트
-      await this.saveOrUpdateSurveyResult(userId, productId, type, categoryScores, lowestCategory, tx);
+  //     // 4. UserChallengeSurveyResult 저장/업데이트
+  //     await this.saveOrUpdateSurveyResult(userId, productId, type, categoryScores, lowestCategory, tx);
 
-      // 5. HealthTypeAnimal에서 동물 캐릭터 정보 조회
-      const healthTypeAnimal = await tx.healthTypeAnimal.findFirst({
-        where: { healthType: lowestCategory },
-      });
+  //     // 5. HealthTypeAnimal에서 동물 캐릭터 정보 조회
+  //     const healthTypeAnimal = await tx.healthTypeAnimal.findFirst({
+  //       where: { healthType: lowestCategory },
+  //     });
 
-      // 6. 챌린지 진행 상황 업데이트
-      await this.processChallengeIntegration(tx, userId, productId);
+  //     // 6. 챌린지 진행 상황 업데이트
+  //     await this.processChallengeIntegration(tx, userId, productId);
 
-      return {
-        scores: categoryScores,
-        lowestCategory,
-        animalCharacter: healthTypeAnimal?.animalName,
-        characterKeyword: healthTypeAnimal?.catchphrase,
-        detailedFeatures: healthTypeAnimal?.symptoms,
-      };
-    });
-  }
+  //     return {
+  //       scores: categoryScores,
+  //       lowestCategory,
+  //       animalCharacter: healthTypeAnimal?.animalName,
+  //       characterKeyword: healthTypeAnimal?.catchphrase,
+  //       detailedFeatures: healthTypeAnimal?.symptoms,
+  //     };
+  //   });
+  // }
 
   /**
    * 설문 ID 기반 설문 완료 처리

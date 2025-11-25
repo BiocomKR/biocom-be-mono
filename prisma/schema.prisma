@@ -126,6 +126,7 @@ model Content {
   createdAt       DateTime         @map("created_at")
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   challengeId     Int?             @map("challenge_id")
+  challenge       Product?         @relation("ChallengeContents", fields: [challengeId], references: [id])
   contentFiles    ContentFile[]
   lectureProducts LectureProduct[]
   lectureQuizzes  LectureQuiz[]
@@ -261,15 +262,16 @@ model SurveyAnswer {
 /// 건강 유형별 동물 캐릭터 테이블
 /// 설문 결과에 따른 건강 유형별 동물 캐릭터 정보를 저장
 model HealthTypeAnimal {
-  id          Int       @id @default(autoincrement())
-  healthType  String    @unique(map: "category_details_category_code_key") @map("health_type") @db.VarChar(50)
-  typeName    String    @map("type_name") @db.VarChar(50)
-  animalName  String    @map("animal_name") @db.VarChar(50)
-  catchphrase String
-  symptoms    String
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime? @updatedAt @map("updated_at")
-  users       User[]
+  id                        Int                         @id @default(autoincrement())
+  healthType                String                      @unique(map: "category_details_category_code_key") @map("health_type") @db.VarChar(50)
+  typeName                  String                      @map("type_name") @db.VarChar(50)
+  animalName                String                      @map("animal_name") @db.VarChar(50)
+  catchphrase               String
+  symptoms                  String
+  createdAt                 DateTime                    @default(now()) @map("created_at")
+  updatedAt                 DateTime?                   @updatedAt @map("updated_at")
+  users                     User[]
+  recommendedProducts       HealthTypeAnimalProduct[]
 
   @@map("health_type_animals")
 }
@@ -645,6 +647,7 @@ model Product {
   /// 챌린지 메타데이터 (challengeType, totalDays, description 등)
   metadata                     Json?
   cartItems                    CartItem[]
+  challengeContents            Content[]                      @relation("ChallengeContents")
   challengeMissions            ChallengeMission[]
   challengeSurveys             ChallengeSurvey[]
   challengeTickets             ChallengeTicket[]
@@ -660,6 +663,7 @@ model Product {
   userSupplementRoutine        UserSupplementRoutine[]        @relation("UserSupplementRoutineProduct")
   userSupplementRoutineHistory UserSupplementRoutineHistory[] @relation("UserSupplementRoutineHistoryProduct")
   wishlistItems                Wishlist[]
+  healthTypeAnimalProducts     HealthTypeAnimalProduct[]
 
   @@index([sku])
   @@index([categoryCode, status])
@@ -1945,17 +1949,33 @@ model UserConsent {
   @@map("user_consents")
 }
 
+/// 사용자별 영양제 루틴 테이블
+/// 회원가입 후 배정받은 동물의 기본 영양제 3종 + 사용자가 추가한 영양제 관리
 model UserSupplementRoutine {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @map("user_id")
-  productId Int       @map("product_id")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @map("updated_at")
-  product   Product   @relation("UserSupplementRoutineProduct", fields: [productId], references: [id], onDelete: Cascade)
-  user      User      @relation("UserSupplementRoutineUser", fields: [userId], references: [id], onDelete: Cascade)
+  id           Int       @id @default(autoincrement())
+  /// 사용자 ID
+  userId       Int       @map("user_id")
+  /// 상품 ID
+  productId    Int       @map("product_id")
+  /// 기본 영양제 여부 (true: 온보딩 시 자동 추가된 기본 3종, 삭제 불가)
+  isDefault    Boolean   @default(false) @map("is_default")
+  /// 노출 순서 (기본 3종은 1~3, 추가 영양제는 4부터)
+  displayOrder Int       @default(999) @map("display_order")
+  /// 활성화 여부
+  isActive     Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt    DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt    DateTime? @updatedAt @map("updated_at")
 
+  /// Relations
+  product      Product   @relation("UserSupplementRoutineProduct", fields: [productId], references: [id], onDelete: Cascade)
+  user         User      @relation("UserSupplementRoutineUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 같은 사용자가 같은 상품을 중복 등록할 수 없음
   @@unique([userId, productId])
   @@index([userId])
+  @@index([userId, isActive])
   @@map("user_supplement_routine")
 }
 
@@ -2090,6 +2110,37 @@ model PushNotificationCampaign {
   @@index([scheduledAt])
   @@index([createdAt])
   @@map("push_notification_campaigns")
+}
+
+/// 건강 타입 동물별 추천 영양제 관계 테이블
+/// 각 동물 타입별로 맞춤 영양제 정보를 관리 (최대 3개)
+model HealthTypeAnimalProduct {
+  id                   Int              @id @default(autoincrement())
+  /// 건강 타입 동물 ID
+  healthTypeAnimalId   Int              @map("health_type_animal_id")
+  /// 상품 ID
+  productId            Int              @map("product_id")
+  /// 노출 순서 (1~3)
+  displayOrder         Int              @map("display_order")
+  /// 활성화 여부
+  isActive             Boolean          @default(true) @map("is_active")
+  /// 생성일시
+  createdAt            DateTime         @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt            DateTime?        @updatedAt @map("updated_at")
+
+  /// Relations
+  healthTypeAnimal     HealthTypeAnimal @relation(fields: [healthTypeAnimalId], references: [id], onDelete: Cascade)
+  product              Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// 각 동물 타입별로 같은 순서의 상품은 하나만 존재
+  @@unique([healthTypeAnimalId, displayOrder])
+  /// 같은 동물 타입에 같은 상품이 중복 등록되지 않도록
+  @@unique([healthTypeAnimalId, productId])
+  @@index([healthTypeAnimalId])
+  @@index([productId])
+  @@index([isActive])
+  @@map("health_type_animal_products")
 }
 
 /// AI 페르소나 성별 Enum
