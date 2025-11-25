@@ -627,7 +627,8 @@ export class SurveyController {
 
 **주의사항:**
 - 같은 type으로 재제출 시 기존 답변이 덮어쓰기 됩니다
-- 모든 질문에 답변해야 합니다 (20개)`,
+- 모든 질문에 답변해야 합니다 (20개)
+- (수면추가 총25개)`,
   })
   @ApiParam({
     name: 'challengeSurveyId',

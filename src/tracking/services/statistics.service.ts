@@ -1584,7 +1584,7 @@ export class StatisticsService {
         const metadata = record.metadata as any || {};
         return {
           date: record.date.toISOString().split('T')[0],
-          diet: metadata.dietType || 'UNKNOWN',
+          diet: metadata.diet || 'UNKNOWN',
           foodName: metadata.foodName || null,
           imageUrl: record.imageUrl || null,
           isFasting: metadata.isFasting || false,

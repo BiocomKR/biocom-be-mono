@@ -50,7 +50,12 @@ export class CompleteSurveyDto {
       { questionId: 17, optionId: 2 }, // 장 건강 질문 2
       { questionId: 18, optionId: 3 }, // 장 건강 질문 3
       { questionId: 19, optionId: 4 }, // 장 건강 질문 4
-      { questionId: 20, optionId: 5 }  // 장 건강 질문 5
+      { questionId: 20, optionId: 5 }, // 장 건강 질문 5
+      { questionId: 21, optionId: 1 }, // 수면 질문 1
+      { questionId: 22, optionId: 2 }, // 수면 질문 2
+      { questionId: 23, optionId: 3 }, // 수면 질문 3
+      { questionId: 24, optionId: 4 }, // 수면 질문 4
+      { questionId: 25, optionId: 5 }  // 수면 질문 5
     ]
   })
   @IsArray()
