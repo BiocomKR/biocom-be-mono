@@ -9,7 +9,7 @@ import { PushTopicService } from './services/push-topic.service';
 import { PushScheduleService } from './services/push-schedule.service';
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
-import { PushTestController } from './controllers/push-test.controller';
+// import { PushTestController } from './controllers/push-test.controller'; // @deprecated 삭제 예정
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
 import { PushTopicController } from './controllers/push-topic.controller';
@@ -29,7 +29,7 @@ import { PrismaService } from '../common/services/prisma.service';
     ScheduleModule.forRoot(), // 크론잡 활성화
   ],
   controllers: [
-    PushTestController,
+    // PushTestController, // @deprecated 삭제 예정
     PushTokenController,
     PushNotificationController,
     PushTopicController,
