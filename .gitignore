@@ -40,3 +40,4 @@ yarn-error.log*
 google-service-account-key.json
 *service-account*.json
 *firebase*.json
+logs/
