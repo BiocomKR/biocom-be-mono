@@ -52,4 +52,28 @@ export const rateLimitConfig = {
     ttl: 86400,
     limit: 5,
   },
+
+  // 푸시 알림 전송: 1분에 10번 (개인 테스트용)
+  pushTest: {
+    ttl: 60,
+    limit: 10,
+  },
+
+  // 푸시 알림 다중 전송: 1분에 60번 (관리자용)
+  pushBatch: {
+    ttl: 60,
+    limit: 60,
+  },
+
+  // 푸시 전체 발송: 1분에 10번 (관리자용)
+  pushBroadcast: {
+    ttl: 60,
+    limit: 10,
+  },
+
+  // 푸시 토큰 등록: 1분에 20번 (자동 로그인 고려)
+  pushTokenRegister: {
+    ttl: 60,
+    limit: 20,
+  },
 };

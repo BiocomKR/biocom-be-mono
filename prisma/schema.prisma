@@ -54,6 +54,8 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
+  subscriptions                Subscription[]
+  userConsents                 UserConsent[]
 
   @@map("users")
 }
@@ -1771,6 +1773,7 @@ model Subscription {
   createdAt       DateTime  @default(now()) @map("created_at")
   /// 수정일시
   updatedAt       DateTime  @updatedAt @map("updated_at")
+  user            User      @relation(fields: [userId], references: [id])
 
   @@index([billingKey], map: "idx_subscriptions_billing_key")
   @@index([nextBillingDate], map: "idx_subscriptions_next_billing_date")
@@ -1779,13 +1782,9 @@ model Subscription {
   @@map("subscriptions")
 }
 
-model datetime_tests {
-  id         Int      @id @default(autoincrement())
-  test_date  DateTime @db.Date
-  test_time  DateTime
-  memo       String?  @db.VarChar(200)
-  created_at DateTime @default(now())
-}
+// ================================================================
+// Push 알림 도메인
+// ================================================================
 
 /// 푸시 토큰 통합 테이블
 /// 모든 푸시 서비스(FCM, OneSignal, APNs 등)의 토큰 관리
@@ -1850,6 +1849,235 @@ model PushToken {
   @@map("push_tokens")
 }
 
+/// 푸시 알림 스케줄 테이블
+/// 반복 발송 설정 및 메시지 템플릿 관리
+model PushNotificationSchedule {
+  /// 고유 ID
+  id Int @id @default(autoincrement())
+
+  /// 스케줄 이름
+  name String @db.VarChar(100)
+
+  /// 스케줄 설명
+  description String? @db.VarChar(500)
+
+  /// 스케줄 타입 (ONCE: 단발성, RECURRING: 반복)
+  scheduleType String @default("RECURRING") @map("schedule_type") @db.VarChar(20)
+
+  /// 푸시 타입
+  type String @db.VarChar(50)
+
+  /// 카테고리 (AUTO, MARKETING)
+  category String @db.VarChar(20)
+
+  /// 크론 표현식 (예: 0 9 * * *) - RECURRING 타입일 때 사용
+  cronExpression String? @map("cron_expression") @db.VarChar(50)
+
+  /// 단발성 예약 시간 (ONCE 타입일 때 사용)
+  oneTimeScheduledAt DateTime? @map("one_time_scheduled_at")
+
+  /// 제목
+  title String @db.VarChar(100)
+
+  /// 본문 템플릿
+  bodyTemplate String @map("body_template") @db.Text
+
+  /// 이미지 URL
+  imageUrl String? @map("image_url") @db.VarChar(500)
+
+  /// 추가 데이터 (JSON)
+  data Json?
+
+  /// 타겟팅 쿼리 조건 (JSON)
+  /// 예: { "marketingEnabled": true, "userIds": [1,2,3], "platforms": ["IOS", "ANDROID"] }
+  targetQuery Json? @map("target_query")
+
+  /// 반복 발송 시작일 (RECURRING 타입일 때 유효 기간 시작)
+  startDate DateTime? @map("start_date")
+
+  /// 반복 발송 종료일 (RECURRING 타입일 때 유효 기간 종료)
+  endDate DateTime? @map("end_date")
+
+  /// 활성화 여부
+  isActive Boolean @default(true) @map("is_active")
+
+  /// 마지막 실행 시간
+  lastExecutedAt DateTime? @map("last_executed_at")
+
+  /// 다음 실행 예정 시간
+  nextExecutionAt DateTime? @map("next_execution_at")
+
+  /// 총 실행 횟수
+  executionCount Int @default(0) @map("execution_count")
+
+  /// 생성한 관리자 ID
+  createdBy Int? @map("created_by")
+
+  /// 생성일시
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// 수정일시
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  /// 관계
+  campaigns PushNotificationCampaign[]
+
+  @@index([type])
+  @@index([category])
+  @@index([isActive])
+  @@index([scheduleType])
+  @@index([nextExecutionAt])
+  @@index([startDate, endDate])
+  @@map("push_notification_schedules")
+}
+
+/// 푸시 알림 캠페인 테이블
+/// 특정 시점의 실제 발송 실행 기록
+model PushNotificationCampaign {
+  /// 고유 ID
+  id Int @id @default(autoincrement())
+
+  /// 스케줄 ID (스케줄 기반 발송이면 설정, 수동 발송이면 null)
+  scheduleId Int? @map("schedule_id")
+
+  /// 캠페인 고유 키
+  campaignKey String @unique @map("campaign_key") @db.VarChar(255)
+
+  /// 캠페인 타입 (MANUAL: 수동, SCHEDULED: 예약, RECURRING: 반복)
+  campaignType String @default("MANUAL") @map("campaign_type") @db.VarChar(20)
+
+  /// 제목
+  title String @db.VarChar(100)
+
+  /// 본문
+  body String @db.Text
+
+  /// 이미지 URL
+  imageUrl String? @map("image_url") @db.VarChar(500)
+
+  /// 추가 데이터 (JSON)
+  data Json?
+
+  /// 푸시 타입
+  type String @db.VarChar(50)
+
+  /// 카테고리
+  category String @db.VarChar(20)
+
+  /// 상태 (PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED)
+  status String @default("PENDING") @db.VarChar(20)
+
+  /// 목표 발송 수
+  targetCount Int @default(0) @map("target_count")
+
+  /// 실제 발송 성공 수
+  sentCount Int @default(0) @map("sent_count")
+
+  /// 실패 수
+  failCount Int @default(0) @map("fail_count")
+
+  /// 예약 발송 시간
+  scheduledAt DateTime? @map("scheduled_at")
+
+  /// 발송 시작 시간
+  startedAt DateTime? @map("started_at")
+
+  /// 발송 완료 시간
+  completedAt DateTime? @map("completed_at")
+
+  /// 취소 시간
+  cancelledAt DateTime? @map("cancelled_at")
+
+  /// 취소 사유
+  cancelReason String? @map("cancel_reason") @db.VarChar(500)
+
+  /// 에러 메시지 (발송 실패 시)
+  errorMessage String? @map("error_message") @db.Text
+
+  /// 생성일시
+  createdAt DateTime @default(now()) @map("created_at")
+
+  /// 생성한 관리자 ID (수동 발송인 경우)
+  createdBy Int? @map("created_by")
+
+  /// 관계
+  schedule PushNotificationSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  logs     PushNotificationLog[]
+
+  @@index([campaignKey])
+  @@index([scheduleId])
+  @@index([campaignType])
+  @@index([status])
+  @@index([type])
+  @@index([scheduledAt])
+  @@index([createdAt])
+  @@map("push_notification_campaigns")
+}
+
+/// 푸시 알림 발송 로그 테이블
+/// 개별 유저별 발송 상세 이력
+model PushNotificationLog {
+  /// 고유 ID
+  id Int @id @default(autoincrement())
+
+  /// 캠페인 ID
+  campaignId Int? @map("campaign_id")
+
+  /// 유저 ID
+  userId Int @map("user_id")
+
+  /// 푸시 토큰 ID
+  pushTokenId Int? @map("push_token_id")
+
+  /// 제목
+  title String @db.VarChar(255)
+
+  /// 본문
+  body String @db.Text
+
+  /// 푸시 타입
+  type String @db.VarChar(50)
+
+  /// 추가 데이터 (주문번호, 미션ID, 딥링크 등)
+  data Json?
+
+  /// 발송 성공 여부
+  success Boolean
+
+  /// 에러 코드
+  errorCode String? @map("error_code") @db.VarChar(100)
+
+  /// 에러 메시지
+  errorMessage String? @map("error_message") @db.Text
+
+  /// 발송 시간
+  sentAt DateTime @default(now()) @map("sent_at")
+
+  /// 알림 읽은 시간
+  readAt DateTime? @map("read_at")
+
+  /// 알림 클릭한 시간
+  clickedAt DateTime? @map("clicked_at")
+
+  /// 테스트 발송 여부 (기본값: false)
+  isTest Boolean @default(false) @map("is_test")
+
+  /// 관계
+  user      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushToken PushToken?                @relation(fields: [pushTokenId], references: [id], onDelete: SetNull)
+  campaign  PushNotificationCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, userId, pushTokenId])
+  @@index([userId])
+  @@index([campaignId])
+  @@index([pushTokenId])
+  @@index([type])
+  @@index([success])
+  @@index([sentAt])
+  @@index([isTest])
+  @@map("push_notification_logs")
+}
+
 model SupplementNutrient {
   id           Int       @id @default(autoincrement())
   productId    Int       @map("product_id")
@@ -1879,73 +2107,41 @@ model UserChart {
   @@map("user_charts")
 }
 
-/// 푸시 알림 발송 로그 테이블
-/// 개별 유저별 발송 상세 이력
-model PushNotificationLog {
-  /// 고유 ID
-  id           Int                       @id @default(autoincrement())
-  /// 유저 ID
-  userId       Int                       @map("user_id")
-  /// 푸시 토큰 ID
-  pushTokenId  Int?                      @map("push_token_id")
-  /// 제목
-  title        String?                   @db.VarChar(255)
-  /// 본문
-  body         String
-  /// 추가 데이터 (주문번호, 미션ID, 딥링크 등)
-  data         Json?
-  /// 푸시 타입
-  type         String?                   @db.VarChar(50)
-  /// 발송 성공 여부
-  success      Boolean
-  /// 에러 코드
-  errorCode    String?                   @map("error_code") @db.VarChar(100)
-  /// 에러 메시지
-  errorMessage String?                   @map("error_message")
-  /// 발송 시간
-  sentAt       DateTime?                 @map("sent_at")
-  /// 알림 읽은 시간
-  readAt       DateTime?                 @map("read_at")
-  /// 알림 클릭한 시간
-  clickedAt    DateTime?                 @map("clicked_at")
-  /// 캠페인 ID
-  campaignId   Int?                      @map("campaign_id")
-  /// 테스트 발송 여부
-  isTest       Boolean                   @map("is_test")
-  /// 생성일시
-  createdAt    DateTime?                 @map("created_at")
-  /// 이미지 URL
-  imageUrl     String?                   @map("image_url") @db.VarChar(500)
-  /// 메시지 ID
-  messageId    String?                   @map("message_id") @db.VarChar(255)
-  campaign     PushNotificationCampaign? @relation(fields: [campaignId], references: [id])
-  pushToken    PushToken?                @relation(fields: [pushTokenId], references: [id])
-  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+/// 약관 마스터 테이블
+model Consent {
+  id            Int       @id @default(autoincrement())
+  code          String    @db.VarChar(50)
+  title         String    @db.VarChar(200)
+  content       String?   @db.Text
+  version       String    @db.VarChar(20)
+  isRequired    Boolean   @default(false) @map("is_required")
+  isActive      Boolean   @default(false) @map("is_active")
+  displayOrder  Int       @default(0) @map("display_order")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamp(6)
 
-  @@unique([campaignId, userId, pushTokenId])
-  @@index([userId], map: "idx_push_notification_logs_user_id")
-  @@index([campaignId])
-  @@index([pushTokenId])
-  @@index([type])
-  @@index([success])
-  @@index([isTest])
-  @@map("push_notification_logs")
+  userConsents  UserConsent[]
+
+  @@unique([code, version])
+  @@index([code, isActive])
+  @@map("consents")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// 사용자 약관 동의 내역
 model UserConsent {
-  id                Int       @id @default(autoincrement())
-  userId            Int       @map("user_id")
-  agreeToTerms      Boolean   @map("agree_to_terms")
-  agreeToAge14      Boolean   @map("agree_to_age14")
-  agreeToPrivacy    Boolean   @map("agree_to_privacy")
-  agreeToThirdParty Boolean   @map("agree_to_third_party")
-  agreeToMarketing  Boolean   @map("agree_to_marketing")
-  agreedAt          DateTime  @map("agreed_at") @db.Timestamp(6)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt         DateTime? @map("updated_at") @db.Timestamp(6)
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  consentId     Int       @map("consent_id")
+  isAgreed      Boolean   @map("is_agreed")
+  agreedAt      DateTime? @map("agreed_at") @db.Timestamp(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
 
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consent       Consent   @relation(fields: [consentId], references: [id])
+
+  @@unique([userId, consentId])
   @@index([userId], map: "idx_user_consents_user_id")
+  @@index([consentId], map: "idx_user_consents_consent_id")
   @@map("user_consents")
 }
 
@@ -1991,125 +2187,6 @@ model UserSupplementRoutineHistory {
   @@unique([userId, productId, date])
   @@index([userId, date])
   @@map("user_supplement_routine_history")
-}
-
-/// 푸시 알림 스케줄 테이블
-/// 반복 발송 설정 및 메시지 템플릿 관리
-model PushNotificationSchedule {
-  /// 고유 ID
-  id                 Int                        @id @default(autoincrement())
-  /// 스케줄 이름
-  name               String                     @db.VarChar(100)
-  /// 스케줄 설명
-  description        String?                    @db.VarChar(500)
-  /// 스케줄 타입 (ONCE: 단발성, RECURRING: 반복)
-  scheduleType       String                     @default("RECURRING") @map("schedule_type") @db.VarChar(20)
-  /// 푸시 타입
-  type               String                     @db.VarChar(50)
-  /// 카테고리 (AUTO, MARKETING)
-  category           String                     @db.VarChar(20)
-  /// 크론 표현식 (예: 0 9 * * *) - RECURRING 타입일 때 사용
-  cronExpression     String?                    @map("cron_expression") @db.VarChar(50)
-  /// 단발성 예약 시간 (ONCE 타입일 때 사용)
-  oneTimeScheduledAt DateTime?                  @map("one_time_scheduled_at")
-  /// 제목
-  title              String                     @db.VarChar(100)
-  /// 본문 템플릿
-  bodyTemplate       String                     @map("body_template")
-  /// 이미지 URL
-  imageUrl           String?                    @map("image_url") @db.VarChar(500)
-  /// 추가 데이터 (JSON)
-  data               Json?
-  /// 타겟팅 쿼리 조건 (JSON)
-  /// 예: { "marketingEnabled": true, "userIds": [1,2,3], "platforms": ["IOS", "ANDROID"] }
-  targetQuery        Json?                      @map("target_query")
-  /// 반복 발송 시작일 (RECURRING 타입일 때 유효 기간 시작)
-  startDate          DateTime?                  @map("start_date")
-  /// 반복 발송 종료일 (RECURRING 타입일 때 유효 기간 종료)
-  endDate            DateTime?                  @map("end_date")
-  /// 활성화 여부
-  isActive           Boolean                    @default(true) @map("is_active")
-  /// 마지막 실행 시간
-  lastExecutedAt     DateTime?                  @map("last_executed_at")
-  /// 다음 실행 예정 시간
-  nextExecutionAt    DateTime?                  @map("next_execution_at")
-  /// 총 실행 횟수
-  executionCount     Int                        @default(0) @map("execution_count")
-  /// 생성한 관리자 ID
-  createdBy          Int?                       @map("created_by")
-  /// 생성일시
-  createdAt          DateTime                   @default(now()) @map("created_at")
-  /// 수정일시
-  updatedAt          DateTime?                  @updatedAt @map("updated_at")
-  campaigns          PushNotificationCampaign[]
-
-  @@index([type])
-  @@index([category])
-  @@index([isActive])
-  @@index([scheduleType])
-  @@index([nextExecutionAt])
-  @@index([startDate, endDate])
-  @@map("push_notification_schedules")
-}
-
-/// 푸시 알림 캠페인 테이블
-/// 특정 시점의 실제 발송 실행 기록
-model PushNotificationCampaign {
-  /// 고유 ID
-  id           Int                       @id @default(autoincrement())
-  /// 스케줄 ID (스케줄 기반 발송이면 설정, 수동 발송이면 null)
-  scheduleId   Int?                      @map("schedule_id")
-  /// 캠페인 고유 키
-  campaignKey  String                    @unique @map("campaign_key") @db.VarChar(255)
-  /// 캠페인 타입 (MANUAL: 수동, SCHEDULED: 예약, RECURRING: 반복)
-  campaignType String                    @default("MANUAL") @map("campaign_type") @db.VarChar(20)
-  /// 제목
-  title        String                    @db.VarChar(100)
-  /// 본문
-  body         String
-  /// 이미지 URL
-  imageUrl     String?                   @map("image_url") @db.VarChar(500)
-  /// 추가 데이터 (JSON)
-  data         Json?
-  /// 푸시 타입
-  type         String                    @db.VarChar(50)
-  /// 카테고리
-  category     String                    @db.VarChar(20)
-  /// 상태 (PENDING, PROCESSING, COMPLETED, FAILED, CANCELLED)
-  status       String                    @default("PENDING") @db.VarChar(20)
-  /// 목표 발송 수
-  targetCount  Int                       @default(0) @map("target_count")
-  /// 실제 발송 성공 수
-  sentCount    Int                       @default(0) @map("sent_count")
-  /// 실패 수
-  failCount    Int                       @default(0) @map("fail_count")
-  /// 예약 발송 시간
-  scheduledAt  DateTime?                 @map("scheduled_at")
-  /// 발송 시작 시간
-  startedAt    DateTime?                 @map("started_at")
-  /// 발송 완료 시간
-  completedAt  DateTime?                 @map("completed_at")
-  /// 취소 시간
-  cancelledAt  DateTime?                 @map("cancelled_at")
-  /// 취소 사유
-  cancelReason String?                   @map("cancel_reason") @db.VarChar(500)
-  /// 에러 메시지 (발송 실패 시)
-  errorMessage String?                   @map("error_message")
-  /// 생성일시
-  createdAt    DateTime                  @default(now()) @map("created_at")
-  /// 생성한 관리자 ID (수동 발송인 경우)
-  createdBy    Int?                      @map("created_by")
-  schedule     PushNotificationSchedule? @relation(fields: [scheduleId], references: [id])
-  logs         PushNotificationLog[]
-
-  @@index([campaignKey])
-  @@index([scheduleId])
-  @@index([campaignType])
-  @@index([status])
-  @@index([type])
-  @@index([scheduledAt])
-  @@index([createdAt])
-  @@map("push_notification_campaigns")
 }
 
 /// 건강 타입 동물별 추천 영양제 관계 테이블
