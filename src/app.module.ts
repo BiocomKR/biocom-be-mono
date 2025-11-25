@@ -108,7 +108,7 @@ import { PushModule } from './push/push.module';
     MissionModule,    // 미션 모듈
     SurveyModule,     // 설문 모듈
     ChallengeModule,  // 챌린지 관리 모듈
-    ManagementModule, // 백오피스 관리 모듈
+    // ManagementModule, // 백오피스 관리 모듈
     PointModule,      // 포인트 관리 모듈
     // CategoriesModule, // ⚠️ 제거됨: Products.categoryCode 사용
     ProductsModule,   // 상품 관리 모듈
