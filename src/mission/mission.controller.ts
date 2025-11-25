@@ -2,215 +2,226 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Param,
-  Body,
-  UseGuards,
-  Request,
-  ParseIntPipe,
   Query,
+  Body,
+  ParseIntPipe,
+  HttpStatus,
+  Logger,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { MissionCompletionService } from './mission-completion.service';
-import { CompleteMissionDto } from './dto/mission-completion.dto';
+import { MissionService } from './mission.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
- * 미션 컨트롤러
- * 사용자의 미션 수행 관련 API
+ * Management 미션 관리 컨트롤러
+ * 백오피스에서 미션을 관리하는 API
  */
-@ApiTags('챌린지-미션')
-@Controller('missions')
+@Controller('management/missions')
 @UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class MissionController {
+  private readonly logger = new Logger(MissionController.name);
+
   constructor(
-    private readonly missionCompletionService: MissionCompletionService,
+    private readonly managementMissionService: MissionService,
   ) {}
 
   /**
-   * 오늘의 1일 1미션 조회
-   * @description 현재 챌린지 일차의 1일 1미션을 조회합니다
+   * 모든 미션 목록 조회
    */
-  @Get('daily')
-  @ApiOperation({
-    summary: '오늘의 1일 1미션 조회',
-    description: '현재 챌린지 일차의 1일 1미션을 조회합니다'
-  })
-  @ApiResponse({
-    status: 200,
-    description: '1일 1미션 조회 성공'
-  })
-  async getDailyMission(@Request() req: any) {
-    const userId = req.user?.userId || req.user?.sub;
-    return this.missionCompletionService.getDailyMission(userId);
-  }
-
-  /**
-   * 일일 미션 진행도 조회 (메인화면용)
-   * @description 오늘의 미션 목록과 전체 미션 달성률을 조회합니다
-   */
-  @Get('daily-progress')
-  @ApiOperation({
-    summary: '일일 미션 진행도 조회',
-    description: '오늘의 미션 목록과 전체 미션 달성률을 조회합니다'
-  })
-  @ApiResponse({
-    status: 200,
-    description: '일일 미션 진행도 조회 성공'
-  })
-  async getDailyProgress(@Request() req: any) {
-    const userId = req.user?.userId || req.user?.sub;
-    return this.missionCompletionService.getDailyProgress(userId);
-  }
-
-  /**
-   * 미션 수행 완료
-   * @description 챌린지 미션을 수행하고 완료 처리합니다
-   */
-  @Post('complete')
-  @ApiOperation({
-    summary: '미션 수행 완료',
-    description: '챌린지 미션을 수행하고 완료 처리합니다. dailyLimit에 따라 진행도가 추적됩니다.'
-  })
-  @ApiResponse({
-    status: 200,
-    description: '미션 수행 성공'
-  })
-  @ApiResponse({
-    status: 400,
-    description: '잘못된 요청 (dailyLimit 초과, 필수 데이터 누락 등)'
-  })
-  @ApiResponse({
-    status: 404,
-    description: '미션을 찾을 수 없음'
-  })
-  async completeMission(
-    @Body() dto: CompleteMissionDto,
-    @Request() req: any
+  @Get()
+  async getAllMissions(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+    @Query('category') category?: string,
+    @Query('search') search?: string,
   ) {
-    const userId = req.user?.userId || req.user?.sub;
-    return this.missionCompletionService.completeMission(
-      userId,
-      dto
-    );
+    this.logger.log(`미션 목록 조회 - 페이지: ${page}, 제한: ${limit}`);
+    
+    const missions = await this.managementMissionService.findAllMissions({
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 10,
+      type,
+      category,
+      search,
+    });
+
+    return {
+      success: true,
+      message: '미션 목록 조회 성공',
+      data: missions,
+      timestamp: getNowKST(),
+    };
   }
 
   /**
-   * 완료한 미션 목록 조회
-   * @description 지정한 기간 동안 완료한 미션들을 일자별로 조회합니다
+   * 특정 미션 상세 조회
    */
-  @Get('completed')
-  @ApiOperation({
-    summary: '완료한 미션 목록 조회',
-    description: '지정한 기간 동안 완료한 미션들을 일자별로 조회합니다'
-  })
-  @ApiQuery({
-    name: 'startDate',
-    required: true,
-    description: '시작일 (YYYY-MM-DD)',
-    example: '2025-01-01',
-  })
-  @ApiQuery({
-    name: 'endDate',
-    required: true,
-    description: '종료일 (YYYY-MM-DD)',
-    example: '2025-01-10',
-  })
-  @ApiResponse({
-    status: 200,
-    description: '완료한 미션 목록 조회 성공'
-  })
-  @ApiResponse({
-    status: 404,
-    description: '활성화된 챌린지가 없음'
-  })
-  async getCompletedMissions(
-    @Request() req: any,
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
+  @Get(':id')
+  async getMissionById(
+    @Param('id', ParseIntPipe) id: number,
   ) {
-    const userId = req.user?.userId || req.user?.sub;
-    return this.missionCompletionService.getCompletedMissions(userId, startDate, endDate);
+    this.logger.log(`미션 상세 조회 - ID: ${id}`);
+    
+    const mission = await this.managementMissionService.findMissionById(id);
+    return {
+      success: true,
+      message: '미션 상세 조회 성공',
+      data: mission,
+      timestamp: getNowKST(),
+    };
   }
 
   /**
-   * 놓친 미션 목록 조회
-   * @description 지정한 기간 동안 놓친 미션들을 일자별로 조회합니다 (과거 미션만)
+   * 새로운 미션 생성
    */
-  @Get('missed')
-  @ApiOperation({
-    summary: '놓친 미션 목록 조회',
-    description: '지정한 기간 동안 놓친 미션들을 일자별로 조회합니다. 미래 미션은 제외되며, 과거에 완료하지 못한 미션만 표시됩니다.'
-  })
-  @ApiQuery({
-    name: 'startDate',
-    required: true,
-    description: '시작일 (YYYY-MM-DD)',
-    example: '2025-01-01',
-  })
-  @ApiQuery({
-    name: 'endDate',
-    required: true,
-    description: '종료일 (YYYY-MM-DD)',
-    example: '2025-01-10',
-  })
-  @ApiResponse({
-    status: 200,
-    description: '놓친 미션 목록 조회 성공'
-  })
-  @ApiResponse({
-    status: 404,
-    description: '활성화된 챌린지가 없음'
-  })
-  async getMissedMissions(
-    @Request() req: any,
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-  ) {
-    const userId = req.user?.userId || req.user?.sub;
-    return this.missionCompletionService.getMissedMissions(userId, startDate, endDate);
-  }
-
-  /**
-   * 자기선언문/칭찬내역 조회
-   * @description 활성화된 챌린지의 자기선언문(1일차), 칭찬내역(10일차) 조회
-   */
-  @Get('self-records')
-  @ApiOperation({
-    summary: '자기선언문/칭찬내역 조회',
-    description: '활성화된 챌린지의 자기선언문(DECLARATION)과 칭찬내역(SELF_PRAISE)을 조회합니다. 타입별로 구분되어 반환됩니다.'
-  })
-  @ApiResponse({
-    status: 200,
-    description: '자기선언문/칭찬내역 조회 성공',
-    schema: {
-      example: {
-        success: true,
-        data: [
-          {
-            type: 'DECLARATION',
-            day: 1,
-            contents: '자기 선언문 내용이 들어갑니다.',
-            completedAt: '2025-01-15T10:30:00Z',
-            pointsEarned: 100
-          },
-          {
-            type: 'SELF_PRAISE',
-            day: 10,
-            contents: '칭찬 내용이 들어갑니다.',
-            completedAt: '2025-01-24T14:20:00Z',
-            pointsEarned: 100
-          }
-        ]
-      }
+  @Post()
+  async createMission(
+    @Body() createMissionDto: {
+      code: string;
+      name: string;
+      description?: string;
+      points: number;
+      requireUpload?: boolean;
+      sortOrder?: number;
+      category?: string;
+      type?: string;
+      recordType?: string;
+      dailyLimit?: number;
+      specificDay?: number;
+      totalDays?: number;
+      uploadType?: string;
+      isActive?: boolean;
     }
-  })
-  @ApiResponse({
-    status: 404,
-    description: '활성화된 챌린지가 없음'
-  })
-  async getRecords(@Request() req: any) {
-    const userId = req.user?.userId || req.user?.sub;
-    return this.missionCompletionService.getRecords(userId);
+  ) {
+    this.logger.log(`미션 생성 - 이름: ${createMissionDto.name}, dailyLimit: ${createMissionDto.dailyLimit || 1}`);
+    
+    const mission = await this.managementMissionService.createMission(createMissionDto);
+    return {
+      success: true,
+      message: '미션 생성 성공',
+      data: mission,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 미션 정보 수정
+   */
+  @Put(':id')
+  async updateMission(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateMissionDto: {
+      code?: string;
+      name?: string;
+      description?: string;
+      points?: number;
+      requireUpload?: boolean;
+      sortOrder?: number;
+      category?: string;
+      type?: string;
+      recordType?: string;
+      dailyLimit?: number;
+      specificDay?: number;
+      totalDays?: number;
+      uploadType?: string;
+      isActive?: boolean;
+    }
+  ) {
+    this.logger.log(`미션 수정 - ID: ${id}, dailyLimit: ${updateMissionDto.dailyLimit}`);
+    
+    const mission = await this.managementMissionService.updateMission(id, updateMissionDto);
+    return {
+      success: true,
+      message: '미션 수정 성공',
+      data: mission,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 미션 삭제
+   */
+  @Delete(':id')
+  async deleteMission(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    this.logger.log(`미션 삭제 - ID: ${id}`);
+    
+    await this.managementMissionService.deleteMission(id);
+    return {
+      success: true,
+      message: '미션 삭제 성공',
+      data: null,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 미션 활성/비활성 전환
+   */
+  @Put(':id/toggle-status')
+  async toggleMissionStatus(
+    @Param('id', ParseIntPipe) missionId: number,
+  ) {
+    this.logger.log(`미션 상태 전환 - 미션 ID: ${missionId}`);
+    
+    const mission = await this.managementMissionService.toggleMissionStatus(missionId);
+    return {
+      success: true,
+      message: '미션 상태 전환 성공',
+      data: mission,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 미션 dailyLimit 업데이트
+   */
+  @Put(':id/daily-limit')
+  async updateMissionDailyLimit(
+    @Param('id', ParseIntPipe) missionId: number,
+    @Body() body: { dailyLimit: number }
+  ) {
+    this.logger.log(`미션 dailyLimit 업데이트 - 미션 ID: ${missionId}, dailyLimit: ${body.dailyLimit}`);
+    
+    if (!body.dailyLimit || body.dailyLimit < 1) {
+      return {
+        success: false,
+        message: 'dailyLimit은 1 이상이어야 합니다',
+        data: null,
+        timestamp: getNowKST(),
+      };
+    }
+    
+    const mission = await this.managementMissionService.updateMissionDailyLimit(missionId, body.dailyLimit);
+    return {
+      success: true,
+      message: '미션 dailyLimit 업데이트 성공',
+      data: mission,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 미션 통계 조회
+   */
+  @Get(':id/stats')
+  async getMissionStats(
+    @Param('id', ParseIntPipe) missionId: number,
+  ) {
+    this.logger.log(`미션 통계 조회 - 미션 ID: ${missionId}`);
+    
+    const stats = await this.managementMissionService.getMissionStats(missionId);
+    return {
+      success: true,
+      message: '미션 통계 조회 성공',
+      data: stats,
+      timestamp: getNowKST(),
+    };
   }
 }

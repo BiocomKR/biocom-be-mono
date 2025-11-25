@@ -401,6 +401,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get userSupplementRoutineHistory() { return this.prisma.userSupplementRoutineHistory; }
   get supplementNutrient() { return this.prisma.supplementNutrient; }
 
+  // 푸시 알림 테이블
+  get pushToken() { return this.prisma.pushToken; }
+  get pushNotificationSchedule() { return this.prisma.pushNotificationSchedule; }
+  get pushNotificationCampaign() { return this.prisma.pushNotificationCampaign; }
+  get pushNotificationLog() { return this.prisma.pushNotificationLog; }
+
   // 메서드 바인딩
   $transaction(arg: any) {
     return (this.prisma as any).$transaction(arg);
