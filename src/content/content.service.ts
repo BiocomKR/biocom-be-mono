@@ -346,16 +346,15 @@ export class ContentService {
   }
 
   /**
-   * 컨텐츠 삭제
+   * 컨텐츠 삭제 (소프트 딜리트 - isActive: false)
    */
   async deleteContent(id: number) {
     const content = await this.prisma.content.findUnique({
       where: { id },
       select: {
+        id: true,
+        isActive: true,
         challengeId: true,
-        contentFiles: {
-          include: { file: true },
-        },
       },
     });
 
@@ -369,35 +368,12 @@ export class ContentService {
       );
     }
 
-    // GCS에서 파일 삭제
-    for (const cf of content.contentFiles) {
-      try {
-        await this.googleStorageService.deleteFile(cf.file.storedName);
-        this.logger.log(`GCS 파일 삭제: ${cf.file.storedName}`);
-      } catch (error) {
-        this.logger.warn(`GCS 파일 삭제 실패: ${cf.file.storedName}`, error);
-      }
-    }
-
-    // DB에서 삭제 (ContentFile은 cascade로 삭제됨)
-    await this.prisma.$transaction(async (tx) => {
-      // ContentFile 관계 삭제
-      await tx.contentFile.deleteMany({
-        where: { contentId: id },
-      });
-
-      // File 레코드 삭제
-      const fileIds = content.contentFiles.map((cf) => cf.file.id);
-      if (fileIds.length > 0) {
-        await tx.file.deleteMany({
-          where: { id: { in: fileIds } },
-        });
-      }
-
-      // Content 삭제
-      await tx.content.delete({
-        where: { id },
-      });
+    // 소프트 딜리트: isActive를 false로 변경
+    await this.prisma.content.update({
+      where: { id },
+      data: { isActive: false },
     });
+
+    this.logger.log(`컨텐츠 소프트 삭제 완료: ${id}`);
   }
 }
