@@ -121,12 +121,6 @@ async function bootstrap() {
       },
       'api-key'
     )
-    .addTag('Management-Dashboard', '대시보드 통계')
-    .addTag('Management-Users', '사용자 관리')
-    .addTag('Management-Orders', '주문 관리')
-    .addTag('Management-Products', '상품 관리')
-    .addTag('Management-Content', '콘텐츠 관리')
-    .addTag('Management-Challenges', '챌린지 관리')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

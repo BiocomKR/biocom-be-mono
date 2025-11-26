@@ -11,6 +11,7 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ConsentService, CreateConsentDto, UpdateConsentDto } from './consent.service';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
@@ -20,7 +21,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * Management 약관 관리 컨트롤러
  * 백오피스에서 약관을 관리하는 API
  */
-@Controller('management/consents')
+@ApiTags('약관 관리')
+@ApiBearerAuth()
+@Controller('consents')
 @UseGuards(JwtAuthGuard)
 export class ConsentController {
   private readonly logger = new Logger(ConsentController.name);

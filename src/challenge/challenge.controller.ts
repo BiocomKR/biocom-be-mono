@@ -11,6 +11,7 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChallengeService } from './challenge.service';
 import { getNowKST } from '../common/utils/kst-date.util';
@@ -19,7 +20,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * Management 챌린지 관리 컨트롤러
  * 백오피스에서 챌린지를 관리하는 API
  */
-@Controller('management/challenges')
+@ApiTags('챌린지 관리')
+@ApiBearerAuth()
+@Controller('challenges')
 @UseGuards(JwtAuthGuard)
 export class ChallengeController {
   private readonly logger = new Logger(ChallengeController.name);

@@ -6,6 +6,7 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PushCampaignService } from './services/push-campaign.service';
@@ -16,9 +17,11 @@ import { CampaignListResponseDto } from './dto/campaign-response.dto';
  * 푸시 캠페인 관리 컨트롤러
  * 백오피스 전용 캠페인 조회 API
  */
+@ApiTags('푸시 캠페인')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @SkipThrottle()
-@Controller('management/push/campaigns')
+@Controller('push/campaigns')
 export class PushCampaignController {
   constructor(private readonly pushCampaignService: PushCampaignService) {}
 

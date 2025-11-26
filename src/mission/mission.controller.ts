@@ -12,6 +12,7 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MissionService } from './mission.service';
 import { getNowKST } from '../common/utils/kst-date.util';
@@ -20,7 +21,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * Management 미션 관리 컨트롤러
  * 백오피스에서 미션을 관리하는 API
  */
-@Controller('management/missions')
+@ApiTags('미션 관리')
+@ApiBearerAuth()
+@Controller('missions')
 @UseGuards(JwtAuthGuard)
 export class MissionController {
   private readonly logger = new Logger(MissionController.name);

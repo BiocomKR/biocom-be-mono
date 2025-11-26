@@ -1,5 +1,5 @@
-import { 
-  Controller, 
+import {
+  Controller,
   Post,
   Get,
   Param,
@@ -8,10 +8,13 @@ import {
   UseGuards,
   ParseIntPipe
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RefundService } from './refund.service';
 
-@Controller('management/refund')
+@ApiTags('환불 관리')
+@ApiBearerAuth()
+@Controller('refund')
 @UseGuards(JwtAuthGuard)
 export class RefundController {
   constructor(private readonly refundService: RefundService) {}

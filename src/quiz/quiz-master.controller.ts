@@ -11,6 +11,7 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { QuizService, QuizDifficulty } from './quiz.service';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
@@ -20,7 +21,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * Management 퀴즈 관리 컨트롤러
  * 백오피스에서 퀴즈 마스터 데이터를 관리하는 API
  */
-@Controller('management/quiz')
+@ApiTags('퀴즈 관리')
+@ApiBearerAuth()
+@Controller('quiz')
 @UseGuards(JwtAuthGuard)
 export class QuizMasterController {
   private readonly logger = new Logger(QuizMasterController.name);

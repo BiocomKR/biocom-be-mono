@@ -1,6 +1,6 @@
-import { 
-  Controller, 
-  Get, 
+import {
+  Controller,
+  Get,
   Post,
   Put,
   Delete,
@@ -11,10 +11,13 @@ import {
   UseGuards,
   ParseIntPipe
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShopService } from './shop.service';
 
-@Controller('api/shop/management')
+@ApiTags('상품 관리')
+@ApiBearerAuth()
+@Controller('shop')
 @UseGuards(JwtAuthGuard)
 export class ShopController {
   constructor(private readonly shopService: ShopService) {}

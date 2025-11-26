@@ -12,6 +12,7 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SurveyService } from './survey.service';
 import { CreateSurveyQuestionDto } from './create-survey-question.dto';
@@ -28,7 +29,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * Management 설문 관리 컨트롤러
  * 백오피스에서 설문을 관리하는 API
  */
-@Controller('management/survey')
+@ApiTags('설문 관리')
+@ApiBearerAuth()
+@Controller('survey')
 @UseGuards(JwtAuthGuard)
 export class SurveyController {
   private readonly logger = new Logger(SurveyController.name);

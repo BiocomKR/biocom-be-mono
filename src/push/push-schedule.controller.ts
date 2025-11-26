@@ -11,6 +11,7 @@ import {
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PushScheduleService } from './services/push-schedule.service';
@@ -22,9 +23,11 @@ import { ScheduleQueryDto } from './dto/schedule-query.dto';
  * 푸시 스케줄 관리 컨트롤러
  * 백오피스 전용 스케줄 CRUD API
  */
+@ApiTags('푸시 스케줄')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @SkipThrottle()
-@Controller('management/push/schedules')
+@Controller('push/schedules')
 export class PushScheduleController {
   constructor(private readonly pushScheduleService: PushScheduleService) {}
 

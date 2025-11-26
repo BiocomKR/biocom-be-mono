@@ -11,6 +11,7 @@ import {
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
@@ -20,7 +21,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * Management 사용자 관리 컨트롤러
  * 백오피스에서 사용자 정보를 관리하는 API
  */
-@Controller('management/users')
+@ApiTags('사용자 관리')
+@ApiBearerAuth()
+@Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   private readonly logger = new Logger(UsersController.name);

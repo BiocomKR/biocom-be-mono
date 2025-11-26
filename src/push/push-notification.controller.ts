@@ -6,6 +6,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PushNotificationService } from './services/push-notification.service';
@@ -19,9 +20,11 @@ import { PushLogListResponseDto } from './dto/push-log-response.dto';
  * 푸시 알림 관리 컨트롤러
  * 백오피스 전용 푸시 알림 전송 및 조회 API
  */
+@ApiTags('푸시 알림')
+@ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @SkipThrottle()
-@Controller('management/push')
+@Controller('push')
 export class PushNotificationController {
   constructor(
     private readonly pushNotificationService: PushNotificationService,

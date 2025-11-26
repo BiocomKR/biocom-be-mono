@@ -8,10 +8,13 @@ import {
   Query,
   UseGuards
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShippingService } from './shipping.service';
 
-@Controller('management/shipping')
+@ApiTags('배송 관리')
+@ApiBearerAuth()
+@Controller('shipping')
 @UseGuards(JwtAuthGuard)
 export class ShippingController {
   constructor(private readonly shippingService: ShippingService) {}

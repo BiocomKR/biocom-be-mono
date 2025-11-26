@@ -1,13 +1,16 @@
-import { 
-  Controller, 
+import {
+  Controller,
   Get,
   Query,
   UseGuards
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
 
-@Controller('management/dashboard')
+@ApiTags('대시보드')
+@ApiBearerAuth()
+@Controller('dashboard')
 @UseGuards(JwtAuthGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}

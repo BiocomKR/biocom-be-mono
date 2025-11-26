@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ContentService, ContentType, ContentFileDto } from './content.service';
@@ -23,7 +24,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * Management 컨텐츠 관리 컨트롤러
  * 백오피스에서 컨텐츠를 관리하는 API
  */
-@Controller('management/content')
+@ApiTags('컨텐츠 관리')
+@ApiBearerAuth()
+@Controller('content')
 @UseGuards(JwtAuthGuard)
 export class ContentController {
   private readonly logger = new Logger(ContentController.name);

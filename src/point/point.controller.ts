@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Param, Query, UseGuards, Logger, ParseIntPipe, DefaultValuePipe } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PointService } from './point.service';
 import { getNowKST } from '../common/utils/kst-date.util';
@@ -7,7 +8,9 @@ import { getNowKST } from '../common/utils/kst-date.util';
  * 백오피스 포인트 관리 컨트롤러
  * 관리자용 포인트 조회 및 관리 기능 제공
  */
-@Controller('management/points')
+@ApiTags('포인트 관리')
+@ApiBearerAuth()
+@Controller('points')
 @UseGuards(JwtAuthGuard)
 export class PointController {
   private readonly logger = new Logger(PointController.name);
