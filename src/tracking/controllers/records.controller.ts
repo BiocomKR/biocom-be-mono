@@ -30,6 +30,8 @@ import {
   RecordResponseDto,
   RecordListResponseDto,
 } from '../dto/records/records.dto';
+import { SupplementRoutineResponseDto } from '../dto/supplement-routine-response.dto';
+import { SaveSupplementIntakeDto } from '../dto/supplement-intake.dto';
 
 /**
  * 기록 컨트롤러
@@ -272,5 +274,43 @@ export class RecordsController {
   })
   async getExerciseTypes(@Request() req: any) {
     return this.recordsService.getExerciseTypes();
+  }
+
+  /**
+   * 내 영양제 루틴 조회
+   * @description user_supplement_routine 테이블과 products 테이블을 조인하여 사용자의 영양제 루틴 목록을 조회합니다
+   */
+  @Get('supplements/routine')
+  @ApiOperation({
+    summary: '내 영양제 루틴 조회',
+    description: '사용자의 맞춤 영양제 루틴 목록을 조회합니다. 설문조사 결과로 할당된 동물 타입 기반 영양제와 사용자가 추가한 영양제가 포함됩니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '영양제 루틴 조회 성공',
+    type: [SupplementRoutineResponseDto],
+  })
+  async getSupplementRoutine(@Request() req: any) {
+    return this.recordsService.getSupplementRoutine(req.user.id);
+  }
+
+  /**
+   * 영양제 섭취 기록 저장
+   * @description 여러 영양제의 아침/점심/저녁 섭취 여부를 한 번에 저장합니다
+   */
+  @Post('supplements/intake')
+  @ApiOperation({
+    summary: '영양제 섭취 기록 저장',
+    description: '여러 영양제의 아침/점심/저녁 섭취 여부를 한 번에 저장합니다. 당일 최초 기록 시 사진 업로드 필수이며 포인트 100점이 지급됩니다.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '영양제 섭취 기록 저장 성공',
+  })
+  async saveSupplementIntake(
+    @Request() req: any,
+    @Body() saveSupplementIntakeDto: SaveSupplementIntakeDto,
+  ) {
+    return this.recordsService.saveSupplementIntake(req.user.id, saveSupplementIntakeDto);
   }
 }

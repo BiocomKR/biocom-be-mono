@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../common/services/prisma.service';
 import { SubscriptionService } from './subscription.service';
+import { SubscriptionStatus } from '../../common/enums';
 
 /**
  * 구독 자동결제 스케줄러
@@ -46,7 +47,7 @@ export class SubscriptionSchedulerService {
     // 오늘 결제해야 할 구독 찾기
     const subscriptionsToCharge = await this.prisma.subscription.findMany({
       where: {
-        status: 'ACTIVE',
+        status: SubscriptionStatus.ACTIVE,
         nextBillingDate: {
           gte: today,
           lt: tomorrow,
@@ -110,13 +111,13 @@ export class SubscriptionSchedulerService {
     // CANCELED 상태이면서 nextBillingDate가 지난 구독을 EXPIRED로 전환
     const expiredSubscriptions = await this.prisma.subscription.updateMany({
       where: {
-        status: 'CANCELED',
+        status: SubscriptionStatus.CANCELED,
         nextBillingDate: {
           lt: now,
         },
       },
       data: {
-        status: 'EXPIRED',
+        status: SubscriptionStatus.EXPIRED,
         endDate: now,
         updatedAt: now,
       },

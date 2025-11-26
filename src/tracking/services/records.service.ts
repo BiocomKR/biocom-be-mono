@@ -1,5 +1,6 @@
 import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { Prisma } from '@prisma/client';
 import { PointService } from '../../point/point.service';
 import { getKoreanToday } from '../../common/utils/korea-date.util';
 import {
@@ -1285,6 +1286,231 @@ export class RecordsService {
         throw error;
       }
       this.logger.error('지연성 알러지 검사 결과 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 내 영양제 루틴 조회
+   * @description user_supplement_routine 테이블과 products 테이블을 조인하여
+   *              사용자의 영양제 루틴 목록을 조회
+   * @param userId 사용자 ID
+   * @returns 영양제 루틴 목록
+   */
+  async getSupplementRoutine(userId: number) {
+    try {
+      this.logger.log(`영양제 루틴 조회 시작: userId=${userId}`);
+
+      // KST 기준 당일 날짜
+      const today = getKoreanToday();
+      const dateObj = new Date(today);
+
+      // user_supplement_routine과 products를 조인하여 조회
+      const routines = await this.prisma.userSupplementRoutine.findMany({
+        where: {
+          userId,
+          isActive: true,
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              productInfo: true,
+              images: {
+                where: {
+                  imageType: 'MAIN',
+                },
+                select: {
+                  imageUrl: true,
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+        orderBy: {
+          displayOrder: 'asc',
+        },
+      });
+
+      this.logger.log(`영양제 루틴 조회 완료: ${routines.length}개`);
+
+      // 당일 user_records에서 각 영양제의 섭취 기록 조회
+      const records = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'SUPPLEMENT',
+          date: dateObj,
+        },
+      });
+
+      // productId별 섭취 기록 매핑
+      const recordMap = new Map();
+      records.forEach(record => {
+        const metadata = record.metadata as any;
+        if (metadata?.productId) {
+          recordMap.set(metadata.productId, {
+            morning: metadata.morning || false,
+            afternoon: metadata.afternoon || false,
+            evening: metadata.evening || false,
+          });
+        }
+      });
+
+      // 응답 데이터 변환
+      const result = routines.map(routine => {
+        const intakeRecord = recordMap.get(routine.productId) || {
+          morning: false,
+          afternoon: false,
+          evening: false,
+        };
+
+        return {
+          routineId: routine.id,
+          productId: routine.productId,
+          productName: routine.product.name,
+          productImage: routine.product.images[0]?.imageUrl || null,
+          dosage: routine.product.productInfo
+            ? {
+                frequency: routine.product.productInfo['frequency_per_day'] || 0,
+                quantity: routine.product.productInfo['quantity_per_dose'] || 0,
+                unit: routine.product.productInfo['unit'] || '정',
+              }
+            : {
+                frequency: 0,
+                quantity: 0,
+                unit: '정',
+              },
+          isDefault: routine.isDefault,
+          displayOrder: routine.displayOrder,
+          morning: intakeRecord.morning,
+          afternoon: intakeRecord.afternoon,
+          evening: intakeRecord.evening,
+        };
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('영양제 루틴 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 영양제 섭취 기록 저장
+   * @description 여러 영양제의 아침/점심/저녁 섭취 여부를 한 번에 저장
+   * @param userId 사용자 ID
+   * @param saveSupplementIntakeDto 영양제 섭취 데이터
+   * @returns 저장 결과
+   */
+  async saveSupplementIntake(userId: number, saveSupplementIntakeDto: any) {
+    try {
+      const { imageUrl, data } = saveSupplementIntakeDto;
+
+      // KST 기준 당일 날짜 가져오기
+      const today = getKoreanToday();
+      const dateObj = new Date(today);
+
+      this.logger.log(`영양제 섭취 기록 저장 시작: userId=${userId}, date=${today}`);
+
+      // 1. 당일 영양제 기록 중 imageUrl이 있는지 조회
+      const existingRecordWithImage = await this.prisma.userRecord.findFirst({
+        where: {
+          userId,
+          recordType: 'SUPPLEMENT',
+          date: dateObj,
+          metadata: {
+            path: ['imageUrl'],
+            not: Prisma.AnyNull,
+          },
+        },
+      });
+
+      this.logger.log(
+        `당일 사진 기록 조회 결과: ${existingRecordWithImage ? '있음' : '없음'}`,
+      );
+
+      // 2. imageUrl 없고, 기존 기록에도 사진이 없으면 400 오류
+      if (!imageUrl && !existingRecordWithImage) {
+        throw new BadRequestException(
+          `${today}일 영양제 사진이 없습니다. 최초 기록 시 사진을 업로드해주세요.`,
+        );
+      }
+
+      // 포인트 지급 여부 (당일 최초 기록인지 확인)
+      const isFirstRecordOfDay = !existingRecordWithImage;
+
+      // 3. RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
+      const updatePromises = data.map(async (item: any) => {
+        const { productId, morning, afternoon, evening } = item;
+
+        // 해당 productId의 기록 조회
+        const record = await this.prisma.userRecord.findFirst({
+          where: {
+            userId,
+            recordType: 'SUPPLEMENT',
+            date: dateObj,
+            metadata: {
+              path: ['productId'],
+              equals: productId,
+            },
+          },
+        });
+
+        if (!record) {
+          this.logger.warn(
+            `영양제 기록을 찾을 수 없습니다: userId=${userId}, date=${today}, productId=${productId}`,
+          );
+          return null;
+        }
+
+        // 4. metadata 업데이트
+        const updatedMetadata: any = {
+          productId,
+          morning,
+          afternoon,
+          evening,
+        };
+
+        // imageUrl이 있으면 metadata에 포함
+        if (imageUrl) {
+          updatedMetadata.imageUrl = imageUrl;
+        }
+
+        // 레코드 업데이트
+        return this.prisma.userRecord.update({
+          where: { id: record.id },
+          data: {
+            metadata: updatedMetadata,
+            updatedAt: new Date(),
+          },
+        });
+      });
+
+      await Promise.all(updatePromises);
+
+      // 5. 당일 최초 기록이면 포인트 100점 지급
+      if (isFirstRecordOfDay) {
+        await this.pointService.addPoints(
+          userId,
+          100,
+          '영양제 섭취 기록',
+          'RECORD',
+          null,
+        );
+
+        this.logger.log(`포인트 100점 지급 완료: userId=${userId}`);
+      }
+
+      this.logger.log(`영양제 섭취 기록 저장 완료: ${data.length}개 업데이트`);
+
+      return {
+        message: '영양제 섭취 기록이 저장되었습니다.',
+        pointsEarned: isFirstRecordOfDay ? 100 : 0,
+      };
+    } catch (error) {
+      this.logger.error('영양제 섭취 기록 저장 실패', error);
       throw error;
     }
   }

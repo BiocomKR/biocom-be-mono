@@ -6,6 +6,7 @@ import {
   ForbiddenException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { QnaStatus } from '../../common/enums';
 import {
   CreateQnaDto,
   UpdateQnaDto,
@@ -73,7 +74,7 @@ export class QnaService {
         },
         replies: {
           where: {
-            status: 'ACTIVE'
+            status: QnaStatus.ACTIVE
           },
           include: {
             user: {
@@ -102,7 +103,7 @@ export class QnaService {
     // WHERE 조건 구성
     const where: Prisma.ProductFeedbackWhereInput = {
       feedbackType: 'QUESTION',
-      status: 'ACTIVE',
+      status: QnaStatus.ACTIVE,
       parentId: null // 원글만 조회 (답글 제외)
     };
 
@@ -163,7 +164,7 @@ export class QnaService {
           },
           replies: {
             where: {
-              status: 'ACTIVE'
+              status: QnaStatus.ACTIVE
             },
             include: {
               user: {
@@ -209,7 +210,7 @@ export class QnaService {
       where: {
         id,
         feedbackType: 'QUESTION',
-        status: 'ACTIVE'
+        status: QnaStatus.ACTIVE
       },
       include: {
         user: {
@@ -226,7 +227,7 @@ export class QnaService {
         },
         replies: {
           where: {
-            status: 'ACTIVE'
+            status: QnaStatus.ACTIVE
           },
           include: {
             user: {
@@ -263,7 +264,7 @@ export class QnaService {
       where: {
         id,
         feedbackType: 'QUESTION',
-        status: 'ACTIVE'
+        status: QnaStatus.ACTIVE
       }
     });
 
@@ -304,7 +305,7 @@ export class QnaService {
         },
         replies: {
           where: {
-            status: 'ACTIVE'
+            status: QnaStatus.ACTIVE
           },
           include: {
             user: {
@@ -334,7 +335,7 @@ export class QnaService {
       where: {
         id,
         feedbackType: 'QUESTION',
-        status: 'ACTIVE'
+        status: QnaStatus.ACTIVE
       }
     });
 
@@ -350,7 +351,7 @@ export class QnaService {
     await this.prisma.productFeedback.update({
       where: { id },
       data: {
-        status: 'DELETED'
+        status: QnaStatus.DELETED
       }
     });
 
@@ -378,7 +379,7 @@ export class QnaService {
       where: {
         id: questionId,
         feedbackType: 'QUESTION',
-        status: 'ACTIVE'
+        status: QnaStatus.ACTIVE
       }
     });
 
@@ -426,7 +427,7 @@ export class QnaService {
         },
         replies: {
           where: {
-            status: 'ACTIVE'
+            status: QnaStatus.ACTIVE
           },
           include: {
             user: {
@@ -459,12 +460,12 @@ export class QnaService {
       where: {
         id: questionId,
         feedbackType: 'QUESTION',
-        status: 'ACTIVE'
+        status: QnaStatus.ACTIVE
       },
       include: {
         replies: {
           where: {
-            status: 'ACTIVE'
+            status: QnaStatus.ACTIVE
           }
         }
       }
@@ -505,7 +506,7 @@ export class QnaService {
         },
         replies: {
           where: {
-            status: 'ACTIVE'
+            status: QnaStatus.ACTIVE
           },
           include: {
             user: {
@@ -534,12 +535,12 @@ export class QnaService {
       where: {
         id: questionId,
         feedbackType: 'QUESTION',
-        status: 'ACTIVE'
+        status: QnaStatus.ACTIVE
       },
       include: {
         replies: {
           where: {
-            status: 'ACTIVE'
+            status: QnaStatus.ACTIVE
           }
         }
       }
@@ -558,7 +559,7 @@ export class QnaService {
     await this.prisma.productFeedback.update({
       where: { id: answer.id },
       data: {
-        status: 'DELETED'
+        status: QnaStatus.DELETED
       }
     });
 

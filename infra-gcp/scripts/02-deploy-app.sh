@@ -461,11 +461,18 @@ deploy_kubernetes() {
     # Ingress 배포
     log_info "Ingress 배포 중..."
     kubectl apply -f ingress.yaml
-    
+
+    # CronJob 배포
+    log_info "CronJob 배포 중..."
+    kubectl apply -f cronjob-expire-challenges.yaml
+    kubectl apply -f cronjob-activate-challenges.yaml
+    kubectl apply -f cronjob-create-supplements.yaml
+    log_success "✅ CronJob 3개 배포 완료 (만료, 활성화, 영양제)"
+
     # 배포 상태 확인
     log_info "배포 상태 확인 중..."
     kubectl rollout status deployment/biocom-api -n "$NAMESPACE" --timeout=300s
-    
+
     log_success "✅ Kubernetes 리소스 배포 완료!"
 }
 
@@ -487,7 +494,12 @@ check_deployment_status() {
     echo
     log_info "Ingress 상태:"
     kubectl get ingress -n "$NAMESPACE"
-    
+
+    # CronJob 상태
+    echo
+    log_info "CronJob 상태:"
+    kubectl get cronjobs -n "$NAMESPACE"
+
     # Ingress IP 확인
     local ingress_ip=""
     local max_attempts=30

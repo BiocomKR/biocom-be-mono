@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { OrderStatus, PaymentStatus, SubscriptionStatus } from '../../common/enums';
 
 /**
  * 토스페이먼츠 웹훅 처리 서비스
@@ -90,7 +91,7 @@ export class WebhooksService {
       }
 
       // 2. 이미 처리된 결제인지 확인 (멱등성 보장)
-      if (order.status === 'PAID') {
+      if (order.status === OrderStatus.PAID) {
         this.logger.warn(`⚠️  이미 처리된 주문입니다: ${orderId}`);
         return; // 중복 처리 방지
       }
@@ -109,7 +110,7 @@ export class WebhooksService {
       await tx.orders.update({
         where: { id: order.id },
         data: {
-          status: 'PAID',
+          status: OrderStatus.PAID,
           updatedAt: new Date(),
         },
       });
@@ -129,7 +130,7 @@ export class WebhooksService {
             pgTransactionId: paymentKey,
             amount: amount,
             method: method || '가상계좌',
-            status: 'COMPLETED',
+            status: PaymentStatus.COMPLETED,
             approvedAt: approvedAt ? new Date(approvedAt) : new Date(),
           },
         });
@@ -171,7 +172,7 @@ export class WebhooksService {
       }
 
       // 2. 이미 취소된 주문인지 확인
-      if (order.status === 'CANCELLED') {
+      if (order.status === OrderStatus.CANCELLED) {
         this.logger.warn(`⚠️  이미 취소된 주문입니다: ${orderId}`);
         return;
       }
@@ -180,7 +181,7 @@ export class WebhooksService {
       await tx.orders.update({
         where: { id: order.id },
         data: {
-          status: 'CANCELLED',
+          status: OrderStatus.CANCELLED,
           updatedAt: new Date(),
         },
       });
@@ -192,7 +193,7 @@ export class WebhooksService {
           pgTransactionId: paymentKey,
         },
         data: {
-          status: 'CANCELLED',
+          status: PaymentStatus.CANCELLED,
           updatedAt: new Date(),
         },
       });
@@ -231,7 +232,7 @@ export class WebhooksService {
       await tx.orders.update({
         where: { id: order.id },
         data: {
-          status: 'PAYMENT_FAILED',
+          status: OrderStatus.PAYMENT_FAILED,
           updatedAt: new Date(),
         },
       });
@@ -302,7 +303,7 @@ export class WebhooksService {
       const subscriptions = await tx.subscription.findMany({
         where: {
           billingKey: billingKey,
-          status: 'ACTIVE',
+          status: SubscriptionStatus.ACTIVE,
         },
         include: {
           product: true,
@@ -322,10 +323,10 @@ export class WebhooksService {
       const updateResult = await tx.subscription.updateMany({
         where: {
           billingKey: billingKey,
-          status: 'ACTIVE',
+          status: SubscriptionStatus.ACTIVE,
         },
         data: {
-          status: 'BILLING_DELETED',
+          status: SubscriptionStatus.BILLING_DELETED,
           endDate: new Date(),
           updatedAt: new Date(),
         },

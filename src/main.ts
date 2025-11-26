@@ -11,9 +11,57 @@ import { createCorsOptions } from './common/config/cors.config';
 import { RequestIdInterceptor, ResponseTransformInterceptor, TimeoutInterceptor } from './common/interceptors';
 
 /**
+ * 스케줄러 단독 실행 함수
+ * Kubernetes CronJob에서 특정 배치만 실행할 때 사용
+ *
+ * 사용법: node dist/main.js --run-scheduler <scheduler-name>
+ * 예시: node dist/main.js --run-scheduler expire-challenges
+ */
+async function runScheduler(schedulerName: string) {
+  const logger = new Logger('Scheduler');
+  logger.log(`🕐 스케줄러 단독 실행 모드: ${schedulerName}`);
+
+  const app = await NestFactory.createApplicationContext(AppModule);
+
+  try {
+    const { ChallengeSchedulerService } = await import('./challenge/challenge-scheduler.service');
+    const schedulerService = app.get(ChallengeSchedulerService);
+
+    switch (schedulerName) {
+      case 'expire-challenges':
+        logger.log('챌린지 만료 처리 배치 실행...');
+        await schedulerService.handleChallengeExpiration();
+        break;
+
+      case 'activate-challenges':
+        logger.log('챌린지 활성화 배치 실행...');
+        await schedulerService.handleChallengeActivation();
+        break;
+
+      case 'create-weekly-supplements':
+        logger.log('영양제 주간 생성 배치 실행...');
+        await schedulerService.handleWeeklySupplementCreation();
+        break;
+
+      default:
+        logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
+        process.exit(1);
+    }
+
+    logger.log(`✅ 스케줄러 실행 완료: ${schedulerName}`);
+    await app.close();
+    process.exit(0);
+  } catch (error) {
+    logger.error(`❌ 스케줄러 실행 실패: ${schedulerName}`, error);
+    await app.close();
+    process.exit(1);
+  }
+}
+
+/**
  * 애플리케이션 부트스트랩 함수
  * NestJS 애플리케이션을 초기화하고 설정하는 메인 함수
- * 
+ *
  * 주요 설정:
  * - 글로벌 Validation Pipe 설정
  * - Swagger API 문서화 설정
@@ -192,9 +240,23 @@ async function bootstrap() {
   });
 }
 
-// 부트스트랩 실행 및 에러 처리
-bootstrap().catch((error) => {
-  const logger = new Logger('Bootstrap');
-  logger.error('애플리케이션 시작 중 오류가 발생했습니다:', error);
-  process.exit(1);
-});
+// CLI 인자 확인 및 실행 모드 결정
+const args = process.argv;
+const runSchedulerIndex = args.indexOf('--run-scheduler');
+
+if (runSchedulerIndex !== -1 && args[runSchedulerIndex + 1]) {
+  // 스케줄러 단독 실행 모드
+  const schedulerName = args[runSchedulerIndex + 1];
+  runScheduler(schedulerName).catch((error) => {
+    const logger = new Logger('Scheduler');
+    logger.error('스케줄러 실행 중 오류가 발생했습니다:', error);
+    process.exit(1);
+  });
+} else {
+  // 일반 웹 서버 모드
+  bootstrap().catch((error) => {
+    const logger = new Logger('Bootstrap');
+    logger.error('애플리케이션 시작 중 오류가 발생했습니다:', error);
+    process.exit(1);
+  });
+}

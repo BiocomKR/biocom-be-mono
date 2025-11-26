@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
+import { UserChallengeStatus } from '../common/enums';
 import {
   NewcomerHomeDataDto,
   ChallengerHomeDataDto,
@@ -42,7 +43,7 @@ export class HomeService {
           name: true,
           status: true,
           userChallenges: {
-            where: { status: 'ACTIVE' },
+            where: { status: UserChallengeStatus.ACTIVE },
             select: {
               id: true,
               productId: true,
