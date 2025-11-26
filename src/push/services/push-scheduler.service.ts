@@ -22,11 +22,14 @@ export class PushSchedulerService {
    * 매분마다 실행할 스케줄 확인 및 실행
    *
    * 크론 표현식: '0 * * * * *' = 매분 0초에 실행
+   *
+   * NOTE: biocom-bo-api에서는 크론 비활성화
+   * 실제 배치 실행은 biocom-api에서만 수행
    */
-  @Cron('0 * * * * *', {
-    name: 'check-push-schedules',
-    timeZone: 'Asia/Seoul',
-  })
+  // @Cron('0 * * * * *', {
+  //   name: 'check-push-schedules',
+  //   timeZone: 'Asia/Seoul',
+  // })
   async handleScheduledPushes() {
     this.logger.log('🕐 [PushScheduler] 스케줄 확인 시작');
 
