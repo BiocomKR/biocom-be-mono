@@ -325,13 +325,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get lectureProduct() { return this.prisma.lectureProduct; }
   
   // 챌린지 도메인 테이블
-  get challenge() { return this.prisma.challenge; }
   get challengeTicket() { return this.prisma.challengeTicket; }
   get userChallenge() { return this.prisma.userChallenge; }
   get challengeMission() { return this.prisma.challengeMission; }
   get challengeSurvey() { return this.prisma.challengeSurvey; }
-  get challengeQuiz() { return this.prisma.challengeQuiz; }
-  get challengeContent() { return this.prisma.challengeContent; }
   // get recordItem() { return this.prisma.recordItem; } // RecordItem 테이블 삭제됨
   get userRecord() { return this.prisma.userRecord; }
   get dailyProgress() { return this.prisma.dailyProgress; }

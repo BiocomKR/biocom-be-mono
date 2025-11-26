@@ -607,8 +607,7 @@ export class ChallengeService {
               userChallenges: true,
               challengeMissions: true,
               challengeSurveys: true,
-              challengeQuizzes: true,
-              challengeContents: true
+              contents: true
             }
           }
         },
@@ -649,9 +648,8 @@ export class ChallengeService {
           include: { survey: true },
           orderBy: { day: 'asc' }
         },
-        challengeQuizzes: {
-          include: { quiz: true },
-          orderBy: { day: 'asc' }
+        contents: {
+          orderBy: { sortOrder: 'asc' }
         },
         _count: {
           select: { userChallenges: true }
@@ -758,8 +756,6 @@ export class ChallengeService {
     await this.prisma.$transaction(async (tx) => {
       await tx.challengeMission.deleteMany({ where: { productId: id } });
       await tx.challengeSurvey.deleteMany({ where: { productId: id } });
-      await tx.challengeQuiz.deleteMany({ where: { productId: id } });
-      // challengeContent 제거됨 (Content.accessLevel 기반으로 변경)
       await tx.product.delete({ where: { id } });
     });
   }
@@ -858,41 +854,24 @@ export class ChallengeService {
   }
 
   /**
-   * 챌린지에 퀴즈 추가 (백오피스용)
-   */
-  async addQuizToChallenge(productId: number, data: {
-    quizId: number;
-    day: number;
-    isActive?: boolean;
-  }) {
-    return await this.prisma.challengeQuiz.create({
-      data: {
-        productId,
-        quizId: data.quizId,
-        day: data.day,
-        isActive: data.isActive ?? true,
-        createdAt: getNowKST(),
-      },
-      include: {
-        quiz: true
-      }
-    });
-  }
-
-  /**
-   * 챌린지에 컨텐츠 추가 (백오피스용)
-   */
-  /**
-   * ⚠️ 제거됨: 챌린지에 컨텐츠 추가
-   * - challenge_contents 테이블 제거로 인해 제거
-   * - Content.accessLevel 기반 접근 제어로 변경
+   * 챌린지에 컨텐츠 연결 (Content.challengeId 업데이트)
    */
   async addContentToChallenge(productId: number, data: {
     contentId: number;
-    weekNumber: number;
-    isActive?: boolean;
+    weekNumber?: number;
   }) {
-    throw new BadRequestException('이 기능은 더 이상 지원되지 않습니다. Content.accessLevel을 사용하세요.');
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product || !this.isChallengeProduct(product)) {
+      throw new NotFoundException('챌린지를 찾을 수 없습니다');
+    }
+
+    return await this.prisma.content.update({
+      where: { id: data.contentId },
+      data: {
+        challengeId: productId,
+        weekNumber: data.weekNumber ?? null,
+      }
+    });
   }
 
   /**
