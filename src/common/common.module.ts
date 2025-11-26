@@ -3,6 +3,7 @@ import { PrismaService } from './services/prisma.service';
 import { ConfigService } from './services/config.service';
 import { LoggerService } from './services/logger.service';
 import { GoogleStorageService } from './services/google-storage.service';
+import { ExcelService } from './services/excel.service';
 
 /**
  * 공통 모듈
@@ -18,12 +19,14 @@ import { GoogleStorageService } from './services/google-storage.service';
     ConfigService,
     LoggerService,
     GoogleStorageService,
+    ExcelService,
   ],
   exports: [
     PrismaService,
     ConfigService,
     LoggerService,
     GoogleStorageService,
+    ExcelService,
   ],
 })
 export class CommonModule {}

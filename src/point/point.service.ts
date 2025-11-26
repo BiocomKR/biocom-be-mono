@@ -28,7 +28,7 @@ export class PointService {
   }
 
   /**
-   * 포인트 내역 조회
+   * 포인트 내역 조회 (특정 사용자)
    */
   async getHistory(
     userId: number,
@@ -44,12 +44,146 @@ export class PointService {
   }
 
   /**
-   * 포인트 내역 전체 개수 조회
+   * 포인트 내역 전체 개수 조회 (특정 사용자)
    */
   async getHistoryCount(userId: number): Promise<number> {
     return await this.prisma.pointHistory.count({
       where: { userId }
     });
+  }
+
+  /**
+   * 전체 포인트 내역 조회 (페이지네이션, 필터 지원)
+   */
+  async getAllHistory(params: {
+    page: number;
+    limit: number;
+    type?: string;
+    relatedType?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const { page, limit, type, relatedType, search, startDate, endDate } = params;
+    const skip = (page - 1) * limit;
+
+    // where 조건 구성
+    const where: any = {};
+
+    if (type && type !== 'ALL') {
+      where.type = type;
+    }
+
+    if (relatedType && relatedType !== 'ALL') {
+      where.relatedType = relatedType;
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    // 검색어가 있으면 사용자 이름/이메일로 필터
+    if (search) {
+      where.user = {
+        OR: [
+          { name: { contains: search } },
+          { email: { contains: search } },
+        ],
+      };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.pointHistory.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      this.prisma.pointHistory.count({ where }),
+    ]);
+
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        userId: item.userId,
+        userName: item.user?.name || '-',
+        userEmail: item.user?.email || '-',
+        type: item.type,
+        amount: item.amount,
+        balance: item.balance,
+        description: item.description,
+        relatedType: item.relatedType,
+        relatedId: item.relatedId,
+        createdAt: item.createdAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * 포인트 통계 조회
+   */
+  async getStats(startDate?: string, endDate?: string) {
+    const where: any = {};
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    // 백엔드 기록에 EARN/EARNED, SPEND/SPENT/USE 혼재
+    const [earnData, spendData, totalTransactions] = await Promise.all([
+      this.prisma.pointHistory.aggregate({
+        where: { ...where, type: { in: ['EARN', 'EARNED'] } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.pointHistory.aggregate({
+        where: { ...where, type: { in: ['SPEND', 'SPENT', 'USE'] } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      this.prisma.pointHistory.count({ where }),
+    ]);
+
+    const totalEarned = earnData._sum.amount || 0;
+    const totalSpent = Math.abs(spendData._sum.amount || 0);
+
+    return {
+      totalEarned,
+      totalSpent,
+      netChange: totalEarned - totalSpent,
+      totalTransactions,
+      earnCount: earnData._count,
+      spendCount: spendData._count,
+    };
   }
 
   /**
