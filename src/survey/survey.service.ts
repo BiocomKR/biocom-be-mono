@@ -1,5 +1,6 @@
 import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { UserChallengeStatus } from '../common/enums';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
 import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption, User } from '@prisma/client';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
@@ -531,7 +532,7 @@ export class SurveyService {
       const activeChallenge = await tx.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         }
       });
 
@@ -697,7 +698,7 @@ export class SurveyService {
       const activeChallenge = await tx.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         },
         include: { product: true }
       });

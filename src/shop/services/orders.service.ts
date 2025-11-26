@@ -18,6 +18,7 @@ import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { OrderStatus, ProductStatus, PaymentStatus, ShippingStatus, UserCouponStatus, ExchangeReturnStatus } from '../../common/enums';
 
 @Injectable()
 export class OrdersService {
@@ -135,7 +136,7 @@ export class OrdersService {
 
       // 3. 상품 상태 검증
       for (const item of orderItemsData) {
-        if (item.product.status !== 'ACTIVE') {
+        if (item.product.status !== ProductStatus.ACTIVE) {
           throw new BadRequestException(`${item.product.name}은(는) 판매 중인 상품이 아닙니다`);
         }
         if (item.quantity > item.product.maxOrderQty) {
@@ -172,7 +173,7 @@ export class OrdersService {
           where: {
             id: dto.userCouponId,
             userId,
-            status: 'ACTIVE'
+            status: ProductStatus.ACTIVE
           },
           include: {
             coupon: {
@@ -241,7 +242,7 @@ export class OrdersService {
       const order = await tx.order.create({
         data: {
           orderNumber,
-          status: 'PENDING_PAYMENT',
+          status: OrderStatus.PENDING_PAYMENT,
           inventoryStatus: 'NOT_PROCESSED',
           totalProductPrice,
           totalDiscount: couponDiscount,
@@ -297,7 +298,7 @@ export class OrdersService {
                 userId,
                 productId: orderItem.productId,
                 orderItemId: orderItem.id,
-                status: 'PURCHASED',
+                status: UserCouponStatus.PURCHASED,
                 ticketType,
                 purchaseDate: getNowKST(),
                 createdAt: getNowKST(),
@@ -314,7 +315,7 @@ export class OrdersService {
       await tx.shipping.create({
         data: {
           orderId: order.id,
-          status: 'PREPARING',
+          status: OrderStatus.PREPARING,
           shippingFee,
           createdAt: getNowKST(),
         },
@@ -352,7 +353,7 @@ export class OrdersService {
         await tx.userCoupon.update({
           where: { id: appliedCoupon.id },
           data: {
-            status: 'USED',
+            status: UserCouponStatus.USED,
             usedAt: getNowKST(),
             usedOrderId: order.id
           }
@@ -507,7 +508,7 @@ export class OrdersService {
       }
 
       // 토스페이먼츠 결제 취소 (결제 완료 상태인 경우만)
-      if (order.status === 'PAID' && order.payment) {
+      if (order.status === OrderStatus.PAID && order.payment) {
         try {
           const tossResponse = await this.tossPaymentsService.cancelPayment(
             order.payment.pgTransactionId, // paymentKey
@@ -526,7 +527,7 @@ export class OrdersService {
       const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: {
-          status: 'CANCELLED',
+          status: OrderStatus.CANCELLED,
           cancelledAt: getNowKST(),
         },
       });
@@ -578,10 +579,10 @@ export class OrdersService {
       const cancelledTickets = await tx.challengeTicket.updateMany({
         where: {
           orderItemId: { in: order.items.map(item => item.id) },
-          status: 'PURCHASED', // 구매만 된 상태만 취소 가능
+          status: UserCouponStatus.PURCHASED, // 구매만 된 상태만 취소 가능
         },
         data: {
-          status: 'CANCELLED',
+          status: OrderStatus.CANCELLED,
         },
       });
 
@@ -606,7 +607,7 @@ export class OrdersService {
       const usedCoupon = await tx.userCoupon.findFirst({
         where: {
           usedOrderId: order.id,
-          status: 'USED'
+          status: UserCouponStatus.USED
         }
       });
 
@@ -687,7 +688,7 @@ export class OrdersService {
     }
 
     // 배송완료 상태인 경우만 구매확정 가능
-    if (order.status !== 'DELIVERED') {
+    if (order.status !== OrderStatus.DELIVERED) {
       throw new BadRequestException('배송이 완료된 주문만 구매확정 가능합니다');
     }
 
@@ -696,7 +697,7 @@ export class OrdersService {
       const updated = await tx.order.update({
         where: { id: order.id },
         data: {
-          status: 'COMPLETED',
+          status: OrderStatus.COMPLETED,
           completedAt: getNowKST(),
         },
       });
@@ -769,8 +770,8 @@ export class OrdersService {
         where: { id: order.id },
         data: {
           status: newStatus,
-          ...(newStatus === 'SHIPPED' && { shippedAt: getNowKST() }),
-          ...(newStatus === 'DELIVERED' && { deliveredAt: getNowKST() }),
+          ...(newStatus === OrderStatus.SHIPPED && { shippedAt: getNowKST() }),
+          ...(newStatus === OrderStatus.DELIVERED && { deliveredAt: getNowKST() }),
         },
       });
 
@@ -790,9 +791,9 @@ export class OrdersService {
         await tx.shipping.updateMany({
           where: { orderId: order.id },
           data: {
-            status: newStatus === 'SHIPPED' ? 'IN_TRANSIT' : 'DELIVERED',
-            ...(newStatus === 'SHIPPED' && { shippedAt: getNowKST() }),
-            ...(newStatus === 'DELIVERED' && { deliveredAt: getNowKST() }),
+            status: newStatus === OrderStatus.SHIPPED ? 'IN_TRANSIT' : 'DELIVERED',
+            ...(newStatus === OrderStatus.SHIPPED && { shippedAt: getNowKST() }),
+            ...(newStatus === OrderStatus.DELIVERED && { deliveredAt: getNowKST() }),
           },
         });
       }
@@ -885,7 +886,7 @@ export class OrdersService {
       }
 
       // 반품 가능 여부 확인
-      if (order.status !== 'DELIVERED') {
+      if (order.status !== OrderStatus.DELIVERED) {
         throw new BadRequestException('배송 완료된 주문만 반품 가능합니다');
       }
 
@@ -907,7 +908,7 @@ export class OrdersService {
         data: {
           orderId: order.id,
           type: 'RETURN',
-          status: 'REQUESTED',
+          status: ExchangeReturnStatus.REQUESTED,
           reason: dto.reason,
           reasonDetail: dto.reasonDetail || null,
           requestedAt: getNowKST(),
@@ -955,7 +956,7 @@ export class OrdersService {
       }
 
       // 교환 가능 여부 확인
-      if (order.status !== 'DELIVERED') {
+      if (order.status !== OrderStatus.DELIVERED) {
         throw new BadRequestException('배송 완료된 주문만 교환 가능합니다');
       }
 
@@ -977,7 +978,7 @@ export class OrdersService {
         data: {
           orderId: order.id,
           type: 'EXCHANGE',
-          status: 'REQUESTED',
+          status: ExchangeReturnStatus.REQUESTED,
           reason: dto.reason,
           reasonDetail: dto.reasonDetail || null,
           requestedAt: getNowKST(),

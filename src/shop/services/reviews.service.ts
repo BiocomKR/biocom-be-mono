@@ -6,6 +6,7 @@ import {
   ForbiddenException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { ReviewStatus } from '../../common/enums';
 import {
   CreateReviewDto,
   UpdateReviewDto,
@@ -157,7 +158,7 @@ export class ReviewsService {
     // WHERE 조건 구성
     const where: Prisma.ProductFeedbackWhereInput = {
       feedbackType: 'REVIEW',
-      status: 'ACTIVE',
+      status: ReviewStatus.ACTIVE,
       parentId: null  // 댓글 제외, 리뷰만 조회
     };
 
@@ -227,7 +228,7 @@ export class ReviewsService {
           },
           replies: {
             where: {
-              status: 'ACTIVE'
+              status: ReviewStatus.ACTIVE
             },
             orderBy: {
               createdAt: 'asc'
@@ -283,7 +284,7 @@ export class ReviewsService {
       where: {
         id,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE'
+        status: ReviewStatus.ACTIVE
       }
     });
 
@@ -338,7 +339,7 @@ export class ReviewsService {
       where: {
         id,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE'
+        status: ReviewStatus.ACTIVE
       }
     });
 
@@ -354,7 +355,7 @@ export class ReviewsService {
     await this.prisma.productFeedback.update({
       where: { id },
       data: {
-        status: 'DELETED'
+        status: ReviewStatus.DELETED
       }
     });
 
@@ -378,7 +379,7 @@ export class ReviewsService {
       where: {
         id: reviewId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE'
+        status: ReviewStatus.ACTIVE
       }
     });
 
@@ -422,7 +423,7 @@ export class ReviewsService {
       where: {
         id: reviewId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE'
+        status: ReviewStatus.ACTIVE
       }
     });
 
@@ -466,7 +467,7 @@ export class ReviewsService {
       where: {
         productId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE',
+        status: ReviewStatus.ACTIVE,
         rating: { not: null }
       },
       _count: {
@@ -565,7 +566,7 @@ export class ReviewsService {
       where: {
         id: reviewId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE'
+        status: ReviewStatus.ACTIVE
       }
     });
 
@@ -609,7 +610,7 @@ export class ReviewsService {
       where: {
         id: reviewId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE'
+        status: ReviewStatus.ACTIVE
       }
     });
 
@@ -621,7 +622,7 @@ export class ReviewsService {
     const where: Prisma.ProductFeedbackWhereInput = {
       parentId: reviewId,
       feedbackType: 'REVIEW',
-      status: 'ACTIVE'
+      status: ReviewStatus.ACTIVE
     };
 
     // 데이터 조회
@@ -663,7 +664,7 @@ export class ReviewsService {
       where: {
         id: commentId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE',
+        status: ReviewStatus.ACTIVE,
         parentId: { not: null } // 댓글인지 확인
       }
     });
@@ -709,7 +710,7 @@ export class ReviewsService {
       where: {
         id: commentId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE',
+        status: ReviewStatus.ACTIVE,
         parentId: { not: null } // 댓글인지 확인
       }
     });
@@ -726,7 +727,7 @@ export class ReviewsService {
     await this.prisma.productFeedback.update({
       where: { id: commentId },
       data: {
-        status: 'DELETED'
+        status: ReviewStatus.DELETED
       }
     });
 

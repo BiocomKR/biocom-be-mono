@@ -21,6 +21,7 @@ import { UserSubscriptionStatus } from '../common/enums/user-subscription-status
 import { getKoreanNow } from '../common/utils/korea-date.util';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
 import { ChallengeTicketStatus, UserChallengeStatus } from '../common/enums/challenge-ticket-status.enum';
+import { ProductStatus } from '../common/enums';
 
 /**
  * 챌린지 서비스
@@ -58,7 +59,7 @@ export class ChallengeService {
       name: product.name,
       description: product.description,
       totalDays: metadata.totalDays || 21,
-      isActive: product.status === 'ACTIVE'
+      isActive: product.status === ProductStatus.ACTIVE
     };
   }
 
@@ -73,7 +74,7 @@ export class ChallengeService {
       // categoryCode가 CHALLENGE인 상품만 조회
       const products = await this.prisma.product.findMany({
         where: {
-          status: 'ACTIVE',
+          status: UserChallengeStatus.ACTIVE,
           categoryCode: 'CHALLENGE'
         },
         include: {
@@ -169,7 +170,7 @@ export class ChallengeService {
       const activeChallenge = await this.prisma.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         },
         include: {
           product: true,
@@ -269,7 +270,7 @@ export class ChallengeService {
       return await this.prisma.$transaction(async (tx) => {
         // 1. 이미 활성 챌린지가 있는지 확인
         const existingActive = await tx.userChallenge.findFirst({
-          where: { userId, status: 'ACTIVE' }
+          where: { userId, status: UserChallengeStatus.ACTIVE }
         });
 
         if (existingActive) {
@@ -328,7 +329,7 @@ export class ChallengeService {
             activatedAt: now,
             expiresAt,
             purchasedAt: ticket.purchaseDate, // 티켓 구매 일시
-            status: 'PENDING', // 시작일 설정 전까지는 PENDING 상태
+            status: UserChallengeStatus.PENDING, // 시작일 설정 전까지는 PENDING 상태
             createdAt: now,
           },
           include: { product: true }
@@ -437,7 +438,7 @@ export class ChallengeService {
       this.logger.log(`사용자 ${userId}의 오늘 활동 조회 시작 - 챌린지 ${productId}`);
 
       const userChallenge = await this.prisma.userChallenge.findFirst({
-        where: { userId, productId, status: 'ACTIVE' },
+        where: { userId, productId, status: UserChallengeStatus.ACTIVE },
         include: { product: true }
       });
 
@@ -910,8 +911,8 @@ export class ChallengeService {
     ] = await Promise.all([
       this.prisma.product.findUnique({ where: { id: productId } }),
       this.prisma.userChallenge.count({ where: { productId } }),
-      this.prisma.userChallenge.count({ where: { productId, status: 'ACTIVE' } }),
-      this.prisma.userChallenge.count({ where: { productId, status: 'COMPLETED' } }),
+      this.prisma.userChallenge.count({ where: { productId, status: UserChallengeStatus.ACTIVE } }),
+      this.prisma.userChallenge.count({ where: { productId, status: UserChallengeStatus.COMPLETED } }),
       this.prisma.challengeMission.count({ where: { productId, isActive: true } }),
       this.prisma.challengeSurvey.count({ where: { productId, isActive: true } }),
       this.prisma.challengeQuiz.count({ where: { productId, isActive: true } })
@@ -1090,7 +1091,7 @@ export class ChallengeService {
           where: {
             name: '이너뷰티 챌린지',
             categoryCode: 'CHALLENGE',
-            status: 'ACTIVE'
+            status: UserChallengeStatus.ACTIVE
           }
         });
 
@@ -1102,7 +1103,7 @@ export class ChallengeService {
 
         // 2. 이미 활성 챌린지가 있는지 확인
         const existingActive = await tx.userChallenge.findFirst({
-          where: { userId, status: 'ACTIVE' }
+          where: { userId, status: UserChallengeStatus.ACTIVE }
         });
 
         if (existingActive) {
@@ -1138,7 +1139,7 @@ export class ChallengeService {
               recipientMobile: 'QUICK_START',
               postalCode: '00000',
               address: 'QUICK_START',
-              status: 'COMPLETED',
+              status: UserChallengeStatus.COMPLETED,
               orderedAt: now,
               createdAt: now
             }
@@ -1177,7 +1178,7 @@ export class ChallengeService {
         const pendingChallenge = await tx.userChallenge.findFirst({
           where: {
             ticketId: ticket.id,
-            status: 'PENDING'
+            status: UserChallengeStatus.PENDING
           }
         });
 
@@ -1196,7 +1197,7 @@ export class ChallengeService {
               activatedAt: now,
               expiresAt,
               purchasedAt: ticket.purchaseDate,
-              status: 'PENDING',
+              status: UserChallengeStatus.PENDING,
               createdAt: now
             }
           });
@@ -1340,7 +1341,7 @@ export class ChallengeService {
       return await this.prisma.$transaction(async (tx) => {
         // 1. 이미 활성 챌린지가 있는지 확인
         const existingActive = await tx.userChallenge.findFirst({
-          where: { userId, status: 'ACTIVE' }
+          where: { userId, status: UserChallengeStatus.ACTIVE }
         });
 
         if (existingActive) {
@@ -1370,7 +1371,7 @@ export class ChallengeService {
         const pendingChallenge = await tx.userChallenge.findFirst({
           where: {
             ticketId: ticket.id,
-            status: 'PENDING'
+            status: UserChallengeStatus.PENDING
           }
         });
 
@@ -1506,7 +1507,7 @@ export class ChallengeService {
           where: {
             userId,
             productId,
-            status: 'ACTIVE'
+            status: UserChallengeStatus.ACTIVE
           }
         });
 
@@ -1516,14 +1517,14 @@ export class ChallengeService {
 
         await tx.userChallenge.update({
           where: { id: userChallenge.id },
-          data: { status: 'COMPLETED' }
+          data: { status: UserChallengeStatus.COMPLETED }
         });
 
         // 2. 다른 활성 챌린지가 있는지 확인
         const otherActiveChallenges = await tx.userChallenge.count({
           where: {
             userId,
-            status: 'ACTIVE',
+            status: UserChallengeStatus.ACTIVE,
             id: { not: userChallenge.id }
           }
         });
@@ -1537,7 +1538,7 @@ export class ChallengeService {
             where: {
               userId,
               ticketType: 'SUBSCRIPTION',
-              status: 'ACTIVE',
+              status: UserChallengeStatus.ACTIVE,
               endDate: { gt: now } // 만료되지 않은 구독
             }
           });
@@ -1579,7 +1580,7 @@ export class ChallengeService {
           where: {
             userId,
             productId,
-            status: 'ACTIVE'
+            status: UserChallengeStatus.ACTIVE
           }
         });
 
@@ -1589,14 +1590,14 @@ export class ChallengeService {
 
         await tx.userChallenge.update({
           where: { id: userChallenge.id },
-          data: { status: 'EXPIRED' }
+          data: { status: UserChallengeStatus.EXPIRED }
         });
 
         // 2. 다른 활성 챌린지가 있는지 확인
         const otherActiveChallenges = await tx.userChallenge.count({
           where: {
             userId,
-            status: 'ACTIVE',
+            status: UserChallengeStatus.ACTIVE,
             id: { not: userChallenge.id }
           }
         });
@@ -1610,7 +1611,7 @@ export class ChallengeService {
             where: {
               userId,
               ticketType: 'SUBSCRIPTION',
-              status: 'ACTIVE',
+              status: UserChallengeStatus.ACTIVE,
               endDate: { gt: now } // 만료되지 않은 구독
             }
           });

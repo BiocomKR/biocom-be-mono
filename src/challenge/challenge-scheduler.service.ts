@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
+import { UserChallengeStatus } from '../common/enums';
 import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
@@ -46,7 +47,7 @@ export class ChallengeSchedulerService {
     // 오늘 시작해야 할 PENDING 챌린지 찾기
     const pendingChallenges = await this.prisma.userChallenge.findMany({
       where: {
-        status: 'PENDING',
+        status: UserChallengeStatus.PENDING,
         startDate: {
           gte: today,
           lt: tomorrow,
@@ -170,7 +171,7 @@ export class ChallengeSchedulerService {
       await tx.userChallenge.update({
         where: { id: userChallengeId },
         data: {
-          status: 'ACTIVE',
+          status: UserChallengeStatus.ACTIVE,
           updatedAt: now,
         },
       });
@@ -297,7 +298,7 @@ export class ChallengeSchedulerService {
     // 오늘 기준으로 만료된 챌린지 찾기 (endDate < 오늘)
     const expiredChallenges = await this.prisma.userChallenge.findMany({
       where: {
-        status: 'ACTIVE',
+        status: UserChallengeStatus.ACTIVE,
         endDate: {
           lt: now, // endDate가 오늘보다 이전
         },
@@ -357,7 +358,7 @@ export class ChallengeSchedulerService {
       await tx.userChallenge.update({
         where: { id: userChallengeId },
         data: {
-          status: 'EXPIRED',
+          status: UserChallengeStatus.EXPIRED,
           updatedAt: now,
         },
       });
@@ -366,7 +367,7 @@ export class ChallengeSchedulerService {
       const otherActiveChallenges = await tx.userChallenge.count({
         where: {
           userId,
-          status: 'ACTIVE',
+          status: UserChallengeStatus.ACTIVE,
           id: { not: userChallengeId },
         },
       });
@@ -379,7 +380,7 @@ export class ChallengeSchedulerService {
           where: {
             userId,
             ticketType: 'SUBSCRIPTION',
-            status: 'ACTIVE',
+            status: UserChallengeStatus.ACTIVE,
             endDate: { gt: now }, // 만료되지 않은 구독
           },
         });

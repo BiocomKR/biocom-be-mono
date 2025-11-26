@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { UserChallengeStatus } from '../common/enums';
 import { PointService } from '../point/point.service';
 import { CompleteMissionDto } from './dto/mission-completion.dto';
 import { Logger } from '@nestjs/common';
@@ -66,7 +67,7 @@ export class MissionCompletionService {
           where: {
             userId,
             productId: challengeMission.productId,
-            status: 'ACTIVE'
+            status: UserChallengeStatus.ACTIVE
           }
         });
 
@@ -373,7 +374,7 @@ export class MissionCompletionService {
       const activeChallenge = await this.prisma.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         },
         include: {
           product: true
@@ -479,7 +480,7 @@ export class MissionCompletionService {
       const activeChallenge = await this.prisma.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         },
         include: {
           product: true
@@ -583,7 +584,7 @@ export class MissionCompletionService {
       const activeChallenge = await this.prisma.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         }
       });
 
@@ -677,7 +678,7 @@ export class MissionCompletionService {
       const activeChallenge = await this.prisma.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         },
         include: {
           product: true
@@ -808,7 +809,7 @@ export class MissionCompletionService {
       const activeChallenge = await this.prisma.userChallenge.findFirst({
         where: {
           userId,
-          status: 'ACTIVE'
+          status: UserChallengeStatus.ACTIVE
         }
       });
 

@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { UserChallengeStatus } from '../common/enums';
 import { PointService } from '../point/point.service';
 import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.util';
 import { CreateContentDto, UpdateContentDto, ContentFileDto } from './content.types';
@@ -502,7 +503,7 @@ export class ContentService {
         const activeChallenge = await tx.userChallenge.findFirst({
           where: {
             userId,
-            status: 'ACTIVE'
+            status: UserChallengeStatus.ACTIVE
           },
           include: { product: true }
         });
@@ -738,7 +739,7 @@ export class ContentService {
         const activeChallenge = await this.prisma.userChallenge.findFirst({
           where: {
             userId,
-            status: 'ACTIVE'
+            status: UserChallengeStatus.ACTIVE
           },
           select: { activatedAt: true }
         });
@@ -768,7 +769,7 @@ export class ContentService {
         const defaultChallenge = await this.prisma.product.findFirst({
           where: {
             categoryCode: 'CHALLENGE',
-            status: 'ACTIVE'
+            status: UserChallengeStatus.ACTIVE
           },
           select: { id: true },
           orderBy: { id: 'asc' }

@@ -17,7 +17,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { getNowKST } from '../../common/utils/kst-date.util';
-import { ChallengeTicketStatus } from '../../common/enums/challenge-ticket-status.enum';
+import { ChallengeTicketStatus, OrderStatus, PaymentStatus } from '../../common/enums';
 
 @Injectable()
 export class PaymentService {
@@ -45,7 +45,7 @@ export class PaymentService {
       throw new NotFoundException('주문을 찾을 수 없습니다');
     }
 
-    if (order.status !== 'PENDING_PAYMENT') {
+    if (order.status !== OrderStatus.PENDING_PAYMENT) {
       throw new BadRequestException('결제 대기 중인 주문이 아닙니다');
     }
 
@@ -53,7 +53,7 @@ export class PaymentService {
     let payment = await this.prisma.payment.findFirst({
       where: {
         orderId: order.id,
-        status: 'PENDING'
+        status: PaymentStatus.PENDING
       }
     });
 
@@ -64,7 +64,7 @@ export class PaymentService {
           orderId: order.id,
           paymentMethod: 'CARD', // 기본값, 실제 결제 시 업데이트
           amount: convertDecimalToNumber(order.totalAmount) || 0,
-          status: 'PENDING',
+          status: PaymentStatus.PENDING,
           pgProvider: 'TOSS_PAYMENTS',
           requestedAt: getNowKST(),
           createdAt: getNowKST(),
@@ -114,7 +114,7 @@ export class PaymentService {
       const payment = await tx.payment.findFirst({
         where: {
           orderId: order.id,
-          status: 'PENDING'
+          status: PaymentStatus.PENDING
         }
       });
 
@@ -149,7 +149,7 @@ export class PaymentService {
           data: {
             pgTransactionId: tossResult.paymentKey,
             paymentMethod: this.mapPaymentMethod(tossResult.method),
-            status: 'COMPLETED',
+            status: PaymentStatus.COMPLETED,
             paidAt: new Date(tossResult.approvedAt),
             paymentDetails: tossResult as any
           }
@@ -159,7 +159,7 @@ export class PaymentService {
         await tx.order.update({
           where: { id: order.id },
           data: {
-            status: 'PAID',
+            status: OrderStatus.PAID,
             paidAt: new Date(tossResult.approvedAt)
           }
         });
@@ -198,7 +198,7 @@ export class PaymentService {
         //     where: {
         //       orderId: order.id,
         //       sku: item.product.sku,
-        //       status: 'PENDING'
+        //       status: PaymentStatus.PENDING
         //     },
         //     data: {
         //       status: 'PROCESSING',
@@ -238,14 +238,14 @@ export class PaymentService {
           customerName: order.recipientName,
           customerEmail: '',
           paymentKey: tossResult.paymentKey,
-          status: 'COMPLETED'
+          status: PaymentStatus.COMPLETED
         };
       } catch (error) {
         // 결제 실패 처리
         await tx.payment.update({
           where: { id: payment.id },
           data: {
-            status: 'FAILED',
+            status: PaymentStatus.FAILED,
             failedAt: getNowKST(),
             failReason: error.message?.substring(0, 500) || 'Unknown error'
           }
@@ -295,7 +295,7 @@ export class PaymentService {
       const payment = await tx.payment.findFirst({
         where: {
           orderId: order.id,
-          status: 'COMPLETED'
+          status: PaymentStatus.COMPLETED
         }
       });
 
@@ -330,7 +330,7 @@ export class PaymentService {
             refundType: 'CANCEL',
             refundAmount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
             reason: dto.cancelReason,
-            status: 'COMPLETED',
+            status: PaymentStatus.COMPLETED,
             tossCancelId: tossResult.cancels[0].transactionKey,
             tossResponse: tossResult as any,
             requestedAt: getNowKST(),
@@ -354,7 +354,7 @@ export class PaymentService {
           await tx.order.update({
             where: { id: order.id },
             data: {
-              status: 'CANCELLED',
+              status: OrderStatus.CANCELLED,
               cancelledAt: getNowKST()
             }
           });
@@ -395,7 +395,7 @@ export class PaymentService {
           //       sku: item.product.sku,
           //       quantity: item.quantity,
           //       action: 'RESTORE',
-          //       status: 'PENDING'
+          //       status: PaymentStatus.PENDING
           //     }
           //   });
           // }
@@ -445,7 +445,7 @@ export class PaymentService {
             refundType: 'CANCEL',
             refundAmount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
             reason: dto.cancelReason,
-            status: 'FAILED',
+            status: PaymentStatus.FAILED,
             reasonDetail: error.message,
             requestedAt: getNowKST(),
             createdAt: getNowKST(),
@@ -486,12 +486,12 @@ export class PaymentService {
 
       case 'PAYMENT.CANCELED':
         // 결제 취소 처리
-        if (payment.status === 'COMPLETED') {
+        if (payment.status === PaymentStatus.COMPLETED) {
           await this.prisma.$transaction(async (tx) => {
             await tx.payment.update({
               where: { id: payment.id },
               data: {
-                status: 'CANCELLED',
+                status: OrderStatus.CANCELLED,
                 cancelledAt: getNowKST()
               }
             });
@@ -499,7 +499,7 @@ export class PaymentService {
             await tx.order.update({
               where: { id: payment.orderId },
               data: {
-                status: 'CANCELLED',
+                status: OrderStatus.CANCELLED,
                 cancelledAt: getNowKST()
               }
             });
@@ -522,7 +522,7 @@ export class PaymentService {
         await this.prisma.payment.update({
           where: { id: payment.id },
           data: {
-            status: 'FAILED',
+            status: PaymentStatus.FAILED,
             failedAt: getNowKST(),
             failReason: dto.data.failure?.message
           }

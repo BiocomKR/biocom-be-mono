@@ -9,6 +9,7 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { TossPaymentsService } from './toss-payments.service';
 import { RegisterBillingDto } from '../dto/subscription/register-billing.dto';
 import { CreateSubscriptionDto } from '../dto/subscription/create-subscription.dto';
+import { SubscriptionStatus } from '../../common/enums';
 
 /**
  * 구독 관리 서비스
@@ -105,10 +106,10 @@ export class SubscriptionService {
       const updateResult = await tx.subscription.updateMany({
         where: {
           userId: userId,
-          status: 'ACTIVE',
+          status: SubscriptionStatus.ACTIVE,
         },
         data: {
-          status: 'CANCELLED',
+          status: SubscriptionStatus.CANCELLED,
           endDate: new Date(),
           updatedAt: new Date(),
         },
@@ -186,7 +187,7 @@ export class SubscriptionService {
       where: {
         userId: userId,
         productId: productId,
-        status: 'ACTIVE',
+        status: SubscriptionStatus.ACTIVE,
       },
     });
 
@@ -217,7 +218,7 @@ export class SubscriptionService {
         productId: productId,
         billingKey: user.billingKey,
         customerKey: user.customerKey,
-        status: 'ACTIVE',
+        status: SubscriptionStatus.ACTIVE,
         startDate: startDate,
         nextBillingDate: nextBillingDate,
         billingCycle: billingCycle,
@@ -329,7 +330,7 @@ export class SubscriptionService {
       throw new NotFoundException('구독을 찾을 수 없습니다');
     }
 
-    if (subscription.status === 'CANCELED') {
+    if (subscription.status === SubscriptionStatus.CANCELED) {
       throw new BadRequestException('이미 취소된 구독입니다');
     }
 
@@ -337,7 +338,7 @@ export class SubscriptionService {
     await this.prisma.subscription.update({
       where: { id: subscriptionId },
       data: {
-        status: 'CANCELED',
+        status: SubscriptionStatus.CANCELED,
         updatedAt: new Date(),
       },
     });
@@ -411,7 +412,7 @@ export class SubscriptionService {
       await this.prisma.subscription.update({
         where: { id: subscriptionId },
         data: {
-          status: 'PAYMENT_FAILED',
+          status: SubscriptionStatus.PAYMENT_FAILED,
           updatedAt: new Date(),
         },
       });

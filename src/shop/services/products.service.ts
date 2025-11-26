@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { ProductQueryDto, ProductSort, ProductStatus } from '../dto/products/product-query.dto';
+import { ReviewStatus } from '../../common/enums';
 import {
   ProductResponseDto,
   ProductPaginatedResponseDto,
@@ -111,7 +112,7 @@ export class ProductsService {
       where: {
         productId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE',
+        status: ReviewStatus.ACTIVE,
         rating: { not: null },
       },
       _count: {
@@ -149,7 +150,7 @@ export class ProductsService {
       where: {
         productId,
         feedbackType: 'REVIEW',
-        status: 'ACTIVE',
+        status: ReviewStatus.ACTIVE,
         reviewType: 'PHOTO',
       },
     });
@@ -172,7 +173,7 @@ export class ProductsService {
         where: {
           productId,
           feedbackType: 'QUESTION',
-          status: 'ACTIVE',
+          status: ReviewStatus.ACTIVE,
           parentId: null, // 원글만 (답글 제외)
         },
       }),
@@ -181,7 +182,7 @@ export class ProductsService {
         where: {
           productId,
           feedbackType: 'QUESTION',
-          status: 'ACTIVE',
+          status: ReviewStatus.ACTIVE,
           parentId: null,
           hasAnswer: true,
         },

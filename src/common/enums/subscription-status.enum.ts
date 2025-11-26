@@ -1,0 +1,11 @@
+/**
+ * 구독 상태 Enum
+ */
+export enum SubscriptionStatus {
+  ACTIVE = 'ACTIVE',
+  CANCELLED = 'CANCELLED',
+  CANCELED = 'CANCELED',
+  EXPIRED = 'EXPIRED',
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
+  BILLING_DELETED = 'BILLING_DELETED',
+}

@@ -5,6 +5,7 @@ import {
   Logger
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
+import { ProductStatus } from '../../common/enums';
 import {
   AddCartItemDto,
   UpdateCartItemDto,
@@ -124,7 +125,7 @@ export class CartService {
       throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
-    if (product.status !== 'ACTIVE') {
+    if (product.status !== ProductStatus.ACTIVE) {
       throw new BadRequestException('판매 중인 상품이 아닙니다');
     }
 
@@ -321,7 +322,7 @@ export class CartService {
     // 각 아이템의 재고 확인
     for (const item of cart.items) {
       // 상품 상태 확인
-      if (item.product.status !== 'ACTIVE') {
+      if (item.product.status !== ProductStatus.ACTIVE) {
         invalidItems.push({
           ...item,
           stockAvailable: false,
