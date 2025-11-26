@@ -70,8 +70,15 @@ export class PointService {
     // where 조건 구성
     const where: any = {};
 
+    // 타입 필터 처리 (EARN/EARNED, USE/SPEND/SPENT 혼재 대응)
     if (type && type !== 'ALL') {
-      where.type = type;
+      if (type === 'EARN' || type === 'EARNED') {
+        where.type = { in: ['EARN', 'EARNED'] };
+      } else if (type === 'USE' || type === 'SPEND' || type === 'SPENT') {
+        where.type = { in: ['USE', 'SPEND', 'SPENT'] };
+      } else {
+        where.type = type;
+      }
     }
 
     if (relatedType && relatedType !== 'ALL') {

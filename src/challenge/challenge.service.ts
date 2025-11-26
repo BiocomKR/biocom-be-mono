@@ -69,8 +69,7 @@ export class ChallengeService {
               userChallenges: true,
               challengeMissions: true,
               challengeSurveys: true,
-              challengeQuizzes: true,
-              challengeContents: true
+              contents: true
             }
           }
         },
@@ -111,9 +110,8 @@ export class ChallengeService {
           include: { survey: true },
           orderBy: { day: 'asc' }
         },
-        challengeQuizzes: {
-          include: { quiz: true },
-          orderBy: { day: 'asc' }
+        contents: {
+          orderBy: { sortOrder: 'asc' }
         },
         _count: {
           select: { userChallenges: true }
@@ -217,7 +215,6 @@ export class ChallengeService {
     await this.prisma.$transaction(async (tx) => {
       await tx.challengeMission.deleteMany({ where: { productId: id } });
       await tx.challengeSurvey.deleteMany({ where: { productId: id } });
-      await tx.challengeQuiz.deleteMany({ where: { productId: id } });
       await tx.product.delete({ where: { id } });
     });
   }
@@ -233,7 +230,7 @@ export class ChallengeService {
       completedParticipants,
       totalMissions,
       totalSurveys,
-      totalQuizzes
+      totalContents
     ] = await Promise.all([
       this.prisma.product.findUnique({ where: { id: productId } }),
       this.prisma.userChallenge.count({ where: { productId } }),
@@ -241,7 +238,7 @@ export class ChallengeService {
       this.prisma.userChallenge.count({ where: { productId, status: 'COMPLETED' } }),
       this.prisma.challengeMission.count({ where: { productId, isActive: true } }),
       this.prisma.challengeSurvey.count({ where: { productId, isActive: true } }),
-      this.prisma.challengeQuiz.count({ where: { productId, isActive: true } })
+      this.prisma.content.count({ where: { challengeId: productId, isActive: true } })
     ]);
 
     if (!product || !this.isChallengeProduct(product)) {
@@ -263,8 +260,8 @@ export class ChallengeService {
         content: {
           missions: totalMissions,
           surveys: totalSurveys,
-          quizzes: totalQuizzes,
-          total: totalMissions + totalSurveys + totalQuizzes
+          contents: totalContents,
+          total: totalMissions + totalSurveys + totalContents
         }
       }
     };
@@ -393,54 +390,23 @@ export class ChallengeService {
   }
 
   /**
-   * 챌린지에 퀴즈 추가
-   */
-  async addQuizToChallenge(productId: number, data: {
-    quizId: number;
-    day: number;
-    points?: number;
-    isActive?: boolean;
-  }) {
-    const product = await this.prisma.product.findUnique({ where: { id: productId } });
-    if (!product || !this.isChallengeProduct(product)) {
-      throw new NotFoundException('챌린지를 찾을 수 없습니다');
-    }
-
-    return await this.prisma.challengeQuiz.create({
-      data: {
-        productId,
-        quizId: data.quizId,
-        day: data.day,
-        points: data.points || 50,
-        isActive: data.isActive ?? true,
-        createdAt: getNowKST()
-      },
-      include: { quiz: true }
-    });
-  }
-
-  /**
-   * 챌린지에 컨텐츠 추가
+   * 챌린지에 컨텐츠 연결 (Content.challengeId 업데이트)
    */
   async addContentToChallenge(productId: number, data: {
     contentId: number;
-    weekNumber: number;
-    isActive?: boolean;
+    weekNumber?: number;
   }) {
     const product = await this.prisma.product.findUnique({ where: { id: productId } });
     if (!product || !this.isChallengeProduct(product)) {
       throw new NotFoundException('챌린지를 찾을 수 없습니다');
     }
 
-    return await this.prisma.challengeContent.create({
+    return await this.prisma.content.update({
+      where: { id: data.contentId },
       data: {
-        productId,
-        contentId: data.contentId,
-        weekNumber: data.weekNumber,
-        isActive: data.isActive ?? true,
-        createdAt: getNowKST()
-      },
-      include: { content: true }
+        challengeId: productId,
+        weekNumber: data.weekNumber ?? null,
+      }
     });
   }
 }

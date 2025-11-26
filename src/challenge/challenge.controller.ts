@@ -215,49 +215,24 @@ export class ChallengeController {
     };
   }
 
-  /**
-   * 챌린지에 퀴즈 추가
-   */
-  @Post(':id/quizzes')
-  async addQuizToChallenge(
-    @Param('id', ParseIntPipe) productId: number,
-    @Body() quizData: {
-      quizId: number;
-      day: number;
-      points?: number;
-      isActive?: boolean;
-    }
-  ) {
-    this.logger.log(`챌린지에 퀴즈 추가 - 상품 ID: ${productId}, 퀴즈 ID: ${quizData.quizId}`);
-
-    const challengeQuiz = await this.challengeService.addQuizToChallenge(productId, quizData);
-    return {
-      success: true,
-      message: '챌린지 퀴즈 추가 성공',
-      data: challengeQuiz,
-      timestamp: getNowKST(),
-    };
-  }
-
-  /**
-   * 챌린지에 컨텐츠 추가
+/**
+   * 챌린지에 컨텐츠 연결
    */
   @Post(':id/contents')
   async addContentToChallenge(
     @Param('id', ParseIntPipe) productId: number,
     @Body() contentData: {
       contentId: number;
-      weekNumber: number;
-      isActive?: boolean;
+      weekNumber?: number;
     }
   ) {
-    this.logger.log(`챌린지에 컨텐츠 추가 - 상품 ID: ${productId}, 컨텐츠 ID: ${contentData.contentId}`);
+    this.logger.log(`챌린지에 컨텐츠 연결 - 상품 ID: ${productId}, 컨텐츠 ID: ${contentData.contentId}`);
 
-    const challengeContent = await this.challengeService.addContentToChallenge(productId, contentData);
+    const content = await this.challengeService.addContentToChallenge(productId, contentData);
     return {
       success: true,
-      message: '챌린지 컨텐츠 추가 성공',
-      data: challengeContent,
+      message: '챌린지 컨텐츠 연결 성공',
+      data: content,
       timestamp: getNowKST(),
     };
   }

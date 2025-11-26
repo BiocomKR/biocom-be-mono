@@ -160,6 +160,35 @@ export class GoogleStorageService {
   }
 
   /**
+   * 일반 파일을 Google Cloud Storage에 업로드 (이미지 최적화 없음)
+   * @param buffer 파일 버퍼
+   * @param fileName 저장할 파일명 (경로 포함)
+   * @param mimeType 파일 MIME 타입
+   * @returns 업로드된 파일의 공개 URL
+   */
+  async uploadFile(buffer: Buffer, fileName: string, mimeType: string): Promise<string> {
+    try {
+      this.logger.log(`파일 업로드 준비: ${fileName}, 크기: ${buffer.length}bytes`);
+
+      const file = this.storage.bucket(this.bucketName).file(fileName);
+
+      await file.save(buffer, {
+        metadata: {
+          contentType: mimeType,
+        },
+      });
+
+      const publicUrl = `https://storage.googleapis.com/${this.bucketName}/${fileName}`;
+      this.logger.log(`파일 업로드 완료: ${publicUrl}`);
+      return publicUrl;
+
+    } catch (error) {
+      this.logger.error(`파일 업로드 실패: ${error.message}`);
+      throw new Error(`스토리지 업로드 실패: ${error.message}`);
+    }
+  }
+
+  /**
    * 특정 파일을 Google Storage에서 삭제
    * @param fileName 삭제할 파일명
    * @returns 삭제 성공 여부

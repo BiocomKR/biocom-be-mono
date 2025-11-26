@@ -9,6 +9,10 @@ dist/
 .env.local
 .env.*.local
 
+# Google Cloud Service Account Keys
+google-service-account-key.json
+*-firebase-adminsdk-*.json
+
 # IDE
 .idea/
 .vscode/

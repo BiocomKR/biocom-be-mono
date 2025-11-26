@@ -16,7 +16,7 @@ import {
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ContentService, ContentType, ContentFileDto } from './content.service';
+import { ContentService, ContentType } from './content.service';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 
@@ -101,15 +101,7 @@ export class ContentController {
     this.logger.log(`컨텐츠 생성 요청 - 제목: ${createDto.title}`);
 
     try {
-      const contentFiles: ContentFileDto[] = files?.map((file, index) => ({
-        fileUrl: `/uploads/${file.filename}`,
-        fileName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        sortOrder: index,
-      })) || [];
-
-      const content = await this.contentService.createContent(createDto, contentFiles);
+      const content = await this.contentService.createContent(createDto, files);
 
       this.logger.log(`컨텐츠 생성 성공 - ID: ${content.id}`);
 
@@ -167,15 +159,7 @@ export class ContentController {
     this.logger.log(`컨텐츠 수정 요청 - ID: ${id}`);
 
     try {
-      const contentFiles: ContentFileDto[] = files?.map((file, index) => ({
-        fileUrl: `/uploads/${file.filename}`,
-        fileName: file.originalname,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        sortOrder: index,
-      })) || [];
-
-      const content = await this.contentService.updateContent(id, updateDto, contentFiles);
+      const content = await this.contentService.updateContent(id, updateDto, files);
 
       this.logger.log(`컨텐츠 수정 성공 - ID: ${id}`);
 
