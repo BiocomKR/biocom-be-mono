@@ -3,6 +3,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { UserQueryDto } from './dto/user-query.dto';
+import { OrderStatus, UserChallengeStatus, CouponStatus } from '../common/enums';
 
 /**
  * 백오피스 사용자 관리 서비스
@@ -244,14 +245,14 @@ export class UsersService {
     // 추가 통계 조회
     const [totalOrderAmount, activeChallengeCount, unusedCouponCount] = await Promise.all([
       this.prisma.order.aggregate({
-        where: { userId: id, status: 'COMPLETED' },
+        where: { userId: id, status: OrderStatus.COMPLETED },
         _sum: { totalAmount: true },
       }),
       this.prisma.userChallenge.count({
-        where: { userId: id, status: 'ACTIVE' },
+        where: { userId: id, status: UserChallengeStatus.ACTIVE },
       }),
       this.prisma.userCoupon.count({
-        where: { userId: id, status: 'ACTIVE', expiresAt: { gt: new Date() } },
+        where: { userId: id, status: CouponStatus.ACTIVE, expiresAt: { gt: new Date() } },
       }),
     ]);
 

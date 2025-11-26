@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException, 
 import { PrismaService } from '../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { MissionType, ProductStatus } from '../common/enums';
 
 /**
  * 관리자 미션 관리 서비스
@@ -158,7 +159,7 @@ export class MissionService {
       }
 
       // 기록형 미션일 경우 recordType 필수 체크
-      if (data.type === 'RECORD' && !data.recordType) {
+      if (data.type === MissionType.RECORD && !data.recordType) {
         throw new BadRequestException('기록형 미션은 recordType이 필수입니다');
       }
 
@@ -237,7 +238,7 @@ export class MissionService {
       }
 
       // 기록형 미션일 경우 recordType 필수 체크
-      if (data.type === 'RECORD' && !data.recordType && !existingMission.recordType) {
+      if (data.type === MissionType.RECORD && !data.recordType && !existingMission.recordType) {
         throw new BadRequestException('기록형 미션은 recordType이 필수입니다');
       }
 
@@ -453,7 +454,7 @@ export class MissionService {
             challengeName: metadata?.challengeName || cu.product.name,
             day: cu.day,
             points: cu.points,
-            isActive: cu.product.status === 'ACTIVE'
+            isActive: cu.product.status === ProductStatus.ACTIVE
           };
         })
       };

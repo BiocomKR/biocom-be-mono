@@ -8,6 +8,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { TossPaymentsService } from '../toss/toss-payments.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { RefundStatus, ExchangeReturnStatus, OrderStatus } from '../common/enums';
 
 @Injectable()
 export class RefundService {
@@ -180,14 +181,14 @@ export class RefundService {
       throw new NotFoundException('환불 요청을 찾을 수 없습니다');
     }
 
-    if (refund.status !== 'REQUESTED') {
+    if (refund.status !== RefundStatus.REQUESTED) {
       throw new BadRequestException('대기 중인 환불 요청만 승인 가능합니다');
     }
 
     const updated = await this.prisma.refund.update({
       where: { id },
       data: {
-        status: 'APPROVED',
+        status: RefundStatus.APPROVED,
         adminMemo: adminMemo || refund.adminMemo
       }
     });
@@ -217,14 +218,14 @@ export class RefundService {
       throw new NotFoundException('환불 요청을 찾을 수 없습니다');
     }
 
-    if (refund.status !== 'REQUESTED') {
+    if (refund.status !== RefundStatus.REQUESTED) {
       throw new BadRequestException('대기 중인 환불 요청만 거절 가능합니다');
     }
 
     const updated = await this.prisma.refund.update({
       where: { id },
       data: {
-        status: 'REJECTED',
+        status: RefundStatus.REJECTED,
         rejectedAt: getNowKST(),
         reasonDetail: reason,
         adminMemo: adminMemo || refund.adminMemo
@@ -264,7 +265,7 @@ export class RefundService {
       throw new NotFoundException('환불 요청을 찾을 수 없습니다');
     }
 
-    if (!['APPROVED', 'PROCESSING'].includes(refund.status)) {
+    if (![RefundStatus.APPROVED, RefundStatus.PROCESSING].includes(refund.status as RefundStatus)) {
       throw new BadRequestException('승인된 환불 요청만 완료 처리 가능합니다');
     }
 
@@ -273,7 +274,7 @@ export class RefundService {
       const updatedRefund = await tx.refund.update({
         where: { id },
         data: {
-          status: 'COMPLETED',
+          status: RefundStatus.COMPLETED,
           completedAt: getNowKST(),
           tossCancelId: transactionId,
           adminMemo: adminMemo || refund.adminMemo
@@ -413,7 +414,7 @@ export class RefundService {
       by: ['reason'],
       where: {
         ...where,
-        status: 'COMPLETED'
+        status: RefundStatus.COMPLETED
       },
       _count: true,
       _sum: {
@@ -425,7 +426,7 @@ export class RefundService {
     const completedRefunds = await this.prisma.refund.findMany({
       where: {
         ...where,
-        status: 'COMPLETED',
+        status: RefundStatus.COMPLETED,
         completedAt: { not: null }
       },
       select: {
@@ -471,7 +472,7 @@ export class RefundService {
   async getPendingRefunds() {
     const refunds = await this.prisma.refund.findMany({
       where: {
-        status: 'REQUESTED'
+        status: RefundStatus.REQUESTED
       },
       include: {
         order: {
@@ -527,7 +528,7 @@ export class RefundService {
       }
 
       // 승인 가능 상태 확인
-      if (exchangeReturn.status !== 'REQUESTED') {
+      if (exchangeReturn.status !== ExchangeReturnStatus.REQUESTED) {
         throw new BadRequestException('이미 처리된 요청입니다');
       }
 
@@ -535,7 +536,7 @@ export class RefundService {
       const updated = await tx.exchangeReturn.update({
         where: { id: returnId },
         data: {
-          status: 'APPROVED',
+          status: ExchangeReturnStatus.APPROVED,
           approvedAt: getNowKST(),
         }
       });
@@ -582,7 +583,7 @@ export class RefundService {
       }
 
       // 승인 상태 확인
-      if (exchangeReturn.status !== 'APPROVED') {
+      if (exchangeReturn.status !== ExchangeReturnStatus.APPROVED) {
         throw new BadRequestException('승인된 반품만 완료 처리 가능합니다');
       }
 
@@ -597,7 +598,7 @@ export class RefundService {
       await tx.exchangeReturn.update({
         where: { id: returnId },
         data: {
-          status: 'COMPLETED',
+          status: ExchangeReturnStatus.COMPLETED,
           completedAt: getNowKST(),
           returnTrackingNumber: returnTrackingNumber || null
         }
@@ -609,7 +610,7 @@ export class RefundService {
           orderId: order.id,
           paymentId: order.payment.id,
           refundType: 'RETURN',
-          status: 'REQUESTED',
+          status: RefundStatus.REQUESTED,
           refundAmount: order.totalAmount, // 전액 환불
           pointRefund: order.pointUsed,
           reason: exchangeReturn.reason,
@@ -633,7 +634,7 @@ export class RefundService {
           data: {
             tossResponse: tossResponse as any,
             tossCancelId: tossResponse.cancels?.[0]?.transactionKey || null,
-            status: 'COMPLETED',
+            status: RefundStatus.COMPLETED,
             completedAt: getNowKST(),
           }
         });
@@ -646,7 +647,7 @@ export class RefundService {
         await tx.refund.update({
           where: { id: refund.id },
           data: {
-            status: 'FAILED',
+            status: RefundStatus.FAILED,
             rejectedAt: getNowKST(),
             reasonDetail: `토스페이먼츠 API 오류: ${error.message}`
           }
@@ -659,7 +660,7 @@ export class RefundService {
       await tx.order.update({
         where: { id: order.id },
         data: {
-          status: 'COMPLETED', // 반품 완료는 COMPLETED로
+          status: OrderStatus.COMPLETED, // 반품 완료는 COMPLETED로
           completedAt: getNowKST(),
         }
       });
@@ -669,7 +670,7 @@ export class RefundService {
         data: {
           orderId: order.id,
           fromStatus: order.status,
-          toStatus: 'COMPLETED',
+          toStatus: OrderStatus.COMPLETED,
           changeReason: `반품 완료 - ${exchangeReturn.reason}`,
           createdAt: getNowKST(),
         }
@@ -741,7 +742,7 @@ export class RefundService {
       }
 
       // 승인 가능 상태 확인
-      if (exchangeReturn.status !== 'REQUESTED') {
+      if (exchangeReturn.status !== ExchangeReturnStatus.REQUESTED) {
         throw new BadRequestException('이미 처리된 요청입니다');
       }
 
@@ -749,7 +750,7 @@ export class RefundService {
       const updated = await tx.exchangeReturn.update({
         where: { id: exchangeId },
         data: {
-          status: 'APPROVED',
+          status: ExchangeReturnStatus.APPROVED,
           approvedAt: getNowKST(),
         }
       });
@@ -792,7 +793,7 @@ export class RefundService {
       }
 
       // 승인 상태 확인
-      if (exchangeReturn.status !== 'APPROVED') {
+      if (exchangeReturn.status !== ExchangeReturnStatus.APPROVED) {
         throw new BadRequestException('승인된 교환만 완료 처리 가능합니다');
       }
 
@@ -802,7 +803,7 @@ export class RefundService {
       await tx.exchangeReturn.update({
         where: { id: exchangeId },
         data: {
-          status: 'COMPLETED',
+          status: ExchangeReturnStatus.COMPLETED,
           completedAt: getNowKST(),
           returnTrackingNumber: exchangeTrackingNumber || null
         }

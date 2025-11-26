@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { OrderStatus, ShippingStatus } from '../common/enums';
 
 @Injectable()
 export class ShippingService {
@@ -114,7 +115,7 @@ export class ShippingService {
     }
 
     // 배송 가능 상태 확인
-    if (!['PAID', 'PREPARING'].includes(order.status)) {
+    if (![OrderStatus.PAID, OrderStatus.PREPARING].includes(order.status as OrderStatus)) {
       throw new BadRequestException('운송장을 등록할 수 없는 주문 상태입니다');
     }
 
@@ -126,23 +127,23 @@ export class ShippingService {
           courierCode: dto.courierCode,
           courierName: dto.courierName,
           trackingNumber: dto.trackingNumber,
-          status: 'READY_FOR_SHIPMENT',
+          status: ShippingStatus.READY_FOR_SHIPMENT,
           readyAt: getNowKST()
         }
       });
 
       // 주문 상태 업데이트
-      if (order.status === 'PAID') {
+      if (order.status === OrderStatus.PAID) {
         await tx.order.update({
           where: { id: order.id },
-          data: { status: 'PREPARING' }
+          data: { status: OrderStatus.PREPARING }
         });
 
         await tx.orderStateLog.create({
           data: {
             orderId: order.id,
-            fromStatus: 'PAID',
-            toStatus: 'PREPARING',
+            fromStatus: OrderStatus.PAID,
+            toStatus: OrderStatus.PREPARING,
             changeReason: '운송장 등록 - 배송 준비',
             createdAt: getNowKST(),
           }
@@ -175,7 +176,7 @@ export class ShippingService {
       throw new NotFoundException('배송 정보를 찾을 수 없습니다');
     }
 
-    if (order.status !== 'PREPARING') {
+    if (order.status !== OrderStatus.PREPARING) {
       throw new BadRequestException('배송 준비 중인 주문만 발송 처리 가능합니다');
     }
 
@@ -188,7 +189,7 @@ export class ShippingService {
       await tx.shipping.update({
         where: { id: order.shipping!.id },
         data: {
-          status: 'IN_TRANSIT',
+          status: ShippingStatus.IN_TRANSIT,
           shippedAt: getNowKST()
         }
       });
@@ -197,7 +198,7 @@ export class ShippingService {
       await tx.order.update({
         where: { id: order.id },
         data: {
-          status: 'SHIPPED',
+          status: OrderStatus.SHIPPED,
           shippedAt: getNowKST()
         }
       });
@@ -206,8 +207,8 @@ export class ShippingService {
       await tx.orderStateLog.create({
         data: {
           orderId: order.id,
-          fromStatus: 'PREPARING',
-          toStatus: 'SHIPPED',
+          fromStatus: OrderStatus.PREPARING,
+          toStatus: OrderStatus.SHIPPED,
           changeReason: '배송 시작',
           createdAt: getNowKST(),
         }
@@ -236,7 +237,7 @@ export class ShippingService {
       throw new NotFoundException('배송 정보를 찾을 수 없습니다');
     }
 
-    if (order.status !== 'SHIPPED') {
+    if (order.status !== OrderStatus.SHIPPED) {
       throw new BadRequestException('배송 중인 주문만 배송완료 처리 가능합니다');
     }
 
@@ -245,7 +246,7 @@ export class ShippingService {
       await tx.shipping.update({
         where: { id: order.shipping!.id },
         data: {
-          status: 'DELIVERED',
+          status: ShippingStatus.DELIVERED,
           deliveredAt: getNowKST()
         }
       });
@@ -254,7 +255,7 @@ export class ShippingService {
       await tx.order.update({
         where: { id: order.id },
         data: {
-          status: 'DELIVERED',
+          status: OrderStatus.DELIVERED,
           deliveredAt: getNowKST()
         }
       });
@@ -263,8 +264,8 @@ export class ShippingService {
       await tx.orderStateLog.create({
         data: {
           orderId: order.id,
-          fromStatus: 'SHIPPED',
-          toStatus: 'DELIVERED',
+          fromStatus: OrderStatus.SHIPPED,
+          toStatus: OrderStatus.DELIVERED,
           changeReason: '배송 완료',
           createdAt: getNowKST(),
         }
@@ -290,10 +291,10 @@ export class ShippingService {
     for (const orderNumber of orderNumbers) {
       try {
         switch (status) {
-          case 'IN_TRANSIT':
+          case ShippingStatus.IN_TRANSIT:
             await this.startShipping(orderNumber);
             break;
-          case 'DELIVERED':
+          case ShippingStatus.DELIVERED:
             await this.completeShipping(orderNumber);
             break;
           default:
@@ -356,7 +357,7 @@ export class ShippingService {
     const completedShippings = await this.prisma.shipping.findMany({
       where: {
         ...where,
-        status: 'DELIVERED',
+        status: ShippingStatus.DELIVERED,
         shippedAt: { not: null },
         deliveredAt: { not: null }
       },

@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { OrderStatus } from '../common/enums';
 
 @Injectable()
 export class ShopService {
@@ -311,10 +312,10 @@ export class ShopService {
         where: { id: order.id },
         data: {
           status,
-          ...(status === 'SHIPPED' && { shippedAt: getNowKST() }),
-          ...(status === 'DELIVERED' && { deliveredAt: getNowKST() }),
-          ...(status === 'CANCELLED' && { cancelledAt: getNowKST() }),
-          ...(status === 'COMPLETED' && { completedAt: getNowKST() })
+          ...(status === OrderStatus.SHIPPED && { shippedAt: getNowKST() }),
+          ...(status === OrderStatus.DELIVERED && { deliveredAt: getNowKST() }),
+          ...(status === OrderStatus.CANCELLED && { cancelledAt: getNowKST() }),
+          ...(status === OrderStatus.COMPLETED && { completedAt: getNowKST() })
         }
       });
 

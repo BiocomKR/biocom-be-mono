@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { OrderStatus, RefundStatus } from '../common/enums';
 
 @Injectable()
 export class DashboardService {
@@ -24,7 +25,7 @@ export class DashboardService {
     // 오늘 매출
     const todaySales = await this.prisma.order.aggregate({
       where: {
-        status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+        status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
         paidAt: {
           gte: today,
           lt: tomorrow
@@ -37,7 +38,7 @@ export class DashboardService {
     // 이번 달 매출
     const monthSales = await this.prisma.order.aggregate({
       where: {
-        status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+        status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
         paidAt: {
           gte: thisMonth,
           lt: nextMonth
@@ -70,14 +71,14 @@ export class DashboardService {
     // 대기 중인 주문
     const pendingOrders = await this.prisma.order.count({
       where: {
-        status: { in: ['PAID', 'PREPARING'] }
+        status: { in: [OrderStatus.PAID, OrderStatus.PREPARING] }
       }
     });
 
     // 대기 중인 환불
     const pendingRefunds = await this.prisma.refund.count({
       where: {
-        status: 'PENDING'
+        status: RefundStatus.PENDING
       }
     });
 
@@ -125,7 +126,7 @@ export class DashboardService {
 
     const orders = await this.prisma.order.findMany({
       where: {
-        status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+        status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
         paidAt: {
           gte: start,
           lte: end
@@ -206,7 +207,7 @@ export class DashboardService {
       by: ['productId'],
       where: {
         order: {
-          status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+          status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
           paidAt: {
             gte: start,
             lte: end
@@ -333,7 +334,7 @@ export class DashboardService {
     // 평균 주문 금액
     const avgOrderAmount = await this.prisma.order.aggregate({
       where: {
-        status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+        status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
         paidAt: {
           gte: start,
           lte: end
@@ -354,7 +355,7 @@ export class DashboardService {
 
     const cancelledOrders = await this.prisma.order.count({
       where: {
-        status: 'CANCELLED',
+        status: OrderStatus.CANCELLED,
         orderedAt: {
           gte: start,
           lte: end
@@ -402,7 +403,7 @@ export class DashboardService {
     // 구매 고객
     const purchasingCustomers = await this.prisma.order.findMany({
       where: {
-        status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+        status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
         paidAt: {
           gte: start,
           lte: end
@@ -418,7 +419,7 @@ export class DashboardService {
     const customerOrders = await this.prisma.order.groupBy({
       by: ['userId'],
       where: {
-        status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+        status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
         paidAt: {
           gte: start,
           lte: end
@@ -438,7 +439,7 @@ export class DashboardService {
     const customerSpending = await this.prisma.order.groupBy({
       by: ['userId'],
       where: {
-        status: { notIn: ['PENDING_PAYMENT', 'CANCELLED'] },
+        status: { notIn: [OrderStatus.PENDING_PAYMENT, OrderStatus.CANCELLED] },
         paidAt: {
           gte: start,
           lte: end
@@ -544,7 +545,7 @@ export class DashboardService {
           gte: start,
           lte: end
         },
-        status: 'COMPLETED'
+        status: RefundStatus.COMPLETED
       },
       _count: true,
       _sum: {
@@ -555,7 +556,7 @@ export class DashboardService {
     // 평균 처리 시간 (요청 ~ 완료)
     const completedRefunds = await this.prisma.refund.findMany({
       where: {
-        status: 'COMPLETED',
+        status: RefundStatus.COMPLETED,
         requestedAt: {
           gte: start,
           lte: end

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { ProductStatus, UserChallengeStatus } from '../common/enums';
 
 /**
  * 백오피스 챌린지 관리 서비스
@@ -28,7 +29,7 @@ export class ChallengeService {
       name: product.name,
       description: product.description,
       totalDays: metadata.totalDays || 21,
-      isActive: product.status === 'ACTIVE'
+      isActive: product.status === ProductStatus.ACTIVE
     };
   }
 
@@ -48,8 +49,8 @@ export class ChallengeService {
       categoryCode: 'CHALLENGE'
     };
 
-    if (status === 'active') where.status = 'ACTIVE';
-    if (status === 'inactive') where.status = 'INACTIVE';
+    if (status === 'active') where.status = ProductStatus.ACTIVE;
+    if (status === 'inactive') where.status = ProductStatus.INACTIVE;
 
     if (search) {
       where.OR = [
@@ -151,7 +152,7 @@ export class ChallengeService {
         name: data.name,
         description: data.description,
         productType: 'SINGLE',
-        status: data.isActive ? 'ACTIVE' : 'INACTIVE',
+        status: data.isActive ? ProductStatus.ACTIVE : ProductStatus.INACTIVE,
         categoryCode: data.categoryCode || 'CHALLENGE',
         categoryName: data.categoryName || '챌린지',
         price: data.price,
@@ -185,7 +186,7 @@ export class ChallengeService {
     if (data.name) updateData.name = data.name;
     if (data.description) updateData.description = data.description;
     if (data.price !== undefined) updateData.price = data.price;
-    if (data.isActive !== undefined) updateData.status = data.isActive ? 'ACTIVE' : 'INACTIVE';
+    if (data.isActive !== undefined) updateData.status = data.isActive ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
 
     if (data.totalDays) {
       updateData.metadata = {
@@ -234,8 +235,8 @@ export class ChallengeService {
     ] = await Promise.all([
       this.prisma.product.findUnique({ where: { id: productId } }),
       this.prisma.userChallenge.count({ where: { productId } }),
-      this.prisma.userChallenge.count({ where: { productId, status: 'ACTIVE' } }),
-      this.prisma.userChallenge.count({ where: { productId, status: 'COMPLETED' } }),
+      this.prisma.userChallenge.count({ where: { productId, status: UserChallengeStatus.ACTIVE } }),
+      this.prisma.userChallenge.count({ where: { productId, status: UserChallengeStatus.COMPLETED } }),
       this.prisma.challengeMission.count({ where: { productId, isActive: true } }),
       this.prisma.challengeSurvey.count({ where: { productId, isActive: true } }),
       this.prisma.content.count({ where: { challengeId: productId, isActive: true } })
@@ -279,7 +280,7 @@ export class ChallengeService {
       throw new NotFoundException('챌린지를 찾을 수 없습니다');
     }
 
-    const newStatus = product.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    const newStatus = product.status === ProductStatus.ACTIVE ? ProductStatus.INACTIVE : ProductStatus.ACTIVE;
 
     return await this.prisma.product.update({
       where: { id: productId },
