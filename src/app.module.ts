@@ -18,6 +18,7 @@ import { CommonModule } from './common/common.module';
 import { TossModule } from './toss/toss.module';
 import { ImwebModule } from './imweb/imweb.module';
 import { PushModule } from './push/push.module';
+import { ConsentModule } from './consent/consent.module';
 
 // Domain Controllers
 import { UsersController } from './users/users.controller';
@@ -99,6 +100,7 @@ import { DashboardService } from './dashboard/dashboard.service';
     TossModule,       // 토스페이먼츠 API 모듈
     ImwebModule,      // 아임웹 API 모듈
     PushModule,       // 푸시 알림 모듈
+    ConsentModule,    // 약관 관리 모듈
   ],
   controllers: [
     UsersController,

@@ -407,6 +407,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get pushNotificationCampaign() { return this.prisma.pushNotificationCampaign; }
   get pushNotificationLog() { return this.prisma.pushNotificationLog; }
 
+  // 약관 테이블
+  get consent() { return this.prisma.consent; }
+  get userConsent() { return this.prisma.userConsent; }
+
   // 메서드 바인딩
   $transaction(arg: any) {
     return (this.prisma as any).$transaction(arg);

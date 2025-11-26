@@ -54,6 +54,7 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
+  userConsents                 UserConsent[]
 
   @@map("users")
 }
@@ -1928,20 +1929,42 @@ model PushNotificationLog {
   @@map("push_notification_logs")
 }
 
-/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
-model UserConsent {
-  id                Int       @id @default(autoincrement())
-  userId            Int       @map("user_id")
-  agreeToTerms      Boolean   @map("agree_to_terms")
-  agreeToAge14      Boolean   @map("agree_to_age14")
-  agreeToPrivacy    Boolean   @map("agree_to_privacy")
-  agreeToThirdParty Boolean   @map("agree_to_third_party")
-  agreeToMarketing  Boolean   @map("agree_to_marketing")
-  agreedAt          DateTime  @map("agreed_at") @db.Timestamp(6)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt         DateTime? @map("updated_at") @db.Timestamp(6)
+/// 약관 마스터 테이블
+/// 서비스 이용약관, 개인정보처리방침 등 약관 관리
+model Consent {
+  id            Int           @id @default(autoincrement())
+  code          String        @db.VarChar(50)
+  title         String        @db.VarChar(200)
+  content       String?       @db.Text
+  version       String        @db.VarChar(20)
+  isRequired    Boolean       @default(false) @map("is_required")
+  isActive      Boolean       @default(false) @map("is_active")
+  displayOrder  Int           @default(0) @map("display_order")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt     DateTime?     @map("deleted_at") @db.Timestamp(6)
 
+  userConsents  UserConsent[]
+
+  @@unique([code, version])
+  @@index([code, isActive])
+  @@map("consents")
+}
+
+/// 사용자 약관 동의 내역
+model UserConsent {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  consentId     Int       @map("consent_id")
+  isAgreed      Boolean   @map("is_agreed")
+  agreedAt      DateTime? @map("agreed_at") @db.Timestamp(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consent       Consent   @relation(fields: [consentId], references: [id])
+
+  @@unique([userId, consentId])
   @@index([userId], map: "idx_user_consents_user_id")
+  @@index([consentId], map: "idx_user_consents_consent_id")
   @@map("user_consents")
 }
 
