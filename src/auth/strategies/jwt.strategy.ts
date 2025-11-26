@@ -28,18 +28,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   /**
    * JWT 페이로드 검증
    * Passport가 JWT를 디코딩한 후 자동으로 호출
-   * 
+   *
    * @param payload 디코딩된 JWT 페이로드
-   * @returns 검증된 사용자 정보
+   * @returns 검증된 운영자 정보
    */
   async validate(payload: JwtPayload) {
-    const user = await this.authService.validateJwtPayload(payload);
-    
-    if (!user) {
+    const operator = await this.authService.validateJwtPayload(payload);
+
+    if (!operator) {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
     }
 
-    // req.user에 저장될 사용자 정보
-    return user;
+    // req.user에 저장될 운영자 정보
+    return operator;
   }
 }

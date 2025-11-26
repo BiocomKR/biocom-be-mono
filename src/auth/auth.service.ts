@@ -1,22 +1,26 @@
-import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+  ConflictException,
+  Logger,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../common/services/prisma.service';
 import { ConfigService } from '../common/services/config.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
-// import { PhoneLoginDto } from './dto/phone-login.dto'; // BO에서 불필요
-// import { PhoneRegisterDto } from './dto/phone-register.dto'; // BO에서 불필요
-// import { PhoneRequestDto } from './dto/phone-request.dto'; // BO에서 불필요
 import { JwtPayload } from './interfaces/jwt-payload.interface';
-import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
 import { getNowKST } from '../common/utils/kst-date.util';
-// import { PhoneVerificationService } from '../phone-verification/phone-verification.service'; // BO에서 불필요
+
+// 계정 잠금 설정
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_DURATION_MINUTES = 30;
 
 /**
- * 인증 서비스
- * 사용자 인증 및 JWT 토큰 관리를 담당
+ * 인증 서비스 (운영자용)
+ * 운영자 인증 및 JWT 토큰 관리를 담당
  */
 @Injectable()
 export class AuthService {
@@ -26,297 +30,318 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
-    // private readonly phoneVerificationService: PhoneVerificationService, // BO에서 불필요
   ) {}
 
   /**
-   * 회원가입
-   * 
-   * @param signUpDto 회원가입 정보
-   * @returns 생성된 사용자 정보와 JWT 토큰
-   */
-  async signUp(signUpDto: SignUpDto) {
-    const { email, password, name, mobile } = signUpDto;
-
-    this.logger.log(`회원가입 시도: ${email}`);
-
-    // 이메일 중복 검사
-    const existingUser = await this.prisma.user.findFirst({
-      where: { email },
-    });
-
-    if (existingUser) {
-      this.logger.warn(`이미 존재하는 이메일: ${email}`);
-      throw new ConflictException('이미 등록된 이메일입니다.');
-    }
-
-    // 패스워드 암호화
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // 사용자 생성
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        mobile,
-        status: UserSubscriptionStatus.NEWCOMER,
-        createdAt: getNowKST(), // KST 시간으로 저장
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        mobile: true,
-        createdAt: true,
-      },
-    });
-
-    this.logger.log(`회원가입 성공: ${user.email} (ID: ${user.id})`);
-
-    // JWT 토큰 생성
-    const payload: JwtPayload = { sub: user.id, name: user.name };
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
-    });
-    
-    // Refresh Token 생성 및 저장
-    const refreshToken = await this.createRefreshToken(user.id);
-
-    return {
-      user,
-      accessToken,
-      refreshToken,
-    };
-  }
-
-  /**
-   * 로그인
-   * 
+   * 운영자 로그인
+   *
    * @param signInDto 로그인 정보
-   * @returns 사용자 정보와 JWT 토큰
+   * @param ip 클라이언트 IP
+   * @param userAgent 클라이언트 User-Agent
+   * @returns 운영자 정보와 JWT 토큰
    */
-  async signIn(signInDto: SignInDto) {
+  async signIn(signInDto: SignInDto, ip?: string, userAgent?: string) {
     const { email, password } = signInDto;
 
-    this.logger.log(`로그인 시도: ${email}`);
+    this.logger.log(`운영자 로그인 시도: ${email}`);
 
-    // 사용자 조회
-    const user = await this.prisma.user.findFirst({
+    // 운영자 조회 (부서 정보 포함)
+    const operator = await this.prisma.operator.findUnique({
       where: { email },
+      include: { department: true },
     });
 
-    if (!user) {
-      this.logger.warn(`존재하지 않는 사용자: ${email}`);
+    if (!operator) {
+      this.logger.warn(`존재하지 않는 운영자: ${email}`);
       throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
-    // 계정 상태 체크
-    if (!user.isActive) {
-      this.logger.warn(`차단된 계정 로그인 시도: ${email}`);
-      throw new UnauthorizedException('차단된 계정입니다. 고객센터에 문의하세요.');
+    // 계정 활성화 상태 체크
+    if (!operator.isActive) {
+      this.logger.warn(`비활성화된 운영자 로그인 시도: ${email}`);
+      await this.logAuthAction(operator.id, 'LOGIN_FAIL_INACTIVE', ip, userAgent);
+      throw new UnauthorizedException('비활성화된 계정입니다. 관리자에게 문의하세요.');
     }
 
-    if (user.deletedAt) {
-      this.logger.warn(`탈퇴한 계정 로그인 시도: ${email}`);
-      throw new UnauthorizedException('탈퇴한 계정입니다.');
+    // 계정 잠금 상태 체크
+    if (operator.lockedUntil) {
+      if (operator.lockedUntil > new Date()) {
+        const remainingMinutes = Math.ceil(
+          (operator.lockedUntil.getTime() - Date.now()) / 60000,
+        );
+        this.logger.warn(`잠긴 계정 로그인 시도: ${email}`);
+        await this.logAuthAction(operator.id, 'LOGIN_FAIL_LOCKED', ip, userAgent);
+        throw new ForbiddenException(
+          `계정이 잠겼습니다. ${remainingMinutes}분 후 재시도하세요.`,
+        );
+      }
+      // 잠금 시간 지남 → 자동 해제
+      await this.prisma.operator.update({
+        where: { id: operator.id },
+        data: { lockedUntil: null, failedAttempts: 0 },
+      });
     }
 
-    // 패스워드 검증
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // 비밀번호 검증
+    const isPasswordValid = await bcrypt.compare(password, operator.password);
 
     if (!isPasswordValid) {
-      this.logger.warn(`잘못된 비밀번호: ${user.name}`);
+      this.logger.warn(`잘못된 비밀번호: ${operator.name}`);
+      await this.handleFailedLogin(operator.id, ip, userAgent);
       throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     }
 
-    this.logger.log(`로그인 성공: ${user.name} (ID: ${user.id})`);
+    // 로그인 성공 처리
+    await this.prisma.operator.update({
+      where: { id: operator.id },
+      data: {
+        failedAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: getNowKST(),
+      },
+    });
+
+    await this.logAuthAction(operator.id, 'LOGIN_SUCCESS', ip, userAgent);
+
+    this.logger.log(`운영자 로그인 성공: ${operator.name} (ID: ${operator.id})`);
 
     // JWT 토큰 생성
-    const payload: JwtPayload = { sub: user.id, name: user.name };
+    const payload: JwtPayload = {
+      sub: operator.id,
+      name: operator.name,
+      accessTier: operator.accessTier,
+    };
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
     });
-    
-    // Refresh Token 생성 및 저장
-    const refreshToken = await this.createRefreshToken(user.id);
 
-    // 클라이언트에 반환할 사용자 정보만 선택
-    const userResponse = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      mobile: user.mobile,
-      createdAt: user.createdAt,
+    // Refresh Token 생성 및 저장
+    const refreshToken = await this.createRefreshToken(operator.id);
+
+    // 응답 데이터
+    const operatorResponse = {
+      id: operator.id,
+      email: operator.email,
+      name: operator.name,
+      accessTier: operator.accessTier,
+      department: operator.department
+        ? {
+            id: operator.department.id,
+            name: operator.department.name,
+            code: operator.department.code,
+            menuCodes: operator.department.menuCodes,
+          }
+        : null,
     };
 
     return {
-      user: userResponse,
+      operator: operatorResponse,
       accessToken,
       refreshToken,
     };
   }
 
   /**
-   * 사용자 검증 (LocalStrategy에서 사용)
-   * 
-   * @param email 이메일
-   * @param password 비밀번호
-   * @returns 검증된 사용자 정보
+   * 로그인 실패 처리
    */
-  async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
+  private async handleFailedLogin(
+    operatorId: number,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const operator = await this.prisma.operator.findUnique({
+      where: { id: operatorId },
     });
 
-    if (user && await bcrypt.compare(password, user.password)) {
-      const { password: _, ...result } = user;
-      return result;
+    const failedAttempts = (operator?.failedAttempts || 0) + 1;
+    const updateData: any = { failedAttempts };
+
+    // 최대 실패 횟수 도달 시 계정 잠금
+    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+      updateData.lockedUntil = new Date(
+        Date.now() + LOCK_DURATION_MINUTES * 60 * 1000,
+      );
+      this.logger.warn(
+        `운영자 계정 잠금: ID ${operatorId} (${failedAttempts}회 실패)`,
+      );
     }
 
-    return null;
+    await this.prisma.operator.update({
+      where: { id: operatorId },
+      data: updateData,
+    });
+
+    await this.logAuthAction(operatorId, 'LOGIN_FAIL', ip, userAgent);
   }
 
   /**
-   * JWT 페이로드로부터 사용자 조회 (JwtStrategy에서 사용)
-   * 
-   * @param payload JWT 페이로드
-   * @returns 사용자 정보
+   * 인증 로그 기록
    */
-  async validateJwtPayload(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        mobile: true,
-        points: true,
-        role: true,
-        createdAt: true,
+  private async logAuthAction(
+    operatorId: number,
+    action: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    await this.prisma.operatorAuthLog.create({
+      data: {
+        operatorId,
+        action,
+        ip,
+        userAgent,
+        createdAt: getNowKST(),
       },
     });
+  }
 
-    if (!user) {
+  /**
+   * JWT 페이로드로부터 운영자 조회 (JwtStrategy에서 사용)
+   *
+   * @param payload JWT 페이로드
+   * @returns 운영자 정보
+   */
+  async validateJwtPayload(payload: JwtPayload) {
+    const operator = await this.prisma.operator.findUnique({
+      where: { id: payload.sub },
+      include: { department: true },
+    });
+
+    if (!operator) {
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
     }
 
-    // req.user에 저장될 사용자 정보 (sub 추가)
+    if (!operator.isActive) {
+      throw new UnauthorizedException('비활성화된 계정입니다.');
+    }
+
+    // req.user에 저장될 운영자 정보
     return {
-      ...user,
-      sub: user.id // JWT payload의 sub 필드와 일치시키기 위해 추가
+      id: operator.id,
+      email: operator.email,
+      name: operator.name,
+      accessTier: operator.accessTier,
+      department: operator.department,
+      sub: operator.id,
     };
   }
-
-  // BO에서 불필요: validatePhoneVerification 메서드 제거
 
   /**
    * Refresh Token 생성 및 저장
    *
-   * @param userId 사용자 ID
+   * @param operatorId 운영자 ID
    * @returns 생성된 Refresh Token
    */
-  private async createRefreshToken(userId: number): Promise<string> {
+  private async createRefreshToken(operatorId: number): Promise<string> {
     // 고유한 토큰 생성
     const token = crypto.randomBytes(64).toString('hex');
-    
-    // 만료 시간 계산 (180일)
+
+    // 만료 시간 계산 (7일 - 운영자는 앱보다 짧게)
     const expiresAt = getNowKST();
-    expiresAt.setDate(expiresAt.getDate() + 180);
-    
-    // 기존 Refresh Token 삭제 (사용자당 1개만 유지)
-    await this.prisma.refreshToken.deleteMany({
-      where: { userId },
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    // 기존 Refresh Token 삭제 (운영자당 1개만 유지)
+    await this.prisma.operatorRefreshToken.deleteMany({
+      where: { operatorId },
     });
-    
+
     // 새로운 Refresh Token 저장
-    await this.prisma.refreshToken.create({
+    await this.prisma.operatorRefreshToken.create({
       data: {
         token,
-        userId,
+        operatorId,
         expiresAt,
         createdAt: getNowKST(),
       },
     });
-    
-    this.logger.log(`Refresh Token 생성: 사용자 ID ${userId}`);
+
+    this.logger.log(`운영자 Refresh Token 생성: ID ${operatorId}`);
     return token;
   }
 
   /**
    * Access Token 갱신
-   * 
+   *
    * @param refreshToken Refresh Token
-   * @returns 새로운 Access Token과 기존 Refresh Token
+   * @returns 새로운 Access Token과 Refresh Token
    */
   async refreshAccessToken(refreshToken: string) {
-    this.logger.log(`토큰 갱신 시도`);
-    
+    this.logger.log(`운영자 토큰 갱신 시도`);
+
     // Refresh Token 조회
-    const storedToken = await this.prisma.refreshToken.findUnique({
+    const storedToken = await this.prisma.operatorRefreshToken.findUnique({
       where: { token: refreshToken },
-      include: { user: true },
+      include: {
+        operator: {
+          include: { department: true },
+        },
+      },
     });
-    
+
     if (!storedToken) {
       this.logger.warn(`유효하지 않은 Refresh Token`);
       throw new UnauthorizedException('유효하지 않은 토큰입니다.');
     }
-    
+
     // 만료 확인
     if (storedToken.expiresAt < getNowKST()) {
-      this.logger.warn(`만료된 Refresh Token: 사용자 ID ${storedToken.userId}`);
-      await this.prisma.refreshToken.delete({
+      this.logger.warn(`만료된 Refresh Token: 운영자 ID ${storedToken.operatorId}`);
+      await this.prisma.operatorRefreshToken.delete({
         where: { id: storedToken.id },
       });
       throw new UnauthorizedException('토큰이 만료되었습니다. 다시 로그인해주세요.');
     }
-    
-    // 사용자 상태 확인
-    const user = storedToken.user;
-    if (!user.isActive) {
-      this.logger.warn(`차단된 계정 토큰 갱신 시도: ${user.name}`);
-      throw new UnauthorizedException('차단된 계정입니다. 고객센터에 문의하세요.');
+
+    // 운영자 상태 확인
+    const operator = storedToken.operator;
+    if (!operator.isActive) {
+      this.logger.warn(`비활성화된 운영자 토큰 갱신 시도: ${operator.name}`);
+      throw new UnauthorizedException('비활성화된 계정입니다.');
     }
-    
-    if (user.deletedAt) {
-      this.logger.warn(`탈퇴한 계정 토큰 갱신 시도: ${user.name}`);
-      throw new UnauthorizedException('탈퇴한 계정입니다.');
-    }
-    
+
     // 새로운 Access Token 생성
-    const payload: JwtPayload = { sub: user.id, name: user.name };
+    const payload: JwtPayload = {
+      sub: operator.id,
+      name: operator.name,
+      accessTier: operator.accessTier,
+    };
     const accessToken = this.jwtService.sign(payload, {
       expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
     });
-    
-    this.logger.log(`토큰 갱신 성공: 사용자 ID ${user.id}`);
-    
+
+    // Refresh Token도 새로 발급 (Rotation)
+    const newRefreshToken = await this.createRefreshToken(operator.id);
+
+    this.logger.log(`운영자 토큰 갱신 성공: ID ${operator.id}`);
+
     return {
       accessToken,
-      refreshToken, // 기존 Refresh Token 그대로 반환 (Fixed 방식)
+      refreshToken: newRefreshToken,
     };
   }
 
   /**
    * 로그아웃
    *
-   * @param userId 사용자 ID
+   * @param operatorId 운영자 ID
+   * @param ip 클라이언트 IP
+   * @param userAgent 클라이언트 User-Agent
    */
-  async logout(userId: number) {
-    this.logger.log(`로그아웃 시도: 사용자 ID ${userId}`);
+  async logout(operatorId: number, ip?: string, userAgent?: string) {
+    this.logger.log(`운영자 로그아웃 시도: ID ${operatorId}`);
 
     // Refresh Token 삭제
-    const result = await this.prisma.refreshToken.deleteMany({
-      where: { userId },
+    const result = await this.prisma.operatorRefreshToken.deleteMany({
+      where: { operatorId },
     });
 
-    this.logger.log(`로그아웃 성공: 사용자 ID ${userId}, 삭제된 토큰 수: ${result.count}`);
+    await this.logAuthAction(operatorId, 'LOGOUT', ip, userAgent);
+
+    this.logger.log(
+      `운영자 로그아웃 성공: ID ${operatorId}, 삭제된 토큰 수: ${result.count}`,
+    );
 
     return {
       message: '로그아웃되었습니다.',
     };
   }
-
-  // BO에서 불필요: phoneLogin, phoneRegister, phoneRequest 메서드 제거
 }

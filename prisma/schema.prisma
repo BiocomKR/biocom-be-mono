@@ -54,7 +54,6 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
-  userConsents                 UserConsent[]
 
   @@map("users")
 }
@@ -128,6 +127,7 @@ model Content {
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   challengeId     Int?             @map("challenge_id")
   contentFiles    ContentFile[]
+  products        Product?         @relation(fields: [challengeId], references: [id])
   lectureProducts LectureProduct[]
   lectureQuizzes  LectureQuiz[]
   quizAttempts    QuizAttempt[]
@@ -262,15 +262,16 @@ model SurveyAnswer {
 /// 건강 유형별 동물 캐릭터 테이블
 /// 설문 결과에 따른 건강 유형별 동물 캐릭터 정보를 저장
 model HealthTypeAnimal {
-  id          Int       @id @default(autoincrement())
-  healthType  String    @unique(map: "category_details_category_code_key") @map("health_type") @db.VarChar(50)
-  typeName    String    @map("type_name") @db.VarChar(50)
-  animalName  String    @map("animal_name") @db.VarChar(50)
-  catchphrase String
-  symptoms    String
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime? @updatedAt @map("updated_at")
-  users       User[]
+  id                          Int                           @id @default(autoincrement())
+  healthType                  String                        @unique(map: "category_details_category_code_key") @map("health_type") @db.VarChar(50)
+  typeName                    String                        @map("type_name") @db.VarChar(50)
+  animalName                  String                        @map("animal_name") @db.VarChar(50)
+  catchphrase                 String
+  symptoms                    String
+  createdAt                   DateTime                      @default(now()) @map("created_at")
+  updatedAt                   DateTime?                     @updatedAt @map("updated_at")
+  health_type_animal_products health_type_animal_products[]
+  users                       User[]
 
   @@map("health_type_animals")
 }
@@ -649,7 +650,9 @@ model Product {
   challengeMissions            ChallengeMission[]
   challengeSurveys             ChallengeSurvey[]
   challengeTickets             ChallengeTicket[]
+  contents                     Content[]
   coupons                      Coupon[]
+  health_type_animal_products  health_type_animal_products[]
   lectureProducts              LectureProduct[]
   orderItems                   OrderItem[]
   feedback                     ProductFeedback[]
@@ -1932,53 +1935,54 @@ model PushNotificationLog {
 /// 약관 마스터 테이블
 /// 서비스 이용약관, 개인정보처리방침 등 약관 관리
 model Consent {
-  id            Int           @id @default(autoincrement())
-  code          String        @db.VarChar(50)
-  title         String        @db.VarChar(200)
-  content       String?       @db.Text
-  version       String        @db.VarChar(20)
-  isRequired    Boolean       @default(false) @map("is_required")
-  isActive      Boolean       @default(false) @map("is_active")
-  displayOrder  Int           @default(0) @map("display_order")
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(6)
-  deletedAt     DateTime?     @map("deleted_at") @db.Timestamp(6)
+  id           Int           @id @default(autoincrement())
+  code         String        @db.VarChar(50)
+  title        String        @db.VarChar(200)
+  content      String?
+  version      String        @db.VarChar(20)
+  isRequired   Boolean?      @default(false) @map("is_required")
+  isActive     Boolean?      @default(false) @map("is_active")
+  displayOrder Int?          @default(0) @map("display_order")
+  createdAt    DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
+  deletedAt    DateTime?     @map("deleted_at") @db.Timestamp(6)
+  userConsents UserConsent[]
 
-  userConsents  UserConsent[]
-
-  @@unique([code, version])
-  @@index([code, isActive])
+  @@unique([code, version], map: "consents_code_version_unique")
+  @@index([code, isActive], map: "idx_consents_code_is_active")
   @@map("consents")
 }
 
 /// 사용자 약관 동의 내역
 model UserConsent {
-  id            Int       @id @default(autoincrement())
-  userId        Int       @map("user_id")
-  consentId     Int       @map("consent_id")
-  isAgreed      Boolean   @map("is_agreed")
-  agreedAt      DateTime? @map("agreed_at") @db.Timestamp(6)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  agreedAt  DateTime @map("agreed_at") @db.Timestamp(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  consentId Int      @map("consent_id")
+  isAgreed  Boolean  @map("is_agreed")
+  consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  consent       Consent   @relation(fields: [consentId], references: [id])
-
-  @@unique([userId, consentId])
+  @@unique([userId, consentId], map: "user_consents_user_id_consent_id_unique")
   @@index([userId], map: "idx_user_consents_user_id")
   @@index([consentId], map: "idx_user_consents_consent_id")
   @@map("user_consents")
 }
 
 model UserSupplementRoutine {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @map("user_id")
-  productId Int       @map("product_id")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime? @map("updated_at")
-  product   Product   @relation("UserSupplementRoutineProduct", fields: [productId], references: [id], onDelete: Cascade)
-  user      User      @relation("UserSupplementRoutineUser", fields: [userId], references: [id], onDelete: Cascade)
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  productId     Int       @map("product_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @map("updated_at")
+  display_order Int       @default(999)
+  is_active     Boolean   @default(true)
+  is_default    Boolean   @default(false)
+  product       Product   @relation("UserSupplementRoutineProduct", fields: [productId], references: [id], onDelete: Cascade)
+  user          User      @relation("UserSupplementRoutineUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
   @@index([userId])
+  @@index([userId, is_active])
   @@map("user_supplement_routine")
 }
 
@@ -2115,8 +2119,141 @@ model PushNotificationCampaign {
   @@map("push_notification_campaigns")
 }
 
+model health_type_animal_products {
+  id                    Int              @id @default(autoincrement())
+  health_type_animal_id Int
+  product_id            Int
+  display_order         Int
+  is_active             Boolean          @default(true)
+  created_at            DateTime         @default(now())
+  updated_at            DateTime?
+  health_type_animals   HealthTypeAnimal @relation(fields: [health_type_animal_id], references: [id], onDelete: Cascade)
+  products              Product          @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([health_type_animal_id, display_order])
+  @@unique([health_type_animal_id, product_id])
+  @@index([health_type_animal_id])
+  @@index([is_active])
+  @@index([product_id])
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model user_consents_backup {
+  id                   Int?
+  user_id              Int?
+  agree_to_terms       Boolean?
+  agree_to_age14       Boolean?
+  agree_to_privacy     Boolean?
+  agree_to_third_party Boolean?
+  agree_to_marketing   Boolean?
+  agreed_at            DateTime? @db.Timestamp(6)
+  created_at           DateTime? @db.Timestamp(6)
+  updated_at           DateTime? @db.Timestamp(6)
+
+  @@ignore
+}
+
 /// AI 페르소나 성별 Enum
 enum Gender {
   M
   F
+}
+
+// ============================================
+// 백오피스 운영자 관련 모델
+// ============================================
+
+/// 운영자 접근 등급
+enum AccessTier {
+  SYSTEM  // 전체 접근 + 운영자 관리 권한
+  MANAGER // 전체 메뉴 접근 (운영자 관리 제외)
+  STAFF   // 소속 부서 메뉴만 (읽기/쓰기)
+  VIEWER  // 소속 부서 메뉴만 (읽기 전용)
+}
+
+/// 메뉴 코드
+enum MenuCode {
+  DASHBOARD
+  USERS
+  CHALLENGE
+  MISSION
+  SURVEY
+  QUIZ
+  CONTENT
+  POINT
+  SHOP
+  ORDERS
+  SHIPPING
+  REFUNDS
+  PUSH
+  OPERATORS
+}
+
+/// 부서 테이블
+model Department {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique // "CS팀", "물류팀"
+  code      String     @unique // "CS", "LOGISTICS"
+  menuCodes MenuCode[] @map("menu_codes") // 접근 가능한 메뉴 코드 배열
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  operators Operator[]
+
+  @@map("departments")
+}
+
+/// 운영자 테이블
+model Operator {
+  id           Int         @id @default(autoincrement())
+  email        String      @unique
+  password     String      // bcrypt hash
+  name         String
+  accessTier   AccessTier  @default(VIEWER) @map("access_tier")
+  departmentId Int?        @map("department_id")
+  isActive     Boolean     @default(true) @map("is_active")
+
+  // 보안
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lockedUntil    DateTime? @map("locked_until")
+  lastLoginAt    DateTime? @map("last_login_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  department    Department?             @relation(fields: [departmentId], references: [id])
+  authLogs      OperatorAuthLog[]
+  refreshTokens OperatorRefreshToken[]
+
+  @@map("operators")
+}
+
+/// 운영자 Refresh Token 테이블
+model OperatorRefreshToken {
+  id         String   @id @default(cuid())
+  token      String   @unique
+  operatorId Int      @map("operator_id")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@index([operatorId])
+  @@index([token])
+  @@map("operator_refresh_tokens")
+}
+
+/// 운영자 인증 로그 테이블
+model OperatorAuthLog {
+  id         Int      @id @default(autoincrement())
+  operatorId Int      @map("operator_id")
+  action     String   // LOGIN_SUCCESS, LOGIN_FAIL, LOGOUT
+  ip         String?
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@index([operatorId, createdAt])
+  @@map("operator_auth_logs")
 }
