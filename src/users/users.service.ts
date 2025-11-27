@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { UserQueryDto } from './dto/user-query.dto';
 import { OrderStatus, UserChallengeStatus, CouponStatus } from '../common/enums';
+import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
  * 백오피스 사용자 관리 서비스
@@ -571,5 +572,95 @@ export class UsersService {
     });
 
     return { message: '사용자가 복구되었습니다.' };
+  }
+
+  /**
+   * 사용자 검색 (이름/전화번호)
+   * - 전화번호: 결정론적 암호화로 정확히 매칭
+   * - 이름: 모든 사용자를 가져와서 복호화 후 필터링 (GCM 암호화는 검색 불가)
+   */
+  async searchUsers(keyword: string, limit: number = 20) {
+    if (!keyword || keyword.trim().length < 1) {
+      return [];
+    }
+
+    const searchKeyword = keyword.trim();
+    const results: any[] = [];
+
+    // 전화번호 형식인지 확인 (숫자만 있거나 010으로 시작하는 경우)
+    const isPhoneNumber = /^[0-9-]+$/.test(searchKeyword);
+
+    if (isPhoneNumber) {
+      // 전화번호 검색: Prisma 미들웨어가 자동으로 암호화 처리
+      // 평문 전화번호를 전달하면 미들웨어에서 암호화해서 검색
+      const normalizedPhone = searchKeyword.replace(/-/g, '');
+
+      const users = await this.prisma.user.findMany({
+        where: {
+          mobile: normalizedPhone,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          status: true,
+        },
+        take: limit,
+      });
+
+      for (const user of users) {
+        results.push({
+          id: user.id,
+          name: CryptoUtil.decrypt(user.name),
+          mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
+          status: user.status,
+        });
+      }
+    } else {
+      // 이름 검색: 모든 활성 사용자를 가져와서 복호화 후 필터링
+      // 성능을 위해 최근 가입 순으로 제한된 수만 조회
+      const users = await this.prisma.user.findMany({
+        where: {
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          status: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1000, // 최대 1000명까지만 검색
+      });
+
+      for (const user of users) {
+        const decryptedName = CryptoUtil.decrypt(user.name);
+        if (decryptedName && decryptedName.includes(searchKeyword)) {
+          results.push({
+            id: user.id,
+            name: decryptedName,
+            mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
+            status: user.status,
+          });
+
+          if (results.length >= limit) break;
+        }
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * 전화번호 포맷팅 (010-1234-5678)
+   */
+  private formatPhoneNumber(phone: string): string {
+    if (!phone) return phone;
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`;
+    }
+    return phone;
   }
 }

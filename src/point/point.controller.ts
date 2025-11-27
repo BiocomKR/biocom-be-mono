@@ -121,7 +121,7 @@ export class PointController {
           formatter: (value) => dayjs(value).format('YYYY-MM-DD HH:mm:ss'),
         },
         { header: '회원명', key: 'userName', width: 15 },
-        { header: '이메일', key: 'userEmail', width: 25 },
+        { header: '휴대폰 번호', key: 'userMobile', width: 15 },
         {
           header: '구분',
           key: 'type',

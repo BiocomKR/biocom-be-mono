@@ -34,6 +34,28 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   /**
+   * 회원 검색 (이름/전화번호)
+   * 푸시 발송, 포인트 지급 등에서 사용자 선택용
+   */
+  @Get('search')
+  @ApiOperation({ summary: '회원 검색 (이름/전화번호)' })
+  async searchUsers(
+    @Query('keyword') keyword: string,
+    @Query('limit') limit?: number,
+  ) {
+    this.logger.log(`회원 검색 - 키워드: ${keyword}`);
+
+    const users = await this.usersService.searchUsers(keyword, limit || 20);
+
+    return {
+      success: true,
+      message: '회원 검색이 완료되었습니다.',
+      data: users,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
    * 회원 통계 조회
    */
   @Get('stats')

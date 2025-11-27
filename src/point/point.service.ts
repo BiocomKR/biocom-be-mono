@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
  * 백오피스 포인트 관리 서비스
@@ -97,14 +98,46 @@ export class PointService {
       }
     }
 
-    // 검색어가 있으면 사용자 이름/이메일로 필터
+    // 검색어가 있으면 사용자 이름/휴대폰 번호로 필터
+    // 암호화된 필드이므로 별도 처리 필요
+    let userIds: number[] | null = null;
     if (search) {
-      where.user = {
-        OR: [
-          { name: { contains: search } },
-          { email: { contains: search } },
-        ],
-      };
+      const searchKeyword = search.trim();
+      const isPhoneNumber = /^[0-9-]+$/.test(searchKeyword);
+
+      if (isPhoneNumber) {
+        // 휴대폰 번호 검색: Prisma 미들웨어가 자동으로 암호화 처리
+        const normalizedPhone = searchKeyword.replace(/[^0-9]/g, '');
+        const users = await this.prisma.user.findMany({
+          where: { mobile: normalizedPhone },
+          select: { id: true },
+        });
+        userIds = users.map((u) => u.id);
+      } else {
+        // 이름 검색: GCM 암호화는 직접 검색 불가, 전체 조회 후 필터링
+        const users = await this.prisma.user.findMany({
+          select: { id: true, name: true },
+          take: 1000,
+        });
+        userIds = users
+          .filter((u) => {
+            const decryptedName = CryptoUtil.decrypt(u.name);
+            return decryptedName && decryptedName.includes(searchKeyword);
+          })
+          .map((u) => u.id);
+      }
+
+      if (userIds.length === 0) {
+        // 검색 결과 없음
+        return {
+          items: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        };
+      }
+      where.userId = { in: userIds };
     }
 
     const [items, total] = await Promise.all([
@@ -115,7 +148,7 @@ export class PointService {
             select: {
               id: true,
               name: true,
-              email: true,
+              mobile: true,
             },
           },
         },
@@ -130,8 +163,8 @@ export class PointService {
       items: items.map((item) => ({
         id: item.id,
         userId: item.userId,
-        userName: item.user?.name || '-',
-        userEmail: item.user?.email || '-',
+        userName: item.user?.name ? CryptoUtil.decrypt(item.user.name) : '-',
+        userMobile: item.user?.mobile ? this.formatPhoneNumber(CryptoUtil.decryptDeterministic(item.user.mobile)) : '-',
         type: item.type,
         amount: item.amount,
         balance: item.balance,
@@ -286,5 +319,17 @@ export class PointService {
         },
       });
     });
+  }
+
+  /**
+   * 전화번호 포맷팅 (010-1234-5678)
+   */
+  private formatPhoneNumber(phone: string): string {
+    if (!phone) return phone;
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`;
+    }
+    return phone;
   }
 }
