@@ -2267,11 +2267,13 @@ model AppEvent {
   id        Int      @id @default(autoincrement())
   eventName String   @map("event_name") @db.VarChar(100)
   userId    Int?     @map("user_id")
+  platform  String   @db.VarChar(20)
   params    Json?
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([eventName])
   @@index([userId])
+  @@index([platform])
   @@index([createdAt])
   @@map("app_events")
 }
