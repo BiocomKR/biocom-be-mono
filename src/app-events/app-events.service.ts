@@ -11,6 +11,7 @@ export class AppEventsService {
       data: {
         eventName: dto.eventName,
         userId: dto.userId,
+        platform: dto.platform,
         params: dto.params,
       },
     });

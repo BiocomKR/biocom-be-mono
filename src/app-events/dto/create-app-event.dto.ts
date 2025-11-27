@@ -8,6 +8,9 @@ export class CreateAppEventDto {
   @IsInt()
   userId?: number;
 
+  @IsString()
+  platform: string;
+
   @IsOptional()
   @IsObject()
   params?: Record<string, any>;
