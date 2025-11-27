@@ -31,6 +31,7 @@ import { ShopController } from './shop/shop.controller';
 import { ShippingController } from './shipping/shipping.controller';
 import { RefundController } from './refund/refund.controller';
 import { DashboardController } from './dashboard/dashboard.controller';
+import { CartController } from './cart/cart.controller';
 
 // Domain Services
 import { UsersService } from './users/users.service';
@@ -44,6 +45,7 @@ import { ShopService } from './shop/shop.service';
 import { ShippingService } from './shipping/shipping.service';
 import { RefundService } from './refund/refund.service';
 import { DashboardService } from './dashboard/dashboard.service';
+import { CartService } from './cart/cart.service';
 
 /**
  * 애플리케이션 루트 모듈
@@ -99,6 +101,7 @@ import { DashboardService } from './dashboard/dashboard.service';
     ShippingController,
     RefundController,
     DashboardController,
+    CartController,
   ],
   providers: [
     PrismaService,
@@ -114,6 +117,7 @@ import { DashboardService } from './dashboard/dashboard.service';
     ShippingService,
     RefundService,
     DashboardService,
+    CartService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

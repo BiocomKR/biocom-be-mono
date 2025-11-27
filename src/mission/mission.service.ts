@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException, 
 import { PrismaService } from '../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
-import { MissionType, ProductStatus } from '../common/enums';
+import { ProductStatus } from '../common/enums';
 
 /**
  * 관리자 미션 관리 서비스
@@ -112,7 +112,6 @@ export class MissionService {
             }
           }
         },
-        schedules: true,
         _count: {
           select: {
             challengeMissions: true
@@ -133,7 +132,6 @@ export class MissionService {
    * @param data 미션 데이터
    */
   async createMission(data: {
-    code: string;
     name: string;
     description?: string;
     points: number;
@@ -141,7 +139,7 @@ export class MissionService {
     sortOrder?: number;
     category?: string;
     type?: string;
-    recordType?: string;
+    recordType: string;
     dailyLimit?: number;
     specificDay?: number;
     totalDays?: number;
@@ -149,23 +147,17 @@ export class MissionService {
     isActive?: boolean;
   }) {
     try {
-      // 중복 코드 확인
+      // recordType 중복 확인
       const existingMission = await this.prisma.mission.findUnique({
-        where: { code: data.code }
+        where: { recordType: data.recordType }
       });
 
       if (existingMission) {
-        throw new ConflictException('이미 존재하는 미션 코드입니다');
-      }
-
-      // 기록형 미션일 경우 recordType 필수 체크
-      if (data.type === MissionType.RECORD && !data.recordType) {
-        throw new BadRequestException('기록형 미션은 recordType이 필수입니다');
+        throw new ConflictException('이미 존재하는 recordType입니다');
       }
 
       const mission = await this.prisma.mission.create({
         data: {
-          code: data.code,
           name: data.name,
           description: data.description,
           points: data.points,
@@ -174,7 +166,7 @@ export class MissionService {
           category: data.category ?? 'DAILY',
           type: data.type ?? 'MISSION',
           recordType: data.recordType,
-          dailyLimit: data.dailyLimit ?? 1, // 기본값 1
+          dailyLimit: data.dailyLimit ?? 1,
           specificDay: data.specificDay,
           totalDays: data.totalDays ?? 21,
           uploadType: data.uploadType,
@@ -198,7 +190,6 @@ export class MissionService {
    * @param data 수정할 데이터
    */
   async updateMission(id: number, data: {
-    code?: string;
     name?: string;
     description?: string;
     points?: number;
@@ -223,23 +214,18 @@ export class MissionService {
         throw new NotFoundException('미션을 찾을 수 없습니다');
       }
 
-      // 코드 중복 확인 (다른 미션과)
-      if (data.code && data.code !== existingMission.code) {
-        const duplicateCode = await this.prisma.mission.findFirst({
+      // recordType 중복 확인 (다른 미션과)
+      if (data.recordType && data.recordType !== existingMission.recordType) {
+        const duplicate = await this.prisma.mission.findFirst({
           where: {
-            code: data.code,
+            recordType: data.recordType,
             id: { not: id }
           }
         });
 
-        if (duplicateCode) {
-          throw new ConflictException('이미 존재하는 미션 코드입니다');
+        if (duplicate) {
+          throw new ConflictException('이미 존재하는 recordType입니다');
         }
-      }
-
-      // 기록형 미션일 경우 recordType 필수 체크
-      if (data.type === MissionType.RECORD && !data.recordType && !existingMission.recordType) {
-        throw new BadRequestException('기록형 미션은 recordType이 필수입니다');
       }
 
       const mission = await this.prisma.mission.update({
@@ -359,6 +345,30 @@ export class MissionService {
       this.logger.error('미션 dailyLimit 업데이트 실패:', error);
       throw error;
     }
+  }
+
+  /**
+   * 미션 전체 통계 조회 (목록 페이지용)
+   */
+  async getMissionOverallStats() {
+    const [total, active, daily, weekly, special] = await Promise.all([
+      this.prisma.mission.count(),
+      this.prisma.mission.count({ where: { isActive: true } }),
+      this.prisma.mission.count({ where: { category: 'DAILY' } }),
+      this.prisma.mission.count({ where: { category: 'WEEKLY' } }),
+      this.prisma.mission.count({ where: { category: 'SPECIAL' } }),
+    ]);
+
+    return {
+      total,
+      active,
+      inactive: total - active,
+      byCategory: {
+        daily,
+        weekly,
+        special,
+      },
+    };
   }
 
   /**

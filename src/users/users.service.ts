@@ -227,6 +227,34 @@ export class UsersService {
           orderBy: { createdAt: 'desc' },
           take: 5,
         },
+        cart: {
+          select: {
+            id: true,
+            items: {
+              select: {
+                id: true,
+                quantity: true,
+                addedAt: true,
+                stockAvailable: true,
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                    images: {
+                      where: { imageType: 'MAIN' },
+                      take: 1,
+                      select: {
+                        imageUrl: true,
+                      },
+                    },
+                  },
+                },
+              },
+              orderBy: { addedAt: 'desc' },
+            },
+          },
+        },
         _count: {
           select: {
             orders: true,
@@ -256,6 +284,24 @@ export class UsersService {
       }),
     ]);
 
+    // 장바구니 정보 가공
+    const cartItems = (user.cart?.items || []).map(item => ({
+      id: item.id,
+      quantity: item.quantity,
+      addedAt: item.addedAt,
+      product: {
+        id: item.product.id,
+        name: item.product.name,
+        price: Number(item.product.price),
+        thumbnailUrl: item.product.images?.[0]?.imageUrl || null,
+      },
+      subtotal: Number(item.product.price) * item.quantity,
+      stockAvailable: item.stockAvailable,
+    }));
+
+    const cartTotalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const cartTotalPrice = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+
     return {
       id: user.id,
       email: user.email,
@@ -284,6 +330,7 @@ export class UsersService {
         couponCount: user._count.userCoupons,
         unusedCouponCount,
         pointHistoryCount: user._count.pointHistories,
+        cartItemCount: cartItems.length,
       },
       recentOrders: user.orders.map(order => ({
         id: order.id,
@@ -300,6 +347,11 @@ export class UsersService {
         endDate: uc.endDate,
         totalPoints: uc.totalPoints,
       })),
+      cart: {
+        items: cartItems,
+        totalQuantity: cartTotalQuantity,
+        totalPrice: cartTotalPrice,
+      },
     };
   }
 

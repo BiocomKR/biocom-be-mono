@@ -94,19 +94,163 @@ export class SurveyController {
   }
 
   /**
+   * 질문 목록 조회 (페이징) - 정적 라우트를 :id 보다 먼저 선언
+   */
+  @Get('questions')
+  async getQuestions(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('surveyId') surveyId?: string,
+    @Query('categoryCode') categoryCode?: string,
+    @Query('isActive') isActive?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log('질문 목록 조회 요청');
+
+    try {
+      const pageNum = parseInt(page || '1', 10);
+      const limitNum = parseInt(limit || '20', 10);
+
+      const filters = {
+        surveyId: surveyId ? parseInt(surveyId, 10) : undefined,
+        categoryCode,
+        isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+        search,
+      };
+
+      const sort = {
+        sortBy: sortBy || 'sortOrder',
+        sortOrder: (sortOrder || 'asc') as 'asc' | 'desc',
+      };
+
+      const result = await this.managementSurveyService.getQuestionsWithPagination(
+        pageNum,
+        limitNum,
+        filters,
+        sort,
+      );
+
+      this.logger.log(`질문 목록 조회 성공 - 총 ${result.total}개`);
+
+      return {
+        success: true,
+        message: '질문 목록이 성공적으로 조회되었습니다.',
+        data: result,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error('질문 목록 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 설문 답변 목록 조회 (페이징 및 필터링) - 정적 라우트를 :id 보다 먼저 선언
+   */
+  @Get('answers')
+  async getAnswers(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('surveyId') surveyId?: string,
+    @Query('type') type?: string,
+    @Query('categoryCode') categoryCode?: string,
+    @Query('userId') userId?: string,
+    @Query('userChallengeId') userChallengeId?: string,
+    @Query('search') search?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log('설문 답변 목록 조회 요청');
+
+    try {
+      const pageNum = parseInt(page || '1', 10);
+      const limitNum = parseInt(limit || '20', 10);
+
+      const filters = {
+        surveyId: surveyId ? parseInt(surveyId, 10) : undefined,
+        type,
+        categoryCode,
+        userId: userId ? parseInt(userId, 10) : undefined,
+        userChallengeId: userChallengeId ? parseInt(userChallengeId, 10) : undefined,
+        search,
+        startDate,
+        endDate,
+      };
+
+      const sort = {
+        sortBy: sortBy || 'createdAt',
+        sortOrder: (sortOrder || 'desc') as 'asc' | 'desc',
+      };
+
+      const result = await this.managementSurveyService.getAnswersWithPagination(
+        pageNum,
+        limitNum,
+        filters,
+        sort,
+      );
+
+      this.logger.log(`설문 답변 목록 조회 성공 - 총 ${result.total}개`);
+
+      return {
+        success: true,
+        message: '설문 답변 목록이 성공적으로 조회되었습니다.',
+        data: result,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error('설문 답변 목록 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 선택지 목록 조회 - 정적 라우트를 :id 보다 먼저 선언
+   */
+  @Get('options')
+  async getOptions(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log('선택지 목록 조회 요청');
+
+    try {
+      const pageNum = parseInt(page || '1', 10);
+      const limitNum = parseInt(limit || '20', 10);
+
+      const result = await this.managementSurveyService.getOptionsWithPagination(pageNum, limitNum);
+
+      this.logger.log(`선택지 목록 조회 성공 - 총 ${result.total}개`);
+
+      return {
+        success: true,
+        message: '선택지 목록이 성공적으로 조회되었습니다.',
+        data: result,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error('선택지 목록 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
    * 새로운 설문 생성
    */
   @Post()
-        async createSurvey(
+  async createSurvey(
     @Body() createSurveyDto: any,
   ): Promise<ApiResponseDto<any>> {
     this.logger.log(`설문 생성 요청 - 이름: ${createSurveyDto.name}`);
 
     try {
       const survey = await this.managementSurveyService.createSurvey(createSurveyDto);
-      
+
       this.logger.log(`설문 생성 성공 - ID: ${survey.id}`);
-      
+
       return {
         success: true,
         message: '설문이 성공적으로 생성되었습니다.',
@@ -120,19 +264,19 @@ export class SurveyController {
   }
 
   /**
-   * 설문 상세 조회
+   * 설문 상세 조회 - 동적 라우트는 정적 라우트 뒤에 선언
    */
   @Get(':id')
-        async getSurvey(
+  async getSurvey(
     @Param('id', ParseIntPipe) id: number,
   ): Promise<ApiResponseDto<any>> {
     this.logger.log(`설문 상세 조회 요청 - ID: ${id}`);
 
     try {
       const survey = await this.managementSurveyService.getSurveyById(id);
-      
+
       this.logger.log(`설문 상세 조회 성공 - ID: ${id}`);
-      
+
       return {
         success: true,
         message: '설문이 성공적으로 조회되었습니다.',
@@ -290,7 +434,7 @@ export class SurveyController {
    * 특정 질문에 대한 모든 답변 조회
    */
   @Get('answers/question/:questionId')
-          async findAnswersByQuestion(
+  async findAnswersByQuestion(
     @Param('questionId', ParseIntPipe) questionId: number,
     @Query('type') type?: 'before' | 'after',
   ): Promise<ApiResponseDto<SurveyAnswerResponseDto[]>> {
@@ -298,9 +442,9 @@ export class SurveyController {
 
     try {
       const answers = await this.managementSurveyService.findAnswersByQuestion(questionId, type);
-      
+
       this.logger.log(`질문별 설문 답변 조회 응답 성공 - 질문 ID: ${questionId}, 답변 수: ${answers.length}`);
-      
+
       return {
         success: true,
         message: '질문에 대한 모든 답변이 성공적으로 조회되었습니다.',
@@ -309,6 +453,150 @@ export class SurveyController {
       };
     } catch (error) {
       this.logger.error(`질문별 설문 답변 조회 응답 실패 - 질문 ID: ${questionId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 사용자별 설문 답변 조회
+   */
+  @Get('answers/user/:userId')
+  async getAnswersByUser(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('surveyId') surveyId?: string,
+    @Query('type') type?: string,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`사용자별 설문 답변 조회 요청 - userId: ${userId}`);
+
+    try {
+      const result = await this.managementSurveyService.getAnswersByUser(
+        userId,
+        surveyId ? parseInt(surveyId, 10) : undefined,
+        type,
+      );
+
+      this.logger.log(`사용자별 설문 답변 조회 성공 - userId: ${userId}`);
+
+      return {
+        success: true,
+        message: '사용자별 설문 답변이 성공적으로 조회되었습니다.',
+        data: result,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`사용자별 설문 답변 조회 실패 - userId: ${userId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 챌린지별 설문 답변 조회 (사전/사후 비교)
+   */
+  @Get('answers/challenge/:userChallengeId')
+  async getAnswersByChallenge(
+    @Param('userChallengeId', ParseIntPipe) userChallengeId: number,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`챌린지별 설문 답변 조회 요청 - userChallengeId: ${userChallengeId}`);
+
+    try {
+      const result = await this.managementSurveyService.getAnswersByChallenge(userChallengeId);
+
+      this.logger.log(`챌린지별 설문 답변 조회 성공 - userChallengeId: ${userChallengeId}`);
+
+      return {
+        success: true,
+        message: '챌린지별 설문 답변이 성공적으로 조회되었습니다.',
+        data: result,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`챌린지별 설문 답변 조회 실패 - userChallengeId: ${userChallengeId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 설문 답변 통계 조회
+   */
+  @Get(':id/statistics')
+  async getAnswerStatistics(
+    @Param('id', ParseIntPipe) surveyId: number,
+    @Query('type') type?: string,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`설문 답변 통계 조회 요청 - surveyId: ${surveyId}, type: ${type || '전체'}`);
+
+    try {
+      const statistics = await this.managementSurveyService.getAnswerStatistics(surveyId, type);
+
+      this.logger.log(`설문 답변 통계 조회 성공 - surveyId: ${surveyId}`);
+
+      return {
+        success: true,
+        message: '설문 답변 통계가 성공적으로 조회되었습니다.',
+        data: statistics,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`설문 답변 통계 조회 실패 - surveyId: ${surveyId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 질문 수정
+   */
+  @Put('questions/:id')
+  async updateQuestion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateData: {
+      category?: string;
+      categoryCode?: string;
+      questionText?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    },
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`질문 수정 요청 - ID: ${id}`);
+
+    try {
+      const question = await this.managementSurveyService.updateQuestion(id, updateData);
+
+      this.logger.log(`질문 수정 성공 - ID: ${id}`);
+
+      return {
+        success: true,
+        message: '질문이 성공적으로 수정되었습니다.',
+        data: question,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`질문 수정 실패 - ID: ${id}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 질문 삭제
+   */
+  @Delete('questions/:id')
+  async deleteQuestion(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ApiResponseDto<null>> {
+    this.logger.log(`질문 삭제 요청 - ID: ${id}`);
+
+    try {
+      await this.managementSurveyService.deleteQuestion(id);
+
+      this.logger.log(`질문 삭제 성공 - ID: ${id}`);
+
+      return {
+        success: true,
+        message: '질문이 성공적으로 삭제되었습니다.',
+        data: null,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`질문 삭제 실패 - ID: ${id}`, error);
       throw error;
     }
   }

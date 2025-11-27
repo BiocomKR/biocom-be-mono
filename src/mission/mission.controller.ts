@@ -62,6 +62,22 @@ export class MissionController {
   }
 
   /**
+   * 미션 전체 통계 조회
+   */
+  @Get('stats')
+  async getMissionOverallStats() {
+    this.logger.log('미션 전체 통계 조회');
+
+    const stats = await this.managementMissionService.getMissionOverallStats();
+    return {
+      success: true,
+      message: '미션 전체 통계 조회 성공',
+      data: stats,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
    * 특정 미션 상세 조회
    */
   @Get(':id')
@@ -85,7 +101,6 @@ export class MissionController {
   @Post()
   async createMission(
     @Body() createMissionDto: {
-      code: string;
       name: string;
       description?: string;
       points: number;
@@ -93,7 +108,7 @@ export class MissionController {
       sortOrder?: number;
       category?: string;
       type?: string;
-      recordType?: string;
+      recordType: string;
       dailyLimit?: number;
       specificDay?: number;
       totalDays?: number;
@@ -119,7 +134,6 @@ export class MissionController {
   async updateMission(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateMissionDto: {
-      code?: string;
       name?: string;
       description?: string;
       points?: number;
