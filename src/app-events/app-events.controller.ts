@@ -20,4 +20,33 @@ export class AppEventsController {
   ) {
     return this.appEventsService.getEventStats(startDate, endDate);
   }
+
+  @Get('stats/platform')
+  async getPlatformStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.appEventsService.getPlatformStats(startDate, endDate);
+  }
+
+  @Get('stats/summary')
+  async getSummary(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.appEventsService.getSummary(startDate, endDate);
+  }
+
+  @Get('stats/hourly')
+  async getHourlyStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.appEventsService.getHourlyStats(startDate, endDate);
+  }
+
+  @Get('stats/daily-trend')
+  async getDailyTrend() {
+    return this.appEventsService.getDailyTrend();
+  }
 }
