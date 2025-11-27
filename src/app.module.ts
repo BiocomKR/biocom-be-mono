@@ -18,6 +18,7 @@ import { ImwebModule } from './imweb/imweb.module';
 import { PushModule } from './push/push.module';
 import { ConsentModule } from './consent/consent.module';
 import { OperatorsModule } from './operators/operators.module';
+import { AppEventsModule } from './app-events/app-events.module';
 
 // Domain Controllers
 import { UsersController } from './users/users.controller';
@@ -88,6 +89,7 @@ import { CartService } from './cart/cart.service';
     PushModule,       // 푸시 알림 모듈
     ConsentModule,    // 약관 관리 모듈
     OperatorsModule,  // 운영자 관리 모듈
+    AppEventsModule,  // 앱 이벤트 수집 모듈
   ],
   controllers: [
     UsersController,
