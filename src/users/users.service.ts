@@ -30,6 +30,9 @@ export class UsersService {
       sortBy = 'createdAt',
       sortOrder = 'desc',
       includeDeleted = false,
+      sex,
+      ageGroup,
+      hasBillingKey,
     } = query;
 
     const offset = (page - 1) * limit;
@@ -74,8 +77,53 @@ export class UsersService {
       }
     }
 
+    // 성별 필터
+    if (sex) {
+      where.sex = sex;
+    }
+
+    // 연령대 필터 (birthDate는 VARCHAR(8) 형식: YYYYMMDD)
+    if (ageGroup) {
+      const now = new Date();
+      const ageStart = parseInt(ageGroup);
+      const ageEnd = ageStart === 60 ? 150 : ageStart + 9; // 60대+는 60세 이상 전부
+
+      // 생년월일 범위 계산 (나이 기준)
+      const birthDateEnd = new Date(now.getFullYear() - ageStart, now.getMonth(), now.getDate());
+      const birthDateStart = new Date(now.getFullYear() - ageEnd - 1, now.getMonth(), now.getDate());
+
+      // YYYYMMDD 문자열 형식으로 변환
+      const formatDateString = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}${month}${day}`;
+      };
+
+      where.birthDate = {
+        gte: formatDateString(birthDateStart),
+        lte: formatDateString(birthDateEnd),
+      };
+    }
+
+    // 빌링키 등록 여부 필터
+    if (hasBillingKey !== undefined) {
+      if (hasBillingKey) {
+        where.billingKey = { not: null };
+      } else {
+        where.billingKey = null;
+      }
+    }
+
     // 정렬 설정
-    const orderBy = { [sortBy]: sortOrder };
+    let orderBy: any;
+    if (sortBy === 'orderCount') {
+      orderBy = { orders: { _count: sortOrder } };
+    } else if (sortBy === 'challengeCount') {
+      orderBy = { userChallenges: { _count: sortOrder } };
+    } else {
+      orderBy = { [sortBy]: sortOrder };
+    }
 
     // 전체 개수 조회
     const total = await this.prisma.user.count({ where });
@@ -95,6 +143,7 @@ export class UsersService {
         birthDate: true,
         sex: true,
         telecom: true,
+        billingKey: true,
         health_type_animal_id: true,
         createdAt: true,
         updatedAt: true,
@@ -104,6 +153,7 @@ export class UsersService {
             id: true,
             animalName: true,
             healthType: true,
+            typeName: true,
           },
         },
         _count: {
@@ -132,6 +182,7 @@ export class UsersService {
       birthDate: user.birthDate,
       sex: user.sex,
       telecom: user.telecom,
+      hasBillingKey: !!user.billingKey,
       healthTypeAnimalId: user.health_type_animal_id,
       healthTypeAnimalName: user.healthTypeAnimal?.animalName,
       createdAt: user.createdAt,
@@ -187,6 +238,7 @@ export class UsersService {
             id: true,
             animalName: true,
             healthType: true,
+            typeName: true,
           },
         },
         pushTokens: {

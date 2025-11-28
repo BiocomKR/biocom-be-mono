@@ -16,6 +16,23 @@ export enum UserSortBy {
   POINTS = 'points',
   CREATED_AT = 'createdAt',
   UPDATED_AT = 'updatedAt',
+  BIRTH_DATE = 'birthDate',
+  ORDER_COUNT = 'orderCount',
+  CHALLENGE_COUNT = 'challengeCount',
+}
+
+export enum UserSex {
+  MALE = '01',    // 남성
+  FEMALE = '02',  // 여성
+}
+
+export enum UserAgeGroup {
+  TEEN = '10',
+  TWENTY = '20',
+  THIRTY = '30',
+  FORTY = '40',
+  FIFTY = '50',
+  SIXTY_PLUS = '60',
 }
 
 export class UserQueryDto {
@@ -81,4 +98,20 @@ export class UserQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   includeDeleted?: boolean = false;
+
+  @ApiPropertyOptional({ description: '성별', enum: UserSex })
+  @IsOptional()
+  @IsEnum(UserSex)
+  sex?: UserSex;
+
+  @ApiPropertyOptional({ description: '연령대', enum: UserAgeGroup })
+  @IsOptional()
+  @IsEnum(UserAgeGroup)
+  ageGroup?: UserAgeGroup;
+
+  @ApiPropertyOptional({ description: '빌링키 등록 여부' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  hasBillingKey?: boolean;
 }
