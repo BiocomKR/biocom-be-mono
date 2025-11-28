@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
-import { OrderStatus } from '../common/enums';
+import { OrderStatus, ProductStatus } from '../common/enums';
 
 @Injectable()
 export class ShopService {
@@ -136,11 +136,13 @@ export class ShopService {
       throw new ConflictException('주문 내역이 있는 상품은 삭제할 수 없습니다. 대신 비활성화하세요.');
     }
 
-    await this.prisma.product.delete({
-      where: { id }
+    // Soft delete: status = INACTIVE
+    await this.prisma.product.update({
+      where: { id },
+      data: { status: ProductStatus.INACTIVE }
     });
 
-    this.logger.log(`상품 삭제: ID ${id}`);
+    this.logger.log(`상품 비활성화(soft delete): ID ${id}`);
 
     return { success: true };
   }

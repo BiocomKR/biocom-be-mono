@@ -212,26 +212,10 @@ export class SurveyService {
       throw new ConflictException(`답변이 존재하는 설문은 삭제할 수 없습니다. (답변 수: ${answers})`);
     }
 
-    // 트랜잭션으로 관련 데이터 모두 삭제
-    await this.prisma.$transaction(async (tx) => {
-      // 설문 옵션 삭제
-      await tx.surveyOption.deleteMany({
-        where: {
-          surveyQuestion: {
-            surveyId: id
-          }
-        }
-      });
-
-      // 설문 질문 삭제
-      await tx.surveyQuestion.deleteMany({
-        where: { surveyId: id }
-      });
-
-      // 설문 삭제
-      await tx.survey.delete({
-        where: { id }
-      });
+    // Soft delete: isActive = false (연관 데이터는 유지)
+    await this.prisma.survey.update({
+      where: { id },
+      data: { isActive: false }
     });
 
     this.logger.log(`설문 삭제 완료 - ID: ${id}`);

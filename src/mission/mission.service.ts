@@ -268,11 +268,13 @@ export class MissionService {
         throw new BadRequestException('챌린지에서 사용 중인 미션은 삭제할 수 없습니다');
       }
 
-      await this.prisma.mission.delete({
-        where: { id }
+      // Soft delete: isActive = false
+      await this.prisma.mission.update({
+        where: { id },
+        data: { isActive: false }
       });
 
-      this.logger.log(`미션 삭제 완료 - ID: ${id}`);
+      this.logger.log(`미션 비활성화(soft delete) 완료 - ID: ${id}`);
 
     } catch (error) {
       this.logger.error('미션 삭제 실패:', error);

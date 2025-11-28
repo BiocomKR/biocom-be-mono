@@ -222,11 +222,13 @@ export class PushScheduleService {
       // 존재 확인
       await this.getScheduleById(id);
 
-      await this.prisma.pushNotificationSchedule.delete({
+      // Soft delete: isActive = false
+      await this.prisma.pushNotificationSchedule.update({
         where: { id },
+        data: { isActive: false },
       });
 
-      this.logger.log(`✅ [PushScheduleService] 스케줄 삭제 완료: id=${id}`);
+      this.logger.log(`✅ [PushScheduleService] 스케줄 비활성화(soft delete) 완료: id=${id}`);
       return { success: true, message: '스케줄이 삭제되었습니다' };
     } catch (error) {
       this.logger.error(`❌ [PushScheduleService] 스케줄 삭제 실패: id=${id}, ${error.message}`, error.stack);

@@ -144,8 +144,10 @@ export class QuizService {
       throw new BadRequestException(`답변이 존재하는 퀴즈는 삭제할 수 없습니다.`);
     }
 
-    await this.prisma.quiz.delete({
+    // Soft delete: isActive = false
+    await this.prisma.quiz.update({
       where: { id },
+      data: { isActive: false },
     });
   }
 
