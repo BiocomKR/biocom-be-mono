@@ -20,8 +20,9 @@ import { ManagementRefundController } from './controllers/management-refund.cont
 import { ManagementChallengeController } from './controllers/management-challenge.controller';
 import { ManagementMissionController } from './controllers/management-mission.controller';
 import { ManagementPushNotificationController } from './controllers/management-push-notification.controller';
-import { ManagementPushCampaignController } from './controllers/management-push-campaign.controller';
-import { ManagementPushScheduleController } from './controllers/management-push-schedule.controller';
+// @deprecated - biocom-bo-api로 이전됨 (biocom-admin은 bo-api 호출)
+// import { ManagementPushCampaignController } from './controllers/management-push-campaign.controller';
+// import { ManagementPushScheduleController } from './controllers/management-push-schedule.controller';
 import { ManagementShopService } from './services/management-shop.service';
 import { ManagementDashboardService } from './services/management-dashboard.service';
 import { ManagementShippingService } from './services/management-shipping.service';
@@ -65,8 +66,9 @@ import { PushModule } from '../push/push.module';
     ManagementChallengeController,
     ManagementMissionController,
     ManagementPushNotificationController,
-    ManagementPushCampaignController,
-    ManagementPushScheduleController,
+    // @deprecated - biocom-bo-api로 이전됨
+    // ManagementPushCampaignController,
+    // ManagementPushScheduleController,
   ],
   providers: [
     ApiKeyGuard,

@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { PushScheduleService } from './push-schedule.service';
 import { PushCampaignService } from './push-campaign.service';
+import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { PushScheduleType } from '../enums';
 
 /**
  * ============================================================================
@@ -40,11 +41,11 @@ export class PushSchedulerService {
    * - NestJS가 자동으로 필요한 서비스 인스턴스를 주입해줌
    * - Python FastAPI의 Depends()와 유사한 개념
    *
-   * @param pushScheduleService - 스케줄 조회/관리 서비스
+   * @param prisma - Prisma ORM 서비스 (DB 접근)
    * @param pushCampaignService - 캠페인 실행 서비스
    */
   constructor(
-    private readonly pushScheduleService: PushScheduleService,
+    private readonly prisma: PrismaService,
     private readonly pushCampaignService: PushCampaignService,
   ) {}
 
@@ -80,7 +81,7 @@ export class PushSchedulerService {
       // - ONCE 타입: 예약 시간이 지난 것
       // - RECURRING 타입: 기간 내에 있는 것
       // ---------------------------------------------------------------
-      const schedules = await this.pushScheduleService.getExecutableSchedules();
+      const schedules = await this.getExecutableSchedules();
 
       if (schedules.length === 0) {
         this.logger.log('ℹ️ [PushScheduler] 실행할 스케줄 없음');
@@ -169,5 +170,56 @@ export class PushSchedulerService {
     this.logger.log('🔧 [PushScheduler] 수동 트리거 실행');
     await this.handleScheduledPushes();
     return { success: true, message: '스케줄 확인이 수동으로 트리거되었습니다' };
+  }
+
+  /**
+   * ========================================================================
+   * 실행 가능한 스케줄 조회 (배치용)
+   * ========================================================================
+   *
+   * [Python 비유]
+   * SQLAlchemy의 session.query()와 동일:
+   * schedules = session.query(PushNotificationSchedule).filter(...).all()
+   *
+   * [조회 조건]
+   * - ONCE 타입: oneTimeScheduledAt이 현재 시간보다 이전이고 isActive=true
+   * - RECURRING 타입: isActive=true이고 startDate~endDate 범위 내
+   *
+   * @returns 현재 실행해야 할 스케줄 목록
+   */
+  private async getExecutableSchedules() {
+    try {
+      const now = getNowKST();
+
+      // ONCE 타입: 1회성 예약 푸시 (예약 시간이 지난 것)
+      const onceSchedules = await this.prisma.pushNotificationSchedule.findMany({
+        where: {
+          isActive: true,
+          scheduleType: PushScheduleType.ONCE,
+          oneTimeScheduledAt: {
+            lte: now,
+          },
+        },
+      });
+
+      // RECURRING 타입: 반복 푸시 (기간 내에 있는 것)
+      const recurringSchedules = await this.prisma.pushNotificationSchedule.findMany({
+        where: {
+          isActive: true,
+          scheduleType: PushScheduleType.RECURRING,
+          OR: [
+            { startDate: null, endDate: null },
+            { startDate: { lte: now }, endDate: null },
+            { startDate: null, endDate: { gte: now } },
+            { startDate: { lte: now }, endDate: { gte: now } },
+          ],
+        },
+      });
+
+      return [...onceSchedules, ...recurringSchedules];
+    } catch (error) {
+      this.logger.error(`❌ [PushScheduler] 실행 가능한 스케줄 조회 실패: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 }

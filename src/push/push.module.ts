@@ -6,7 +6,7 @@ import { PushTestService } from './services/push-test.service';
 import { PushTokenService } from './services/push-token.service';
 import { PushNotificationService } from './services/push-notification.service';
 import { PushTopicService } from './services/push-topic.service';
-import { PushScheduleService } from './services/push-schedule.service';
+// import { PushScheduleService } from './services/push-schedule.service'; // @deprecated - push-scheduler.service.ts로 통합됨
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
 // import { PushTestController } from './controllers/push-test.controller'; // @deprecated 삭제 예정
@@ -40,7 +40,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTokenService,
     PushNotificationService,
     PushTopicService,
-    PushScheduleService,
+    // PushScheduleService, // @deprecated - push-scheduler.service.ts로 통합됨
     PushCampaignService,
     PushSchedulerService,
     PrismaService,
@@ -51,7 +51,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTokenService,
     PushNotificationService,
     PushTopicService,
-    PushScheduleService,
+    // PushScheduleService, // @deprecated - push-scheduler.service.ts로 통합됨
     PushCampaignService,
   ],
 })
