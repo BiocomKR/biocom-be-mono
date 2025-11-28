@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
-import { getDayOfWeek } from '../../common/utils/korea-date.util';
+import { getDayOfWeek, formatKoreanDate } from '../../common/utils/korea-date.util';
 import {
   BeautyStatisticsDto,
   DietStatisticsDto,
@@ -50,8 +50,8 @@ export class StatisticsService {
     startDate.setDate(yesterday.getDate() - 6); // 어제부터 역산 7일
 
     return {
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: yesterday.toISOString().split('T')[0]
+      startDate: formatKoreanDate(startDate),
+      endDate: formatKoreanDate(yesterday)
     };
   }
 
@@ -71,8 +71,8 @@ export class StatisticsService {
     previousWeekStart.setDate(previousWeekEnd.getDate() - 6); // 이전 주 시작일
 
     return {
-      startDate: previousWeekStart.toISOString().split('T')[0],
-      endDate: previousWeekEnd.toISOString().split('T')[0]
+      startDate: formatKoreanDate(previousWeekStart),
+      endDate: formatKoreanDate(previousWeekEnd)
     };
   }
 
@@ -81,13 +81,14 @@ export class StatisticsService {
    */
   private generateWeekDates(startDate: string): string[] {
     const dates: string[] = [];
-    const current = new Date(startDate);
-    
+    const [year, month, day] = startDate.split('-').map(Number);
+    const current = new Date(year, month - 1, day);
+
     for (let i = 0; i < 7; i++) {
-      dates.push(current.toISOString().split('T')[0]);
+      dates.push(formatKoreanDate(current));
       current.setDate(current.getDate() + 1);
     }
-    
+
     return dates;
   }
 
@@ -235,7 +236,7 @@ export class StatisticsService {
     // 일별 데이터 처리
     weekDates.forEach(date => {
       const record = records.find(r => {
-        const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+        const recordDate = r.date instanceof Date ? formatKoreanDate(r.date) : r.date;
         return recordDate === date;
       });
 
@@ -366,7 +367,7 @@ export class StatisticsService {
       // 일별 데이터 계산
       weekDates.forEach(date => {
         const dailyRecords = dietRecords.filter(r => {
-          const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+          const recordDate = r.date instanceof Date ? formatKoreanDate(r.date) : r.date;
           return recordDate === date;
         });
 
@@ -435,95 +436,369 @@ export class StatisticsService {
    * 영양제 통계 조회
    * @param userId 사용자 ID
    */
-  async getSupplementStatistics(userId: number, isNewcomer: boolean = false): Promise<SupplementStatisticsDto> {
+  /**
+   * 영양제 통계 조회 (매트릭스 구조)
+   * - 주간(월~일) 7일 동안의 영양제 섭취 이력을 매트릭스 형태로 반환
+   * - 1그룹(기본영양제): 7일 전체 데이터 존재 (null 없음)
+   * - 2,3그룹(사용자 추가): 루틴 추가 이후 날짜만 데이터 존재
+   * @param userId 사용자 ID
+   * @param startDate 시작일 (YYYY-MM-DD, 월요일)
+   * @param endDate 종료일 (YYYY-MM-DD, 일요일)
+   * @param isNewcomer NEWCOMER 여부
+   */
+  async getSupplementStatistics(
+    userId: number,
+    startDate: string,
+    endDate: string,
+    isNewcomer: boolean = false,
+  ): Promise<SupplementStatisticsDto> {
     try {
-      this.logger.log(`영양제 통계 조회 시작 - 사용자: ${userId}, NEWCOMER: ${isNewcomer}`);
+      this.logger.log(
+        `영양제 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate}~${endDate}, NEWCOMER: ${isNewcomer}`,
+      );
 
       // NEWCOMER는 예시 데이터 반환
       if (isNewcomer) {
         this.logger.log(`예시 영양제 통계 데이터 생성 - 사용자: ${userId}`);
-        return this.getSampleSupplementStatistics();
+        return this.getSampleSupplementStatistics(startDate, endDate);
       }
 
-      const { startDate, endDate } = this.getWeekDateRange();
+      // 1. 주간 7일 날짜 배열 생성 (YYYY-MM-DD 문자열 배열, KST 기준)
+      const weekDates: string[] = [];
+      const [year, month, day] = startDate.split('-').map(Number);
+      const currentDate = new Date(year, month - 1, day); // 로컬 타임존 기준
+      for (let i = 0; i < 7; i++) {
+        const y = currentDate.getFullYear();
+        const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const d = String(currentDate.getDate()).padStart(2, '0');
+        weekDates.push(`${y}-${m}-${d}`);
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
 
-      // 1주일간 영양제 기록 조회
+      // 2. 해당 주간의 모든 영양제 기록 조회
+      const startDateTime = new Date(startDate + 'T00:00:00+09:00');
+      const endDateTime = new Date(endDate + 'T23:59:59+09:00');
+
       const supplementRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
           recordType: 'SUPPLEMENT',
           date: {
-            gte: startDate,
-            lte: endDate
-          }
+            gte: startDateTime,
+            lte: endDateTime,
+          },
         },
-        orderBy: { date: 'asc' }
+        orderBy: { date: 'asc' },
       });
 
-      console.log(`🔥 영양제 쿼리 조건 - userId: ${userId}, startDate: ${startDate}, endDate: ${endDate}`);
-      console.log(`🔥 영양제 조회 결과: ${JSON.stringify(supplementRecords, null, 2)}`);
-
-      const weekDates = this.generateWeekDates(startDate);
-      const weeklySupplements = [];
-      let takenDays = 0;
-
-      // 일별 데이터 생성 (개선된 구조)
-      weekDates.forEach(date => {
-        const records = supplementRecords.filter(r => r.date === date);
-
-        let allTakenSupplements: string[] = [];
-
-        if (records.length > 0) {
-          // 같은 날짜의 모든 기록을 처리
-          records.forEach(record => {
-            if (record.metadata && record.metadata.supplements) {
-              // 섭취한 영양제만 필터링
-              const takenSupplements = record.metadata.supplements
-                .filter((supplement: any) => supplement.taken)
-                .map((supplement: any) => supplement.name);
-
-              allTakenSupplements = [...allTakenSupplements, ...takenSupplements];
-            }
-          });
-
-          weeklySupplements.push({
-            date,
-            supplements: allTakenSupplements,
-            taken: allTakenSupplements.length
-          });
-
-          if (allTakenSupplements.length > 0) {
-            takenDays++;
-          }
-        } else {
-          weeklySupplements.push({
-            date,
-            supplements: [],
-            taken: 0
-          });
+      // 3. 주간에 등장한 모든 productId 추출 (중복 제거)
+      const productIdSet = new Set<number>();
+      supplementRecords.forEach((record) => {
+        const metadata = record.metadata as any;
+        if (metadata?.productId) {
+          productIdSet.add(metadata.productId);
         }
       });
 
-      // 준수율 계산 (소수점 반올림)
-      const complianceRate = Math.round((takenDays / 7) * 100);
+      const productIds = Array.from(productIdSet);
 
-      this.logger.log(`영양제 통계 조회 완료 - 사용자: ${userId}, 준수율: ${complianceRate}%`);
+      if (productIds.length === 0) {
+        // 데이터 없으면 빈 배열 반환
+        return {
+          startDate,
+          endDate,
+          supplements: [],
+          nutrients: [],
+        };
+      }
 
-      // 당일 기록 제한 정보 계산 (오늘 날짜 기준)
-      const recordLimit = await this.getTodayRecordLimit(userId, 'SUPPLEMENT');
+      // 4. 현재(오늘 기준) user_supplement_routine에서 display_order 조회
+      const routineList = await this.prisma.userSupplementRoutine.findMany({
+        where: {
+          userId,
+          isActive: true,
+          productId: { in: productIds },
+        },
+        select: {
+          productId: true,
+          displayOrder: true,
+        },
+      });
+
+      const displayOrderMap = new Map<number, number>(
+        routineList.map((r) => [r.productId, r.displayOrder]),
+      );
+
+      // 5. Product 정보 조회
+      const products = await this.prisma.product.findMany({
+        where: {
+          id: { in: productIds },
+        },
+        select: {
+          id: true,
+          name: true,
+          productInfo: true,
+        },
+      });
+
+      const productInfoMap = new Map<
+        number,
+        { name: string; frequencyPerDay: number }
+      >(
+        products.map((p) => [
+          p.id,
+          {
+            name: p.name,
+            frequencyPerDay: p.productInfo
+              ? (p.productInfo as any)['frequency_per_day'] || 1
+              : 1,
+          },
+        ]),
+      );
+
+      // 6. 날짜별 + productId별로 그룹화
+      const recordsByDateAndProduct = new Map<string, Map<number, any>>();
+      supplementRecords.forEach((record) => {
+        const dateStr = formatKoreanDate(record.date);
+        const metadata = record.metadata as any;
+        const productId = metadata?.productId;
+
+        if (!productId) return;
+
+        if (!recordsByDateAndProduct.has(dateStr)) {
+          recordsByDateAndProduct.set(dateStr, new Map());
+        }
+
+        const morning = metadata.morning || false;
+        const afternoon = metadata.afternoon || false;
+        const evening = metadata.evening || false;
+        const intakeCount = [morning, afternoon, evening].filter(Boolean).length;
+
+        recordsByDateAndProduct.get(dateStr)!.set(productId, {
+          intakeCount,
+          recommendedCount: productInfoMap.get(productId)?.frequencyPerDay || 1,
+        });
+      });
+
+      // 7. 영양제별 주간 통계 생성
+      const supplements = productIds.map((productId) => {
+        const productInfo = productInfoMap.get(productId);
+        const displayOrder = displayOrderMap.get(productId) || 999;
+
+        // 7일 매트릭스 생성
+        const dailyStats = weekDates.map((dateStr) => {
+          const recordMap = recordsByDateAndProduct.get(dateStr);
+          const record = recordMap?.get(productId);
+
+          if (record) {
+            // 데이터 있음
+            return {
+              date: dateStr,
+              intakeCount: Math.min(
+                record.intakeCount,
+                record.recommendedCount,
+              ),
+              recommendedCount: record.recommendedCount,
+            };
+          } else {
+            // 데이터 없음 = null
+            return {
+              date: dateStr,
+              intakeCount: null,
+              recommendedCount: null,
+            };
+          }
+        });
+
+        return {
+          productId,
+          productName: productInfo?.name || '알 수 없는 영양제',
+          displayOrder,
+          dailyStats,
+        };
+      });
+
+      // 8. display_order 순서로 정렬
+      supplements.sort((a, b) => a.displayOrder - b.displayOrder);
+
+      // 9. 영양소 섭취량 통계 계산 (1그룹 영양제만)
+      const nutrients = await this.calculateNutrientIntake(
+        userId,
+        startDate,
+        endDate,
+        supplementRecords,
+      );
+
+      this.logger.log(
+        `영양제 통계 조회 완료 - 사용자: ${userId}, 영양제 수: ${supplements.length}, 영양소 수: ${nutrients.length}`,
+      );
 
       return {
-        weeklySupplements,
-        summary: {
-          score: complianceRate
-        },
-        currentCount: recordLimit.currentCount,
-        maxCount: recordLimit.maxCount
-        // TODO: nutritionAnalysis 영양소 정보 기록 시스템 구축 후 활성화
+        startDate,
+        endDate,
+        supplements,
+        nutrients,
       };
     } catch (error) {
       this.logger.error(`영양제 통계 조회 실패 - 사용자: ${userId}`, error);
       throw error;
+    }
+  }
+
+  /**
+   * 영양소 섭취량 통계 계산 (1그룹 영양제 기준)
+   * @param userId 사용자 ID
+   * @param startDate 시작일
+   * @param endDate 종료일
+   * @param supplementRecords 영양제 기록 데이터
+   */
+  private async calculateNutrientIntake(
+    userId: number,
+    startDate: string,
+    endDate: string,
+    supplementRecords: any[],
+  ) {
+    try {
+      // 1. 1그룹 영양제 조회 (isDefault: true)
+      const defaultRoutine = await this.prisma.userSupplementRoutine.findMany({
+        where: {
+          userId,
+          isDefault: true,
+          isActive: true,
+        },
+        select: {
+          productId: true,
+        },
+      });
+
+      const defaultProductIds = defaultRoutine.map((r) => r.productId);
+
+      if (defaultProductIds.length === 0) {
+        return [];
+      }
+
+      // 2. 1그룹 영양제들의 영양소 조회
+      const supplementNutrients =
+        await this.prisma.supplementNutrient.findMany({
+          where: {
+            productId: { in: defaultProductIds },
+          },
+          select: {
+            productId: true,
+            nutrientName: true,
+          },
+        });
+
+      // 3. 각 영양제의 frequency_per_day 및 제품명 조회
+      const products = await this.prisma.product.findMany({
+        where: {
+          id: { in: defaultProductIds },
+        },
+        select: {
+          id: true,
+          name: true,
+          productInfo: true,
+        },
+      });
+
+      const productFrequencyMap = new Map<number, number>(
+        products.map((p) => [
+          p.id,
+          p.productInfo
+            ? (p.productInfo as any)['frequency_per_day'] || 1
+            : 1,
+        ]),
+      );
+
+      const productNameMap = new Map<number, string>(
+        products.map((p) => [p.id, p.name]),
+      );
+
+      // 4. 영양소별로 그룹화 (영양소 → 포함 영양제 목록)
+      const nutrientToProducts = new Map<number, Set<number>>();
+      supplementNutrients.forEach((sn) => {
+        if (!nutrientToProducts.has(sn.nutrientName as any)) {
+          nutrientToProducts.set(sn.nutrientName as any, new Set());
+        }
+        nutrientToProducts.get(sn.nutrientName as any)!.add(sn.productId);
+      });
+
+      // 5. 영양제별 실제 섭취 횟수 계산
+      const productIntakeCounts = new Map<number, number>();
+      defaultProductIds.forEach((productId) => {
+        productIntakeCounts.set(productId, 0);
+      });
+
+      supplementRecords.forEach((record) => {
+        const metadata = record.metadata as any;
+        const productId = metadata?.productId;
+
+        if (!defaultProductIds.includes(productId)) {
+          return; // 1그룹 아니면 스킵
+        }
+
+        const morning = metadata.morning || false;
+        const afternoon = metadata.afternoon || false;
+        const evening = metadata.evening || false;
+
+        // 실제로 몇 번 먹었는지 카운트 (morning, afternoon, evening 각각 1회)
+        let dailyIntakeCount = 0;
+        if (morning) dailyIntakeCount++;
+        if (afternoon) dailyIntakeCount++;
+        if (evening) dailyIntakeCount++;
+
+        if (dailyIntakeCount > 0) {
+          // 하루 권장량을 초과할 수 없음
+          const frequency = productFrequencyMap.get(productId) || 1;
+          const validIntakeCount = Math.min(dailyIntakeCount, frequency);
+
+          const currentCount = productIntakeCounts.get(productId) || 0;
+          productIntakeCounts.set(productId, currentCount + validIntakeCount);
+        }
+      });
+
+      // 6. 영양소별 섭취량 계산
+      const nutrients = Array.from(nutrientToProducts.entries()).map(
+        ([nutrientName, productIds]) => {
+          // 권장 섭취량 (분모) = Σ(frequency_per_day) × 7
+          let recommendedCount = 0;
+          productIds.forEach((productId) => {
+            const frequency = productFrequencyMap.get(productId) || 1;
+            recommendedCount += frequency * 7;
+          });
+
+          // 실제 섭취량 (분자) = Σ(실제 먹은 횟수, 단 권장량 초과 불가)
+          let intakeCount = 0;
+          productIds.forEach((productId) => {
+            const actualIntakeCount = productIntakeCounts.get(productId) || 0;
+            intakeCount += actualIntakeCount;
+          });
+
+          // 해당 영양소가 포함된 영양제 이름 목록
+          const supplementNames: string[] = [];
+          productIds.forEach((productId) => {
+            const name = productNameMap.get(productId);
+            if (name) {
+              supplementNames.push(name);
+            }
+          });
+
+          return {
+            nutrientName: nutrientName as any,
+            intakeCount,
+            recommendedCount,
+            supplementNames,
+          };
+        },
+      );
+
+      // 7. 영양소명 가나다순으로 정렬
+      nutrients.sort((a, b) => a.nutrientName.localeCompare(b.nutrientName, 'ko'));
+
+      return nutrients;
+    } catch (error) {
+      this.logger.error('영양소 섭취량 계산 실패', error);
+      return [];
     }
   }
 
@@ -566,7 +841,7 @@ export class StatisticsService {
       // 주간 점수 데이터 생성
       const weekScore = weekDates.map(date => {
         const record = fastingRecords.find(r => {
-          const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+          const recordDate = r.date instanceof Date ? formatKoreanDate(r.date) : r.date;
           return recordDate === date;
         });
 
@@ -674,7 +949,7 @@ export class StatisticsService {
       // 주간 점수 데이터 생성
       const weekScore = weekDates.map(date => {
         const record = sleepRecords.find(r => {
-          const recordDate = r.date instanceof Date ? r.date.toISOString().split('T')[0] : r.date;
+          const recordDate = r.date instanceof Date ? formatKoreanDate(r.date) : r.date;
           return recordDate === date;
         });
 
@@ -789,7 +1064,7 @@ export class StatisticsService {
       weekDates.forEach((date) => {
         // 해당 날짜의 모든 활동 기록
         const dayRecords = activityRecords.filter((r: any) => {
-          const recordDate = new Date(r.date).toISOString().split('T')[0];
+          const recordDate = formatKoreanDate(new Date(r.date));
           return recordDate === date;
         });
 
@@ -882,12 +1157,13 @@ export class StatisticsService {
       }
 
       // 각 통계 조회 (병렬 처리) - 완성된 5개 통계 API 응답을 그대로 묶어서 반환
-      const [beauty, diet, fasting, sleep, activity] = await Promise.all([
+      const [beauty, diet, fasting, sleep, activity, supplement] = await Promise.all([
         this.getBeautyStatistics(userId, startDate, endDate),
         this.getDietStatistics(userId, startDate, endDate),
         this.getFastingStatistics(userId, startDate, endDate),
         this.getSleepStatistics(userId, startDate, endDate),
-        this.getActivityStatistics(userId, startDate, endDate)
+        this.getActivityStatistics(userId, startDate, endDate),
+        this.getSupplementStatistics(userId, startDate, endDate),
       ]);
 
       // comment, totalComment 제거 처리
@@ -896,7 +1172,7 @@ export class StatisticsService {
       const cleanedFasting = this.removeComments(fasting);
       const cleanedSleep = this.removeComments(sleep);
       const cleanedActivity = this.removeComments(activity);
-
+      const cleanedSupplement = this.removeComments(supplement);
       this.logger.log(`통계 목록 조회 완료 - 사용자: ${userId}`);
 
       // 5개 통계 응답을 그대로 반환 (프론트엔드에서 알아서 처리)
@@ -904,7 +1180,7 @@ export class StatisticsService {
         dateRange: { startDate, endDate },
         beauty: cleanedBeauty,
         diet: cleanedDiet,
-        supplement: { summary: {}, detailData: {} }, // 영양제 기획 미확정
+        supplement: cleanedSupplement,
         fasting: cleanedFasting,
         sleep: cleanedSleep,
         activity: cleanedActivity
@@ -1252,9 +1528,10 @@ export class StatisticsService {
    * 이전 날짜 계산 헬퍼 함수
    */
   private getPreviousDate(dateString: string): string {
-    const date = new Date(dateString);
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     date.setDate(date.getDate() - 1);
-    return date.toISOString().split('T')[0];
+    return formatKoreanDate(date);
   }
 
   /**
@@ -1267,7 +1544,7 @@ export class StatisticsService {
   private async getTodayRecordLimit(userId: number, recordType: string): Promise<{ currentCount: number; maxCount: number }> {
     // 오늘 날짜 (KST)
     const today = getNowKST();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = formatKoreanDate(today);
 
     // 오늘 날짜의 기록 개수 조회
     const todayRecordCount = await this.prisma.userRecord.count({
@@ -1340,21 +1617,18 @@ export class StatisticsService {
   /**
    * NEWCOMER용 예시 영양제 통계 데이터
    */
-  private getSampleSupplementStatistics(): SupplementStatisticsDto {
-    const { startDate, endDate } = this.getWeekDateRange();
-    const weekDates = this.generateWeekDates(startDate);
-
+  /**
+   * NEWCOMER용 예시 영양제 통계 데이터
+   */
+  private getSampleSupplementStatistics(
+    startDate: string,
+    endDate: string,
+  ): SupplementStatisticsDto {
     return {
-      weeklySupplements: weekDates.map(date => ({
-        date,
-        supplements: [],
-        taken: 0
-      })),
-      summary: {
-        score: 0
-      },
-      currentCount: 0,
-      maxCount: -1
+      startDate,
+      endDate,
+      supplements: [],
+      nutrients: [],
     };
   }
 
@@ -1562,7 +1836,7 @@ export class StatisticsService {
         const outerBeautyScore = outerBeauty.reduce((sum: number, item: any) => sum + (item.score || 0), 0);
 
         return {
-          date: record.date.toISOString().split('T')[0],
+          date: formatKoreanDate(record.date),
           totalScore: innerBeautyScore + outerBeautyScore,
           innerBeautyScore,
           outerBeautyScore,
@@ -1583,7 +1857,7 @@ export class StatisticsService {
       const 식단 = dietRecords.map(record => {
         const metadata = record.metadata as any || {};
         return {
-          date: record.date.toISOString().split('T')[0],
+          date: formatKoreanDate(record.date),
           diet: metadata.diet || 'UNKNOWN',
           foodName: metadata.foodName || null,
           imageUrl: record.imageUrl || null,
@@ -1612,7 +1886,7 @@ export class StatisticsService {
       const 간헐적단식 = fastingRecords.map(record => {
         const metadata = record.metadata as any || {};
         return {
-          date: record.date.toISOString().split('T')[0],
+          date: formatKoreanDate(record.date),
           startDateTime: metadata.startDateTime || '',
           endDateTime: metadata.endDateTime || '',
           fastingHours: metadata.fastingHours || 0
@@ -1631,7 +1905,7 @@ export class StatisticsService {
       const 수면 = sleepRecords.map(record => {
         const metadata = record.metadata as any || {};
         return {
-          date: record.date.toISOString().split('T')[0],
+          date: formatKoreanDate(record.date),
           bedDateTime: metadata.bedDateTime || '',
           wakeDateTime: metadata.wakeDateTime || '',
           sleepHours: metadata.sleepHours || 0
@@ -1650,7 +1924,7 @@ export class StatisticsService {
       const 활동 = activityRecords.map(record => {
         const metadata = record.metadata as any || {};
         return {
-          date: record.date.toISOString().split('T')[0],
+          date: formatKoreanDate(record.date),
           imageUrl: record.imageUrl || null,
           activityTime: metadata.activityTime || '00:00:00',
           activityType: {
