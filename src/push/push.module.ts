@@ -3,14 +3,12 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { FirebaseAdminModule } from './firebase-admin.module';
 import { FcmProvider } from './providers/fcm.provider';
 import { PUSH_PROVIDER_TOKEN } from './interfaces/push-provider.interface';
-import { PushTestService } from './services/push-test.service';
 import { PushTokenService } from './services/push-token.service';
 import { PushNotificationService } from './services/push-notification.service';
 import { PushTopicService } from './services/push-topic.service';
 // import { PushScheduleService } from './services/push-schedule.service'; // @deprecated - push-scheduler.service.ts로 통합됨
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
-// import { PushTestController } from './controllers/push-test.controller'; // @deprecated 삭제 예정
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
 import { PushTopicController } from './controllers/push-topic.controller';
@@ -30,7 +28,6 @@ import { PrismaService } from '../common/services/prisma.service';
     ScheduleModule.forRoot(), // 크론잡 활성화
   ],
   controllers: [
-    // PushTestController, // @deprecated 삭제 예정
     PushTokenController,
     PushNotificationController,
     PushTopicController,
@@ -42,7 +39,6 @@ import { PrismaService } from '../common/services/prisma.service';
       useClass: FcmProvider,
     },
     FcmProvider, // 기존 직접 주입 호환용 (점진적 마이그레이션)
-    PushTestService,
     PushTokenService,
     PushNotificationService,
     PushTopicService,
@@ -54,7 +50,6 @@ import { PrismaService } from '../common/services/prisma.service';
   exports: [
     PUSH_PROVIDER_TOKEN,
     FcmProvider, // 기존 직접 주입 호환용 (점진적 마이그레이션)
-    PushTestService,
     PushTokenService,
     PushNotificationService,
     PushTopicService,
