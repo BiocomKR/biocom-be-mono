@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FirebaseAdminModule } from './firebase-admin.module';
 import { FcmProvider } from './providers/fcm.provider';
+import { PUSH_PROVIDER_TOKEN } from './interfaces/push-provider.interface';
 import { PushTestService } from './services/push-test.service';
 import { PushTokenService } from './services/push-token.service';
 import { PushNotificationService } from './services/push-notification.service';
@@ -35,7 +36,12 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTopicController,
   ],
   providers: [
-    FcmProvider,
+    // 푸시 Provider DI 토큰 설정 (FCM → OneSignal 등 교체 용이)
+    {
+      provide: PUSH_PROVIDER_TOKEN,
+      useClass: FcmProvider,
+    },
+    FcmProvider, // 기존 직접 주입 호환용 (점진적 마이그레이션)
     PushTestService,
     PushTokenService,
     PushNotificationService,
@@ -46,7 +52,8 @@ import { PrismaService } from '../common/services/prisma.service';
     PrismaService,
   ],
   exports: [
-    FcmProvider,
+    PUSH_PROVIDER_TOKEN,
+    FcmProvider, // 기존 직접 주입 호환용 (점진적 마이그레이션)
     PushTestService,
     PushTokenService,
     PushNotificationService,

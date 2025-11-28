@@ -1,4 +1,19 @@
 /**
+ * 푸시 Provider DI 토큰
+ *
+ * NestJS 의존성 주입 시 사용하는 토큰 상수
+ * 문자열 하드코딩 방지 및 타입 안전성 확보
+ *
+ * @example
+ * // 모듈에서 Provider 등록
+ * { provide: PUSH_PROVIDER_TOKEN, useClass: FcmProvider }
+ *
+ * // 서비스에서 주입
+ * @Inject(PUSH_PROVIDER_TOKEN) private readonly pushProvider: IPushProvider
+ */
+export const PUSH_PROVIDER_TOKEN = 'PUSH_PROVIDER';
+
+/**
  * 푸시 알림 메시지 인터페이스
  *
  * 모든 푸시 서비스에서 공통으로 사용하는 메시지 구조
@@ -142,4 +157,31 @@ export interface IPushProvider {
    * ```
    */
   validateToken(tokenData: any): Promise<boolean>;
+
+  /**
+   * Topic 구독
+   *
+   * @param tokens - FCM 토큰 배열
+   * @param topic - 토픽 이름
+   * @returns 구독 성공 여부
+   */
+  subscribeToTopic(tokens: string[], topic: string): Promise<boolean>;
+
+  /**
+   * Topic 구독 해제
+   *
+   * @param tokens - FCM 토큰 배열
+   * @param topic - 토픽 이름
+   * @returns 구독 해제 성공 여부
+   */
+  unsubscribeFromTopic(tokens: string[], topic: string): Promise<boolean>;
+
+  /**
+   * Topic으로 푸시 발송
+   *
+   * @param topic - 토픽 이름
+   * @param message - 발송할 메시지
+   * @returns 발송 결과
+   */
+  sendToTopic(topic: string, message: PushMessage): Promise<PushSendResult>;
 }

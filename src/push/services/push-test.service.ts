@@ -1,14 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { FcmProvider } from '../providers/fcm.provider';
+import { Injectable, Inject } from '@nestjs/common';
+import { IPushProvider, PUSH_PROVIDER_TOKEN } from '../interfaces/push-provider.interface';
 
 /**
  * 푸시 알림 테스트 서비스
  *
- * FCM 푸시 발송 테스트용 간단한 서비스
+ * 푸시 발송 테스트용 간단한 서비스
  */
 @Injectable()
 export class PushTestService {
-  constructor(private readonly fcmProvider: FcmProvider) {}
+  constructor(
+    @Inject(PUSH_PROVIDER_TOKEN) private readonly pushProvider: IPushProvider,
+  ) {}
 
   /**
    * FCM 토큰으로 테스트 푸시 발송
@@ -25,7 +27,7 @@ export class PushTestService {
       tokenPrefix: token?.substring(0, 20) + '...',
     });
 
-    const result = await this.fcmProvider.sendToToken(
+    const result = await this.pushProvider.sendToToken(
       token,
       { title, body },
     );
