@@ -43,6 +43,15 @@ async function runScheduler(schedulerName: string) {
         await schedulerService.handleWeeklySupplementCreation();
         break;
 
+      case 'check-push-schedules': {
+        // 푸시 스케줄 확인 배치 (매분 실행)
+        logger.log('푸시 스케줄 확인 배치 실행...');
+        const { PushSchedulerService } = await import('./push/services/push-scheduler.service');
+        const pushSchedulerService = app.get(PushSchedulerService);
+        await pushSchedulerService.handleScheduledPushes();
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         process.exit(1);

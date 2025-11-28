@@ -389,7 +389,8 @@ deploy_kubernetes() {
         --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
         --from-literal=GOOGLE_API_KEY="$GOOGLE_API_KEY" \
         --from-literal=KCP_PRIVATE_KEY_PASSWORD="$KCP_PRIVATE_KEY_PASSWORD" \
-        --from-literal=TOSS_PAYMENTS_SECRET_KEY="$TOSS_PAYMENTS_SECRET_KEY"
+        --from-literal=TOSS_PAYMENTS_SECRET_KEY="$TOSS_PAYMENTS_SECRET_KEY" \
+        --from-literal=SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
     
     # Google Service Account Key Secret 확인/생성
     log_info "Google Service Account Key Secret 확인 중..."
@@ -440,7 +441,33 @@ deploy_kubernetes() {
 
         log_success "✅ KCP 인증서 Secret 생성 완료!"
     fi
-    
+
+    # Firebase Service Account Key Secret 확인/생성
+    log_info "Firebase Service Account Key Secret 확인 중..."
+
+    if kubectl get secret firebase-service-account-key -n "$NAMESPACE" &>/dev/null; then
+        log_success "✅ Firebase Service Account Key Secret이 이미 존재합니다. 건너뜁니다."
+    else
+        log_info "Firebase Service Account Key Secret이 없습니다. 생성합니다..."
+
+        # Firebase 서비스 계정 키 파일 확인 (패턴 매칭)
+        FIREBASE_KEY_FILE=$(find "$PROJECT_ROOT" -maxdepth 1 -name "*firebase*adminsdk*.json" -type f | head -1)
+
+        if [[ -z "$FIREBASE_KEY_FILE" ]] || [[ ! -f "$FIREBASE_KEY_FILE" ]]; then
+            log_error "Firebase Service Account Key 파일을 찾을 수 없습니다: $PROJECT_ROOT/*firebase*adminsdk*.json"
+            log_error "Firebase Console에서 서비스 계정 키를 다운로드하세요."
+            exit 1
+        fi
+
+        log_info "Firebase 키 파일 발견: $FIREBASE_KEY_FILE"
+
+        kubectl create secret generic firebase-service-account-key \
+            --namespace="$NAMESPACE" \
+            --from-file=firebase-key.json="$FIREBASE_KEY_FILE"
+
+        log_success "✅ Firebase Service Account Key Secret 생성 완료!"
+    fi
+
     # Service 배포
     log_info "Service 배포 중..."
     kubectl apply -f service.yaml
@@ -467,7 +494,8 @@ deploy_kubernetes() {
     kubectl apply -f cronjob-expire-challenges.yaml
     kubectl apply -f cronjob-activate-challenges.yaml
     kubectl apply -f cronjob-create-supplements.yaml
-    log_success "✅ CronJob 3개 배포 완료 (만료, 활성화, 영양제)"
+    kubectl apply -f cronjob-check-push-schedules.yaml
+    log_success "✅ CronJob 4개 배포 완료 (만료, 활성화, 영양제, 푸시스케줄)"
 
     # 배포 상태 확인
     log_info "배포 상태 확인 중..."

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+// import { Cron, CronExpression } from '@nestjs/schedule'; // K8s CronJob으로 대체
 import { PushCampaignService } from './push-campaign.service';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
@@ -66,11 +66,15 @@ export class PushSchedulerService {
    * 1. getExecutableSchedules()로 "지금 발송해야 할" 스케줄 목록 조회
    * 2. 각 스케줄을 순회하며 조건 검사
    * 3. executeScheduledCampaign()으로 실제 푸시 발송
+   *
+   * NOTE: Kubernetes CronJob으로 실행하므로 @Cron 비활성화
+   * - 멀티 팟 환경에서 Race Condition 방지
+   * - K8s CronJob의 concurrencyPolicy: Forbid로 단일 실행 보장
    */
-  @Cron('0 * * * * *', {
-    name: 'check-push-schedules',
-    timeZone: 'Asia/Seoul', // 한국 시간 기준으로 실행
-  })
+  // @Cron('0 * * * * *', {
+  //   name: 'check-push-schedules',
+  //   timeZone: 'Asia/Seoul', // 한국 시간 기준으로 실행
+  // })
   async handleScheduledPushes() {
     this.logger.log('🕐 [PushScheduler] 스케줄 확인 시작');
 
