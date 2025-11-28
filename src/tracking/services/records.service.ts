@@ -122,6 +122,23 @@ export class RecordsService {
               currentCount: recordLimit.currentCount,
               maxCount: recordLimit.maxCount,
             });
+          } else if (type === 'SUPPLEMENT') {
+            // SUPPLEMENT는 모든 영양제 기록을 배열로 변환
+            const supplementList = await this.transformSupplementRecords(
+              userId,
+              typeRecords,
+            );
+
+            const recordLimit = this.getRecordLimit(type, typeRecords);
+
+            result.push({
+              id: typeRecords[0].id, // 대표 ID
+              recordType: type,
+              date: typeRecords[0].date,
+              metadata: supplementList, // 배열 형태
+              currentCount: recordLimit.currentCount,
+              maxCount: recordLimit.maxCount,
+            });
           } else {
             // 나머지는 개별 처리 (첫 번째 기록만 사용)
             const record = typeRecords[0];
@@ -911,8 +928,8 @@ export class RecordsService {
         return { currentCount: records.length, maxCount: 9 }; // 아침1+점심1+저녁1+간식3+야식3 = 9
 
       case 'SUPPLEMENT':
-        // 무제한
-        return { currentCount: records.length, maxCount: -1 }; // -1 = 무제한
+        // 1일 10회
+        return { currentCount: records.length, maxCount: 10 };
 
       case 'FASTING':
         // 1일 1회
@@ -1511,6 +1528,468 @@ export class RecordsService {
       };
     } catch (error) {
       this.logger.error('영양제 섭취 기록 저장 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 영양제 기록 변환 (배열 형태)
+   * - user_records의 영양제 기록을 productId별로 그룹화
+   * - 각 영양제의 product 정보 조회 (이름, frequency_per_day)
+   * - 섭취량 = morning + afternoon + evening 중 true 개수 (최대값은 frequency_per_day)
+   * - user_supplement_routine의 display_order 순서로 정렬
+   * - [{ productId, productName, intakeCount, recommendedCount }] 형태로 반환
+   */
+  private async transformSupplementRecords(
+    userId: number,
+    typeRecords: any[],
+  ) {
+    try {
+      // productId 추출
+      const productIds = typeRecords
+        .map((record) => {
+          const metadata = record.metadata as any;
+          return metadata?.productId;
+        })
+        .filter((id) => id !== undefined);
+
+      if (productIds.length === 0) {
+        return [];
+      }
+
+      // user_supplement_routine에서 display_order 조회
+      const routineList = await this.prisma.userSupplementRoutine.findMany({
+        where: {
+          userId,
+          isActive: true,
+          productId: { in: productIds },
+        },
+        select: {
+          productId: true,
+          displayOrder: true,
+        },
+      });
+
+      // productId별 displayOrder 매핑
+      const displayOrderMap = new Map<number, number>(
+        routineList.map((r) => [r.productId, r.displayOrder]),
+      );
+
+      // products 테이블에서 상품명 + product_info 조회
+      const products = await this.prisma.product.findMany({
+        where: {
+          id: { in: productIds },
+        },
+        select: {
+          id: true,
+          name: true,
+          productInfo: true,
+        },
+      });
+
+      // productId별 정보 매핑
+      const productInfoMap = new Map<
+        number,
+        { name: string; frequencyPerDay: number }
+      >(
+        products.map((p) => [
+          p.id,
+          {
+            name: p.name,
+            frequencyPerDay: p.productInfo
+              ? (p.productInfo as any)['frequency_per_day'] || 1
+              : 1,
+          },
+        ]),
+      );
+
+      // 영양제 배열 생성
+      const supplementList = typeRecords.map((record) => {
+        const metadata = record.metadata as any;
+        const productInfo = productInfoMap.get(metadata.productId);
+        const displayOrder = displayOrderMap.get(metadata.productId) || 9999;
+
+        // 섭취 횟수 계산 (morning, afternoon, evening 중 true 개수)
+        const morning = metadata.morning || false;
+        const afternoon = metadata.afternoon || false;
+        const evening = metadata.evening || false;
+        const intakeCount = [morning, afternoon, evening].filter(Boolean).length;
+
+        // 권장 섭취량
+        const recommendedCount = productInfo?.frequencyPerDay || 1;
+
+        // 최대값 제한 (섭취량이 권장량보다 많으면 권장량으로 제한)
+        const actualIntakeCount = Math.min(intakeCount, recommendedCount);
+
+        return {
+          productId: metadata.productId,
+          productName: productInfo?.name || '알 수 없는 영양제',
+          intakeCount: actualIntakeCount,
+          recommendedCount: recommendedCount,
+          displayOrder, // 정렬용
+        };
+      });
+
+      // display_order 순서로 정렬 후 displayOrder 필드 제거
+      supplementList.sort((a, b) => a.displayOrder - b.displayOrder);
+      return supplementList.map(({ displayOrder, ...rest }) => rest);
+    } catch (error) {
+      this.logger.error('영양제 기록 변환 실패', error);
+      return [];
+    }
+  }
+
+  /**
+   * 루틴 편집 화면용 전체 영양제 목록 조회
+   * - 전체 영양제 목록 조회
+   * - 내 루틴 포함 여부 표시
+   * - 정렬: 1) 내 루틴, 2) 메타드림/리셋데이, 3) 나머지 ㄱㄴㄷ순
+   */
+  async getSupplementRoutineForEdit(userId: number) {
+    try {
+      this.logger.log(`루틴 편집용 영양제 목록 조회 시작: userId=${userId}`);
+
+      // 1. 내 루틴 조회
+      const myRoutine = await this.prisma.userSupplementRoutine.findMany({
+        where: {
+          userId,
+          isActive: true,
+        },
+        select: {
+          productId: true,
+          isDefault: true,
+          displayOrder: true,
+        },
+      });
+
+      // productId별 루틴 정보 매핑
+      const routineMap = new Map<
+        number,
+        { isDefault: boolean; displayOrder: number }
+      >(
+        myRoutine.map((r) => [
+          r.productId,
+          { isDefault: r.isDefault, displayOrder: r.displayOrder },
+        ]),
+      );
+
+      // 2. 전체 영양제 목록 조회 (영양제 카테고리 + status='ACTIVE')
+      const allProducts = await this.prisma.product.findMany({
+        where: {
+          categoryCode: 'SUPPLEMENT',
+          status: 'ACTIVE',
+        },
+        select: {
+          id: true,
+          name: true,
+          productInfo: true,
+          images: {
+            where: { imageType: 'MAIN' },
+            select: { imageUrl: true },
+            take: 1,
+          },
+        },
+      });
+
+      // 3. 응답 데이터 변환 및 그룹 지정
+      const supplements = allProducts.map((product) => {
+        const routineInfo = routineMap.get(product.id);
+        const isInMyRoutine = !!routineInfo;
+        const isDefault = routineInfo?.isDefault || false;
+
+        // 그룹 결정
+        let groupOrder = 3; // 기본: 나머지
+        if (isInMyRoutine) {
+          groupOrder = 1; // 내 루틴
+        } else if (
+          product.name === '메타드림' ||
+          product.name === '리셋데이'
+        ) {
+          groupOrder = 2; // 메타드림/리셋데이
+        }
+
+        return {
+          productId: product.id,
+          productName: product.name,
+          productImage: product.images[0]?.imageUrl || null,
+          dosage: product.productInfo
+            ? {
+                frequency: product.productInfo['frequency_per_day'] || 0,
+                quantity: product.productInfo['quantity_per_dose'] || 0,
+                unit: product.productInfo['unit'] || '정',
+              }
+            : { frequency: 0, quantity: 0, unit: '정' },
+          isInMyRoutine,
+          isDefault,
+          groupOrder,
+          displayOrder: routineInfo?.displayOrder || 999, // 내 루틴만 displayOrder 있음
+        };
+      });
+
+      // 4. 정렬
+      // 1순위: groupOrder (1 > 2 > 3)
+      // 2순위: 1그룹은 isDefault (true > false) 후 displayOrder, 2그룹은 메타드림>리셋데이 고정, 3그룹은 이름 ㄱㄴㄷ순
+      supplements.sort((a, b) => {
+        if (a.groupOrder !== b.groupOrder) {
+          return a.groupOrder - b.groupOrder;
+        }
+
+        if (a.groupOrder === 1) {
+          // 내 루틴: isDefault 먼저 (기본 영양제 > 사용자 추가), 그 다음 displayOrder
+          if (a.isDefault !== b.isDefault) {
+            return a.isDefault ? -1 : 1; // true가 먼저
+          }
+          return a.displayOrder - b.displayOrder;
+        }
+
+        if (a.groupOrder === 2) {
+          // 메타드림/리셋데이: 고정 순서 (메타드림 > 리셋데이)
+          if (a.productName === '메타드림') return -1;
+          if (b.productName === '메타드림') return 1;
+          return 0;
+        }
+
+        // 3그룹: 이름 ㄱㄴㄷ순
+        return a.productName.localeCompare(b.productName, 'ko');
+      });
+
+      // displayOrder 필드 제거 (응답에 불필요)
+      const result = supplements.map(({ displayOrder, ...rest }) => rest);
+
+      this.logger.log(
+        `루틴 편집용 영양제 목록 조회 완료: 총 ${result.length}개`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error('루틴 편집용 영양제 목록 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 영양제 루틴 저장 (추가/삭제)
+   * 페이즈 1: user_supplement_routine 테이블 수정
+   * - 기본 영양제(isDefault=true)는 유지
+   * - 기존 사용자 추가 영양제(isDefault=false) 삭제
+   * - 새로운 productIds로 사용자 추가 영양제 생성
+   * - displayOrder 자동 계산 (기본 영양제 뒤에 배치)
+   *
+   * 페이즈 2: user_records 테이블 동기화 (오늘 ~ 미래 날짜)
+   * - 오늘: 루틴에 있는데 기록 없으면 INSERT, 루틴에 없는데 기록 있으면 DELETE (단, 섭취 체크한 기록은 삭제 금지)
+   * - 오늘 이후: 루틴에 있는데 기록 없으면 INSERT, 루틴에 없으면 무조건 DELETE
+   */
+  async saveSupplementRoutine(userId: number, productIds: number[]) {
+    try {
+      this.logger.log(
+        `영양제 루틴 저장 시작: userId=${userId}, productIds=${productIds.join(', ')}`,
+      );
+
+      return await this.prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const today = getKoreanToday(); // KST 기준 오늘 날짜 (YYYY-MM-DD)
+        const todayDate = new Date(today);
+
+        // ============ 페이즈 1: user_supplement_routine 수정 ============
+
+        // 1. 기본 영양제 조회 (displayOrder 계산용 + 중복 제거용)
+        const defaultRoutines = await tx.userSupplementRoutine.findMany({
+          where: {
+            userId,
+            isDefault: true,
+            isActive: true,
+          },
+          select: {
+            productId: true,
+          },
+        });
+
+        const defaultProductIds = new Set(
+          defaultRoutines.map((r) => r.productId),
+        );
+        const defaultRoutineCount = defaultRoutines.length;
+
+        // 2. 기존 사용자 추가 영양제 삭제 (isDefault=false만)
+        const deletedRoutineCount = await tx.userSupplementRoutine.deleteMany({
+          where: {
+            userId,
+            isDefault: false,
+          },
+        });
+
+        this.logger.log(
+          `[페이즈1] 기존 사용자 추가 영양제 ${deletedRoutineCount.count}개 삭제`,
+        );
+
+        // 3. 새로운 사용자 추가 영양제 생성 (기본 영양제 제외)
+        const userAddedProductIds = productIds.filter(
+          (id) => !defaultProductIds.has(id),
+        );
+
+        if (userAddedProductIds.length > 0) {
+          await tx.userSupplementRoutine.createMany({
+            data: userAddedProductIds.map((productId, index) => ({
+              userId,
+              productId,
+              isDefault: false,
+              displayOrder: defaultRoutineCount + index + 1, // 기본 영양제 뒤에 배치
+              isActive: true,
+              createdAt: now,
+            })),
+          });
+
+          this.logger.log(
+            `[페이즈1] 새로운 사용자 추가 영양제 ${userAddedProductIds.length}개 생성 (기본 영양제 ${defaultProductIds.size}개 제외)`,
+          );
+        }
+
+        // ============ 페이즈 2: user_records 동기화 ============
+
+        // 4. 최종 루틴 전체 조회 (기본 영양제 + 사용자 추가 영양제)
+        const finalRoutine = await tx.userSupplementRoutine.findMany({
+          where: {
+            userId,
+            isActive: true,
+          },
+          select: {
+            productId: true,
+          },
+        });
+
+        const routineProductIds = new Set<number>(
+          finalRoutine.map((r) => r.productId),
+        );
+
+        this.logger.log(
+          `[페이즈2] 최종 루틴 영양제: ${Array.from(routineProductIds).join(', ')}`,
+        );
+
+        // 5. 오늘 이후 날짜의 user_records 조회 (date >= 오늘)
+        const futureRecords = await tx.userRecord.findMany({
+          where: {
+            userId,
+            recordType: 'SUPPLEMENT',
+            date: {
+              gte: todayDate,
+            },
+          },
+        });
+
+        this.logger.log(
+          `[페이즈2] 오늘 이후 영양제 기록: ${futureRecords.length}개`,
+        );
+
+        // 날짜별, productId별로 그룹화
+        const recordsByDateAndProduct = new Map<
+          string,
+          Map<number, { id: number; morning: boolean; afternoon: boolean; evening: boolean }>
+        >();
+
+        futureRecords.forEach((record) => {
+          const dateStr = record.date.toISOString().split('T')[0];
+          const metadata = record.metadata as any;
+          const productId = metadata?.productId as number;
+
+          if (!productId) return;
+
+          if (!recordsByDateAndProduct.has(dateStr)) {
+            recordsByDateAndProduct.set(dateStr, new Map());
+          }
+
+          recordsByDateAndProduct.get(dateStr)!.set(productId, {
+            id: record.id,
+            morning: metadata.morning || false,
+            afternoon: metadata.afternoon || false,
+            evening: metadata.evening || false,
+          });
+        });
+
+        let insertCount = 0;
+        let deleteCount = 0;
+
+        // 6. 날짜별로 동기화 처리
+        const dateKeys = Array.from(recordsByDateAndProduct.keys()).sort();
+
+        for (const dateStr of dateKeys) {
+          const isToday = dateStr === today;
+          const recordDate = new Date(dateStr);
+          const recordsMap = recordsByDateAndProduct.get(dateStr)!;
+
+          // 6-1. 루틴에 있는데 기록 없으면 INSERT (최대 10개 제한)
+          let dailyInsertCount = 0;
+          const currentRecordCount = recordsMap.size;
+
+          for (const productId of routineProductIds) {
+            if (!recordsMap.has(productId)) {
+              // 1일 최대 10개 영양제 제한
+              if (currentRecordCount + dailyInsertCount >= 10) {
+                this.logger.warn(
+                  `[페이즈2] 날짜 ${dateStr} 영양제 기록 10개 제한 도달, 추가 INSERT 스킵`,
+                );
+                break; // 더 이상 INSERT 안 함
+              }
+
+              await tx.userRecord.create({
+                data: {
+                  userId,
+                  recordType: 'SUPPLEMENT',
+                  date: recordDate,
+                  metadata: {
+                    productId,
+                    morning: false,
+                    afternoon: false,
+                    evening: false,
+                  },
+                  createdAt: now,
+                },
+              });
+              insertCount++;
+              dailyInsertCount++;
+            }
+          }
+
+          // 6-2. 루틴에 없는데 기록 있으면 DELETE
+          for (const [productId, record] of recordsMap.entries()) {
+            if (!routineProductIds.has(productId)) {
+              // 오늘 날짜: 섭취 체크한 기록은 삭제 금지
+              if (isToday) {
+                const hasIntake =
+                  record.morning || record.afternoon || record.evening;
+                if (hasIntake) {
+                  this.logger.log(
+                    `[페이즈2] 오늘 날짜 섭취 기록 삭제 스킵: productId=${productId}`,
+                  );
+                  continue; // 삭제하지 않음
+                }
+              }
+
+              // 오늘 이후 또는 섭취 체크 안 한 오늘 기록: 삭제
+              await tx.userRecord.delete({
+                where: { id: record.id },
+              });
+              deleteCount++;
+            }
+          }
+        }
+
+        this.logger.log(
+          `[페이즈2] user_records 동기화 완료: INSERT ${insertCount}개, DELETE ${deleteCount}개`,
+        );
+
+        return {
+          message: '영양제 루틴이 저장되었습니다.',
+          routine: {
+            addedCount: userAddedProductIds.length,
+            deletedCount: deletedRoutineCount.count,
+          },
+          records: {
+            insertCount,
+            deleteCount,
+          },
+        };
+      });
+    } catch (error) {
+      this.logger.error('영양제 루틴 저장 실패', error);
       throw error;
     }
   }

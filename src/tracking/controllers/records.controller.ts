@@ -32,6 +32,10 @@ import {
 } from '../dto/records/records.dto';
 import { SupplementRoutineResponseDto } from '../dto/supplement-routine-response.dto';
 import { SaveSupplementIntakeDto } from '../dto/supplement-intake.dto';
+import {
+  SupplementRoutineEditItemDto,
+  SaveSupplementRoutineDto,
+} from '../dto/supplement-routine-edit.dto';
 
 /**
  * 기록 컨트롤러
@@ -292,6 +296,47 @@ export class RecordsController {
   })
   async getSupplementRoutine(@Request() req: any) {
     return this.recordsService.getSupplementRoutine(req.user.id);
+  }
+
+  /**
+   * 루틴 편집 화면용 전체 영양제 목록 조회
+   * @description 전체 영양제 목록과 내 루틴 포함 여부를 조회합니다. 정렬: 1) 내 루틴, 2) 메타드림/리셋데이, 3) 나머지 ㄱㄴㄷ순
+   */
+  @Get('supplements/routine/edit')
+  @ApiOperation({
+    summary: '루틴 편집 화면용 영양제 목록 조회',
+    description: '루틴 편집 화면에서 사용할 전체 영양제 목록을 조회합니다. 내 루틴 포함 여부와 기본 영양제 여부가 표시되며, 정렬 순서는 1) 내 루틴, 2) 메타드림/리셋데이, 3) 나머지 ㄱㄴㄷ순입니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '영양제 목록 조회 성공',
+    type: [SupplementRoutineEditItemDto],
+  })
+  async getSupplementRoutineForEdit(@Request() req: any) {
+    return this.recordsService.getSupplementRoutineForEdit(req.user.id);
+  }
+
+  /**
+   * 영양제 루틴 저장 (추가/삭제)
+   * @description 사용자 추가 영양제를 저장합니다. 기본 영양제는 자동으로 유지됩니다.
+   */
+  @Post('supplements/routine/edit')
+  @ApiOperation({
+    summary: '영양제 루틴 저장',
+    description: '사용자 추가 영양제를 저장합니다. 기본 영양제(isDefault=true)는 자동 유지되며, 사용자가 선택한 영양제만 추가/삭제됩니다.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '영양제 루틴 저장 성공',
+  })
+  async saveSupplementRoutine(
+    @Request() req: any,
+    @Body() saveSupplementRoutineDto: SaveSupplementRoutineDto,
+  ) {
+    return this.recordsService.saveSupplementRoutine(
+      req.user.id,
+      saveSupplementRoutineDto.productIds,
+    );
   }
 
   /**
