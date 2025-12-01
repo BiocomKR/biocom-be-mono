@@ -78,7 +78,7 @@ export class ContentService {
       this.prisma.content.findMany({
         where,
         include: {
-          products: {
+          challenge: {
             select: {
               id: true,
               name: true,
@@ -101,8 +101,8 @@ export class ContentService {
     // 프론트엔드 형식에 맞게 변환
     const formattedItems = items.map((item) => ({
       ...item,
-      challengeId: item.products?.id || null,
-      challengeName: item.products?.name || null,
+      challengeId: item.challenge?.id || null,
+      challengeName: item.challenge?.name || null,
     }));
 
     return {
