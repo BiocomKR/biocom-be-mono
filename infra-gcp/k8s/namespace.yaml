@@ -1,0 +1,10 @@
+# 🏷️ Namespace - biocom-bo-api 전용 네임스페이스
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: biocom-bo-api
+  labels:
+    app: biocom-bo-api
+    environment: dev
+    managed-by: kubectl

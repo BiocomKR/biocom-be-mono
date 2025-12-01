@@ -213,10 +213,10 @@ export class ChallengeService {
       throw new BadRequestException('참여자가 있는 챌린지는 삭제할 수 없습니다');
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.challengeMission.deleteMany({ where: { productId: id } });
-      await tx.challengeSurvey.deleteMany({ where: { productId: id } });
-      await tx.product.delete({ where: { id } });
+    // Soft delete: isActive = false (연관 데이터는 유지)
+    await this.prisma.product.update({
+      where: { id },
+      data: { isActive: false }
     });
   }
 

@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { FcmProvider } from '../providers/fcm.provider';
+import { IPushProvider, PUSH_PROVIDER_TOKEN } from '../interfaces/push-provider.interface';
 import { SubscribeTopicDto } from '../dto/subscribe-topic.dto';
 import { UnsubscribeTopicDto } from '../dto/unsubscribe-topic.dto';
 import { SendPushToTopicDto } from '../dto/send-push-to-topic.dto';
@@ -16,7 +16,7 @@ export class PushTopicService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fcmProvider: FcmProvider,
+    @Inject(PUSH_PROVIDER_TOKEN) private readonly pushProvider: IPushProvider,
   ) {}
 
   /**
@@ -47,7 +47,7 @@ export class PushTopicService {
     }
 
     // 2. FCM Topic 구독
-    const success = await this.fcmProvider.subscribeToTopic(tokens, dto.topic);
+    const success = await this.pushProvider.subscribeToTopic(tokens, dto.topic);
 
     this.logger.log(
       `✅ [PushTopicService] Topic 구독 완료: topic=${dto.topic}, success=${success}`,
@@ -89,7 +89,7 @@ export class PushTopicService {
     }
 
     // 2. FCM Topic 구독 해제
-    const success = await this.fcmProvider.unsubscribeFromTopic(tokens, dto.topic);
+    const success = await this.pushProvider.unsubscribeFromTopic(tokens, dto.topic);
 
     this.logger.log(
       `✅ [PushTopicService] Topic 구독 해제 완료: topic=${dto.topic}, success=${success}`,
@@ -114,7 +114,7 @@ export class PushTopicService {
       `📣 [PushTopicService] Topic 푸시 전송: topic=${dto.topic}, title="${dto.title}"`,
     );
 
-    const result = await this.fcmProvider.sendToTopic(dto.topic, {
+    const result = await this.pushProvider.sendToTopic(dto.topic, {
       title: dto.title,
       body: dto.body,
       imageUrl: dto.imageUrl,

@@ -8,6 +8,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.secrets
 
 # Google Cloud Service Account Keys
 google-service-account-key.json
@@ -33,3 +34,4 @@ coverage/
 
 # Prisma
 prisma/*.db
+infra-gcp/terraform/.terraform/

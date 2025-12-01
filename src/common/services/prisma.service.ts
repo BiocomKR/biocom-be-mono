@@ -417,6 +417,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get operatorAuthLog() { return this.prisma.operatorAuthLog; }
   get department() { return this.prisma.department; }
 
+  // 앱 이벤트 테이블
+  get appEvent() { return this.prisma.appEvent; }
+
   // 메서드 바인딩
   $transaction(arg: any) {
     return (this.prisma as any).$transaction(arg);

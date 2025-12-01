@@ -367,6 +367,25 @@ export class ConsentService {
   }
 
   /**
+   * 약관 순서 일괄 변경 (드래그앤드롭)
+   */
+  async reorderConsents(orderedIds: number[]) {
+    this.logger.log(`약관 순서 일괄 변경: ${orderedIds.join(', ')}`);
+
+    // 트랜잭션으로 모든 순서 업데이트
+    await this.prisma.$transaction(
+      orderedIds.map((id, index) =>
+        this.prisma.consent.update({
+          where: { id },
+          data: { displayOrder: index },
+        }),
+      ),
+    );
+
+    return { success: true };
+  }
+
+  /**
    * 약관 동의 목록 조회 (페이징, 필터링)
    */
   async getUserConsentsWithPagination(

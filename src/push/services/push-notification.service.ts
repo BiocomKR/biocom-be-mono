@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { FcmProvider } from '../providers/fcm.provider';
 import {
+  IPushProvider,
+  PUSH_PROVIDER_TOKEN,
   PushMessage,
   PushSendResult,
 } from '../interfaces/push-provider.interface';
@@ -23,7 +24,7 @@ export class PushNotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fcmProvider: FcmProvider,
+    @Inject(PUSH_PROVIDER_TOKEN) private readonly pushProvider: IPushProvider,
   ) {}
 
   /**
@@ -95,7 +96,7 @@ export class PushNotificationService {
         this.logger.debug(
           `📤 [PushNotificationService] FCM 전송 시도: token=${pushToken.token ? '있음' : '없음'}`,
         );
-        const result = await this.fcmProvider.sendToToken(
+        const result = await this.pushProvider.sendToToken(
           pushToken.token,
           enrichedMessage,
         );
@@ -242,7 +243,7 @@ export class PushNotificationService {
           },
         };
 
-        const result = await this.fcmProvider.sendToToken(
+        const result = await this.pushProvider.sendToToken(
           pushToken.token,
           enrichedMessage,
         );
@@ -628,7 +629,7 @@ export class PushNotificationService {
 
     try {
       // 마케팅 Topic으로 전송 (marketing Topic 구독자 = 마케팅 동의자)
-      const result = await this.fcmProvider.sendToTopic('marketing', {
+      const result = await this.pushProvider.sendToTopic('marketing', {
         title: message.title,
         body: message.body,
         imageUrl: message.imageUrl,
