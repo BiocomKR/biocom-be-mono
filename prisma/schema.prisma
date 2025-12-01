@@ -54,6 +54,7 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
+  iapReceipts                  IAPReceipt[]
 
   @@map("users")
 }
@@ -472,6 +473,7 @@ model ChallengeTicket {
   product        Product?        @relation(fields: [productId], references: [id])
   user           User            @relation(fields: [userId], references: [id])
   userChallenges UserChallenge[]
+  iapReceipt     IAPReceipt?
 
   @@index([userId, status, ticketType])
   @@map("challenge_tickets")
@@ -664,6 +666,7 @@ model Product {
   userSupplementRoutine        UserSupplementRoutine[]        @relation("UserSupplementRoutineProduct")
   userSupplementRoutineHistory UserSupplementRoutineHistory[] @relation("UserSupplementRoutineHistoryProduct")
   wishlistItems                Wishlist[]
+  iapProducts                  IAPProduct[]
 
   @@index([sku])
   @@index([categoryCode, status])
@@ -2276,4 +2279,145 @@ model AppEvent {
   @@index([platform])
   @@index([createdAt])
   @@map("app_events")
+}
+
+// ============================================
+// IAP (In-App Purchase) 관련 테이블
+// ============================================
+
+/// IAP 플랫폼 Enum
+enum IAPPlatform {
+  APPLE
+  GOOGLE
+}
+
+/// IAP 영수증 상태 Enum
+enum IAPReceiptStatus {
+  PENDING    /// 검증 대기 중
+  VERIFIED   /// 검증 완료
+  FAILED     /// 검증 실패
+  REFUNDED   /// 환불됨
+}
+
+/// IAP 상품 타입 Enum
+enum IAPProductType {
+  CONSUMABLE          /// 소모성 (챌린지 티켓 등)
+  NON_CONSUMABLE      /// 비소모성 (영구 해제)
+  AUTO_RENEWABLE      /// 자동 갱신 구독
+  NON_RENEWING        /// 비갱신 구독
+}
+
+/// IAP 상품 마스터 테이블
+/// App Store / Play Store에 등록된 IAP 상품 정보를 관리
+model IAPProduct {
+  id              Int            @id @default(autoincrement())
+  /// Apple App Store 상품 ID (com.BiocomChallenge.consumable.xxx)
+  appleProductId  String?        @unique @map("apple_product_id") @db.VarChar(200)
+  /// Google Play 상품 ID (challenge_xxx)
+  googleProductId String?        @unique @map("google_product_id") @db.VarChar(200)
+  /// 내부 상품 ID (products 테이블과 매핑)
+  productId       Int            @map("product_id")
+  /// IAP 상품 타입
+  productType     IAPProductType @map("product_type")
+  /// 상품명 (관리용)
+  name            String         @db.VarChar(200)
+  /// 상품 설명
+  description     String?
+  /// 활성화 여부
+  isActive        Boolean        @default(true) @map("is_active")
+  /// 생성일시
+  createdAt       DateTime       @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt       DateTime?      @updatedAt @map("updated_at")
+  /// 내부 상품 관계
+  product         Product        @relation(fields: [productId], references: [id])
+  /// 영수증 관계
+  receipts        IAPReceipt[]
+
+  @@index([productId])
+  @@index([isActive])
+  @@map("iap_products")
+}
+
+/// IAP 영수증 검증 기록 테이블
+/// Apple/Google 영수증 검증 내역 및 구매 이력 관리
+model IAPReceipt {
+  id                    Int              @id @default(autoincrement())
+  /// 사용자 ID
+  userId                Int              @map("user_id")
+  /// IAP 상품 ID
+  iapProductId          Int              @map("iap_product_id")
+  /// 플랫폼 (APPLE, GOOGLE)
+  platform              IAPPlatform
+  /// 플랫폼 트랜잭션 ID (Apple: transactionId, Google: orderId)
+  transactionId         String           @unique @map("transaction_id") @db.VarChar(200)
+  /// 원본 트랜잭션 ID (구독 갱신시 최초 구매 트랜잭션 ID)
+  originalTransactionId String?          @map("original_transaction_id") @db.VarChar(200)
+  /// 구매일시
+  purchaseDate          DateTime         @map("purchase_date")
+  /// 만료일시 (구독인 경우)
+  expiresDate           DateTime?        @map("expires_date")
+  /// 원본 영수증 데이터 (Apple: receipt-data, Google: purchaseToken)
+  receiptData           String           @map("receipt_data") @db.Text
+  /// 검증 응답 데이터 (JSON)
+  verificationResponse  Json?            @map("verification_response")
+  /// 영수증 상태
+  status                IAPReceiptStatus @default(PENDING)
+  /// 환불일시
+  refundedAt            DateTime?        @map("refunded_at")
+  /// 환불 사유 (Apple revocationReason)
+  refundReason          String?          @map("refund_reason") @db.VarChar(200)
+  /// 발급된 챌린지 티켓 ID
+  challengeTicketId     Int?             @unique @map("challenge_ticket_id")
+  /// 생성일시
+  createdAt             DateTime         @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt             DateTime?        @updatedAt @map("updated_at")
+  /// 사용자 관계
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// IAP 상품 관계
+  iapProduct            IAPProduct       @relation(fields: [iapProductId], references: [id])
+  /// 챌린지 티켓 관계
+  challengeTicket       ChallengeTicket? @relation(fields: [challengeTicketId], references: [id])
+
+  @@index([userId])
+  @@index([iapProductId])
+  @@index([platform])
+  @@index([status])
+  @@index([originalTransactionId])
+  @@index([purchaseDate])
+  @@map("iap_receipts")
+}
+
+/// IAP 웹훅 로그 테이블
+/// Apple S2S Notification / Google RTDN 웹훅 이력 저장
+model IAPWebhookLog {
+  id              Int         @id @default(autoincrement())
+  /// 플랫폼 (APPLE, GOOGLE)
+  platform        IAPPlatform
+  /// 웹훅 메시지 ID (Apple: signedPayload의 일부, Google: messageId)
+  messageId       String      @unique @map("message_id") @db.VarChar(200)
+  /// 알림 타입 (Apple: notificationType, Google: notificationType)
+  notificationType String     @map("notification_type") @db.VarChar(100)
+  /// 알림 하위 타입 (Apple: subtype)
+  subtype         String?     @db.VarChar(100)
+  /// 원본 페이로드 (JSON)
+  payload         Json
+  /// 처리 상태 (RECEIVED, PROCESSED, FAILED)
+  processStatus   String      @default("RECEIVED") @map("process_status") @db.VarChar(20)
+  /// 처리 에러 메시지
+  errorMessage    String?     @map("error_message")
+  /// 관련 트랜잭션 ID
+  transactionId   String?     @map("transaction_id") @db.VarChar(200)
+  /// 수신일시
+  receivedAt      DateTime    @default(now()) @map("received_at")
+  /// 처리완료일시
+  processedAt     DateTime?   @map("processed_at")
+
+  @@index([platform])
+  @@index([notificationType])
+  @@index([processStatus])
+  @@index([transactionId])
+  @@index([receivedAt])
+  @@map("iap_webhook_logs")
 }
