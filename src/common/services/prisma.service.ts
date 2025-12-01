@@ -421,6 +421,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 앱 이벤트 테이블
   get appEvent() { return this.prisma.appEvent; }
 
+  // IAP 관련 테이블
+  get iAPProduct() { return this.prisma.iAPProduct; }
+  get iAPReceipt() { return this.prisma.iAPReceipt; }
+  get iAPWebhookLog() { return this.prisma.iAPWebhookLog; }
+
   // 메서드 바인딩
   $transaction(arg: any) {
     return (this.prisma as any).$transaction(arg);

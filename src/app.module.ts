@@ -42,6 +42,7 @@ import { PhoneVerificationModule } from './phone-verification/phone-verification
 import { PushModule } from './push/push.module';
 import { AppEventsModule } from './app-events/app-events.module';
 import { ContentModule } from './content/content.module';
+import { IapModule } from './iap/iap.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -130,6 +131,7 @@ import { ContentModule } from './content/content.module';
     PushModule,      // 푸시 알림 모듈 (FCM)
     AppEventsModule, // 앱 이벤트 수집 모듈 (GA4 대체/보조)
     ContentModule,   // 컨텐츠 관리 모듈
+    IapModule,       // 인앱결제 모듈 (Apple/Google)
     // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
