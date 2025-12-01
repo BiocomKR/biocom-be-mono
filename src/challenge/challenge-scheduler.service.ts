@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
-import { UserChallengeStatus } from '../common/enums';
+import { RecordType, UserSubscriptionStatus, UserChallengeStatus } from '../common/enums';
 import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
@@ -30,11 +29,13 @@ export class ChallengeSchedulerService {
    * - 0초, 5분, 0시, 매일, 매월, 월요일(1)
    * - 월요일: 1 (일요일=0, 월요일=1, 화요일=2, ...)
    * - 만료 배치(00:00) 이후 5분 뒤 실행 (경쟁 상태 방지)
+   *
+   * NOTE: Kubernetes CronJob으로 실행됨. NestJS @Cron은 멀티 파드 환경에서 중복 실행 방지를 위해 비활성화.
    */
-  @Cron('0 5 * * 1', {
-    name: 'activate-challenges',
-    timeZone: 'Asia/Seoul',
-  })
+  // @Cron('0 5 * * 1', {
+  //   name: 'activate-challenges',
+  //   timeZone: 'Asia/Seoul',
+  // })
   async handleChallengeActivation() {
     this.logger.log('🕐 챌린지 활성화 스케줄러 시작...');
 
@@ -99,11 +100,13 @@ export class ChallengeSchedulerService {
    * 참고: user_challenges 테이블에 데이터가 있는 사용자
    *       = 챌린지를 한 번이라도 시작했던 사람
    *       = 현재 상태(NEWCOMER/CHALLENGER)와 무관하게 영양제 계속 복용
+   *
+   * NOTE: Kubernetes CronJob으로 실행됨. NestJS @Cron은 멀티 파드 환경에서 중복 실행 방지를 위해 비활성화.
    */
-  @Cron('0 10 * * 1', {
-    name: 'create-weekly-supplements',
-    timeZone: 'Asia/Seoul',
-  })
+  // @Cron('0 10 * * 1', {
+  //   name: 'create-weekly-supplements',
+  //   timeZone: 'Asia/Seoul',
+  // })
   async handleWeeklySupplementCreation() {
     this.logger.log('💊 영양제 주간 생성 스케줄러 시작...');
 
@@ -252,7 +255,7 @@ export class ChallengeSchedulerService {
         recordsToCreate.push({
           userId,
           userChallengeId: null, // 영양제는 챌린지와 무관
-          recordType: 'SUPPLEMENTS',
+          recordType: RecordType.SUPPLEMENT,
           metadata: {
             productId: routine.productId,
             morning: false,
@@ -267,8 +270,10 @@ export class ChallengeSchedulerService {
     }
 
     // 한 번에 모든 레코드 생성
+    // skipDuplicates: true - 중복 시 자동 스킵 (UNIQUE 제약과 함께 사용)
     await tx.userRecord.createMany({
       data: recordsToCreate,
+      skipDuplicates: true,
     });
 
     this.logger.log(
@@ -284,11 +289,13 @@ export class ChallengeSchedulerService {
    *
    * 참고: endDate가 오늘보다 이전인 ACTIVE 챌린지를 EXPIRED로 변경
    *       다른 활성 챌린지가 없으면 사용자 상태를 SUBSCRIBER 또는 NEWCOMER로 변경
+   *
+   * NOTE: Kubernetes CronJob으로 실행됨. NestJS @Cron은 멀티 파드 환경에서 중복 실행 방지를 위해 비활성화.
    */
-  @Cron('0 0 * * *', {
-    name: 'expire-challenges',
-    timeZone: 'Asia/Seoul',
-  })
+  // @Cron('0 0 * * *', {
+  //   name: 'expire-challenges',
+  //   timeZone: 'Asia/Seoul',
+  // })
   async handleChallengeExpiration() {
     this.logger.log('⏰ 챌린지 만료 처리 스케줄러 시작...');
 

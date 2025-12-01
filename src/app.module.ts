@@ -40,6 +40,7 @@ import { AiPersonaModule } from './ai-persona/ai-persona.module';
 import { BannersModule } from './shop/banners.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
 import { PushModule } from './push/push.module';
+import { ContentModule } from './content/content.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -126,6 +127,7 @@ import { PushModule } from './push/push.module';
     AiPersonaModule, // AI 페르소나 관리 모듈
     PhoneVerificationModule, // 휴대폰 본인인증 모듈 (NHN KCP SMS 인증)
     PushModule,      // 푸시 알림 모듈 (FCM)
+    ContentModule,   // 컨텐츠 관리 모듈
     // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음

@@ -175,6 +175,26 @@ export class SleepRecordDto {
 }
 
 // ========================================
+// 영양제 기록 (일별 제품별)
+// ========================================
+export class SupplementRecordDto {
+  @ApiProperty({ description: '기록 날짜', example: '2025-11-26' })
+  date: string;
+
+  @ApiProperty({ description: '제품명', example: '바이오 밸런스' })
+  productName: string;
+
+  @ApiProperty({ description: '실제 섭취 횟수', example: 1 })
+  intakeCount: number;
+
+  @ApiProperty({ description: '권장 섭취 횟수', example: 1 })
+  recommendedCount: number;
+
+  @ApiProperty({ description: '포함 영양소 목록', example: ['마그네슘', '아연', '셀레늄'] })
+  nutrients: string[];
+}
+
+// ========================================
 // 활동 기록 (일별 + 활동별)
 // ========================================
 export class ActivityTypeDto {
@@ -251,8 +271,8 @@ export class AiAgentStatisticsDto {
   @ApiProperty({ description: '식단 기록 목록', type: [DietRecordDto] })
   식단: DietRecordDto[];
 
-  @ApiProperty({ description: '영양제 기록', example: '없음' })
-  영양제: string;
+  @ApiProperty({ description: '영양제 기록 목록 (제품별 섭취 통계)', type: [SupplementRecordDto] })
+  영양제: SupplementRecordDto[];
 
   @ApiProperty({ description: '간헐적단식 기록 목록', type: [FastingRecordDto] })
   간헐적단식: FastingRecordDto[];

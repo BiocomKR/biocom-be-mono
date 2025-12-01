@@ -509,6 +509,8 @@ export class StatisticsService {
           endDate,
           supplements: [],
           nutrients: [],
+          currentCount: 0,
+          maxCount: 10,
         };
       }
 
@@ -638,6 +640,8 @@ export class StatisticsService {
         endDate,
         supplements,
         nutrients,
+        currentCount: supplements.length,
+        maxCount: 10,
       };
     } catch (error) {
       this.logger.error(`영양제 통계 조회 실패 - 사용자: ${userId}`, error);
@@ -1546,42 +1550,52 @@ export class StatisticsService {
     const today = getNowKST();
     const todayStr = formatKoreanDate(today);
 
-    // 오늘 날짜의 기록 개수 조회
-    const todayRecordCount = await this.prisma.userRecord.count({
-      where: {
-        userId,
-        recordType,
-        date: new Date(todayStr)
-      }
-    });
-
-    // 기록 타입별 최대 기록 수
+    let currentCount: number;
     let maxCount: number;
-    switch (recordType) {
-      case 'BEAUTY':
-        maxCount = 1;
-        break;
-      case 'DIET':
-        maxCount = 9; // 아침1+점심1+저녁1+간식3+야식3
-        break;
-      case 'SUPPLEMENT':
-        maxCount = -1; // 무제한
-        break;
-      case 'FASTING':
-        maxCount = 1;
-        break;
-      case 'SLEEP':
-        maxCount = 1;
-        break;
-      case 'ACTIVITY':
-        maxCount = 5;
-        break;
-      default:
-        maxCount = -1;
+
+    // SUPPLEMENT는 루틴에 등록된 영양제 개수를 currentCount로 사용
+    if (recordType === 'SUPPLEMENT') {
+      currentCount = await this.prisma.userSupplementRoutine.count({
+        where: {
+          userId,
+          isActive: true,
+        }
+      });
+      maxCount = 10; // 최대 10개
+    } else {
+      // 다른 타입들은 오늘 날짜의 기록 개수 조회
+      currentCount = await this.prisma.userRecord.count({
+        where: {
+          userId,
+          recordType,
+          date: new Date(todayStr)
+        }
+      });
+
+      // 기록 타입별 최대 기록 수
+      switch (recordType) {
+        case 'BEAUTY':
+          maxCount = 1;
+          break;
+        case 'DIET':
+          maxCount = 9; // 아침1+점심1+저녁1+간식3+야식3
+          break;
+        case 'FASTING':
+          maxCount = 1;
+          break;
+        case 'SLEEP':
+          maxCount = 1;
+          break;
+        case 'ACTIVITY':
+          maxCount = 5;
+          break;
+        default:
+          maxCount = -1;
+      }
     }
 
     return {
-      currentCount: todayRecordCount,
+      currentCount,
       maxCount
     };
   }
@@ -1629,6 +1643,8 @@ export class StatisticsService {
       endDate,
       supplements: [],
       nutrients: [],
+      currentCount: 0,
+      maxCount: 10,
     };
   }
 
@@ -1676,18 +1692,19 @@ export class StatisticsService {
    * AI Agent용 통합 통계 데이터 조회
    *
    * @param chartId 결과지 ID (암호화된 토큰에서 복호화된 값)
+   * @param days 조회 기간 (오늘 기준 N일 전부터 오늘까지, 기본값: 7)
    * @returns AI Agent가 분석에 필요한 모든 데이터
    *
    * 처리 순서:
    * 1. chartId로 userId 조회
    * 2. 외부 API(getIggLevels)로 음식물과민증 검사 결과 조회
    * 3. users 테이블에서 이름, 이너뷰티유형, AI코치유형, MBTI 조회
-   * 4. user_records 테이블에서 자기선언문, 칭찬하기, 1일1미션 조회
-   * 5. user_balance_game_histories 테이블에서 밸런스게임 이력 조회
-   * 6. 6대 기록 데이터 조회 (뷰티, 식단, 영양제, 간헐적단식, 수면, 활동)
+   * 4. user_records 테이블에서 자기선언문, 칭찬하기, 1일1미션 조회 (날짜 필터링)
+   * 5. user_balance_game_histories 테이블에서 밸런스게임 이력 조회 (날짜 필터링)
+   * 6. 6대 기록 데이터 조회 (뷰티, 식단, 영양제, 간헐적단식, 수면, 활동) (날짜 필터링)
    */
-  async getAiAgentStatistics(chartId: string): Promise<AiAgentStatisticsDto> {
-    this.logger.log(`AI Agent 통계 조회 시작: chartId=${chartId}`);
+  async getAiAgentStatistics(chartId: string, days: number = 7): Promise<AiAgentStatisticsDto> {
+    this.logger.log(`AI Agent 통계 조회 시작: chartId=${chartId}, days=${days}`);
 
     try {
       // 1. chartId로 userId 조회
@@ -1701,6 +1718,16 @@ export class StatisticsService {
 
       const userId = userChart.userId;
       this.logger.log(`userId 조회 완료: ${userId}`);
+
+      // 날짜 필터 계산 (오늘 기준 N일 전부터 오늘까지, KST 기준)
+      const today = getNowKST();
+      today.setHours(23, 59, 59, 999); // 오늘 23:59:59 (KST)
+
+      const startDate = getNowKST();
+      startDate.setDate(today.getDate() - (days - 1)); // days=7이면 오늘 포함 7일
+      startDate.setHours(0, 0, 0, 0); // 시작일 00:00:00 (KST)
+
+      this.logger.log(`날짜 필터 (KST): ${startDate.toISOString()} ~ ${today.toISOString()}`);
 
       // 2. 외부 API: 음식물과민증 검사 결과 조회
       let iggLevels = [];
@@ -1742,37 +1769,58 @@ export class StatisticsService {
 
       this.logger.log(`사용자 정보 조회 완료: ${이름}, ${이너뷰티유형}, ${AI코치유형}`);
 
-      // 4. user_records: 자기선언문, 칭찬하기, 1일1미션 조회
-      const records = await this.prisma.userRecord.findMany({
+      // 4-1. 자기선언문, 칭찬하기 조회 (날짜 필터 없이 최신 1건)
+      const declarationRecord = await this.prisma.userRecord.findFirst({
         where: {
           userId,
-          recordType: { in: ['DECLARATION', 'SELF_PRAISE', 'DAILY_MISSION'] }
+          recordType: 'DECLARATION'
         },
         orderBy: { createdAt: 'desc' }
       });
 
-      let 자기선언문 = '없음';
-      let 칭찬하기 = '없음';
-      const missions: string[] = [];
+      const selfPraiseRecord = await this.prisma.userRecord.findFirst({
+        where: {
+          userId,
+          recordType: 'SELF_PRAISE'
+        },
+        orderBy: { createdAt: 'desc' }
+      });
 
-      for (const record of records) {
-        if (record.recordType === 'DECLARATION') {
-          자기선언문 = (record.metadata as any)?.contents || '없음';
-        } else if (record.recordType === 'SELF_PRAISE') {
-          칭찬하기 = (record.metadata as any)?.contents || '없음';
-        } else if (record.recordType === 'DAILY_MISSION') {
-          const mission = (record.metadata as any)?.missionTitle || (record.metadata as any)?.title;
-          if (mission) {
-            missions.push(mission);
+      const 자기선언문 = (declarationRecord?.metadata as any)?.contents || '없음';
+      const 칭찬하기 = (selfPraiseRecord?.metadata as any)?.contents || '없음';
+
+      // 4-2. 1일1미션 조회 (날짜 필터링 적용)
+      const missionRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'DAILY_MISSION',
+          date: {
+            gte: startDate,
+            lte: today
           }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      const missions: string[] = [];
+      for (const record of missionRecords) {
+        const mission = (record.metadata as any)?.missionTitle || (record.metadata as any)?.title;
+        if (mission) {
+          missions.push(mission);
         }
       }
 
       this.logger.log(`미션 데이터 조회 완료: 자기선언문=${자기선언문 !== '없음'}, 칭찬하기=${칭찬하기 !== '없음'}, 미션=${missions.length}건`);
 
-      // 5. user_balance_game_histories: 밸런스게임 이력 조회
+      // 5. user_balance_game_histories: 밸런스게임 이력 조회 (날짜 필터링)
       const balanceGameHistories = await this.prisma.userBalanceGameHistory.findMany({
-        where: { userId },
+        where: {
+          userId,
+          playDate: {
+            gte: startDate,
+            lte: today
+          }
+        },
         include: {
           game: true // 밸런스게임 마스터 정보 포함
         },
@@ -1817,12 +1865,16 @@ export class StatisticsService {
 
       this.logger.log(`밸런스게임 이력 조회 완료: ${밸런스게임.length}건`);
 
-      // 6. 6대 기록 데이터 조회
+      // 6. 6대 기록 데이터 조회 (날짜 필터링)
       // 6-1. 뷰티 기록
       const beautyRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: 'BEAUTY'
+          recordType: 'BEAUTY',
+          date: {
+            gte: startDate,
+            lte: today
+          }
         },
         orderBy: { date: 'asc' }
       });
@@ -1849,7 +1901,11 @@ export class StatisticsService {
       const dietRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: 'DIET'
+          recordType: 'DIET',
+          date: {
+            gte: startDate,
+            lte: today
+          }
         },
         orderBy: { date: 'asc' }
       });
@@ -1871,14 +1927,99 @@ export class StatisticsService {
         };
       });
 
-      // 6-3. 영양제 기록 (현재는 "없음"으로 고정)
-      const 영양제 = '없음';
+      // 6-3. 영양제 기록 (일별 제품별)
+      const supplementRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'SUPPLEMENT',
+          date: {
+            gte: startDate,
+            lte: today
+          }
+        },
+        orderBy: { date: 'asc' }
+      });
+
+      // productId 수집
+      const productIds = new Set<number>();
+      supplementRecords.forEach(record => {
+        const metadata = record.metadata as any || {};
+        if (metadata?.productId) {
+          productIds.add(metadata.productId);
+        }
+      });
+
+      let 영양제 = [];
+
+      if (productIds.size > 0) {
+        // 제품 정보 조회
+        const products = await this.prisma.product.findMany({
+          where: { id: { in: Array.from(productIds) } },
+          select: {
+            id: true,
+            name: true,
+            productInfo: true
+          }
+        });
+
+        // 영양소 조회
+        const supplementNutrients = await this.prisma.supplementNutrient.findMany({
+          where: { productId: { in: Array.from(productIds) } },
+          select: {
+            productId: true,
+            nutrientName: true
+          }
+        });
+
+        // productId별 영양소 그룹화
+        const nutrientsByProduct = new Map<number, string[]>();
+        supplementNutrients.forEach(sn => {
+          if (!nutrientsByProduct.has(sn.productId)) {
+            nutrientsByProduct.set(sn.productId, []);
+          }
+          nutrientsByProduct.get(sn.productId)!.push(sn.nutrientName);
+        });
+
+        // productId -> product 매핑
+        const productMap = new Map(products.map(p => [p.id, p]));
+
+        // 일별-제품별로 펼치기
+        영양제 = supplementRecords.map(record => {
+          const metadata = record.metadata as any || {};
+          const productId = metadata?.productId;
+
+          if (!productId) return null;
+
+          const product = productMap.get(productId) as any;
+          if (!product) return null;
+
+          const frequencyPerDay = product.productInfo?.['frequency_per_day'] || 1;
+
+          // 하루 섭취 횟수 계산
+          let dailyIntake = 0;
+          if (metadata.morning) dailyIntake++;
+          if (metadata.afternoon) dailyIntake++;
+          if (metadata.evening) dailyIntake++;
+
+          return {
+            date: formatKoreanDate(record.date),
+            productName: product.name,
+            intakeCount: dailyIntake,
+            recommendedCount: frequencyPerDay,
+            nutrients: nutrientsByProduct.get(product.id) || []
+          };
+        }).filter(item => item !== null);
+      }
 
       // 6-4. 간헐적단식 기록
       const fastingRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: 'FASTING'
+          recordType: 'FASTING',
+          date: {
+            gte: startDate,
+            lte: today
+          }
         },
         orderBy: { date: 'asc' }
       });
@@ -1897,7 +2038,11 @@ export class StatisticsService {
       const sleepRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: 'SLEEP'
+          recordType: 'SLEEP',
+          date: {
+            gte: startDate,
+            lte: today
+          }
         },
         orderBy: { date: 'asc' }
       });
@@ -1916,7 +2061,11 @@ export class StatisticsService {
       const activityRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: 'ACTIVITY'
+          recordType: 'ACTIVITY',
+          date: {
+            gte: startDate,
+            lte: today
+          }
         },
         orderBy: { date: 'asc' }
       });

@@ -342,6 +342,18 @@ export class SupplementStatisticsDto {
     ]
   })
   nutrients: NutrientIntakeDto[];
+
+  @ApiProperty({
+    description: '오늘 기록한 영양제 수',
+    example: 2
+  })
+  currentCount: number;
+
+  @ApiProperty({
+    description: '하루 최대 기록 가능 수',
+    example: 10
+  })
+  maxCount: number;
 }
 
 // ========================================

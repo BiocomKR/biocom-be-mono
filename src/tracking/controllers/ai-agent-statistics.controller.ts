@@ -3,11 +3,13 @@ import {
   Get,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { StatisticsService } from '../services/statistics.service';
 import { AiAgentStatisticsDto } from '../dto/statistics/ai-agent-statistics.dto';
@@ -36,6 +38,13 @@ export class AiAgentStatisticsController {
     summary: 'AI Agent용 통합 통계 조회',
     description: 'AI Agent 서버에서 사용자 분석에 필요한 모든 데이터를 한 번에 조회합니다. x-token 헤더에 암호화된 chartId 전달 필요',
   })
+  @ApiQuery({
+    name: 'day',
+    required: false,
+    type: Number,
+    description: '조회 기간 (오늘 기준 N일 전부터 오늘까지, 기본값: 7)',
+    example: 7,
+  })
   @ApiResponse({
     status: 200,
     description: 'AI Agent 통계 조회 성공',
@@ -45,9 +54,13 @@ export class AiAgentStatisticsController {
     status: 401,
     description: 'x-token 헤더 없음 또는 복호화 실패',
   })
-  async getAiAgentStatistics(@Request() req: any) {
+  async getAiAgentStatistics(
+    @Request() req: any,
+    @Query('day') day?: number,
+  ) {
     const chartId = req.chartId; // AiAgentAuthGuard에서 설정한 chartId
-    const data = await this.statisticsService.getAiAgentStatistics(chartId);
+    const days = day ? Number(day) : 7; // 기본값 7일
+    const data = await this.statisticsService.getAiAgentStatistics(chartId, days);
     return {
       success: true,
       data,
