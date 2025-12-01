@@ -177,22 +177,40 @@ export class StatisticsController {
 
   /**
    * 영양제 상세 통계 조회
-   * @description 영양제 섭취 준수율과 일별 섭취 패턴 1주일 통계를 조회합니다
+   * @description 영양제 섭취 이력을 매트릭스 형태로 조회합니다 (7일간, 월~일)
    */
   @Get('supplement')
   @ApiOperation({
     summary: '영양제 상세 통계 조회',
-    description: '영양제 섭취 준수율과 일별 섭취 패턴의 1주일 통계를 조회합니다.',
+    description: '영양제 섭취 이력을 매트릭스 형태로 조회합니다 (7일간, 월~일)',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    description: '시작일 (YYYY-MM-DD, 월요일)',
+    example: '2025-07-20',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    description: '종료일 (YYYY-MM-DD, 일요일)',
+    example: '2025-07-26',
   })
   @ApiResponse({
     status: 200,
     description: '영양제 통계 조회 성공',
     type: SupplementStatisticsResponseDto,
   })
-  async getSupplementStatistics(@Request() req: any) {
+  async getSupplementStatistics(
+    @Request() req: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
     const data = await this.statisticsService.getSupplementStatistics(
       req.user.id,
-      req.isNewcomer || false
+      startDate,
+      endDate,
+      req.isNewcomer || false,
     );
     return {
       success: true,

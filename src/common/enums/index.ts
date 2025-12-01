@@ -2,6 +2,7 @@
 export * from './challenge-ticket-status.enum';
 export * from './content-access-level.enum';
 export * from './exam-code.enum';
+export * from './record-type.enum';
 export * from './ticket-type.enum';
 export * from './user-subscription-status.enum';
 

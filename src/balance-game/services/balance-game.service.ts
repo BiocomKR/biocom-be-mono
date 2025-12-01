@@ -64,12 +64,12 @@ export class BalanceGameService {
 
     // 오늘 이미 플레이했는지 확인
     const today = getNowKST();
-    const todayStr = today.toISOString().split('T')[0];
+    today.setHours(0, 0, 0, 0); // 00:00:00으로 설정
     const hasPlayedToday = await this.prisma.userBalanceGameHistory.findFirst({
       where: {
         userId,
         gameId: game.id,
-        playDate: todayStr
+        playDate: today
       }
     });
 
@@ -172,7 +172,8 @@ export class BalanceGameService {
   ): Promise<BalanceGameCompleteResponseDto> {
     this.logger.log(`사용자 ${userId}가 게임 ${gameId} 완료`);
 
-    const today = getNowKST().toISOString().split('T')[0];
+    const today = getNowKST();
+    today.setHours(0, 0, 0, 0); // 00:00:00으로 설정
 
     // 이 게임을 한 번이라도 완료했는지 확인 (최초 완료 여부 체크용)
     const existingHistory = await this.prisma.userBalanceGameHistory.findFirst({

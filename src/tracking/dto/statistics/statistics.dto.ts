@@ -207,77 +207,153 @@ export class DietStatisticsDto {
 /**
  * 일별 영양제 섭취 데이터 DTO
  */
-export class DailySupplementDto {
+/**
+ * 일별 영양제 섭취 상태 DTO
+ */
+export class DailySupplementStatusDto {
   @ApiProperty({
     description: '날짜 (YYYY-MM-DD)',
-    example: '2025-09-18'
+    example: '2025-07-20'
   })
   date: string;
 
   @ApiProperty({
-    description: '섭취한 영양제 목록',
-    example: ['비타민D', '오메가3']
+    description: '섭취량 (null = 해당 날짜 루틴에 없음)',
+    example: 1,
+    nullable: true
   })
-  supplements: string[];
+  intakeCount: number | null;
 
   @ApiProperty({
-    description: '섭취한 영양제 개수',
-    example: 2
+    description: '권장 섭취량 (null = 해당 날짜 루틴에 없음)',
+    example: 2,
+    nullable: true
   })
-  taken: number;
+  recommendedCount: number | null;
 }
 
 /**
- * 영양제 통계 요약 DTO
+ * 영양제별 주간 통계 DTO
  */
-export class SupplementSummaryDto {
+export class SupplementWeeklyStatsDto {
   @ApiProperty({
-    description: '7일간 영양제 섭취 준수율 (소수점 반올림)',
-    example: 71
+    description: '영양제 ID',
+    example: 4
   })
-  score: number;
+  productId: number;
+
+  @ApiProperty({
+    description: '영양제명',
+    example: '바이오 밸런스'
+  })
+  productName: string;
+
+  @ApiProperty({
+    description: '현재 루틴 정렬 순서 (999 = 루틴에서 삭제됨)',
+    example: 1
+  })
+  displayOrder: number;
+
+  @ApiProperty({
+    description: '7일간 일별 섭취 상태 (월요일~일요일)',
+    type: [DailySupplementStatusDto],
+    example: [
+      { date: '2025-07-20', intakeCount: 1, recommendedCount: 1 },
+      { date: '2025-07-21', intakeCount: 0, recommendedCount: 1 },
+      { date: '2025-07-22', intakeCount: 0, recommendedCount: 1 },
+      { date: '2025-07-23', intakeCount: 1, recommendedCount: 1 },
+      { date: '2025-07-24', intakeCount: null, recommendedCount: null },
+      { date: '2025-07-25', intakeCount: null, recommendedCount: null },
+      { date: '2025-07-26', intakeCount: null, recommendedCount: null }
+    ]
+  })
+  dailyStats: DailySupplementStatusDto[];
 }
 
 /**
- * 영양제 통계 응답 DTO (개선된 구조)
+ * 영양소 섭취량 통계 DTO
+ */
+export class NutrientIntakeDto {
+  @ApiProperty({
+    description: '영양소명',
+    example: '아연'
+  })
+  nutrientName: string;
+
+  @ApiProperty({
+    description: '실제 섭취량 (횟수)',
+    example: 16
+  })
+  intakeCount: number;
+
+  @ApiProperty({
+    description: '권장 섭취량 (횟수)',
+    example: 21
+  })
+  recommendedCount: number;
+
+  @ApiProperty({
+    description: '해당 영양소가 포함된 영양제 이름 목록',
+    example: ['바이오 밸런스', '클린 밸런스'],
+    type: [String]
+  })
+  supplementNames: string[];
+}
+
+/**
+ * 영양제 통계 응답 DTO (매트릭스 구조)
  */
 export class SupplementStatisticsDto {
   @ApiProperty({
-    description: '7일간 일별 영양제 섭취 데이터',
-    type: [DailySupplementDto],
-    example: [
-      { date: '2025-09-12', supplements: [], taken: 0 },
-      { date: '2025-09-13', supplements: [], taken: 0 },
-      { date: '2025-09-14', supplements: [], taken: 0 },
-      { date: '2025-09-15', supplements: [], taken: 0 },
-      { date: '2025-09-16', supplements: [], taken: 0 },
-      { date: '2025-09-17', supplements: ['혈당관리엔 당당케어'], taken: 1 },
-      { date: '2025-09-18', supplements: ['혈당관리엔 당당케어'], taken: 1 }
-    ]
+    description: '통계 시작일 (월요일)',
+    example: '2025-07-20'
   })
-  weeklySupplements: DailySupplementDto[];
+  startDate: string;
 
   @ApiProperty({
-    description: '통계 요약',
-    type: SupplementSummaryDto
+    description: '통계 종료일 (일요일)',
+    example: '2025-07-26'
   })
-  summary: SupplementSummaryDto;
+  endDate: string;
 
-  @ApiProperty({ description: '현재 기록 수', example: 8 })
+  @ApiProperty({
+    description: '영양제별 주간 통계 (display_order 순서)',
+    type: [SupplementWeeklyStatsDto],
+    example: [
+      {
+        productId: 4,
+        productName: '바이오 밸런스',
+        displayOrder: 1,
+        dailyStats: [
+          { date: '2025-07-20', intakeCount: 1, recommendedCount: 1 },
+          { date: '2025-07-21', intakeCount: 0, recommendedCount: 1 }
+        ]
+      }
+    ]
+  })
+  supplements: SupplementWeeklyStatsDto[];
+
+  @ApiProperty({
+    description: '영양소별 섭취량 통계 (1그룹 영양제 기준)',
+    type: [NutrientIntakeDto],
+    example: [
+      { nutrientName: '아연', intakeCount: 8, recommendedCount: 21 },
+      { nutrientName: '비타민D', intakeCount: 14, recommendedCount: 21 }
+    ]
+  })
+  nutrients: NutrientIntakeDto[];
+
+  @ApiProperty({
+    description: '오늘 기록한 영양제 수',
+    example: 2
+  })
   currentCount: number;
 
-  @ApiProperty({ description: '최대 기록 수 (무제한)', example: -1 })
+  @ApiProperty({
+    description: '하루 최대 기록 가능 수',
+    example: 10
+  })
   maxCount: number;
-
-  // TODO: 영양소 섭취율 분석 (영양소 정보 기록 시스템 구축 후 활성화)
-  // @ApiProperty({
-  //   description: '영양소별 섭취율 분석',
-  //   example: {
-  //     vitaminD: { intake: 80, target: 100 },
-  //     omega3: { intake: 60, target: 100 }
-  //   }
-  // })
-  // nutritionAnalysis?: Record<string, { intake: number; target: number }>;
 }
 
 // ========================================

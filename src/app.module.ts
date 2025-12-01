@@ -41,6 +41,7 @@ import { BannersModule } from './shop/banners.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
 import { PushModule } from './push/push.module';
 import { AppEventsModule } from './app-events/app-events.module';
+import { ContentModule } from './content/content.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -128,6 +129,7 @@ import { AppEventsModule } from './app-events/app-events.module';
     PhoneVerificationModule, // 휴대폰 본인인증 모듈 (NHN KCP SMS 인증)
     PushModule,      // 푸시 알림 모듈 (FCM)
     AppEventsModule, // 앱 이벤트 수집 모듈 (GA4 대체/보조)
+    ContentModule,   // 컨텐츠 관리 모듈
     // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
