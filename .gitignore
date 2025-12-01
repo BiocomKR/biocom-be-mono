@@ -8,6 +8,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.secrets
 
 # Google Cloud Service Account Keys
 google-service-account-key.json
