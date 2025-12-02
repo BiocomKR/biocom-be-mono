@@ -242,11 +242,15 @@ export class PushSchedulerService {
    *
    * [역할]
    * - 크론 표현식을 파싱하여 현재 시간(분 단위)에 실행해야 하는지 확인
-   * - 매분 실행되는 스케줄러에서 RECURRING 타입의 중복 실행 방지
+   * - 매분 실행되는 스케줄러에서 RECURRING 타입의 실행 여부 판단
    *
    * [크론 표현식 형식]
    * - 5자리: 분 시 일 월 요일 (예: "0 9 * * *" = 매일 09:00)
    * - 6자리: 초 분 시 일 월 요일 (NestJS @Cron 형식)
+   *
+   * [로직]
+   * - 현재 시간(분 단위)이 크론 표현식의 실행 시점에 해당하는지 확인
+   * - 현재 시간을 기준으로 prev()와 next()를 비교하여 "이번 분"에 실행해야 하는지 판단
    *
    * @param cronExpression - 크론 표현식
    * @returns 현재 시간에 실행해야 하면 true
@@ -254,6 +258,9 @@ export class PushSchedulerService {
   private shouldExecuteCron(cronExpression: string): boolean {
     try {
       const now = getNowKST();
+      // 현재 시간의 분 시작점 (초/밀리초 제거)
+      const nowMinuteStart = new Date(now);
+      nowMinuteStart.setSeconds(0, 0);
 
       // 크론 표현식 파싱 (KST 기준)
       const interval = CronExpressionParser.parse(cronExpression, {
@@ -263,14 +270,16 @@ export class PushSchedulerService {
 
       // 이전 실행 시간 조회
       const prevDate = interval.prev().toDate();
+      // prev의 분 시작점
+      const prevMinuteStart = new Date(prevDate);
+      prevMinuteStart.setSeconds(0, 0);
 
-      // 현재 시간과 이전 실행 시간의 차이가 1분 이내면 실행
-      // (스케줄러가 매분 0초에 실행되므로, 59초 이내 차이면 해당 분에 실행해야 함)
-      const diffMs = now.getTime() - prevDate.getTime();
-      const shouldExecute = diffMs >= 0 && diffMs < 60000; // 0~59초 이내
+      // 현재 분과 이전 실행 분이 같으면 실행해야 함
+      // (예: cron이 "0 */5 * * *"이고 현재가 10:05:30이면, prev는 10:05:00이므로 같은 분)
+      const shouldExecute = nowMinuteStart.getTime() === prevMinuteStart.getTime();
 
       this.logger.debug(
-        `🕐 [PushScheduler] 크론 검증: cron=${cronExpression}, prev=${prevDate.toISOString()}, now=${now.toISOString()}, diff=${diffMs}ms, execute=${shouldExecute}`,
+        `🕐 [PushScheduler] 크론 검증: cron=${cronExpression}, nowMin=${nowMinuteStart.toISOString()}, prevMin=${prevMinuteStart.toISOString()}, execute=${shouldExecute}`,
       );
 
       return shouldExecute;

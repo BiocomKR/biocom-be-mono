@@ -40,11 +40,12 @@ export class PushNotificationService {
     );
 
     try {
-      // 1. 활성화된 푸시 토큰 조회
+      // 1. 활성화된 FCM 푸시 토큰 조회
       const pushTokens = await this.prisma.pushToken.findMany({
         where: {
           userId,
           isActive: true,
+          provider: 'FCM',
         },
       });
 
@@ -180,6 +181,10 @@ export class PushNotificationService {
   /**
    * 모든 유저에게 푸시 알림 전송 (공지사항 등)
    *
+   * FCM Multicast API를 활용하여 배치 단위로 효율적으로 발송
+   * - FCM 제약: 최대 500개 토큰을 한 번에 발송 가능
+   * - 각 토큰별 로그 생성, 결과 업데이트, 토큰 상태 관리 수행
+   *
    * @param message - 푸시 메시지
    * @param filter - 선택적 필터 (예: 마케팅 동의 여부)
    * @param isTest - 테스트 발송 여부 (기본값: false)
@@ -195,10 +200,11 @@ export class PushNotificationService {
     );
 
     try {
-      // 활성화된 모든 푸시 토큰 조회
+      // 활성화된 모든 FCM 푸시 토큰 조회
       const pushTokens = await this.prisma.pushToken.findMany({
         where: {
           isActive: true,
+          provider: 'FCM',
           ...(filter?.marketingEnabled !== undefined && {
             marketingEnabled: filter.marketingEnabled,
           }),
@@ -221,59 +227,52 @@ export class PushNotificationService {
         `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
       );
 
-      // 병렬 처리를 위한 배치 크기 (동시에 처리할 토큰 수)
-      const BATCH_SIZE = 50;
+      // FCM Multicast 배치 크기 (최대 500개)
+      const BATCH_SIZE = 500;
       let successCount = 0;
       let failureCount = 0;
 
-      // 배치 단위로 병렬 처리
+      // 배치 단위로 Multicast 발송
       for (let i = 0; i < pushTokens.length; i += BATCH_SIZE) {
         const batch = pushTokens.slice(i, i + BATCH_SIZE);
 
-        const batchResults = await Promise.all(
-          batch.map(async (pushToken) => {
-            const logId = await this.createPendingLog(
-              pushToken,
-              message,
-              PushNotificationType.SYSTEM,
-              isTest,
-            );
+        // 1. 배치 내 모든 토큰에 대해 로그 미리 생성
+        const logIds: (number | null)[] = await Promise.all(
+          batch.map((pushToken) =>
+            this.createPendingLog(pushToken, message, PushNotificationType.SYSTEM, isTest),
+          ),
+        );
 
-            const enrichedMessage: PushMessage = {
-              ...message,
-              data: {
-                ...message.data,
-                logId: logId?.toString(),
-              },
-            };
+        // 2. FCM Multicast 발송 (sendToMultiple 활용)
+        const batchResults = await this.pushProvider.sendToMultiple(batch, message);
 
-            const result = await this.pushProvider.sendToToken(
-              pushToken.token,
-              enrichedMessage,
-            );
+        // 3. 각 토큰별 결과 처리
+        await Promise.all(
+          batch.map(async (pushToken, index) => {
+            const result = batchResults[index];
+            const logId = logIds[index];
 
+            // 로그 실패 업데이트
             if (logId && !result.success) {
               await this.updateLogWithFailure(logId, result);
             }
 
+            // 토큰 통계 업데이트
             await this.updateTokenStats(pushToken.id, result.success);
 
+            // 무효 토큰 비활성화
             if (this.shouldInvalidateToken(result)) {
               await this.invalidateToken(pushToken, result.errorCode);
             }
 
-            return result;
+            // 결과 집계
+            if (result.success) successCount++;
+            else failureCount++;
           }),
         );
 
-        // 배치 결과 집계
-        batchResults.forEach((result) => {
-          if (result.success) successCount++;
-          else failureCount++;
-        });
-
         this.logger.debug(
-          `📦 [PushNotificationService] 배치 ${Math.floor(i / BATCH_SIZE) + 1} 완료: ${batch.length}개 처리`,
+          `📦 [PushNotificationService] 배치 ${Math.floor(i / BATCH_SIZE) + 1} 완료: ${batch.length}개 처리 (Multicast)`,
         );
       }
 

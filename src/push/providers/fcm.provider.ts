@@ -38,13 +38,16 @@ export class FcmProvider implements IPushProvider {
     message: PushMessage,
     maxRetries: number = 3,
   ): Promise<PushSendResult> {
-    // 재시도 로직
+    let lastResult: PushSendResult | null = null;
+
+    // 재시도 로직 (최대 maxRetries 번 시도)
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const result = await this.sendToTokenOnce(token, message);
+      lastResult = result;
 
       // 성공하거나 재시도 불가능한 에러면 즉시 반환
       if (result.success || !this.isRetryableError(result.errorCode)) {
-        if (attempt > 0) {
+        if (attempt > 0 && result.success) {
           this.logger.log(`✅ [FCM] 재시도 성공: ${attempt + 1}번째 시도에서 성공`);
         }
         return result;
@@ -53,13 +56,14 @@ export class FcmProvider implements IPushProvider {
       // 마지막 시도가 아니면 대기 후 재시도
       if (attempt < maxRetries - 1) {
         const delay = 1000 * Math.pow(2, attempt); // 1초, 2초, 4초
-        this.logger.warn(`🔄 [FCM] 재시도 ${attempt + 1}/${maxRetries - 1} - ${delay}ms 후 재시도`);
+        this.logger.warn(`🔄 [FCM] 재시도 ${attempt + 1}/${maxRetries} - ${delay}ms 후 재시도`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
     // 모든 재시도 실패 시 마지막 결과 반환
-    return await this.sendToTokenOnce(token, message);
+    this.logger.error(`❌ [FCM] ${maxRetries}회 재시도 모두 실패`);
+    return lastResult!;
   }
 
   /**

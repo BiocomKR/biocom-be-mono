@@ -10,9 +10,11 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PushNotificationService } from '../../push/services/push-notification.service';
+import { PushTopicService } from '../../push/services/push-topic.service';
 import { SendPushToUserDto } from '../../push/dto/send-push-to-user.dto';
 import { SendPushToUsersDto } from '../../push/dto/send-push-to-users.dto';
 import { SendPushToAllDto } from '../../push/dto/send-push-to-all.dto';
+import { SendPushToTopicDto } from '../../push/dto/send-push-to-topic.dto';
 import { PushLogQueryDto } from '../../push/dto/push-log-query.dto';
 import { PushLogListResponseDto } from '../../push/dto/push-log-response.dto';
 
@@ -32,6 +34,7 @@ import { PushLogListResponseDto } from '../../push/dto/push-log-response.dto';
 export class ManagementPushNotificationController {
   constructor(
     private readonly pushNotificationService: PushNotificationService,
+    private readonly pushTopicService: PushTopicService,
   ) {}
 
   /**
@@ -191,5 +194,24 @@ export class ManagementPushNotificationController {
     @Query('isTest') isTest?: boolean,
   ) {
     return await this.pushNotificationService.getPushStats(startDate, endDate, isTest);
+  }
+
+  /**
+   * Topic으로 푸시 전송 (관리자 전용)
+   *
+   * @param dto - Topic 푸시 정보
+   * @returns 전송 결과
+   */
+  @Post('send-to-topic')
+  @ApiOperation({
+    summary: 'Topic으로 푸시 전송 (관리자)',
+    description: '특정 Topic에 구독한 모든 유저에게 푸시를 전송합니다',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '푸시 전송 성공',
+  })
+  async sendToTopic(@Body() dto: SendPushToTopicDto) {
+    return await this.pushTopicService.sendToTopic(dto);
   }
 }

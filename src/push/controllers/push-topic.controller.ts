@@ -10,12 +10,12 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PushTopicService } from '../services/push-topic.service';
 import { SubscribeTopicDto } from '../dto/subscribe-topic.dto';
 import { UnsubscribeTopicDto } from '../dto/unsubscribe-topic.dto';
-import { SendPushToTopicDto } from '../dto/send-push-to-topic.dto';
 
 /**
- * 푸시 Topic 관리 컨트롤러
+ * 푸시 Topic 관리 컨트롤러 (유저용)
  *
- * FCM Topic 구독/해제 및 Topic 기반 푸시 발송 API
+ * FCM Topic 구독/해제 API
+ * Topic 발송은 management-push-notification.controller.ts 참고
  */
 @ApiTags('푸시-Topic')
 @ApiBearerAuth()
@@ -64,24 +64,5 @@ export class PushTopicController {
   async unsubscribeTopic(@Req() req: any, @Body() dto: UnsubscribeTopicDto) {
     const userId = req.user.id;
     return await this.pushTopicService.unsubscribeTopic(userId, dto);
-  }
-
-  /**
-   * Topic으로 푸시 전송 (관리자 전용)
-   *
-   * @param dto - Topic 푸시 정보
-   * @returns 전송 결과
-   */
-  @Post('send')
-  @ApiOperation({
-    summary: 'Topic으로 푸시 전송 (관리자)',
-    description: '특정 Topic에 구독한 모든 유저에게 푸시를 전송합니다',
-  })
-  @ApiResponse({
-    status: 201,
-    description: '푸시 전송 성공',
-  })
-  async sendToTopic(@Body() dto: SendPushToTopicDto) {
-    return await this.pushTopicService.sendToTopic(dto);
   }
 }
