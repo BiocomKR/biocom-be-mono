@@ -18,7 +18,7 @@ data:
   DATABASE_URL: "postgresql://biocom:bico0825%21%40%23@34.47.124.132:5432/biocom?connection_limit=5&pool_timeout=30&connect_timeout=10"
 
   # 애플리케이션 설정
-  NODE_ENV: "production"
+  NODE_ENV: "development"
   PORT: "10805"  # biocom-api는 10804
 
   # API 설정
@@ -30,7 +30,7 @@ data:
   LOG_FORMAT: "json"
 
   # CORS 설정 (백오피스 FE 도메인)
-  CORS_ORIGIN: "https://bo-dev.biocom.ai.kr,https://biocom-bo-dev-v2.web.app,http://localhost:3000"
+  CORS_ORIGIN: "https://admin-dev.biocom.ai.kr"
 
   # JWT 설정
   JWT_ACCESS_TOKEN_EXPIRES_IN: "3h"
@@ -54,6 +54,10 @@ data:
 
   # 기타 설정
   TIMEZONE: "Asia/Seoul"
+
+  # Slack 알림 설정
+  SLACK_NOTIFICATION_ENABLED: "true"
+  PROJECT_NAME: "biocom-bo-api"
 
 ---
 # 📝 로깅 설정용 ConfigMap

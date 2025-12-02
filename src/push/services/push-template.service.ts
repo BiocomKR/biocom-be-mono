@@ -93,9 +93,11 @@ export class PushTemplateService {
     userIds: number[],
   ): Promise<Map<number, string>> {
     const usedVarKeys = this.extractVariableKeys(template);
+    this.logger.debug(`🔍 [substituteForUsers] 사용된 변수: ${usedVarKeys.join(', ')}`);
 
     // 변수가 없으면 모든 사용자에게 동일한 메시지
     if (usedVarKeys.length === 0) {
+      this.logger.debug(`🔍 [substituteForUsers] 변수 없음, 원본 반환`);
       const result = new Map<number, string>();
       userIds.forEach((id) => result.set(id, template));
       return result;
@@ -108,15 +110,18 @@ export class PushTemplateService {
         isActive: true,
       },
     });
+    this.logger.debug(`🔍 [substituteForUsers] 매핑 조회 결과: ${mappings.length}개 - ${JSON.stringify(mappings.map(m => ({ key: m.variableKey, path: m.dataPath })))}`);
 
     // 필요한 관계(include) 수집
     const includes = this.collectIncludes(mappings);
+    this.logger.debug(`🔍 [substituteForUsers] includes: ${JSON.stringify(includes)}`);
 
     // 사용자 조회 (관계 포함)
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds } },
       include: includes,
     });
+    this.logger.debug(`🔍 [substituteForUsers] 사용자 조회: ${users.length}명`);
 
     // 사용자별 치환
     const result = new Map<number, string>();
@@ -124,6 +129,7 @@ export class PushTemplateService {
       let message = template;
       for (const mapping of mappings) {
         const value = this.getValueByPath(user, mapping.dataPath);
+        this.logger.debug(`🔍 [substituteForUsers] userId=${user.id}, var=${mapping.variableKey}, path=${mapping.dataPath}, value=${value}`);
         const finalValue =
           value !== null && value !== undefined
             ? String(value)
@@ -135,6 +141,7 @@ export class PushTemplateService {
         );
         message = message.replace(pattern, finalValue);
       }
+      this.logger.debug(`🔍 [substituteForUsers] userId=${user.id}, 최종 메시지: ${message}`);
       result.set(user.id, message);
     }
 
