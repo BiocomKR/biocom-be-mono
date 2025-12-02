@@ -72,23 +72,23 @@ export const OPERATORS: Record<string, OperatorDefinition> = {
     valueCount: -1,
   },
 
-  // 날짜 특화 (PostgreSQL NOW() 사용)
+  // 날짜 특화 (PostgreSQL)
   days_ago: {
     label: '정확히 N일 전',
     types: ['date'],
-    sql: "{expr} >= NOW() - INTERVAL '? days' - INTERVAL '1 day' AND {expr} < NOW() - INTERVAL '? days'",
+    sql: "{expr} >= NOW() - (?::int + 1) * INTERVAL '1 day' AND {expr} < NOW() - ?::int * INTERVAL '1 day'",
     valueCount: 1,
   },
   days_ago_gte: {
     label: 'N일 이상 경과',
     types: ['date'],
-    sql: "{expr} <= NOW() - INTERVAL '? days'",
+    sql: "{expr} <= NOW() - ?::int * INTERVAL '1 day'",
     valueCount: 1,
   },
   days_ago_lte: {
     label: 'N일 이내',
     types: ['date'],
-    sql: "{expr} >= NOW() - INTERVAL '? days'",
+    sql: "{expr} >= NOW() - ?::int * INTERVAL '1 day'",
     valueCount: 1,
   },
 

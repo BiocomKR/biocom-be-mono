@@ -25,6 +25,7 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 const SLACK_ENABLED = process.env.SLACK_NOTIFICATION_ENABLED === 'true';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const SERVER_PORT = process.env.PORT || '3000';
+const PROJECT_NAME = process.env.PROJECT_NAME || 'biocom-bo-api';
 
 /**
  * 민감정보 마스킹
@@ -96,11 +97,16 @@ function formatSlackMessage(info: any): any {
     second: '2-digit',
   });
 
-  // 에러 요약
-  const errorSummary = `${emoji} *[${level.toUpperCase()}]* ${message}`;
+  // 에러 요약 (프로젝트명 + 환경 포함)
+  const errorSummary = `${emoji} *[${PROJECT_NAME}/${environment}]* ${message}`;
 
   // Slack Attachment Fields
   const fields: any[] = [
+    {
+      title: '프로젝트',
+      value: PROJECT_NAME,
+      short: true,
+    },
     {
       title: '환경',
       value: environment,
@@ -113,12 +119,12 @@ function formatSlackMessage(info: any): any {
     },
   ];
 
-  // 요청 정보
+  // 요청 정보 (서버와 같은 줄)
   if (method && endpoint) {
     fields.push({
       title: '엔드포인트',
       value: `${method} ${endpoint}`,
-      short: false,
+      short: true,
     });
   }
 
