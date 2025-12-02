@@ -7,3 +7,10 @@ export { PushCampaignType } from './push-campaign-type.enum';
 export { PushCampaignStatus } from './push-campaign-status.enum';
 export { PushCategory } from './push-category.enum';
 export { PushLogStatus } from './push-log-status.enum';
+export {
+  OPERATORS,
+  type OperatorCode,
+  type OperatorDefinition,
+  isValidOperator,
+  getOperator,
+} from './segment-operator.enum';

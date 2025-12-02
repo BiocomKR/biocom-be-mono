@@ -406,6 +406,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get pushNotificationSchedule() { return this.prisma.pushNotificationSchedule; }
   get pushNotificationCampaign() { return this.prisma.pushNotificationCampaign; }
   get pushNotificationLog() { return this.prisma.pushNotificationLog; }
+  get pushTemplateVariable() { return this.prisma.pushTemplateVariable; }
+  get pushSegmentCondition() { return this.prisma.pushSegmentCondition; }
 
   // 약관 테이블
   get consent() { return this.prisma.consent; }
@@ -428,7 +430,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   $queryRaw(query: TemplateStringsArray, ...values: any[]) {
     return (this.prisma as any).$queryRaw(query, ...values);
   }
-  
+
+  $queryRawUnsafe<T = any>(query: string, ...values: any[]): Promise<T> {
+    return (this.prisma as any).$queryRawUnsafe(query, ...values);
+  }
+
   $executeRaw(query: TemplateStringsArray, ...values: any[]) {
     return (this.prisma as any).$executeRaw(query, ...values);
   }

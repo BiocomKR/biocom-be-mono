@@ -9,9 +9,12 @@ import { PushTopicService } from './services/push-topic.service';
 import { PushScheduleService } from './services/push-schedule.service';
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
+import { PushSegmentService } from './services/push-segment.service';
+import { PushTemplateService } from './services/push-template.service';
 import { PushCampaignController } from './push-campaign.controller';
 import { PushNotificationController } from './push-notification.controller';
 import { PushScheduleController } from './push-schedule.controller';
+import { PushPersonalizedController } from './push-personalized.controller';
 import { PrismaService } from '../common/services/prisma.service';
 
 /**
@@ -22,6 +25,7 @@ import { PrismaService } from '../common/services/prisma.service';
  * - 스케줄링 푸시 (ONCE/RECURRING)
  * - 캠페인 관리
  * - 푸시 로그 조회
+ * - 개인화 푸시 (세그먼트 + 템플릿)
  */
 @Module({
   imports: [
@@ -32,6 +36,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushCampaignController,
     PushNotificationController,
     PushScheduleController,
+    PushPersonalizedController,
   ],
   providers: [
     // 푸시 Provider DI 토큰 설정 (FCM → OneSignal 등 교체 용이)
@@ -46,6 +51,8 @@ import { PrismaService } from '../common/services/prisma.service';
     PushScheduleService,
     PushCampaignService,
     PushSchedulerService,
+    PushSegmentService,
+    PushTemplateService,
     PrismaService,
   ],
   exports: [
@@ -56,6 +63,8 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTopicService,
     PushScheduleService,
     PushCampaignService,
+    PushSegmentService,
+    PushTemplateService,
   ],
 })
 export class PushModule {}
