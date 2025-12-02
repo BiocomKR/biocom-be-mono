@@ -1,9 +1,7 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { PushNotificationService } from './push-notification.service';
-import { CampaignQueryDto } from '../dto/campaign-query.dto';
-import { CampaignResponseDto } from '../dto/campaign-response.dto';
-import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
+import { getNowKST } from '../../common/utils/kst-date.util';
 import { PushScheduleType, PushCampaignType, PushCampaignStatus } from '../enums';
 
 /**
@@ -51,90 +49,6 @@ export class PushCampaignService {
     private readonly prisma: PrismaService, // DB 접근용 (SQLAlchemy의 session과 유사)
     private readonly pushNotificationService: PushNotificationService, // 실제 FCM 발송 서비스
   ) {}
-
-  /**
-   * 캠페인 목록 조회
-   */
-  async getCampaigns(query: CampaignQueryDto) {
-    const { page = 1, limit = 20, scheduleId, campaignType, status, startDate, endDate } = query;
-    const skip = (page - 1) * limit;
-
-    this.logger.log(`📋 [PushCampaignService] 캠페인 목록 조회: page=${page}, limit=${limit}`);
-
-    try {
-      // 필터 조건
-      const where: any = {};
-      if (scheduleId !== undefined) where.scheduleId = scheduleId;
-      if (campaignType) where.campaignType = campaignType;
-      if (status) where.status = status;
-
-      // 날짜 필터
-      if (startDate || endDate) {
-        where.createdAt = {};
-        if (startDate) {
-          where.createdAt.gte = stringToKSTDate(startDate, 0, 0, 0);
-        }
-        if (endDate) {
-          where.createdAt.lte = stringToKSTDate(endDate, 23, 59, 59);
-        }
-      }
-
-      const [campaigns, total] = await Promise.all([
-        this.prisma.pushNotificationCampaign.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.pushNotificationCampaign.count({ where }),
-      ]);
-
-      this.logger.log(`✅ [PushCampaignService] 조회 완료: ${campaigns.length}개 (전체: ${total}개)`);
-
-      return {
-        campaigns: campaigns.map((c) => this.mapToCampaignResponseDto(c)),
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      };
-    } catch (error) {
-      this.logger.error(`❌ [PushCampaignService] 캠페인 목록 조회 실패: ${error.message}`, error.stack);
-      throw error;
-    }
-  }
-
-  /**
-   * 캠페인 상세 조회
-   */
-  async getCampaignById(id: number) {
-    this.logger.log(`📋 [PushCampaignService] 캠페인 상세 조회: id=${id}`);
-
-    try {
-      const campaign = await this.prisma.pushNotificationCampaign.findUnique({
-        where: { id },
-        include: {
-          schedule: true,
-          logs: {
-            take: 100,
-            orderBy: { sentAt: 'desc' },
-          },
-        },
-      });
-
-      if (!campaign) {
-        throw new NotFoundException(`캠페인을 찾을 수 없습니다: id=${id}`);
-      }
-
-      return campaign;
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      this.logger.error(`❌ [PushCampaignService] 캠페인 조회 실패: id=${id}, ${error.message}`, error.stack);
-      throw error;
-    }
-  }
 
   /**
    * ========================================================================
@@ -418,35 +332,5 @@ export class PushCampaignService {
     // userId 배열로 변환하여 반환
     // TODO [AI 개발자]: { userId, characterId } 객체 배열로 변경
     return users.map((u) => u.id);
-  }
-
-  /**
-   * Prisma 엔티티 → Response DTO 변환
-   */
-  private mapToCampaignResponseDto(campaign: any): CampaignResponseDto {
-    return {
-      id: campaign.id,
-      scheduleId: campaign.scheduleId,
-      campaignKey: campaign.campaignKey,
-      campaignType: campaign.campaignType,
-      title: campaign.title,
-      body: campaign.body,
-      imageUrl: campaign.imageUrl,
-      data: campaign.data,
-      type: campaign.type,
-      category: campaign.category,
-      status: campaign.status,
-      targetCount: campaign.targetCount,
-      sentCount: campaign.sentCount,
-      failCount: campaign.failCount,
-      scheduledAt: campaign.scheduledAt?.toISOString(),
-      startedAt: campaign.startedAt?.toISOString(),
-      completedAt: campaign.completedAt?.toISOString(),
-      cancelledAt: campaign.cancelledAt?.toISOString(),
-      cancelReason: campaign.cancelReason,
-      errorMessage: campaign.errorMessage,
-      createdAt: campaign.createdAt.toISOString(),
-      createdBy: campaign.createdBy,
-    };
   }
 }

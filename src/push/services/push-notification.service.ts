@@ -9,7 +9,6 @@ import {
 import { PushNotificationType, PushLogStatus } from '../enums';
 import { PushLogQueryDto } from '../dto/push-log-query.dto';
 import { PushLogListResponseDto, PushLogResponseDto } from '../dto/push-log-response.dto';
-import { SendPushToTopicDto } from '../dto/send-push-to-topic.dto';
 import { PushStatsResponseDto } from '../dto/push-stats-response.dto';
 import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
 
@@ -607,72 +606,6 @@ export class PushNotificationService {
   }
 
   /**
-   * 마케팅 푸시 전송 (래퍼 메서드)
-   *
-   * Topic 기반으로 마케팅 동의한 유저에게만 푸시 전송
-   * 향후 UserConsent.agreeToMarketing 필드 추가시 필터링 로직 보강 예정
-   *
-   * @param message - 마케팅 푸시 메시지
-   * @returns 전송 결과
-   */
-  async sendMarketingBroadcast(message: {
-    title: string;
-    body: string;
-    imageUrl?: string;
-    data?: Record<string, any>;
-  }) {
-    this.logger.log(
-      `📣 [PushNotificationService] 마케팅 푸시 전송: title="${message.title}"`,
-    );
-
-    try {
-      // 마케팅 Topic으로 전송 (marketing Topic 구독자 = 마케팅 동의자)
-      const result = await this.pushProvider.sendToTopic('marketing', {
-        title: message.title,
-        body: message.body,
-        imageUrl: message.imageUrl,
-        data: {
-          ...message.data,
-          subType: 'MARKETING_BROADCAST', // 세부 타입
-        },
-      });
-
-      // Topic 발송 로그 기록 (통계용)
-      await this.createTopicLog(
-        'marketing',
-        {
-          title: message.title,
-          body: message.body,
-          imageUrl: message.imageUrl,
-          data: message.data,
-        },
-        PushNotificationType.MARKETING,
-        result,
-      );
-
-      this.logger.log(
-        `✅ [PushNotificationService] 마케팅 푸시 전송 완료: success=${result.success}`,
-      );
-
-      return {
-        success: result.success,
-        message: result.success
-          ? '마케팅 푸시가 전송되었습니다'
-          : '마케팅 푸시 전송에 실패했습니다',
-        messageId: result.messageId,
-        errorCode: result.errorCode,
-        errorMessage: result.errorMessage,
-      };
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] 마케팅 푸시 전송 실패: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
-  }
-
-  /**
    * 푸시 로그 미리 생성 (전송 전)
    *
    * @param pushToken - 푸시 토큰
@@ -754,47 +687,6 @@ export class PushNotificationService {
     } catch (error) {
       this.logger.error(
         `❌ [PushNotificationService] 토큰 상태 업데이트 실패: ${error.message}`,
-      );
-    }
-  }
-
-  /**
-   * Topic 발송 로그 생성 (통계용)
-   *
-   * Topic 발송은 개별 유저 정보가 없으므로 userId, pushTokenId 없이 로그 생성
-   *
-   * @param topic - 토픽 이름
-   * @param message - 푸시 메시지
-   * @param type - 푸시 타입
-   * @param result - FCM 발송 결과
-   * @private
-   */
-  private async createTopicLog(
-    topic: string,
-    message: PushMessage,
-    type: PushNotificationType,
-    result: PushSendResult,
-  ): Promise<void> {
-    try {
-      await this.prisma.pushNotificationLog.create({
-        data: {
-          title: message.title,
-          body: message.body,
-          type,
-          data: { ...message.data, topic }, // topic 정보 포함
-          success: result.success,
-          errorCode: result.errorCode,
-          errorMessage: result.errorMessage,
-          sentAt: getNowKST(),
-          isTest: false,
-        },
-      });
-      this.logger.debug(
-        `📝 [PushNotificationService] Topic 로그 생성 완료: topic=${topic}, success=${result.success}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] Topic 로그 생성 실패: ${error.message}`,
       );
     }
   }
