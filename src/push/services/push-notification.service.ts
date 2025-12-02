@@ -222,45 +222,60 @@ export class PushNotificationService {
         `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
       );
 
-      // 각 토큰별로 로그 생성 후 전송
-      const results: PushSendResult[] = [];
+      // 병렬 처리를 위한 배치 크기 (동시에 처리할 토큰 수)
+      const BATCH_SIZE = 50;
       let successCount = 0;
       let failureCount = 0;
 
-      for (const pushToken of pushTokens) {
-        const logId = await this.createPendingLog(
-          pushToken,
-          message,
-          PushNotificationType.SYSTEM,
-          isTest,
+      // 배치 단위로 병렬 처리
+      for (let i = 0; i < pushTokens.length; i += BATCH_SIZE) {
+        const batch = pushTokens.slice(i, i + BATCH_SIZE);
+
+        const batchResults = await Promise.all(
+          batch.map(async (pushToken) => {
+            const logId = await this.createPendingLog(
+              pushToken,
+              message,
+              PushNotificationType.SYSTEM,
+              isTest,
+            );
+
+            const enrichedMessage: PushMessage = {
+              ...message,
+              data: {
+                ...message.data,
+                logId: logId?.toString(),
+              },
+            };
+
+            const result = await this.pushProvider.sendToToken(
+              pushToken.token,
+              enrichedMessage,
+            );
+
+            if (logId && !result.success) {
+              await this.updateLogWithFailure(logId, result);
+            }
+
+            await this.updateTokenStats(pushToken.id, result.success);
+
+            if (this.shouldInvalidateToken(result)) {
+              await this.invalidateToken(pushToken, result.errorCode);
+            }
+
+            return result;
+          }),
         );
 
-        const enrichedMessage: PushMessage = {
-          ...message,
-          data: {
-            ...message.data,
-            logId: logId?.toString(),
-          },
-        };
+        // 배치 결과 집계
+        batchResults.forEach((result) => {
+          if (result.success) successCount++;
+          else failureCount++;
+        });
 
-        const result = await this.pushProvider.sendToToken(
-          pushToken.token,
-          enrichedMessage,
+        this.logger.debug(
+          `📦 [PushNotificationService] 배치 ${Math.floor(i / BATCH_SIZE) + 1} 완료: ${batch.length}개 처리`,
         );
-        results.push(result);
-
-        if (logId && !result.success) {
-          await this.updateLogWithFailure(logId, result);
-        }
-
-        await this.updateTokenStats(pushToken.id, result.success);
-
-        if (this.shouldInvalidateToken(result)) {
-          await this.invalidateToken(pushToken, result.errorCode);
-        }
-
-        if (result.success) successCount++;
-        else failureCount++;
       }
 
       this.logger.log(
@@ -434,24 +449,6 @@ export class PushNotificationService {
     this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회 (isTest=${isTest})`);
 
     try {
-      // 날짜 필터 구성
-      const dateFilter: any = {};
-      if (startDate || endDate) {
-        dateFilter.sentAt = {};
-        if (startDate) {
-          dateFilter.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
-        }
-        if (endDate) {
-          dateFilter.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
-        }
-      }
-
-      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
-      if (isTest !== undefined) {
-        dateFilter.isTest = isTest;
-      }
-
-      // WHERE 조건 생성
       // WHERE 조건 구성
       const whereFilter: any = {};
 
@@ -467,6 +464,7 @@ export class PushNotificationService {
           lte: stringToKSTDate(endDate, 23, 59, 59),
         };
       }
+      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
       if (isTest !== undefined) {
         whereFilter.isTest = isTest;
       }
@@ -639,6 +637,19 @@ export class PushNotificationService {
         },
       });
 
+      // Topic 발송 로그 기록 (통계용)
+      await this.createTopicLog(
+        'marketing',
+        {
+          title: message.title,
+          body: message.body,
+          imageUrl: message.imageUrl,
+          data: message.data,
+        },
+        PushNotificationType.MARKETING,
+        result,
+      );
+
       this.logger.log(
         `✅ [PushNotificationService] 마케팅 푸시 전송 완료: success=${result.success}`,
       );
@@ -743,6 +754,47 @@ export class PushNotificationService {
     } catch (error) {
       this.logger.error(
         `❌ [PushNotificationService] 토큰 상태 업데이트 실패: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Topic 발송 로그 생성 (통계용)
+   *
+   * Topic 발송은 개별 유저 정보가 없으므로 userId, pushTokenId 없이 로그 생성
+   *
+   * @param topic - 토픽 이름
+   * @param message - 푸시 메시지
+   * @param type - 푸시 타입
+   * @param result - FCM 발송 결과
+   * @private
+   */
+  private async createTopicLog(
+    topic: string,
+    message: PushMessage,
+    type: PushNotificationType,
+    result: PushSendResult,
+  ): Promise<void> {
+    try {
+      await this.prisma.pushNotificationLog.create({
+        data: {
+          title: message.title,
+          body: message.body,
+          type,
+          data: { ...message.data, topic }, // topic 정보 포함
+          success: result.success,
+          errorCode: result.errorCode,
+          errorMessage: result.errorMessage,
+          sentAt: getNowKST(),
+          isTest: false,
+        },
+      });
+      this.logger.debug(
+        `📝 [PushNotificationService] Topic 로그 생성 완료: topic=${topic}, success=${result.success}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushNotificationService] Topic 로그 생성 실패: ${error.message}`,
       );
     }
   }

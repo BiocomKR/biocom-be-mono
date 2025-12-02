@@ -4,6 +4,7 @@ import { PushCampaignService } from './push-campaign.service';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { PushScheduleType } from '../enums';
+import CronExpressionParser from 'cron-parser';
 
 /**
  * ============================================================================
@@ -122,9 +123,16 @@ export class PushSchedulerService {
           // ---------------------------------------------------------
           // RECURRING 타입: 반복 발송
           // - 크론 표현식으로 정의된 반복 발송
+          // - 크론 표현식이 현재 시간(분 단위)에 맞는지 검증
           // - 중복 방지는 campaignKey로 처리 (push-campaign.service.ts 참고)
           // ---------------------------------------------------------
           if (schedule.scheduleType === 'RECURRING' && schedule.cronExpression) {
+            if (!this.shouldExecuteCron(schedule.cronExpression)) {
+              this.logger.debug(
+                `⏭️ [PushScheduler] RECURRING 스케줄 크론 조건 불일치: scheduleId=${schedule.id}, cron=${schedule.cronExpression}`,
+              );
+              continue;
+            }
             this.logger.log(
               `🔄 [PushScheduler] RECURRING 스케줄 실행: scheduleId=${schedule.id}, cron=${schedule.cronExpression}`,
             );
@@ -224,6 +232,53 @@ export class PushSchedulerService {
     } catch (error) {
       this.logger.error(`❌ [PushScheduler] 실행 가능한 스케줄 조회 실패: ${error.message}`, error.stack);
       throw error;
+    }
+  }
+
+  /**
+   * ========================================================================
+   * 크론 표현식이 현재 시간에 실행되어야 하는지 검증
+   * ========================================================================
+   *
+   * [역할]
+   * - 크론 표현식을 파싱하여 현재 시간(분 단위)에 실행해야 하는지 확인
+   * - 매분 실행되는 스케줄러에서 RECURRING 타입의 중복 실행 방지
+   *
+   * [크론 표현식 형식]
+   * - 5자리: 분 시 일 월 요일 (예: "0 9 * * *" = 매일 09:00)
+   * - 6자리: 초 분 시 일 월 요일 (NestJS @Cron 형식)
+   *
+   * @param cronExpression - 크론 표현식
+   * @returns 현재 시간에 실행해야 하면 true
+   */
+  private shouldExecuteCron(cronExpression: string): boolean {
+    try {
+      const now = getNowKST();
+
+      // 크론 표현식 파싱 (KST 기준)
+      const interval = CronExpressionParser.parse(cronExpression, {
+        currentDate: now,
+        tz: 'Asia/Seoul',
+      });
+
+      // 이전 실행 시간 조회
+      const prevDate = interval.prev().toDate();
+
+      // 현재 시간과 이전 실행 시간의 차이가 1분 이내면 실행
+      // (스케줄러가 매분 0초에 실행되므로, 59초 이내 차이면 해당 분에 실행해야 함)
+      const diffMs = now.getTime() - prevDate.getTime();
+      const shouldExecute = diffMs >= 0 && diffMs < 60000; // 0~59초 이내
+
+      this.logger.debug(
+        `🕐 [PushScheduler] 크론 검증: cron=${cronExpression}, prev=${prevDate.toISOString()}, now=${now.toISOString()}, diff=${diffMs}ms, execute=${shouldExecute}`,
+      );
+
+      return shouldExecute;
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushScheduler] 크론 표현식 파싱 실패: cron=${cronExpression}, error=${error.message}`,
+      );
+      return false; // 파싱 실패 시 실행하지 않음
     }
   }
 }
