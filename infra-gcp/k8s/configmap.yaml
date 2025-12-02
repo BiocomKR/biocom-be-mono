@@ -30,7 +30,7 @@ data:
   LOG_FORMAT: "json"
 
   # CORS 설정 (백오피스 FE 도메인)
-  CORS_ORIGIN: "https://admin-dev.biocom.ai.kr"
+  CORS_ORIGIN: "https://bo-dev.biocom.ai.kr"
 
   # JWT 설정
   JWT_ACCESS_TOKEN_EXPIRES_IN: "3h"
