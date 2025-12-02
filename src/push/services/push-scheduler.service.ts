@@ -4,7 +4,7 @@ import { PushCampaignService } from './push-campaign.service';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { PushScheduleType } from '../enums';
-import CronExpressionParser from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 
 /**
  * ============================================================================
