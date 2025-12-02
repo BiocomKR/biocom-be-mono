@@ -1790,6 +1790,21 @@ export class StatisticsService {
       const 칭찬하기 = (selfPraiseRecord?.metadata as any)?.contents || '없음';
 
       // 4-2. 1일1미션 조회 (날짜 필터링 적용)
+      // 챌린지 일차 계산
+      const activeChallenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE' // UserChallengeStatus.ACTIVE
+        },
+        select: { activatedAt: true }
+      });
+
+      let 챌린지일차 = 0;
+      if (activeChallenge) {
+        const { calculateChallengeDay } = await import('../../common/utils/kst-date.util');
+        챌린지일차 = calculateChallengeDay(activeChallenge.activatedAt);
+      }
+
       const missionRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
@@ -1802,15 +1817,18 @@ export class StatisticsService {
         orderBy: { createdAt: 'desc' }
       });
 
-      const missions: string[] = [];
-      for (const record of missionRecords) {
-        const mission = (record.metadata as any)?.missionTitle || (record.metadata as any)?.title;
-        if (mission) {
-          missions.push(mission);
-        }
-      }
+      const 수행한미션수 = missionRecords.length;
 
-      this.logger.log(`미션 데이터 조회 완료: 자기선언문=${자기선언문 !== '없음'}, 칭찬하기=${칭찬하기 !== '없음'}, 미션=${missions.length}건`);
+      const missions = {
+        챌린지일차,
+        수행한미션수,
+        data: missionRecords.map(record => ({
+          미션명: (record.metadata as any)?.missionTitle || (record.metadata as any)?.title || '없음',
+          수행일시: record.createdAt.toISOString().replace('T', ' ').replace('Z', '')
+        }))
+      };
+
+      this.logger.log(`미션 데이터 조회 완료: 자기선언문=${자기선언문 !== '없음'}, 칭찬하기=${칭찬하기 !== '없음'}, 챌린지일차=${챌린지일차}, 수행한미션수=${수행한미션수}`);
 
       // 5. user_balance_game_histories: 밸런스게임 이력 조회 (날짜 필터링)
       const balanceGameHistories = await this.prisma.userBalanceGameHistory.findMany({

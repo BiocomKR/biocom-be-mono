@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService as NestConfigService } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bullmq';
 import { APP_INTERCEPTOR, APP_GUARD, Reflector } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
@@ -41,6 +42,7 @@ import { BannersModule } from './shop/banners.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
 import { PushModule } from './push/push.module';
 import { ContentModule } from './content/content.module';
+import { GraphSyncModule } from './graph-sync/graph-sync.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -72,6 +74,15 @@ import { ContentModule } from './content/content.module';
 
     // 스케줄러 모듈 (Cron Job)
     ScheduleModule.forRoot(),
+
+    // BullMQ 모듈 (GraphDB 동기화용 메시지 큐)
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        password: process.env.REDIS_PASSWORD || undefined,
+      },
+    }),
 
     // 정적 파일 서빙
     ServeStaticModule.forRootAsync({
@@ -128,6 +139,7 @@ import { ContentModule } from './content/content.module';
     PhoneVerificationModule, // 휴대폰 본인인증 모듈 (NHN KCP SMS 인증)
     PushModule,      // 푸시 알림 모듈 (FCM)
     ContentModule,   // 컨텐츠 관리 모듈
+    GraphSyncModule, // GraphDB 동기화 모듈 (BullMQ Producer)
     // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음

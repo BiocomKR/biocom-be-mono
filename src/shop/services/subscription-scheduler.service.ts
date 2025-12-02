@@ -30,11 +30,13 @@ export class SubscriptionSchedulerService {
    *
    * Cron 표현식: 0 0 * * * (초 분 시 일 월 요일)
    * - 0초, 0시, 매일, 매월, 매주
+   *
+   * NOTE: Kubernetes CronJob으로 실행됨. NestJS @Cron은 멀티 파드 환경에서 중복 실행 방지를 위해 비활성화.
    */
-  @Cron('0 0 * * *', {
-    name: 'auto-billing',
-    timeZone: 'Asia/Seoul',
-  })
+  // @Cron('0 0 * * *', {
+  //   name: 'auto-billing',
+  //   timeZone: 'Asia/Seoul',
+  // })
   async handleAutoBilling() {
     this.logger.log('🕐 자동결제 스케줄러 시작...');
 
@@ -98,11 +100,13 @@ export class SubscriptionSchedulerService {
    * 만료된 구독 정리 (매일 00:01)
    *
    * CANCELED 상태의 구독 중 nextBillingDate가 지난 것을 EXPIRED로 전환
+   *
+   * NOTE: Kubernetes CronJob으로 실행됨. NestJS @Cron은 멀티 파드 환경에서 중복 실행 방지를 위해 비활성화.
    */
-  @Cron('0 1 0 * * *', {
-    name: 'expire-subscriptions',
-    timeZone: 'Asia/Seoul',
-  })
+  // @Cron('0 1 0 * * *', {
+  //   name: 'expire-subscriptions',
+  //   timeZone: 'Asia/Seoul',
+  // })
   async handleExpiredSubscriptions() {
     this.logger.log('🕐 만료된 구독 정리 시작...');
 

@@ -38,6 +38,28 @@ export class IggLevelDto {
 }
 
 // ========================================
+// 1일1미션 응답 DTO
+// ========================================
+export class DailyMissionDto {
+  @ApiProperty({ description: '미션명', example: '물 2L 마시기' })
+  미션명: string;
+
+  @ApiProperty({ description: '생성일시', example: '2025-10-23 02:40:11.000' })
+  createdAt: string;
+}
+
+export class DailyMissionResponseDto {
+  @ApiProperty({ description: '챌린지 일차', example: 5 })
+  챌린지일차: number;
+
+  @ApiProperty({ description: '수행한 미션 수', example: 2 })
+  수행한미션수: number;
+
+  @ApiProperty({ description: '미션 목록', type: [DailyMissionDto] })
+  data: DailyMissionDto[];
+}
+
+// ========================================
 // 밸런스 게임 이력
 // ========================================
 export class BalanceGameHistoryDto {
@@ -259,8 +281,8 @@ export class AiAgentStatisticsDto {
   @ApiProperty({ description: '칭찬하기', example: '나를 칭찬한다.' })
   칭찬하기: string;
 
-  @ApiProperty({ description: '1일1미션 목록', type: [String], example: ['미션1', '미션2'] })
-  '1일1미션': string[];
+  @ApiProperty({ description: '1일1미션 정보', type: DailyMissionResponseDto })
+  '1일1미션': DailyMissionResponseDto;
 
   @ApiProperty({ description: '밸런스게임 선택 이력', type: [BalanceGameHistoryDto] })
   밸런스게임: BalanceGameHistoryDto[];

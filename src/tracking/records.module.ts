@@ -5,6 +5,7 @@ import { RecordsService } from './services/records.service';
 import { RecordAccessGuard } from './guards/record-access.guard';
 import { RecordExtendedAccessGuard } from './guards/record-extended-access.guard';
 import { PointModule } from '../point/point.module';
+import { GraphSyncModule } from '../graph-sync/graph-sync.module';
 import { PrismaService } from '../common/services/prisma.service';
 
 /**
@@ -19,8 +20,9 @@ import { PrismaService } from '../common/services/prisma.service';
  */
 @Module({
   imports: [
-    PointModule, // PointService 사용을 위해 import
-    HttpModule,  // 외부 API 호출을 위해 import
+    PointModule,     // PointService 사용을 위해 import
+    HttpModule,      // 외부 API 호출을 위해 import
+    GraphSyncModule, // GraphDB 동기화를 위해 import
   ],
   controllers: [RecordsController],
   providers: [RecordsService, RecordAccessGuard, RecordExtendedAccessGuard, PrismaService],

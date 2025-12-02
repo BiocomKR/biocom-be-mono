@@ -2,6 +2,7 @@ import { Injectable, Logger, ConflictException, NotFoundException, BadRequestExc
 import { PrismaService } from '../../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { PointService } from '../../point/point.service';
+import { GraphSyncService } from '../../graph-sync/graph-sync.service';
 import { getKoreanToday } from '../../common/utils/korea-date.util';
 import {
   getNowKST,
@@ -35,6 +36,7 @@ export class RecordsService {
     private readonly prisma: PrismaService,
     private readonly pointService: PointService,
     private readonly httpService: HttpService,
+    private readonly graphSyncService: GraphSyncService,
   ) {}
 
   /**
@@ -339,6 +341,8 @@ export class RecordsService {
 
   /**
    * 영양제 섭취 기록 저장 (신규 - 루틴 기반)
+   *
+   * @deprecated 이 메서드는 더 이상 사용되지 않습니다. saveSupplementIntake()를 사용하세요.
    * @param userId 사용자 ID
    * @param dto 영양제 섭취 기록 데이터
    */
@@ -665,14 +669,19 @@ export class RecordsService {
     recordData: { date: string; metadata: any }
   ) {
     const { date, metadata } = recordData;
-    
+
     try {
       this.logger.log(`${recordCode} 기록 저장 시작 - 사용자: ${userId}, 날짜: ${date}`);
 
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         // 각 기록 타입별 구현으로 위임
         return await this.createRecordByType(tx, userId, recordCode, date, metadata);
       });
+
+      // ✅ PostgreSQL 커밋 완료 후 → BullMQ Queue에 비동기 전송 (Fire-and-Forget)
+      await this.syncToGraphDB(userId, recordCode, date, metadata, result);
+
+      return result;
     } catch (error) {
       this.logger.error(`${recordCode} 기록 저장 실패 - 사용자: ${userId}`, error);
       throw error;
@@ -1522,6 +1531,9 @@ export class RecordsService {
 
       this.logger.log(`영양제 섭취 기록 저장 완료: ${data.length}개 업데이트`);
 
+      // ✅ 영양제 섭취 기록 완료 후 → GraphDB에 동기화 (Fire-and-Forget)
+      await this.syncSupplementToGraphDB(userId, today);
+
       return {
         message: '영양제 섭취 기록이 저장되었습니다.',
         pointsEarned: isFirstRecordOfDay ? 100 : 0,
@@ -1785,9 +1797,10 @@ export class RecordsService {
         `영양제 루틴 저장 시작: userId=${userId}, productIds=${productIds.join(', ')}`,
       );
 
-      return await this.prisma.$transaction(async (tx) => {
+      const today = getKoreanToday(); // KST 기준 오늘 날짜 (YYYY-MM-DD)
+
+      const result = await this.prisma.$transaction(async (tx) => {
         const now = new Date();
-        const today = getKoreanToday(); // KST 기준 오늘 날짜 (YYYY-MM-DD)
         const todayDate = new Date(today);
 
         // ============ 페이즈 1: user_supplement_routine 수정 ============
@@ -1991,6 +2004,251 @@ export class RecordsService {
     } catch (error) {
       this.logger.error('영양제 루틴 저장 실패', error);
       throw error;
+    }
+  }
+
+  /**
+   * GraphDB 동기화 (BullMQ Producer)
+   * PostgreSQL 커밋 완료 후 비동기로 Queue에 전송
+   *
+   * @param userId 사용자 ID
+   * @param recordType 기록 타입 (BEAUTY, DIET, SUPPLEMENT, FASTING, SLEEP, ACTIVITY)
+   * @param date 날짜 (YYYY-MM-DD)
+   * @param metadata 메타데이터
+   * @param result DB 저장 결과
+   */
+  private async syncToGraphDB(
+    userId: number,
+    recordType: string,
+    date: string,
+    metadata: any,
+    result: any
+  ) {
+    try {
+      // User Chart ID 조회 (user_charts 테이블에서 최신 지연성알러지 검사 결과)
+      const userChart = await this.prisma.userChart.findFirst({
+        where: {
+          userId,
+          orderCode: {
+            in: [ExamCode.LEGACY_DELAYED_ALLERGY, ExamCode.DELAYED_ALLERGY],
+          },
+        },
+        orderBy: {
+          receiptDate: 'desc',
+        },
+        select: {
+          chartId: true,
+        },
+      });
+
+      if (!userChart) {
+        this.logger.warn(
+          `GraphDB 동기화 스킵: user_charts에 지연성알러지 검사 결과 없음 (userId=${userId})`
+        );
+        return;
+      }
+
+      const chartId = userChart.chartId;
+      const dateId = `${chartId}_${date}`;
+
+      switch (recordType) {
+        case 'BEAUTY':
+          await this.graphSyncService.syncBeauty({
+            chartId,
+            dateId,
+            date,
+            totalScore: metadata.totalScore || 0,
+            innerBeautyScore: metadata.innerBeautyScore || 0,
+            outerBeautyScore: metadata.outerBeautyScore || 0,
+            innerBeautyDetails: metadata.innerBeauty || [],
+            outerBeautyDetails: metadata.outerBeauty || [],
+          });
+          break;
+
+        case 'DIET':
+          // 공복 식사는 Food 노드 생성 안 함
+          if (!metadata.isFasting) {
+            await this.graphSyncService.syncFood({
+              chartId,
+              dateId,
+              date,
+              foods: [
+                {
+                  foodId: `food:${userId}:${date}:${metadata.foodName}`,
+                  foodName: metadata.foodName,
+                  dietType: metadata.diet,
+                  isFasting: false,
+                  imageUrl: metadata.imageUrl || undefined,
+                  allergyFoods: metadata.allergyFoods || [],
+                  allergyScore: metadata.allergyScore || 0,
+                  processedCount: metadata.processedCount || 0,
+                  processedFoods: metadata.processedFoods || [],
+                  highFodmapCount: metadata.highFodmapCount || 0,
+                  highFodmapFoods: metadata.highFodmapFoods || [],
+                },
+              ],
+            });
+          }
+          break;
+
+        case 'SUPPLEMENT':
+          // 영양제는 saveSupplementIntake에서 별도 처리
+          break;
+
+        case 'FASTING':
+          await this.graphSyncService.syncFasting({
+            chartId,
+            dateId,
+            date,
+            startDateTime: metadata.startDateTime || `${date}T00:00:00`,
+            endDateTime: metadata.endDateTime || `${date}T00:00:00`,
+            fastingHours: metadata.fastingHours || 0,
+            isFastingDay: (metadata.fastingHours || 0) >= 12,
+          });
+          break;
+
+        case 'SLEEP':
+          await this.graphSyncService.syncSleep({
+            chartId,
+            dateId,
+            date,
+            bedDateTime: metadata.bedDateTime || `${date}T22:00:00`,
+            wakeDateTime: metadata.wakeDateTime || `${date}T06:00:00`,
+            sleepHours: metadata.sleepHours || 0,
+            sleepQuality: metadata.sleepQuality || 'NORMAL',
+          });
+          break;
+
+        case 'ACTIVITY':
+          await this.graphSyncService.syncActivity({
+            chartId,
+            dateId,
+            date,
+            totalCalories: metadata.totalCalories || 0,
+            activityCount: metadata.activities?.length || 1,
+            totalDurationMinutes: metadata.totalDurationMinutes || 0,
+            activities: metadata.activities || [],
+          });
+          break;
+
+        default:
+          this.logger.warn(`GraphDB 동기화 미지원 타입: ${recordType}`);
+      }
+    } catch (error: any) {
+      // Fire-and-Forget: Queue 추가 실패해도 API는 성공 응답
+      this.logger.error(
+        `GraphDB Queue 추가 실패 (무시): recordType=${recordType}, userId=${userId}, error=${error.message}`
+      );
+    }
+  }
+
+  /**
+   * 영양제 루틴 GraphDB 동기화 (BullMQ Producer)
+   * saveSupplementRoutine 완료 후 비동기로 Queue에 전송
+   *
+   * @param userId 사용자 ID
+   * @param date 날짜 (YYYY-MM-DD)
+   */
+  private async syncSupplementToGraphDB(userId: number, date: string) {
+    try {
+      // User Chart ID 조회 (user_charts 테이블에서 최신 지연성알러지 검사 결과)
+      const userChart = await this.prisma.userChart.findFirst({
+        where: {
+          userId,
+          orderCode: {
+            in: [ExamCode.LEGACY_DELAYED_ALLERGY, ExamCode.DELAYED_ALLERGY],
+          },
+        },
+        orderBy: {
+          receiptDate: 'desc',
+        },
+        select: {
+          chartId: true,
+        },
+      });
+
+      if (!userChart) {
+        this.logger.warn(
+          `GraphDB 동기화 스킵: user_charts에 지연성알러지 검사 결과 없음 (userId=${userId})`
+        );
+        return;
+      }
+
+      const chartId = userChart.chartId;
+      const dateId = `date:${date}`;
+
+      // 오늘 날짜의 영양제 기록 조회
+      const supplementRecords = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'SUPPLEMENT',
+          date: new Date(date),
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (supplementRecords.length === 0) {
+        this.logger.log(`GraphDB 동기화 스킵: 영양제 기록 없음 (userId=${userId}, date=${date})`);
+        return;
+      }
+
+      // 영양제별 섭취 횟수 계산 및 영양소 정보 조회
+      const supplementMap = new Map<number, any>();
+
+      for (const record of supplementRecords) {
+        const productId = (record.metadata as any)?.productId;
+        if (!productId) continue;
+
+        if (!supplementMap.has(productId)) {
+          // 영양소 정보 조회
+          const nutrients = await this.prisma.supplementNutrient.findMany({
+            where: { productId },
+            select: { nutrientName: true },
+          });
+
+          supplementMap.set(productId, {
+            productId,
+            productName: record.product?.name || '알 수 없음',
+            intakeCount: 0,
+            nutrients: nutrients.map((n) => n.nutrientName),
+          });
+        }
+
+        // 섭취 횟수 계산 (morning, afternoon, evening)
+        const metadata = record.metadata as any;
+        const count = [metadata.morning, metadata.afternoon, metadata.evening].filter(Boolean).length;
+        supplementMap.get(productId).intakeCount += count;
+      }
+
+      // GraphSync Queue에 전송
+      await this.graphSyncService.syncSupplement({
+        chartId,
+        dateId,
+        date,
+        supplements: Array.from(supplementMap.values()).map((s) => ({
+          supplementId: `supplement_${s.productId}`,
+          supplementName: s.productName,
+          intakeCount: s.intakeCount,
+          recommendedCount: 3, // 기본 권장 횟수 (아침, 점심, 저녁)
+          nutrients: s.nutrients,
+        })),
+      });
+
+      this.logger.log(
+        `✅ 영양제 GraphDB 동기화 완료: userId=${userId}, date=${date}, 영양제수=${supplementMap.size}개`
+      );
+    } catch (error: any) {
+      // Fire-and-Forget: Queue 추가 실패해도 API는 성공 응답
+      this.logger.error(
+        `영양제 GraphDB Queue 추가 실패 (무시): userId=${userId}, error=${error.message}`
+      );
     }
   }
 }
