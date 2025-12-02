@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+// import { Cron, CronExpression } from '@nestjs/schedule'; // 미사용
 import { PushScheduleService } from './push-schedule.service';
 import { PushCampaignService } from './push-campaign.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import CronExpressionParser from 'cron-parser';
 
 /**
  * 푸시 알림 배치 스케줄러
@@ -61,11 +62,14 @@ export class PushSchedulerService {
             }
           }
 
-          // RECURRING 타입인 경우 크론 표현식 확인 (간단한 체크만)
+          // RECURRING 타입인 경우 크론 표현식이 현재 시간에 맞는지 검증
           if (schedule.scheduleType === 'RECURRING' && schedule.cronExpression) {
-            // 여기서는 간단한 체크만 수행
-            // 실제 크론 표현식 파싱은 복잡하므로 매번 실행하고
-            // 중복 방지는 campaignKey로 처리
+            if (!this.shouldExecuteCron(schedule.cronExpression)) {
+              this.logger.debug(
+                `⏭️ [PushScheduler] RECURRING 스케줄 크론 조건 불일치: scheduleId=${schedule.id}, cron=${schedule.cronExpression}`,
+              );
+              continue;
+            }
             this.logger.log(
               `🔄 [PushScheduler] RECURRING 스케줄 실행: scheduleId=${schedule.id}, cron=${schedule.cronExpression}`,
             );
@@ -106,5 +110,41 @@ export class PushSchedulerService {
     this.logger.log('🔧 [PushScheduler] 수동 트리거 실행');
     await this.handleScheduledPushes();
     return { success: true, message: '스케줄 확인이 수동으로 트리거되었습니다' };
+  }
+
+  /**
+   * 크론 표현식이 현재 시간에 실행되어야 하는지 검증
+   *
+   * @param cronExpression - 크론 표현식
+   * @returns 현재 시간에 실행해야 하면 true
+   */
+  private shouldExecuteCron(cronExpression: string): boolean {
+    try {
+      const now = getNowKST();
+
+      // 크론 표현식 파싱 (KST 기준)
+      const interval = CronExpressionParser.parse(cronExpression, {
+        currentDate: now,
+        tz: 'Asia/Seoul',
+      });
+
+      // 이전 실행 시간 조회
+      const prevDate = interval.prev().toDate();
+
+      // 현재 시간과 이전 실행 시간의 차이가 1분 이내면 실행
+      const diffMs = now.getTime() - prevDate.getTime();
+      const shouldExecute = diffMs >= 0 && diffMs < 60000; // 0~59초 이내
+
+      this.logger.debug(
+        `🕐 [PushScheduler] 크론 검증: cron=${cronExpression}, prev=${prevDate.toISOString()}, now=${now.toISOString()}, diff=${diffMs}ms, execute=${shouldExecute}`,
+      );
+
+      return shouldExecute;
+    } catch (error) {
+      this.logger.error(
+        `❌ [PushScheduler] 크론 표현식 파싱 실패: cron=${cronExpression}, error=${error.message}`,
+      );
+      return false;
+    }
   }
 }

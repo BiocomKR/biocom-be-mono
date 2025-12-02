@@ -112,7 +112,10 @@ export class PushCampaignService {
    */
   async executeScheduledCampaign(schedule: any) {
     const now = getNowKST();
-    const campaignKey = `schedule-${schedule.id}-${now.toISOString()}`;
+    // campaignKey: 중복 실행 방지용 고유 키 (스케줄ID + 분 단위 시간)
+    // 밀리초 단위가 아닌 분 단위로 키를 생성하여 동시 요청 시 중복 방지
+    const timeKey = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const campaignKey = `schedule-${schedule.id}-${timeKey}`;
 
     this.logger.log(`🚀 [PushCampaignService] 스케줄 캠페인 실행: scheduleId=${schedule.id}, key=${campaignKey}`);
 
