@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ManagerGuard } from '../common/guards/manager.guard';
 import { PushSegmentService } from './services/push-segment.service';
 import { PushTemplateService } from './services/push-template.service';
 import { PushNotificationService } from './services/push-notification.service';
@@ -19,7 +20,7 @@ import { OPERATORS } from './enums';
  */
 @ApiTags('개인화 푸시')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, ManagerGuard)
 @SkipThrottle()
 @Controller('push/personalized')
 export class PushPersonalizedController {

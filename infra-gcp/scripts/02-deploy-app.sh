@@ -49,8 +49,8 @@ BIOCOM BO-API 애플리케이션 배포 스크립트 - Docker 이미지 빌드 �
   ┌────────┬──────────────────────┬─────────────────────────────┐
   │ 환경   │ GCP 프로젝트          │ API URL                     │
   ├────────┼──────────────────────┼─────────────────────────────┤
-  │ dev    │ biocom-bo-api-dev    │ bo-api-dev.biocom.ai.kr     │
-  │ prod   │ biocom-bo-api-prod   │ bo-api.biocom.ai.kr         │
+  │ dev    │ biocom-bo-api        │ bo-api-dev.biocom.ai.kr     │
+  │ prod   │ biocom-bo-api        │ bo-api.biocom.ai.kr         │
   └────────┴──────────────────────┴─────────────────────────────┘
 
 주의사항:
@@ -78,9 +78,9 @@ else
     usage
 fi
 
-# 환경별 설정
+# 환경별 설정 (dev/prod 모두 biocom-bo-api 프로젝트 사용)
+PROJECT_ID="biocom-bo-api"
 if [[ "$ENV" == "dev" ]]; then
-    PROJECT_ID="biocom-bo-api-dev"
     ENV_NAME="Development"
     API_DOMAIN="bo-api-dev.biocom.ai.kr"
     FE_DOMAIN="bo-dev.biocom.ai.kr"
@@ -88,7 +88,6 @@ if [[ "$ENV" == "dev" ]]; then
     GCP_PROJECT_ID="api-dev-biocom"
     GCS_BUCKET="api-dev-biocom-uploads"
 else
-    PROJECT_ID="biocom-bo-api-prod"
     ENV_NAME="Production"
     API_DOMAIN="bo-api.biocom.ai.kr"
     FE_DOMAIN="bo.biocom.ai.kr"
@@ -102,6 +101,7 @@ CLUSTER_NAME="biocom-bo-cluster"
 NAMESPACE="biocom-bo-api"
 SKIP_BUILD=false
 AUTO_APPROVE=false
+ZONE="asia-northeast3-a"
 REGION="asia-northeast3"
 IMAGE_TAG=""
 
@@ -186,7 +186,7 @@ setup_auth() {
     gcloud config set project "$PROJECT_ID" --quiet
 
     gcloud container clusters get-credentials "$CLUSTER_NAME" \
-        --region="$REGION" \
+        --zone="$ZONE" \
         --project="$PROJECT_ID"
 
     log_success "✅ 인증 설정 완료!"
@@ -196,7 +196,7 @@ setup_auth() {
 check_infrastructure() {
     log_info "인프라 상태 확인 중..."
 
-    if ! gcloud container clusters describe "$CLUSTER_NAME" --region="$REGION" --project="$PROJECT_ID" &>/dev/null; then
+    if ! gcloud container clusters describe "$CLUSTER_NAME" --zone="$ZONE" --project="$PROJECT_ID" &>/dev/null; then
         log_error "GKE 클러스터가 없습니다. 먼저 01-deploy-infrastructure.sh를 실행하세요."
         exit 1
     fi

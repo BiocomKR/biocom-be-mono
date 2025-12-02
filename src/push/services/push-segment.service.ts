@@ -2,6 +2,9 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { OPERATORS, isValidOperator } from '../enums';
 
+/** 값 타입 */
+type ValueType = 'number' | 'string' | 'date' | 'boolean' | 'enum';
+
 /**
  * 세그먼트 규칙 JSON 구조
  */
@@ -146,6 +149,11 @@ export class PushSegmentService {
       }
 
       const op = OPERATORS[cond.operator];
+
+      // 값 타입 검증
+      const valueType = condDef.valueType as ValueType;
+      this.validateValueType(cond.key, valueType, cond.value, op.valueCount);
+
       let sql = op.sql;
 
       // field_expression 치환
@@ -183,5 +191,87 @@ export class PushSegmentService {
       sql: clauses.join(` ${logic} `),
       params,
     };
+  }
+
+  /**
+   * 값 타입 검증
+   */
+  private validateValueType(
+    condKey: string,
+    valueType: ValueType,
+    value: any,
+    valueCount: number,
+  ): void {
+    // 값이 필요 없는 연산자 (is_true, is_false, is_null 등)
+    if (valueCount === 0) return;
+
+    // 값이 없으면 에러
+    if (value === undefined || value === null) {
+      throw new BadRequestException(`조건 '${condKey}'에 값이 필요합니다`);
+    }
+
+    // 배열 연산자 (in, between)
+    if (valueCount === -1 || valueCount === 2) {
+      if (!Array.isArray(value)) {
+        throw new BadRequestException(
+          `조건 '${condKey}'에 배열 값이 필요합니다`,
+        );
+      }
+      if (valueCount === 2 && value.length !== 2) {
+        throw new BadRequestException(
+          `조건 '${condKey}'에 정확히 2개의 값이 필요합니다 (범위)`,
+        );
+      }
+      // 배열 내 각 요소 타입 검증
+      for (const v of value) {
+        this.validateSingleValue(condKey, valueType, v);
+      }
+      return;
+    }
+
+    // 단일값
+    this.validateSingleValue(condKey, valueType, value);
+  }
+
+  /**
+   * 단일 값 타입 검증
+   */
+  private validateSingleValue(
+    condKey: string,
+    valueType: ValueType,
+    value: any,
+  ): void {
+    switch (valueType) {
+      case 'number':
+        if (typeof value !== 'number' || isNaN(value)) {
+          throw new BadRequestException(
+            `조건 '${condKey}'에 숫자 값이 필요합니다`,
+          );
+        }
+        break;
+      case 'boolean':
+        if (typeof value !== 'boolean') {
+          throw new BadRequestException(
+            `조건 '${condKey}'에 boolean 값이 필요합니다`,
+          );
+        }
+        break;
+      case 'string':
+      case 'enum':
+        if (typeof value !== 'string' && typeof value !== 'number') {
+          throw new BadRequestException(
+            `조건 '${condKey}'에 문자열 또는 숫자 값이 필요합니다`,
+          );
+        }
+        break;
+      case 'date':
+        // date 타입은 days_ago 계열에서 숫자(N일)로 받거나, 직접 날짜 문자열로 받음
+        if (typeof value !== 'number' && typeof value !== 'string') {
+          throw new BadRequestException(
+            `조건 '${condKey}'에 날짜 값이 필요합니다`,
+          );
+        }
+        break;
+    }
   }
 }
