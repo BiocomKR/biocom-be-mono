@@ -19,8 +19,8 @@ import { ManagementShippingController } from './controllers/management-shipping.
 import { ManagementRefundController } from './controllers/management-refund.controller';
 import { ManagementChallengeController } from './controllers/management-challenge.controller';
 import { ManagementMissionController } from './controllers/management-mission.controller';
-import { ManagementPushNotificationController } from './controllers/management-push-notification.controller';
 // @deprecated - biocom-bo-api로 이전됨 (biocom-admin은 bo-api 호출)
+// import { ManagementPushNotificationController } from './controllers/management-push-notification.controller';
 // import { ManagementPushCampaignController } from './controllers/management-push-campaign.controller';
 // import { ManagementPushScheduleController } from './controllers/management-push-schedule.controller';
 import { ManagementShopService } from './services/management-shop.service';
@@ -32,7 +32,8 @@ import { ManagementMissionService } from './services/management-mission.service'
 import { PointModule } from '../point/point.module';
 import { ChallengeModule } from '../challenge/challenge.module';
 import { PaymentModule } from '../shop/payment.module';
-import { PushModule } from '../push/push.module';
+// @deprecated - biocom-bo-api로 이전됨
+// import { PushModule } from '../push/push.module';
 
 /**
  * Management 모듈
@@ -50,7 +51,7 @@ import { PushModule } from '../push/push.module';
     PointModule,
     ChallengeModule,
     PaymentModule,
-    PushModule,
+    // PushModule, // @deprecated - biocom-bo-api로 이전됨
   ],
   controllers: [
     ManagementUsersController,
@@ -65,8 +66,8 @@ import { PushModule } from '../push/push.module';
     ManagementRefundController,
     ManagementChallengeController,
     ManagementMissionController,
-    ManagementPushNotificationController,
     // @deprecated - biocom-bo-api로 이전됨
+    // ManagementPushNotificationController,
     // ManagementPushCampaignController,
     // ManagementPushScheduleController,
   ],
