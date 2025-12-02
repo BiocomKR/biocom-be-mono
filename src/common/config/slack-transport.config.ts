@@ -229,6 +229,12 @@ class SlackTransport extends Transport {
       return;
     }
 
+    // 404 에러는 Slack 알림 제외 (악성 크롤러 스캔 등 노이즈 방지)
+    if (info.statusCode === 404) {
+      callback();
+      return;
+    }
+
     try {
       const slackMessage = formatSlackMessage(info);
 
