@@ -2423,3 +2423,73 @@ model IAPWebhookLog {
   @@index([receivedAt])
   @@map("iap_webhook_logs")
 }
+
+/// 푸시 템플릿 변수 정의 테이블
+/// 개인화 푸시에서 사용 가능한 변수 목록 관리
+model PushTemplateVariable {
+  /// 고유 ID
+  id              Int       @id @default(autoincrement())
+  /// 카테고리 (사용자, 건강유형, 페르소나 등)
+  category        String    @db.VarChar(50)
+  /// 변수 키 (템플릿에서 사용: {{variableKey}})
+  variableKey     String    @unique @map("variable_key") @db.VarChar(50)
+  /// 표시 이름 (관리자 화면용)
+  displayName     String    @map("display_name") @db.VarChar(100)
+  /// 설명
+  description     String?
+  /// 데이터 경로 (user.name, user.healthTypeAnimal.animalName 등)
+  dataPath        String    @map("data_path") @db.VarChar(200)
+  /// 필요한 관계 로딩 목록 (JSON: ["healthTypeAnimal", "aiPersona"])
+  requiredIncludes Json?    @map("required_includes")
+  /// null일 때 기본값
+  defaultValue    String?   @map("default_value") @db.VarChar(200)
+  /// 정렬 순서
+  sortOrder       Int       @default(0) @map("sort_order")
+  /// 활성화 여부
+  isActive        Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt       DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt       DateTime? @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("push_template_variables")
+}
+
+/// 푸시 세그먼트 조건 정의 테이블
+/// 개인화 푸시에서 사용 가능한 타겟팅 조건 목록 관리
+model PushSegmentCondition {
+  /// 고유 ID
+  id                Int       @id @default(autoincrement())
+  /// 카테고리 (사용자, 구매, 챌린지, 접속 등)
+  category          String    @db.VarChar(50)
+  /// 표시 이름 (관리자 화면용)
+  displayName       String    @map("display_name") @db.VarChar(100)
+  /// 설명
+  description       String?
+  /// 조건 키 (프론트엔드에서 사용)
+  conditionKey      String    @unique @map("condition_key") @db.VarChar(50)
+  /// 필드 표현식 (SQL WHERE절 왼쪽: users.points, (SELECT ...) 등)
+  fieldExpression   String    @map("field_expression")
+  /// 값 타입 (date, number, boolean, enum)
+  valueType         String    @map("value_type") @db.VarChar(20)
+  /// enum일 경우 선택지 (JSON: ["M", "F"])
+  enumOptions       Json?     @map("enum_options")
+  /// 허용된 연산자 목록 (JSON: ["eq", "gte", "lte"])
+  allowedOperators  Json      @map("allowed_operators")
+  /// 정렬 순서
+  sortOrder         Int       @default(0) @map("sort_order")
+  /// 활성화 여부
+  isActive          Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt         DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt         DateTime? @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("push_segment_conditions")
+}
