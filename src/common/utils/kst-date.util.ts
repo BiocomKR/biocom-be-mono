@@ -74,13 +74,17 @@ export const stringToKSTDate = (
  */
 export const getNowKST = (): Date => {
   const now = new Date();
+  // KST = UTC + 9시간
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kstTime = new Date(now.getTime() + kstOffset);
+
   return createKSTDate(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    now.getDate(),
-    now.getHours(),
-    now.getMinutes(),
-    now.getSeconds()
+    kstTime.getUTCFullYear(),
+    kstTime.getUTCMonth() + 1,
+    kstTime.getUTCDate(),
+    kstTime.getUTCHours(),
+    kstTime.getUTCMinutes(),
+    kstTime.getUTCSeconds()
   );
 };
 
