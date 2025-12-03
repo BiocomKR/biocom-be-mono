@@ -125,7 +125,10 @@ spec:
         - name: kcp-cert-files
           mountPath: /config/kcp-cert
           readOnly: true
-      
+        - name: firebase-service-account-key
+          mountPath: /app/firebase
+          readOnly: true
+
       # Cloud SQL Proxy 사이드카 컨테이너 (Workload Identity 사용 시 제거)
       # GKE는 Private IP로 직접 연결 가능
       # - name: cloudsql-proxy
@@ -148,6 +151,9 @@ spec:
       - name: kcp-cert-files
         secret:
           secretName: kcp-cert-files
+      - name: firebase-service-account-key
+        secret:
+          secretName: firebase-service-account-key
       # Cloud SQL credentials (Workload Identity 사용 시 불필요)
       # - name: cloudsql-instance-credentials
       #   secret:

@@ -49,6 +49,12 @@ data:
   GOOGLE_CLOUD_PROJECT_ID: "api-dev-biocom"
   GCS_BUCKET_NAME: "api-dev-biocom-uploads"
   GOOGLE_APPLICATION_CREDENTIALS: "/app/secrets/key.json"
+
+  # Firebase 설정
+  FIREBASE_SERVICE_ACCOUNT_PATH: "/app/firebase/firebase-key.json"
+
+  # Slack 알림 설정
+  SLACK_NOTIFICATION_ENABLED: "true"
   
   # 파일 업로드 설정 (Google Cloud Storage 사용)
   MAX_FILE_SIZE: "10485760"  # 10MB

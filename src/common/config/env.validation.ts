@@ -168,6 +168,17 @@ export interface EnvironmentVariables {
   // 보안
   BCRYPT_ROUNDS: number;
   SESSION_SECRET?: string;
+
+  // Apple IAP
+  APPLE_IAP_PRIVATE_KEY?: string;
+  APPLE_IAP_KEY_ID?: string;
+  APPLE_IAP_ISSUER_ID?: string;
+  APPLE_BUNDLE_ID?: string;
+
+  // Google IAP
+  GOOGLE_PACKAGE_NAME?: string;
+  GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
 }
 
 /**

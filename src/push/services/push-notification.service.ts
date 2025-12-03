@@ -1,14 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { FcmProvider } from '../providers/fcm.provider';
 import {
+  IPushProvider,
   PushMessage,
   PushSendResult,
+  PUSH_PROVIDER_TOKEN,
 } from '../interfaces/push-provider.interface';
 import { PushNotificationType, PushLogStatus } from '../enums';
 import { PushLogQueryDto } from '../dto/push-log-query.dto';
 import { PushLogListResponseDto, PushLogResponseDto } from '../dto/push-log-response.dto';
-import { SendPushToTopicDto } from '../dto/send-push-to-topic.dto';
 import { PushStatsResponseDto } from '../dto/push-stats-response.dto';
 import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
 
@@ -23,7 +23,7 @@ export class PushNotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly fcmProvider: FcmProvider,
+    @Inject(PUSH_PROVIDER_TOKEN) private readonly pushProvider: IPushProvider,
   ) {}
 
   /**
@@ -40,11 +40,12 @@ export class PushNotificationService {
     );
 
     try {
-      // 1. 활성화된 푸시 토큰 조회
+      // 1. 활성화된 FCM 푸시 토큰 조회
       const pushTokens = await this.prisma.pushToken.findMany({
         where: {
           userId,
           isActive: true,
+          provider: 'FCM',
         },
       });
 
@@ -95,7 +96,7 @@ export class PushNotificationService {
         this.logger.debug(
           `📤 [PushNotificationService] FCM 전송 시도: token=${pushToken.token ? '있음' : '없음'}`,
         );
-        const result = await this.fcmProvider.sendToToken(
+        const result = await this.pushProvider.sendToToken(
           pushToken.token,
           enrichedMessage,
         );
@@ -180,6 +181,10 @@ export class PushNotificationService {
   /**
    * 모든 유저에게 푸시 알림 전송 (공지사항 등)
    *
+   * FCM Multicast API를 활용하여 배치 단위로 효율적으로 발송
+   * - FCM 제약: 최대 500개 토큰을 한 번에 발송 가능
+   * - 각 토큰별 로그 생성, 결과 업데이트, 토큰 상태 관리 수행
+   *
    * @param message - 푸시 메시지
    * @param filter - 선택적 필터 (예: 마케팅 동의 여부)
    * @param isTest - 테스트 발송 여부 (기본값: false)
@@ -195,10 +200,11 @@ export class PushNotificationService {
     );
 
     try {
-      // 활성화된 모든 푸시 토큰 조회
+      // 활성화된 모든 FCM 푸시 토큰 조회
       const pushTokens = await this.prisma.pushToken.findMany({
         where: {
           isActive: true,
+          provider: 'FCM',
           ...(filter?.marketingEnabled !== undefined && {
             marketingEnabled: filter.marketingEnabled,
           }),
@@ -221,45 +227,53 @@ export class PushNotificationService {
         `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
       );
 
-      // 각 토큰별로 로그 생성 후 전송
-      const results: PushSendResult[] = [];
+      // FCM Multicast 배치 크기 (최대 500개)
+      const BATCH_SIZE = 500;
       let successCount = 0;
       let failureCount = 0;
 
-      for (const pushToken of pushTokens) {
-        const logId = await this.createPendingLog(
-          pushToken,
-          message,
-          PushNotificationType.SYSTEM,
-          isTest,
+      // 배치 단위로 Multicast 발송
+      for (let i = 0; i < pushTokens.length; i += BATCH_SIZE) {
+        const batch = pushTokens.slice(i, i + BATCH_SIZE);
+
+        // 1. 배치 내 모든 토큰에 대해 로그 미리 생성
+        const logIds: (number | null)[] = await Promise.all(
+          batch.map((pushToken) =>
+            this.createPendingLog(pushToken, message, PushNotificationType.SYSTEM, isTest),
+          ),
         );
 
-        const enrichedMessage: PushMessage = {
-          ...message,
-          data: {
-            ...message.data,
-            logId: logId?.toString(),
-          },
-        };
+        // 2. FCM Multicast 발송 (sendToMultiple 활용)
+        const batchResults = await this.pushProvider.sendToMultiple(batch, message);
 
-        const result = await this.fcmProvider.sendToToken(
-          pushToken.token,
-          enrichedMessage,
+        // 3. 각 토큰별 결과 처리
+        await Promise.all(
+          batch.map(async (pushToken, index) => {
+            const result = batchResults[index];
+            const logId = logIds[index];
+
+            // 로그 실패 업데이트
+            if (logId && !result.success) {
+              await this.updateLogWithFailure(logId, result);
+            }
+
+            // 토큰 통계 업데이트
+            await this.updateTokenStats(pushToken.id, result.success);
+
+            // 무효 토큰 비활성화
+            if (this.shouldInvalidateToken(result)) {
+              await this.invalidateToken(pushToken, result.errorCode);
+            }
+
+            // 결과 집계
+            if (result.success) successCount++;
+            else failureCount++;
+          }),
         );
-        results.push(result);
 
-        if (logId && !result.success) {
-          await this.updateLogWithFailure(logId, result);
-        }
-
-        await this.updateTokenStats(pushToken.id, result.success);
-
-        if (this.shouldInvalidateToken(result)) {
-          await this.invalidateToken(pushToken, result.errorCode);
-        }
-
-        if (result.success) successCount++;
-        else failureCount++;
+        this.logger.debug(
+          `📦 [PushNotificationService] 배치 ${Math.floor(i / BATCH_SIZE) + 1} 완료: ${batch.length}개 처리 (Multicast)`,
+        );
       }
 
       this.logger.log(
@@ -433,24 +447,6 @@ export class PushNotificationService {
     this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회 (isTest=${isTest})`);
 
     try {
-      // 날짜 필터 구성
-      const dateFilter: any = {};
-      if (startDate || endDate) {
-        dateFilter.sentAt = {};
-        if (startDate) {
-          dateFilter.sentAt.gte = stringToKSTDate(startDate, 0, 0, 0);
-        }
-        if (endDate) {
-          dateFilter.sentAt.lte = stringToKSTDate(endDate, 23, 59, 59);
-        }
-      }
-
-      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
-      if (isTest !== undefined) {
-        dateFilter.isTest = isTest;
-      }
-
-      // WHERE 조건 생성
       // WHERE 조건 구성
       const whereFilter: any = {};
 
@@ -466,6 +462,7 @@ export class PushNotificationService {
           lte: stringToKSTDate(endDate, 23, 59, 59),
         };
       }
+      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
       if (isTest !== undefined) {
         whereFilter.isTest = isTest;
       }
@@ -601,59 +598,6 @@ export class PushNotificationService {
     } catch (error) {
       this.logger.error(
         `❌ [PushNotificationService] 푸시 로그 상태 업데이트 실패: logId=${logId}, ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * 마케팅 푸시 전송 (래퍼 메서드)
-   *
-   * Topic 기반으로 마케팅 동의한 유저에게만 푸시 전송
-   * 향후 UserConsent.agreeToMarketing 필드 추가시 필터링 로직 보강 예정
-   *
-   * @param message - 마케팅 푸시 메시지
-   * @returns 전송 결과
-   */
-  async sendMarketingBroadcast(message: {
-    title: string;
-    body: string;
-    imageUrl?: string;
-    data?: Record<string, any>;
-  }) {
-    this.logger.log(
-      `📣 [PushNotificationService] 마케팅 푸시 전송: title="${message.title}"`,
-    );
-
-    try {
-      // 마케팅 Topic으로 전송 (marketing Topic 구독자 = 마케팅 동의자)
-      const result = await this.fcmProvider.sendToTopic('marketing', {
-        title: message.title,
-        body: message.body,
-        imageUrl: message.imageUrl,
-        data: {
-          ...message.data,
-          subType: 'MARKETING_BROADCAST', // 세부 타입
-        },
-      });
-
-      this.logger.log(
-        `✅ [PushNotificationService] 마케팅 푸시 전송 완료: success=${result.success}`,
-      );
-
-      return {
-        success: result.success,
-        message: result.success
-          ? '마케팅 푸시가 전송되었습니다'
-          : '마케팅 푸시 전송에 실패했습니다',
-        messageId: result.messageId,
-        errorCode: result.errorCode,
-        errorMessage: result.errorMessage,
-      };
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] 마케팅 푸시 전송 실패: ${error.message}`,
         error.stack,
       );
       throw error;
