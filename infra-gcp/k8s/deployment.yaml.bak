@@ -27,9 +27,6 @@ spec:
     spec:
       serviceAccountName: biocom-bo-api-sa
 
-      imagePullSecrets:
-        - name: gcr-json-key
-
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -38,7 +35,7 @@ spec:
       containers:
         - name: biocom-bo-api
           # TODO: 실제 이미지 태그로 변경
-          image: asia-northeast3-docker.pkg.dev/biocom-bo-api/biocom-bo-api/biocom-bo-api:latest
+          image: asia-northeast3-docker.pkg.dev/biocom-backoffice/biocom-bo-api/biocom-bo-api:latest
           imagePullPolicy: Always
 
           ports:
@@ -183,5 +180,5 @@ metadata:
   labels:
     app: biocom-bo-api
   annotations:
-    iam.gke.io/gcp-service-account: biocom-bo-api@biocom-bo-api.iam.gserviceaccount.com
+    iam.gke.io/gcp-service-account: biocom-bo-api@biocom-backoffice.iam.gserviceaccount.com
 automountServiceAccountToken: true

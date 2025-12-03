@@ -29,7 +29,7 @@ BIOCOM BO-API 인프라 배포 스크립트 - Terraform으로 GCP 인프라 생�
   -h, --help                     이 도움말 출력
 
 예시:
-  $0 --project-id biocom-bo-api --yes
+  $0 --project-id biocom-backoffice --yes
 
 주의사항:
   - GCP 프로젝트가 미리 생성되어 있어야 합니다
@@ -134,6 +134,21 @@ run_terraform() {
     log_success "✅ Terraform 인프라 생성 완료!"
 }
 
+# GKE 노드가 Artifact Registry에서 이미지 pull 할 수 있도록 권한 부여
+setup_artifact_registry_permission() {
+    log_info "🔐 Artifact Registry 권한 설정 중..."
+
+    PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
+
+    # Compute Engine 기본 서비스 계정에 Artifact Registry 읽기 권한 부여
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+        --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+        --role="roles/artifactregistry.reader" \
+        --quiet
+
+    log_success "✅ Artifact Registry 읽기 권한 부여 완료!"
+}
+
 # 결과 출력
 show_outputs() {
     log_info "📊 인프라 정보:"
@@ -148,7 +163,7 @@ show_outputs() {
     echo
 
     log_success "🎉 인프라 배포가 완료되었습니다!"
-    log_info "다음 단계: ./02-deploy-app.sh --project-id $PROJECT_ID --yes"
+    log_info "다음 단계: ./02-deploy-app.sh --project-id biocom-backoffice --yes"
 }
 
 # 메인
@@ -158,6 +173,7 @@ main() {
     check_requirements
     setup_auth
     run_terraform
+    setup_artifact_registry_permission
     show_outputs
 }
 

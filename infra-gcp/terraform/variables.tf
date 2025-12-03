@@ -8,7 +8,7 @@
 variable "project_id" {
   description = "GCP 프로젝트 ID"
   type        = string
-  default     = "biocom-bo-api"
+  default     = "biocom-backoffice"
 
   validation {
     condition     = length(var.project_id) > 0
@@ -190,7 +190,7 @@ variable "common_labels" {
   description = "모든 리소스에 적용할 공통 라벨"
   type        = map(string)
   default = {
-    project     = "biocom-bo-api"
+    project     = "biocom-backoffice"
     owner       = "biocom-team"
     managed-by  = "terraform"
     environment = "dev"

@@ -34,8 +34,8 @@ BIOCOM BO-API 애플리케이션 배포 스크립트 - Docker 이미지 빌드 �
   -h, --help                     이 도움말 출력
 
 예시:
-  $0 --project-id biocom-bo-api --yes              # 전체 배포
-  $0 --project-id biocom-bo-api --skip-build --yes # 빌드 없이 배포만
+  $0 --project-id biocom-backoffice --yes              # 전체 배포
+  $0 --project-id biocom-backoffice --skip-build --yes # 빌드 없이 배포만
 
 주의사항:
   - 인프라가 먼저 구축되어 있어야 합니다 (01-deploy-infrastructure.sh)
@@ -246,9 +246,8 @@ ensure_static_ip() {
 deploy_kubernetes() {
     log_info "☸️ Kubernetes 리소스 배포 시작..."
 
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    K8S_DIR="$SCRIPT_DIR/../k8s"
     PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+    K8S_DIR="$PROJECT_ROOT/infra-gcp/k8s"
 
     if [[ ! -d "$K8S_DIR" ]]; then
         log_error "K8s 디렉토리를 찾을 수 없습니다: $K8S_DIR"
