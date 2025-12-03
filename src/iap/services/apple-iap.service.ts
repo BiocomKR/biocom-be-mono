@@ -112,8 +112,12 @@ export class AppleIapService {
     jwt: string,
     transactionId: string,
   ): Promise<AppleTransactionInfo | null> {
-    // Sandbox 환경 먼저 시도, 실패하면 Production 시도
-    const urls = [this.SANDBOX_URL, this.PRODUCTION_URL];
+    // 환경에 따라 API 호출 순서 결정
+    // Production 환경에서는 Production URL 먼저 시도
+    const isProduction = this.configService.raw.get<string>('NODE_ENV') === 'production';
+    const urls = isProduction
+      ? [this.PRODUCTION_URL, this.SANDBOX_URL]
+      : [this.SANDBOX_URL, this.PRODUCTION_URL];
 
     for (const baseUrl of urls) {
       try {

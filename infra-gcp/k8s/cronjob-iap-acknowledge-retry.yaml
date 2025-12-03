@@ -1,0 +1,72 @@
+# 🔄 CronJob - Google IAP Acknowledge 재시도
+# 매시간 정각에 실행 (KST 기준)
+# - VERIFIED 상태이면서 acknowledgedAt이 NULL인 Google 영수증 재처리
+# - 3일 내 미처리 시 Google에서 자동 환불
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: iap-acknowledge-retry
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+    job-type: iap-acknowledge-retry
+spec:
+  # Cron 표현식 (UTC 기준 - KST 정각 = UTC -9시간)
+  # 예: KST 01:00 = UTC 16:00 (전날)
+  # 매시간 실행: "0 * * * *"
+  schedule: "0 * * * *"
+
+  # 성공한 Job 히스토리 보관 개수
+  successfulJobsHistoryLimit: 3
+
+  # 실패한 Job 히스토리 보관 개수
+  failedJobsHistoryLimit: 3
+
+  # 동시 실행 정책 (중복 실행 방지)
+  concurrencyPolicy: Forbid
+
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 3600
+
+      template:
+        metadata:
+          labels:
+            app: biocom-api
+            job-type: iap-acknowledge-retry
+        spec:
+          serviceAccountName: biocom-api-sa
+
+          imagePullSecrets:
+          - name: gcr-json-key
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 2000
+
+          restartPolicy: Never
+
+          containers:
+          - name: iap-acknowledge-retry
+            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:latest
+            imagePullPolicy: Always
+
+            command:
+            - node
+            - dist/main.js
+            - --run-scheduler
+            - iap-acknowledge-retry
+
+            envFrom:
+            - configMapRef:
+                name: biocom-api-config
+
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "500m"

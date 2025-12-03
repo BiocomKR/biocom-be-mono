@@ -21,8 +21,8 @@ export class VerifyReceiptDto {
   platform: IAPPlatformType;
 
   @ApiProperty({
-    description: '영수증 데이터 (Apple: receipt-data base64, Google: purchaseToken)',
-    example: 'MIITuQYJKoZIhvc...',
+    description: '영수증 데이터 (Apple: 현재 미사용 - 빈 문자열 가능, Google: purchaseToken)',
+    example: 'purchaseToken...',
   })
   @IsString()
   @IsNotEmpty()

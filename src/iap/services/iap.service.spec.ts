@@ -12,6 +12,21 @@ describe('IapService', () => {
   let appleIapService: any;
   let googleIapService: any;
 
+  // 트랜잭션 내부에서 사용할 Mock
+  const mockTxClient = {
+    iAPReceipt: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+      update: jest.fn(),
+    },
+    product: {
+      findUnique: jest.fn(),
+    },
+    challengeTicket: {
+      create: jest.fn(),
+    },
+  };
+
   const mockPrismaService = {
     iAPReceipt: {
       findUnique: jest.fn(),
@@ -29,6 +44,8 @@ describe('IapService', () => {
     challengeTicket: {
       create: jest.fn(),
     },
+    // $transaction Mock: 콜백 함수를 받아서 mockTxClient로 실행
+    $transaction: jest.fn((callback) => callback(mockTxClient)),
   };
 
   const mockAppleIapService = {
@@ -58,6 +75,12 @@ describe('IapService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // 트랜잭션 Mock도 초기화
+    mockTxClient.iAPReceipt.findUnique.mockReset();
+    mockTxClient.iAPReceipt.upsert.mockReset();
+    mockTxClient.iAPReceipt.update.mockReset();
+    mockTxClient.product.findUnique.mockReset();
+    mockTxClient.challengeTicket.create.mockReset();
   });
 
   describe('verifyAndProcessPurchase', () => {
@@ -98,7 +121,17 @@ describe('IapService', () => {
 
     describe('중복 구매 검증', () => {
       it('이미 검증된 트랜잭션이면 ConflictException 발생', async () => {
-        mockPrismaService.iAPReceipt.findUnique.mockResolvedValue({
+        // 상품 조회 성공 (트랜잭션 외부)
+        mockPrismaService.iAPProduct.findUnique.mockResolvedValue(mockIapProduct);
+        // Apple 검증 성공
+        mockAppleIapService.verifyReceipt.mockResolvedValue({
+          isValid: true,
+          transactionId: mockDto.transactionId,
+          purchaseDate: new Date(),
+          rawResponse: {},
+        });
+        // 트랜잭션 내부에서 중복 체크 - 이미 VERIFIED 상태
+        mockTxClient.iAPReceipt.findUnique.mockResolvedValue({
           ...mockReceipt,
           status: 'VERIFIED',
         });
@@ -106,28 +139,27 @@ describe('IapService', () => {
         await expect(
           service.verifyAndProcessPurchase(mockUserId, mockDto),
         ).rejects.toThrow(ConflictException);
-
-        expect(mockPrismaService.iAPReceipt.findUnique).toHaveBeenCalledWith({
-          where: { transactionId: mockDto.transactionId },
-        });
       });
 
       it('실패한 검증은 재시도 허용', async () => {
-        mockPrismaService.iAPReceipt.findUnique.mockResolvedValue({
-          ...mockReceipt,
-          status: 'FAILED',
-        });
+        // 상품 조회 성공 (트랜잭션 외부)
         mockPrismaService.iAPProduct.findUnique.mockResolvedValue(mockIapProduct);
+        // Apple 검증 성공
         mockAppleIapService.verifyReceipt.mockResolvedValue({
           isValid: true,
           transactionId: mockDto.transactionId,
           purchaseDate: new Date(),
           rawResponse: {},
         });
-        mockPrismaService.iAPReceipt.upsert.mockResolvedValue(mockReceipt);
-        mockPrismaService.product.findUnique.mockResolvedValue({ id: 10, price: 9900 });
-        mockPrismaService.challengeTicket.create.mockResolvedValue(mockTicket);
-        mockPrismaService.iAPReceipt.update.mockResolvedValue(mockReceipt);
+        // 트랜잭션 내부 - 기존 FAILED 상태 (재시도 허용)
+        mockTxClient.iAPReceipt.findUnique.mockResolvedValue({
+          ...mockReceipt,
+          status: 'FAILED',
+        });
+        mockTxClient.iAPReceipt.upsert.mockResolvedValue(mockReceipt);
+        mockTxClient.product.findUnique.mockResolvedValue({ id: 10, price: 9900 });
+        mockTxClient.challengeTicket.create.mockResolvedValue(mockTicket);
+        mockTxClient.iAPReceipt.update.mockResolvedValue(mockReceipt);
 
         const result = await service.verifyAndProcessPurchase(mockUserId, mockDto);
 
@@ -148,11 +180,11 @@ describe('IapService', () => {
 
     describe('Apple 영수증 검증', () => {
       beforeEach(() => {
-        mockPrismaService.iAPReceipt.findUnique.mockResolvedValue(null);
         mockPrismaService.iAPProduct.findUnique.mockResolvedValue(mockIapProduct);
       });
 
       it('Apple 영수증 검증 성공 시 티켓 발급', async () => {
+        // Apple 검증 성공
         mockAppleIapService.verifyReceipt.mockResolvedValue({
           isValid: true,
           transactionId: mockDto.transactionId,
@@ -160,10 +192,12 @@ describe('IapService', () => {
           purchaseDate: new Date(),
           rawResponse: { status: 0 },
         });
-        mockPrismaService.iAPReceipt.upsert.mockResolvedValue(mockReceipt);
-        mockPrismaService.product.findUnique.mockResolvedValue({ id: 10, price: 9900 });
-        mockPrismaService.challengeTicket.create.mockResolvedValue(mockTicket);
-        mockPrismaService.iAPReceipt.update.mockResolvedValue(mockReceipt);
+        // 트랜잭션 내부 Mock
+        mockTxClient.iAPReceipt.findUnique.mockResolvedValue(null); // 중복 없음
+        mockTxClient.iAPReceipt.upsert.mockResolvedValue(mockReceipt);
+        mockTxClient.product.findUnique.mockResolvedValue({ id: 10, price: 9900 });
+        mockTxClient.challengeTicket.create.mockResolvedValue(mockTicket);
+        mockTxClient.iAPReceipt.update.mockResolvedValue(mockReceipt);
 
         const result = await service.verifyAndProcessPurchase(mockUserId, mockDto);
 
@@ -181,6 +215,7 @@ describe('IapService', () => {
           error: 'INVALID_RECEIPT',
           message: '영수증이 유효하지 않습니다.',
         });
+        // 검증 실패 시 트랜잭션 없이 저장 (prisma 직접 사용)
         mockPrismaService.iAPReceipt.upsert.mockResolvedValue({
           ...mockReceipt,
           status: 'FAILED',
@@ -198,10 +233,10 @@ describe('IapService', () => {
         ...mockDto,
         platform: IAPPlatformType.GOOGLE,
         productId: 'challenge_ticket_1',
+        transactionId: 'order-123',
       };
 
       beforeEach(() => {
-        mockPrismaService.iAPReceipt.findUnique.mockResolvedValue(null);
         mockPrismaService.iAPProduct.findUnique.mockResolvedValue({
           ...mockIapProduct,
           googleProductId: 'challenge_ticket_1',
@@ -209,6 +244,7 @@ describe('IapService', () => {
       });
 
       it('Google 영수증 검증 성공 시 Acknowledge 호출', async () => {
+        // Google 검증 성공
         mockGoogleIapService.verifyReceipt.mockResolvedValue({
           isValid: true,
           orderId: 'order-123',
@@ -216,9 +252,13 @@ describe('IapService', () => {
           rawResponse: { purchaseState: 0 },
         });
         mockGoogleIapService.acknowledgePurchase.mockResolvedValue(true);
-        mockPrismaService.iAPReceipt.upsert.mockResolvedValue(mockReceipt);
-        mockPrismaService.product.findUnique.mockResolvedValue({ id: 10, price: 9900 });
-        mockPrismaService.challengeTicket.create.mockResolvedValue(mockTicket);
+        // 트랜잭션 내부 Mock
+        mockTxClient.iAPReceipt.findUnique.mockResolvedValue(null); // 중복 없음
+        mockTxClient.iAPReceipt.upsert.mockResolvedValue(mockReceipt);
+        mockTxClient.product.findUnique.mockResolvedValue({ id: 10, price: 9900 });
+        mockTxClient.challengeTicket.create.mockResolvedValue(mockTicket);
+        mockTxClient.iAPReceipt.update.mockResolvedValue(mockReceipt);
+        // Acknowledge 성공 후 업데이트 (트랜잭션 외부)
         mockPrismaService.iAPReceipt.update.mockResolvedValue(mockReceipt);
 
         const result = await service.verifyAndProcessPurchase(mockUserId, googleDto);
@@ -236,6 +276,7 @@ describe('IapService', () => {
           error: 'INVALID_PURCHASE_STATE',
           message: '구매 상태가 유효하지 않습니다.',
         });
+        // 검증 실패 시 트랜잭션 없이 저장
         mockPrismaService.iAPReceipt.upsert.mockResolvedValue({
           ...mockReceipt,
           status: 'FAILED',

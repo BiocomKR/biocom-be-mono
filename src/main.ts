@@ -52,6 +52,15 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'iap-acknowledge-retry': {
+        // Google IAP Acknowledge 재시도 배치 (매시간 실행)
+        logger.log('Google Acknowledge 재시도 배치 실행...');
+        const { IapSchedulerService } = await import('./iap/services/iap-scheduler.service');
+        const iapSchedulerService = app.get(IapSchedulerService);
+        await iapSchedulerService.handleGoogleAcknowledgeRetry();
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         process.exit(1);

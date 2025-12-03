@@ -2369,6 +2369,8 @@ model IAPReceipt {
   refundReason          String?          @map("refund_reason") @db.VarChar(200)
   /// 발급된 챌린지 티켓 ID
   challengeTicketId     Int?             @unique @map("challenge_ticket_id")
+  /// Google Acknowledge 완료일시
+  acknowledgedAt        DateTime?        @map("acknowledged_at")
   /// 생성일시
   createdAt             DateTime         @default(now()) @map("created_at")
   /// 수정일시
