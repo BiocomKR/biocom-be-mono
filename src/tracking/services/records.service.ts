@@ -577,10 +577,10 @@ export class RecordsService {
   /**
    * 활동 기록 저장 (새로운 구조)
    * @param userId 사용자 ID
-   * @param dto 활동 기록 데이터 (activityType, activityTime, imageUrl, date)
+   * @param dto 활동 기록 데이터 (activityType, activityTime, imageUrl)
    */
   async createActivityRecord(userId: number, dto: CreateActivityRecordDto) {
-    const targetDate = dto.date || getKoreanToday();
+    const targetDate = getKoreanToday();
 
     this.logger.log(`활동 기록 저장 시작 - 사용자: ${userId}, 날짜: ${targetDate}`);
 
