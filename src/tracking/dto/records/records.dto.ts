@@ -305,14 +305,6 @@ export class CreateActivityRecordDto {
   @IsNotEmpty()
   imageUrl: string;
 
-  @ApiProperty({
-    description: '기록 날짜 (YYYY-MM-DD 형식)',
-    example: '2025-09-15',
-    required: false
-  })
-  @IsOptional()
-  @IsDateString()
-  date?: string;
 }
 
 /**

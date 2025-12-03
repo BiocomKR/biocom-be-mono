@@ -2120,14 +2120,41 @@ export class RecordsService {
           break;
 
         case 'ACTIVITY':
+          // 당일 모든 활동 기록 조회
+          const activityRecords = await this.prisma.userRecord.findMany({
+            where: {
+              userId,
+              recordType: 'ACTIVITY',
+              date: new Date(date),
+            },
+          });
+
+          // 활동 데이터 변환 및 합산
+          const activitiesData = activityRecords.map((activity) => {
+            const metadata = activity.metadata as any;
+            return {
+              activityId: `${dateId}_ACTIVITY_${activity.id}`,
+              activityTypeCode: metadata.activityType?.code || 'UNKNOWN',
+              name: metadata.activityType?.name || '알 수 없음',
+              activityTime: metadata.activityTime || '00:00:00',
+              durationMinutes: metadata.durationInMinutes || 0,
+              estimatedCalories: metadata.estimatedCalories || 0,
+              imageUrl: metadata.imageUrl || '',
+            };
+          });
+
+          // 총 칼로리 및 총 시간 계산
+          const totalCalories = activitiesData.reduce((sum, act) => sum + act.estimatedCalories, 0);
+          const totalDurationMinutes = activitiesData.reduce((sum, act) => sum + act.durationMinutes, 0);
+
           await this.graphSyncService.syncActivity({
             chartId,
             dateId,
             date,
-            totalCalories: metadata.totalCalories || 0,
-            activityCount: metadata.activities?.length || 1,
-            totalDurationMinutes: metadata.totalDurationMinutes || 0,
-            activities: metadata.activities || [],
+            totalCalories,
+            activityCount: activitiesData.length,
+            totalDurationMinutes,
+            activities: activitiesData,
           });
           break;
 
