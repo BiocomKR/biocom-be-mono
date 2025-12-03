@@ -4,6 +4,7 @@ import { AppleIapService } from './apple-iap.service';
 import { GoogleIapService } from './google-iap.service';
 import { VerifyReceiptDto, IAPPlatformType } from '../dto/verify-receipt.dto';
 import { IAPReceiptStatus } from '@prisma/client';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * IAP 통합 서비스
@@ -124,7 +125,7 @@ export class IapService {
     verificationResult: any,
   ) {
     const status: IAPReceiptStatus = verificationResult.isValid ? 'VERIFIED' : 'FAILED';
-    const purchaseDate = verificationResult.purchaseDate || verificationResult.purchaseTime || new Date();
+    const purchaseDate = verificationResult.purchaseDate || verificationResult.purchaseTime || getNowKST();
 
     return this.prisma.iAPReceipt.upsert({
       where: { transactionId: dto.transactionId },
@@ -172,17 +173,17 @@ export class IapService {
         ticketType: 'IAP',
         status: 'AVAILABLE',
         purchasePrice: product.price,
-        purchasedAt: new Date(),
+        purchasedAt: getNowKST(),
         expiresAt: this.calculateExpiryDate(30), // 30일 후 만료
       },
     });
   }
 
   /**
-   * 만료일 계산
+   * 만료일 계산 (KST 기준)
    */
   private calculateExpiryDate(days: number): Date {
-    const date = new Date();
+    const date = getNowKST();
     date.setDate(date.getDate() + days);
     return date;
   }
