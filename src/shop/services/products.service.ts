@@ -33,7 +33,8 @@ export class ProductsService {
         status: ProductStatus.ACTIVE,
       },
       include: {
-        images: {
+        productFiles: {
+          include: { file: true },
           orderBy: { sortOrder: 'asc' },
         },
       },
@@ -45,6 +46,13 @@ export class ProductsService {
 
     return {
       ...product,
+      images: product.productFiles.map(pf => ({
+        id: pf.id,
+        imageUrl: pf.file.filePath,
+        imageType: pf.imageType,
+        sortOrder: pf.sortOrder,
+        altText: pf.altText,
+      })),
       price: product.price ? Number(product.price.toString()) : null,
       originalPrice: product.originalPrice ? Number(product.originalPrice.toString()) : null,
       minPrice: product.price ? Number(product.price.toString()) : 0,
@@ -65,7 +73,8 @@ export class ProductsService {
         status: ProductStatus.ACTIVE,
       },
       include: {
-        images: {
+        productFiles: {
+          include: { file: true },
           orderBy: { sortOrder: 'asc' },
         },
       },
@@ -82,7 +91,7 @@ export class ProductsService {
     const qnaStats = await this.getQnaSummary(id);
 
     // 이미지 URL 배열 생성
-    const imageUrls = product.images.map(img => img.imageUrl);
+    const imageUrls = product.productFiles.map(pf => pf.file.filePath);
 
     return {
       id: product.id,
@@ -326,19 +335,20 @@ export class ProductsService {
 
     // 상품 ID 리스트로 이미지 조회
     const productIds = products.map(p => p.id);
-    const images = await this.prisma.productImage.findMany({
+    const productFiles = await this.prisma.productFile.findMany({
       where: {
         productId: { in: productIds },
         imageType: 'MAIN',
       },
+      include: { file: true },
       orderBy: { sortOrder: 'asc' },
     });
 
     // 상품 ID별 이미지 맵 생성
     const imageMap = new Map<number, string>();
-    images.forEach(img => {
-      if (!imageMap.has(img.productId)) {
-        imageMap.set(img.productId, img.imageUrl);
+    productFiles.forEach(pf => {
+      if (!imageMap.has(pf.productId)) {
+        imageMap.set(pf.productId, pf.file.filePath);
       }
     });
 

@@ -420,9 +420,9 @@ export class RecordsService {
         id: true,
         name: true,
         description: true,
-        images: {
+        productFiles: {
           where: { imageType: 'MAIN' },
-          select: { imageUrl: true },
+          include: { file: true },
           take: 1,
         },
         nutrients: {
@@ -450,7 +450,7 @@ export class RecordsService {
           type: 'PRODUCT',
           name: product.name,
           description: product.description,
-          imageUrl: product.images[0]?.imageUrl,
+          imageUrl: product.productFiles[0]?.file.filePath,
           nutrients: product.nutrients,
         })),
       },
@@ -1343,13 +1343,14 @@ export class RecordsService {
               id: true,
               name: true,
               productInfo: true,
-              images: {
+              productFiles: {
                 where: {
                   imageType: 'MAIN',
                 },
-                select: {
-                  imageUrl: true,
+                include: {
+                  file: true,
                 },
+                orderBy: { sortOrder: 'asc' },
                 take: 1,
               },
             },
@@ -1396,7 +1397,7 @@ export class RecordsService {
           routineId: routine.id,
           productId: routine.productId,
           productName: routine.product.name,
-          productImage: routine.product.images[0]?.imageUrl || null,
+          productImage: routine.product.productFiles[0]?.file.filePath || null,
           dosage: routine.product.productInfo
             ? {
                 frequency: routine.product.productInfo['frequency_per_day'] || 0,
@@ -1695,9 +1696,10 @@ export class RecordsService {
           id: true,
           name: true,
           productInfo: true,
-          images: {
+          productFiles: {
             where: { imageType: 'MAIN' },
-            select: { imageUrl: true },
+            include: { file: true },
+            orderBy: { sortOrder: 'asc' },
             take: 1,
           },
         },
@@ -1723,7 +1725,7 @@ export class RecordsService {
         return {
           productId: product.id,
           productName: product.name,
-          productImage: product.images[0]?.imageUrl || null,
+          productImage: product.productFiles[0]?.file.filePath || null,
           dosage: product.productInfo
             ? {
                 frequency: product.productInfo['frequency_per_day'] || 0,

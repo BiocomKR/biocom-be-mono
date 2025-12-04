@@ -1,3 +1,13 @@
+/**
+ * @deprecated
+ * 이 모듈은 더 이상 사용되지 않습니다.
+ * biocom-bo-api로 전부 이전되었습니다.
+ * biocom-admin은 bo-api를 호출합니다.
+ *
+ * 삭제 예정 - 참고용으로만 유지
+ */
+
+/*
 import { Module } from '@nestjs/common';
 import { CommonModule } from '../common/common.module';
 import { UsersModule } from '../users/users.module';
@@ -19,10 +29,6 @@ import { ManagementShippingController } from './controllers/management-shipping.
 import { ManagementRefundController } from './controllers/management-refund.controller';
 import { ManagementChallengeController } from './controllers/management-challenge.controller';
 import { ManagementMissionController } from './controllers/management-mission.controller';
-// @deprecated - biocom-bo-api로 이전됨 (biocom-admin은 bo-api 호출)
-// import { ManagementPushNotificationController } from './controllers/management-push-notification.controller';
-// import { ManagementPushCampaignController } from './controllers/management-push-campaign.controller';
-// import { ManagementPushScheduleController } from './controllers/management-push-schedule.controller';
 import { ManagementShopService } from './services/management-shop.service';
 import { ManagementDashboardService } from './services/management-dashboard.service';
 import { ManagementShippingService } from './services/management-shipping.service';
@@ -32,14 +38,7 @@ import { ManagementMissionService } from './services/management-mission.service'
 import { PointModule } from '../point/point.module';
 import { ChallengeModule } from '../challenge/challenge.module';
 import { PaymentModule } from '../shop/payment.module';
-// @deprecated - biocom-bo-api로 이전됨
-// import { PushModule } from '../push/push.module';
 
-/**
- * Management 모듈
- * 백오피스에서 사용하는 관리용 API들을 제공
- * API-KEY 기반 인증 사용
- */
 @Module({
   imports: [
     CommonModule,
@@ -51,7 +50,6 @@ import { PaymentModule } from '../shop/payment.module';
     PointModule,
     ChallengeModule,
     PaymentModule,
-    // PushModule, // @deprecated - biocom-bo-api로 이전됨
   ],
   controllers: [
     ManagementUsersController,
@@ -66,10 +64,6 @@ import { PaymentModule } from '../shop/payment.module';
     ManagementRefundController,
     ManagementChallengeController,
     ManagementMissionController,
-    // @deprecated - biocom-bo-api로 이전됨
-    // ManagementPushNotificationController,
-    // ManagementPushCampaignController,
-    // ManagementPushScheduleController,
   ],
   providers: [
     ApiKeyGuard,
@@ -83,4 +77,14 @@ import { PaymentModule } from '../shop/payment.module';
   ],
   exports: [ApiKeyGuard],
 })
+export class ManagementModule {}
+*/
+
+// 빈 모듈로 대체 (app.module.ts에서 import하고 있을 수 있으므로)
+import { Module } from '@nestjs/common';
+
+/**
+ * @deprecated - biocom-bo-api로 이전됨
+ */
+@Module({})
 export class ManagementModule {}
