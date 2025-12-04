@@ -70,7 +70,7 @@ export class ChallengeService {
               userChallenges: true,
               challengeMissions: true,
               challengeSurveys: true,
-              contents: true
+              challengeContents: true
             }
           }
         },

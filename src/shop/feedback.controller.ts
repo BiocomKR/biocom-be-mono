@@ -149,4 +149,19 @@ export class FeedbackController {
     const operatorId = req.user?.id || req.user?.sub;
     return this.feedbackService.answerQuestion(id, dto.content, operatorId);
   }
+
+  /**
+   * 문의 답변 수정
+   */
+  @Patch('questions/:id/answer')
+  @ApiOperation({ summary: '문의 답변 수정' })
+  @ApiResponse({ status: 200, description: '답변 수정 성공' })
+  async updateAnswer(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: AnswerQuestionDto,
+    @Request() req: any,
+  ) {
+    const operatorId = req.user?.id || req.user?.sub;
+    return this.feedbackService.updateAnswer(id, dto.content, operatorId);
+  }
 }
