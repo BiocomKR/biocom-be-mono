@@ -63,7 +63,11 @@ export class ShopService {
         take: limit,
         orderBy,
         include: {
-          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+          productFiles: {
+            include: { file: true },
+            orderBy: { sortOrder: 'asc' },
+            take: 1
+          },
           _count: {
             select: { orderItems: true }
           }
@@ -89,7 +93,7 @@ export class ShopService {
         viewCount: p.viewCount,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
-        imageUrl: p.images[0]?.imageUrl || null,
+        imageUrl: p.productFiles[0]?.file.filePath || null,
         orderCount: p._count.orderItems
       })),
       total,
@@ -106,7 +110,10 @@ export class ShopService {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
-        images: { orderBy: { sortOrder: 'asc' } },
+        productFiles: {
+          include: { file: true },
+          orderBy: { sortOrder: 'asc' }
+        },
         _count: {
           select: { orderItems: true }
         }
@@ -143,12 +150,12 @@ export class ShopService {
       metadata: product.metadata,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
-      images: product.images.map(img => ({
-        id: img.id,
-        imageUrl: img.imageUrl,
-        imageType: img.imageType,
-        sortOrder: img.sortOrder,
-        altText: img.altText
+      images: product.productFiles.map(pf => ({
+        id: pf.id,
+        imageUrl: pf.file.filePath,
+        imageType: pf.imageType,
+        sortOrder: pf.sortOrder,
+        altText: pf.altText
       })),
       orderCount: product._count.orderItems
     };
@@ -171,7 +178,10 @@ export class ShopService {
       where: { id: product.id },
       include: {
         category: true,
-        images: true
+        productFiles: {
+          include: { file: true },
+          orderBy: { sortOrder: 'asc' }
+        }
       }
     });
   }
@@ -199,7 +209,10 @@ export class ShopService {
       where: { id },
       include: {
         category: true,
-        images: true
+        productFiles: {
+          include: { file: true },
+          orderBy: { sortOrder: 'asc' }
+        }
       }
     });
   }

@@ -90,6 +90,7 @@ model File {
   updatedAt    DateTime?     @updatedAt @map("updated_at")
   contentFiles ContentFile[]
   userFiles    UserFile[]
+  productFiles ProductFile[]
 
   @@index([createdAt], map: "idx_files_created_at")
   @@index([isActive], map: "idx_files_is_active")
@@ -659,6 +660,7 @@ model Product {
   orderItems                   OrderItem[]
   feedback                     ProductFeedback[]
   images                       ProductImage[]
+  productFiles                 ProductFile[]
   recentlyViewed               RecentlyViewed[]
   supplementNutrients          SupplementNutrient[]
   userChallengeSurveyResults   UserChallengeSurveyResult[]
@@ -693,6 +695,24 @@ model ProductImage {
 
   @@index([productId, sortOrder])
   @@map("product_images")
+}
+
+/// 상품-파일 연결 테이블
+/// products와 files를 연결하는 중간 테이블
+model ProductFile {
+  id        Int      @id @default(autoincrement())
+  productId Int      @map("product_id")
+  fileId    Int      @map("file_id")
+  imageType String   @map("image_type") @db.VarChar(20)
+  sortOrder Int      @default(0) @map("sort_order")
+  altText   String?  @map("alt_text") @db.VarChar(200)
+  createdAt DateTime @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  file    File    @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([productId, imageType, sortOrder])
+  @@map("product_files")
 }
 
 /// 장바구니 테이블

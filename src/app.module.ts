@@ -29,6 +29,7 @@ import { QuizMasterController } from './quiz/quiz-master.controller';
 import { ContentController } from './content/content.controller';
 import { PointController } from './point/point.controller';
 import { ShopController } from './shop/shop.controller';
+import { FeedbackController } from './shop/feedback.controller';
 import { ShippingController } from './shipping/shipping.controller';
 import { RefundController } from './refund/refund.controller';
 import { DashboardController } from './dashboard/dashboard.controller';
@@ -43,6 +44,7 @@ import { QuizService } from './quiz/quiz.service';
 import { ContentService } from './content/content.service';
 import { PointService } from './point/point.service';
 import { ShopService } from './shop/shop.service';
+import { FeedbackService } from './shop/feedback.service';
 import { ShippingService } from './shipping/shipping.service';
 import { RefundService } from './refund/refund.service';
 import { DashboardService } from './dashboard/dashboard.service';
@@ -100,6 +102,7 @@ import { CartService } from './cart/cart.service';
     ContentController,
     PointController,
     ShopController,
+    FeedbackController,
     ShippingController,
     RefundController,
     DashboardController,
@@ -116,6 +119,7 @@ import { CartService } from './cart/cart.service';
     ContentService,
     PointService,
     ShopService,
+    FeedbackService,
     ShippingService,
     RefundService,
     DashboardService,
