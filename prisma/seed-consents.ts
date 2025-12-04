@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 const consentData = [
+  // ===== 회원가입 약관 (SIGNUP) =====
   {
     code: 'SERVICE_TERMS',
     title: '서비스 이용약관',
@@ -17,6 +18,7 @@ const consentData = [
 1. 이 약관은 서비스를 이용하고자 하는 모든 이용자에게 적용됩니다.
 2. 회사는 필요한 경우 관련 법령을 위반하지 않는 범위에서 이 약관을 변경할 수 있습니다.`,
     version: '1.0',
+    category: 'SIGNUP',
     isRequired: true,
     isActive: true,
     displayOrder: 1,
@@ -30,6 +32,7 @@ const consentData = [
 
 바이오컴 서비스는 만 14세 이상의 이용자를 대상으로 합니다.`,
     version: '1.0',
+    category: 'SIGNUP',
     isRequired: true,
     isActive: true,
     displayOrder: 2,
@@ -54,6 +57,7 @@ const consentData = [
 - 이용자는 개인정보 수집에 동의하지 않을 권리가 있습니다.
 - 다만, 필수항목에 대한 동의 거부 시 서비스 이용이 제한될 수 있습니다.`,
     version: '1.0',
+    category: 'SIGNUP',
     isRequired: true,
     isActive: true,
     displayOrder: 3,
@@ -81,6 +85,7 @@ const consentData = [
 - 이용자는 제3자 제공에 동의하지 않을 권리가 있습니다.
 - 다만, 동의 거부 시 상품 구매 서비스 이용이 제한될 수 있습니다.`,
     version: '1.0',
+    category: 'SIGNUP',
     isRequired: false,
     isActive: true,
     displayOrder: 4,
@@ -106,9 +111,55 @@ const consentData = [
 - 마이페이지에서 언제든지 수신 동의를 철회할 수 있습니다.
 - 수신 거부 시에도 서비스 이용에 필요한 필수 안내는 발송됩니다.`,
     version: '1.0',
+    category: 'SIGNUP',
     isRequired: false,
     isActive: true,
     displayOrder: 5,
+  },
+  // ===== 결제 약관 (PAYMENT) =====
+  {
+    code: 'PAYMENT_TERMS',
+    title: '전자결제 이용약관',
+    content: `제1조 (목적)
+본 약관은 바이오컴(이하 "회사")이 제공하는 전자결제 서비스의 이용조건 및 절차에 관한 사항을 규정합니다.
+
+제2조 (결제 수단)
+회사는 다음 결제 수단을 제공합니다.
+- 신용카드/체크카드
+- 간편결제 (토스페이, 카카오페이 등)
+- 계좌이체
+
+제3조 (결제 취소 및 환불)
+1. 결제 취소는 결제일로부터 7일 이내 가능합니다.
+2. 상품 배송 시작 후에는 반품 절차에 따라 환불됩니다.
+3. 환불은 원결제 수단으로 진행됩니다.`,
+    version: '1.0',
+    category: 'PAYMENT',
+    isRequired: true,
+    isActive: true,
+    displayOrder: 1,
+  },
+  {
+    code: 'PAYMENT_PRIVACY',
+    title: '결제 시 개인정보 수집 동의',
+    content: `1. 수집 항목
+- 결제자 정보: 이름, 연락처
+- 결제 정보: 카드번호, 유효기간 (PG사에서 처리)
+
+2. 수집 목적
+- 결제 처리 및 결제 내역 확인
+- 환불 처리
+
+3. 보유 기간
+- 전자상거래법에 따라 5년간 보관
+
+4. 동의 거부 시
+- 결제 서비스 이용이 불가합니다.`,
+    version: '1.0',
+    category: 'PAYMENT',
+    isRequired: true,
+    isActive: true,
+    displayOrder: 2,
   },
 ];
 
@@ -132,12 +183,13 @@ async function main() {
         data: {
           title: consent.title,
           content: consent.content,
+          category: consent.category,
           isRequired: consent.isRequired,
           isActive: consent.isActive,
           displayOrder: consent.displayOrder,
         },
       });
-      console.log(`✅ 업데이트: ${consent.code} v${consent.version}`);
+      console.log(`✅ 업데이트: ${consent.code} v${consent.version} (${consent.category})`);
     } else {
       // 신규 생성
       await prisma.consent.create({
