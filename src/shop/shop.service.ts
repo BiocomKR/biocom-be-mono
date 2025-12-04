@@ -6,6 +6,7 @@ import {
   ConflictException
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { UploadService } from '../upload/upload.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { OrderStatus, ProductStatus } from '../common/enums';
@@ -14,7 +15,10 @@ import { OrderStatus, ProductStatus } from '../common/enums';
 export class ShopService {
   private readonly logger = new Logger(ShopService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   /**
    * 상품 목록 조회 (관리자)
@@ -104,6 +108,32 @@ export class ShopService {
   }
 
   /**
+   * SKU 중복 검사 (대소문자 구분 없음)
+   */
+  async checkSkuDuplicate(sku: string, excludeId?: number) {
+    if (!sku || sku.trim() === '') {
+      return { isDuplicate: false, message: '' };
+    }
+
+    const existingProduct = await this.prisma.product.findFirst({
+      where: {
+        sku: { equals: sku.trim(), mode: 'insensitive' },
+        ...(excludeId ? { id: { not: excludeId } } : {})
+      },
+      select: { id: true, name: true, sku: true }
+    });
+
+    if (existingProduct) {
+      return {
+        isDuplicate: true,
+        message: `이미 사용 중인 SKU입니다 (${existingProduct.sku})`
+      };
+    }
+
+    return { isDuplicate: false, message: '사용 가능한 SKU입니다' };
+  }
+
+  /**
    * 상품 상세 조회 (관리자)
    */
   async getProductById(id: number) {
@@ -165,6 +195,21 @@ export class ShopService {
    * 상품 생성
    */
   async createProduct(dto: any) {
+    // SKU 검증: 공백 포함 불가
+    if (dto.sku && /\s/.test(dto.sku)) {
+      throw new BadRequestException('SKU에 공백을 포함할 수 없습니다');
+    }
+
+    // SKU 중복 검사 (대소문자 구분 없음)
+    if (dto.sku) {
+      const existing = await this.prisma.product.findFirst({
+        where: { sku: { equals: dto.sku, mode: 'insensitive' } }
+      });
+      if (existing) {
+        throw new ConflictException(`이미 사용 중인 SKU입니다 (${existing.sku})`);
+      }
+    }
+
     const product = await this.prisma.product.create({
       data: {
         ...dto,
@@ -174,16 +219,7 @@ export class ShopService {
 
     this.logger.log(`상품 생성: ${product.name} (ID: ${product.id})`);
 
-    return await this.prisma.product.findUnique({
-      where: { id: product.id },
-      include: {
-        category: true,
-        productFiles: {
-          include: { file: true },
-          orderBy: { sortOrder: 'asc' }
-        }
-      }
-    });
+    return this.getProductById(product.id);
   }
 
   /**
@@ -205,16 +241,7 @@ export class ShopService {
 
     this.logger.log(`상품 수정: ${product.name} (ID: ${id})`);
 
-    return await this.prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        productFiles: {
-          include: { file: true },
-          orderBy: { sortOrder: 'asc' }
-        }
-      }
-    });
+    return this.getProductById(id);
   }
 
   /**
@@ -242,28 +269,88 @@ export class ShopService {
   }
 
   /**
-   * 상품 이미지 추가
+   * 파일을 GCS에 업로드하고 File 테이블에 저장 (UserFile 없이)
    */
-  async addProductImage(productId: number, dto: any) {
+  private async uploadAndSaveFile(file: Express.Multer.File): Promise<number> {
+    // 상품 이미지 전용 업로드 (UserFile 없이 File 테이블에만 저장)
+    const result = await this.uploadService.uploadProductImage(file);
+    return result.id;
+  }
+
+  /**
+   * 상품 이미지 업로드 (MAIN 타입)
+   */
+  async uploadProductImages(
+    productId: number,
+    files?: Express.Multer.File[],
+    deleteFileIdsJson?: string
+  ) {
     const product = await this.prisma.product.findUnique({
-      where: { id: productId }
+      where: { id: productId },
+      include: {
+        productFiles: {
+          orderBy: { sortOrder: 'asc' }
+        }
+      }
     });
 
     if (!product) {
       throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
-    const image = await this.prisma.productImage.create({
-      data: {
-        productId,
-        ...dto,
-        createdAt: getNowKST(),
+    // 삭제할 파일 ID 파싱
+    let deleteFileIds: number[] = [];
+    if (deleteFileIdsJson) {
+      try {
+        deleteFileIds = JSON.parse(deleteFileIdsJson);
+      } catch {
+        this.logger.warn(`deleteFileIds 파싱 실패: ${deleteFileIdsJson}`);
+      }
+    }
+
+    // 새 파일 업로드 (트랜잭션 외부)
+    const newFileIds: number[] = [];
+    if (files && files.length > 0) {
+      for (const file of files) {
+        const fileId = await this.uploadAndSaveFile(file);
+        newFileIds.push(fileId);
+      }
+    }
+
+    // 기존 파일의 최대 sortOrder 구하기
+    const maxSortOrder = product.productFiles.length > 0
+      ? Math.max(...product.productFiles.map(pf => pf.sortOrder))
+      : -1;
+
+    await this.prisma.$transaction(async (tx) => {
+      // 삭제할 파일 관계 제거 (deleteFileIds는 ProductFile.id)
+      if (deleteFileIds.length > 0) {
+        await tx.productFile.deleteMany({
+          where: {
+            productId,
+            id: { in: deleteFileIds },
+          },
+        });
+        this.logger.log(`상품 이미지 삭제: 상품 ID ${productId}, ProductFile IDs ${deleteFileIds.join(', ')}`);
+      }
+
+      // 새 파일 추가 (MAIN 타입으로)
+      if (newFileIds.length > 0) {
+        await tx.productFile.createMany({
+          data: newFileIds.map((fileId, index) => ({
+            productId,
+            fileId,
+            imageType: 'MAIN',
+            sortOrder: maxSortOrder + 1 + index,
+            createdAt: getNowKST(),
+          })),
+        });
+        this.logger.log(`상품 이미지 추가: 상품 ID ${productId}, ${newFileIds.length}개 파일`);
       }
     });
 
-    this.logger.log(`상품 이미지 추가: 상품 ID ${productId}`);
-
-    return image;
+    // 업데이트된 상품 정보 반환
+    return this.getProductById(productId);
   }
 
   /**

@@ -9,9 +9,12 @@ import {
   Query,
   Body,
   UseGuards,
-  ParseIntPipe
+  ParseIntPipe,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShopService } from './shop.service';
 
@@ -48,6 +51,11 @@ export class ShopController {
     });
   }
 
+  @Get('products/check-sku')
+  async checkSkuDuplicate(@Query('sku') sku: string, @Query('excludeId') excludeId?: string) {
+    return this.shopService.checkSkuDuplicate(sku, excludeId ? parseInt(excludeId) : undefined);
+  }
+
   @Get('products/:id')
   async getProductById(@Param('id', ParseIntPipe) id: number) {
     return this.shopService.getProductById(id);
@@ -71,12 +79,17 @@ export class ShopController {
     return this.shopService.deleteProduct(id);
   }
 
+  /**
+   * 상품 이미지 업로드 (MAIN 타입)
+   */
   @Post('products/:id/images')
-        async addProductImage(
+  @UseInterceptors(FilesInterceptor('files', 10))
+  async uploadProductImages(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: any
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() dto: { deleteFileIds?: string }
   ) {
-    return this.shopService.addProductImage(id, dto);
+    return this.shopService.uploadProductImages(id, files, dto.deleteFileIds);
   }
 
   /**

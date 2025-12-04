@@ -374,4 +374,81 @@ export class UploadService {
 
     this.logger.log(`파일 삭제 완료 - ID: ${fileId}`);
   }
+
+  /**
+   * 상품 이미지 업로드 (UserFile 없이 File 테이블에만 저장)
+   * 관리자용 상품 이미지 업로드에 사용
+   */
+  async uploadProductImage(file: Express.Multer.File): Promise<{ id: number; filePath: string }> {
+    this.logger.log(`상품 이미지 업로드 시작 - 파일: ${file.originalname}`);
+
+    try {
+      // 1. 파일 존재 여부 확인
+      if (!file || (!file.buffer && !file.path)) {
+        throw new BadRequestException(this.config.errorMessages.fileNotFound);
+      }
+
+      // 파일 버퍼 준비
+      let fileBuffer: Buffer;
+      if (file.buffer) {
+        fileBuffer = file.buffer;
+      } else if (file.path) {
+        const fs = require('fs');
+        fileBuffer = fs.readFileSync(file.path);
+        setTimeout(() => {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (error) {
+            this.logger.warn(`임시 파일 삭제 실패: ${file.path}`);
+          }
+        }, 1000);
+      } else {
+        throw new BadRequestException('파일 데이터가 없습니다.');
+      }
+
+      // 2. 파일 크기 검증
+      if (file.size > this.config.limits.maxFileSize) {
+        throw new BadRequestException(this.config.errorMessages.fileSizeTooLarge);
+      }
+
+      if (file.size < this.config.limits.minFileSize) {
+        throw new BadRequestException(this.config.errorMessages.fileSizeTooSmall);
+      }
+
+      // 3. MIME 타입 검증
+      if (!this.config.allowedMimeTypes.has(file.mimetype)) {
+        throw new BadRequestException(this.config.errorMessages.invalidFileType);
+      }
+
+      // 4. 안전한 파일명 생성
+      const fileExt = extname(file.originalname).toLowerCase();
+      const safeFileName = `${crypto.randomBytes(16).toString('hex')}${fileExt}`;
+
+      // 5. Google Cloud Storage에 업로드
+      const publicUrl = await this.uploadToGoogleStorage(fileBuffer, safeFileName, file.mimetype);
+
+      // 6. File 테이블에만 저장 (UserFile 없이)
+      const fileRecord = await this.prisma.file.create({
+        data: {
+          originalName: file.originalname,
+          storedName: safeFileName,
+          filePath: publicUrl,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          storageType: 'gcs',
+          createdAt: getNowKST(),
+        },
+      });
+
+      this.logger.log(`상품 이미지 업로드 완료 - File ID: ${fileRecord.id}, URL: ${publicUrl}`);
+
+      return {
+        id: fileRecord.id,
+        filePath: publicUrl,
+      };
+    } catch (error) {
+      this.logger.error(`상품 이미지 업로드 중 오류 발생: ${error.message}`, error);
+      throw error;
+    }
+  }
 }
