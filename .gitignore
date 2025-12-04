@@ -35,3 +35,8 @@ coverage/
 # Prisma
 prisma/*.db
 infra-gcp/terraform/.terraform/
+
+
+# Davia
+.davia/
+.claude/skills/davia-documentation/SKILL.md

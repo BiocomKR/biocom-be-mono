@@ -2050,6 +2050,7 @@ model Consent {
   title        String        @db.VarChar(200)
   content      String?
   version      String        @db.VarChar(20)
+  category     String        @default("SIGNUP") @db.VarChar(50)
   isRequired   Boolean?      @default(false) @map("is_required")
   isActive     Boolean?      @default(false) @map("is_active")
   displayOrder Int?          @default(0) @map("display_order")
@@ -2059,6 +2060,7 @@ model Consent {
 
   @@unique([code, version], map: "consents_code_version_unique")
   @@index([code, isActive], map: "idx_consents_code_is_active")
+  @@index([category, isActive], map: "idx_consents_category_is_active")
   @@map("consents")
 }
 

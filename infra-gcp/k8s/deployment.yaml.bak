@@ -12,6 +12,11 @@ metadata:
     environment: dev
 spec:
   replicas: 1  # 백오피스는 1개로 충분
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0          # 추가 Pod 없이 배포 (메모리 절약)
+      maxUnavailable: 1    # 기존 Pod 먼저 종료 후 새 Pod 생성
   selector:
     matchLabels:
       app: biocom-bo-api
@@ -35,7 +40,7 @@ spec:
       containers:
         - name: biocom-bo-api
           # TODO: 실제 이미지 태그로 변경
-          image: asia-northeast3-docker.pkg.dev/biocom-backoffice/biocom-bo-api/biocom-bo-api:latest
+          image: asia-northeast3-docker.pkg.dev/biocom-backoffice/biocom-bo-api/biocom-bo-api:20251204123319
           imagePullPolicy: Always
 
           ports:
