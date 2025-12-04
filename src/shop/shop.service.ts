@@ -21,26 +21,38 @@ export class ShopService {
    */
   async getProducts(params: {
     status?: string;
-    categoryId?: number;
+    categoryCode?: string;
+    search?: string;
+    isFeatured?: boolean;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
     page: number;
     limit: number;
   }) {
-    const { status, categoryId, page, limit } = params;
+    const { status, categoryCode, search, isFeatured, sortBy, sortOrder, page, limit } = params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.ProductWhereInput = {};
     if (status) where.status = status;
-    if (categoryId) {
-      // categoryId를 categoryCode로 매핑
-      const categoryMapping: { [key: number]: string } = {
-        1: 'SUPPLEMENT', // 영양제
-        2: 'HEALTH_FOOD', // 건강식품
-        3: 'VITAMIN', // 비타민
-        4: 'PROBIOTICS', // 프로바이오틱스
-      };
-      const categoryCode = categoryMapping[categoryId];
-      if (categoryCode) {
-        where.categoryCode = categoryCode;
+    if (categoryCode) where.categoryCode = categoryCode;
+    if (isFeatured !== undefined) where.isFeatured = isFeatured;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // 정렬 설정
+    let orderBy: Prisma.ProductOrderByWithRelationInput = { createdAt: 'desc' };
+    if (sortBy) {
+      const order = sortOrder || 'desc';
+      switch (sortBy) {
+        case 'name': orderBy = { name: order }; break;
+        case 'price': orderBy = { price: order }; break;
+        case 'viewCount': orderBy = { viewCount: order }; break;
+        case 'createdAt': orderBy = { createdAt: order }; break;
+        default: orderBy = { createdAt: 'desc' };
       }
     }
 
@@ -49,10 +61,9 @@ export class ShopService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
-          category: true,
-          images: { orderBy: { sortOrder: 'asc' } },
+          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
           _count: {
             select: { orderItems: true }
           }
@@ -63,13 +74,83 @@ export class ShopService {
 
     return {
       items: products.map(p => ({
-        ...p,
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        description: p.description,
+        categoryCode: p.categoryCode,
+        categoryName: p.categoryName,
+        productType: p.productType,
+        price: p.price ? Number(p.price) : null,
+        originalPrice: p.originalPrice ? Number(p.originalPrice) : null,
+        discountRate: p.discountRate,
+        status: p.status,
+        isFeatured: p.isFeatured,
+        viewCount: p.viewCount,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        imageUrl: p.images[0]?.imageUrl || null,
         orderCount: p._count.orderItems
       })),
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit)
+    };
+  }
+
+  /**
+   * 상품 상세 조회 (관리자)
+   */
+  async getProductById(id: number) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        _count: {
+          select: { orderItems: true }
+        }
+      }
+    });
+
+    if (!product) {
+      throw new NotFoundException('상품을 찾을 수 없습니다');
+    }
+
+    return {
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      description: product.description,
+      categoryCode: product.categoryCode,
+      categoryName: product.categoryName,
+      productType: product.productType,
+      setItems: product.setItems,
+      productInfo: product.productInfo,
+      price: product.price ? Number(product.price) : null,
+      originalPrice: product.originalPrice ? Number(product.originalPrice) : null,
+      discountRate: product.discountRate,
+      shippingFee: Number(product.shippingFee),
+      shippingPolicy: product.shippingPolicy,
+      freeShippingAmount: product.freeShippingAmount ? Number(product.freeShippingAmount) : null,
+      maxOrderQty: product.maxOrderQty,
+      weight: product.weight,
+      status: product.status,
+      isFeatured: product.isFeatured,
+      viewCount: product.viewCount,
+      pointRate: product.pointRate,
+      tags: product.tags,
+      metadata: product.metadata,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+      images: product.images.map(img => ({
+        id: img.id,
+        imageUrl: img.imageUrl,
+        imageType: img.imageType,
+        sortOrder: img.sortOrder,
+        altText: img.altText
+      })),
+      orderCount: product._count.orderItems
     };
   }
 

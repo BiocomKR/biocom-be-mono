@@ -26,27 +26,40 @@ export class ShopController {
    * 상품 관리
    */
   @Get('products')
-            async getProducts(
+  async getProducts(
     @Query('status') status?: string,
-    @Query('category') category?: string,
+    @Query('categoryCode') categoryCode?: string,
+    @Query('search') search?: string,
+    @Query('isFeatured') isFeatured?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string
   ) {
     return this.shopService.getProducts({
       status,
-      categoryId: category ? parseInt(category) : undefined,
+      categoryCode,
+      search,
+      isFeatured: isFeatured === 'true' ? true : isFeatured === 'false' ? false : undefined,
+      sortBy,
+      sortOrder: sortOrder as 'asc' | 'desc' | undefined,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 20
     });
   }
 
+  @Get('products/:id')
+  async getProductById(@Param('id', ParseIntPipe) id: number) {
+    return this.shopService.getProductById(id);
+  }
+
   @Post('products')
-      async createProduct(@Body() dto: any) {
+  async createProduct(@Body() dto: any) {
     return this.shopService.createProduct(dto);
   }
 
   @Put('products/:id')
-      async updateProduct(
+  async updateProduct(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: any
   ) {
@@ -54,7 +67,7 @@ export class ShopController {
   }
 
   @Delete('products/:id')
-      async deleteProduct(@Param('id', ParseIntPipe) id: number) {
+  async deleteProduct(@Param('id', ParseIntPipe) id: number) {
     return this.shopService.deleteProduct(id);
   }
 
