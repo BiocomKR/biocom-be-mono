@@ -6,6 +6,7 @@ export interface CreateConsentDto {
   title: string;
   content?: string;
   version: string;
+  category: string;
   isRequired: boolean;
   displayOrder?: number;
 }
@@ -32,6 +33,7 @@ export class ConsentService {
     filters: {
       search?: string;
       code?: string;
+      category?: string;
       isActive?: boolean;
       isRequired?: boolean;
       includeDeleted?: boolean;
@@ -58,6 +60,11 @@ export class ConsentService {
     // 코드 필터
     if (filters.code) {
       where.code = filters.code;
+    }
+
+    // 카테고리 필터
+    if (filters.category) {
+      where.category = filters.category;
     }
 
     // 활성 여부
@@ -138,6 +145,7 @@ export class ConsentService {
         title: dto.title,
         content: dto.content,
         version: dto.version,
+        category: dto.category,
         isRequired: dto.isRequired,
         isActive: false, // 생성 시 비활성
         displayOrder: dto.displayOrder ?? 0,
@@ -283,6 +291,7 @@ export class ConsentService {
           title: existing.title,
           content: existing.content,
           version: newVersion,
+          category: existing.category,
           isRequired: existing.isRequired,
           isActive: true,
           displayOrder: existing.displayOrder,

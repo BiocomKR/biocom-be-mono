@@ -39,6 +39,7 @@ export class ConsentController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('code') code?: string,
+    @Query('category') category?: string,
     @Query('isActive') isActive?: string,
     @Query('isRequired') isRequired?: string,
     @Query('includeDeleted') includeDeleted?: string,
@@ -53,6 +54,7 @@ export class ConsentController {
     const filters = {
       search,
       code,
+      category,
       isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
       isRequired: isRequired === 'true' ? true : isRequired === 'false' ? false : undefined,
       includeDeleted: includeDeleted === 'true',
