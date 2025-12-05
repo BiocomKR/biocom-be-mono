@@ -178,17 +178,21 @@ export class AuthService {
    * 인증 로그 기록
    */
   private async logAuthAction(
-    operatorId: number,
+    operatorId: number | null,
     action: string,
     ip?: string,
     userAgent?: string,
   ) {
-    await this.prisma.operatorAuthLog.create({
+    await this.prisma.operatorActivityLog.create({
       data: {
         operatorId,
+        method: 'POST',
+        path: '/api/auth/login',
         action,
+        statusCode: action === 'LOGIN_SUCCESS' ? 200 : 401,
         ip,
         userAgent,
+        duration: 0,
         createdAt: getNowKST(),
       },
     });
