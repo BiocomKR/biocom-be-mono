@@ -2521,3 +2521,40 @@ model PushSegmentCondition {
   @@index([sortOrder])
   @@map("push_segment_conditions")
 }
+
+/// 앱 버전 관리 테이블
+/// 클라이언트 버전 관리, 강제 업데이트, 점검 모드 제어
+model AppVersion {
+  /// 고유 ID
+  id                 Int       @id @default(autoincrement())
+  /// 플랫폼 (IOS, ANDROID, WEB)
+  platform           String    @db.VarChar(20)
+  /// 버전 (semver: 1.0.0)
+  version            String    @db.VarChar(20)
+  /// 빌드 번호 (모바일용)
+  buildNumber        Int?      @map("build_number")
+  /// 최소 지원 버전 (이 버전 미만 → 강제 업데이트)
+  minRequiredVersion String    @map("min_required_version") @db.VarChar(20)
+  /// 강제 업데이트 여부
+  isForceUpdate      Boolean   @default(false) @map("is_force_update")
+  /// 점검 모드 여부
+  isMaintenanceMode  Boolean   @default(false) @map("is_maintenance_mode")
+  /// 점검 안내 메시지
+  maintenanceMessage String?   @map("maintenance_message")
+  /// 릴리즈 노트
+  releaseNotes       String?   @map("release_notes")
+  /// 스토어/배포 URL
+  storeUrl           String?   @map("store_url") @db.VarChar(500)
+  /// 활성화 여부 (현재 최신 버전인지)
+  isActive           Boolean   @default(true) @map("is_active")
+  /// 배포일
+  releasedAt         DateTime? @map("released_at")
+  /// 생성일시
+  createdAt          DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt          DateTime? @updatedAt @map("updated_at")
+
+  @@unique([platform, version])
+  @@index([platform, isActive])
+  @@map("app_versions")
+}
