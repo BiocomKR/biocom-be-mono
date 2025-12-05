@@ -417,7 +417,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 운영자 관련 테이블
   get operator() { return this.prisma.operator; }
   get operatorRefreshToken() { return this.prisma.operatorRefreshToken; }
-  get operatorAuthLog() { return this.prisma.operatorAuthLog; }
+  get operatorActivityLog() { return this.prisma.operatorActivityLog; }
   get department() { return this.prisma.department; }
 
   // 앱 이벤트 테이블

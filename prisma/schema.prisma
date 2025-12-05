@@ -2189,21 +2189,21 @@ model Department {
 
 /// 운영자 테이블
 model Operator {
-  id             Int                    @id @default(autoincrement())
-  email          String                 @unique
+  id             Int                      @id @default(autoincrement())
+  email          String                   @unique
   password       String
   name           String
-  accessTier     AccessTier             @default(VIEWER) @map("access_tier")
-  departmentId   Int?                   @map("department_id")
-  isActive       Boolean                @default(true) @map("is_active")
-  failedAttempts Int                    @default(0) @map("failed_attempts")
-  lockedUntil    DateTime?              @map("locked_until")
-  lastLoginAt    DateTime?              @map("last_login_at")
-  createdAt      DateTime               @default(now()) @map("created_at")
-  updatedAt      DateTime               @updatedAt @map("updated_at")
-  authLogs       OperatorAuthLog[]
+  accessTier     AccessTier               @default(VIEWER) @map("access_tier")
+  departmentId   Int?                     @map("department_id")
+  isActive       Boolean                  @default(true) @map("is_active")
+  failedAttempts Int                      @default(0) @map("failed_attempts")
+  lockedUntil    DateTime?                @map("locked_until")
+  lastLoginAt    DateTime?                @map("last_login_at")
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+  activityLogs   OperatorActivityLog[]
   refreshTokens  OperatorRefreshToken[]
-  department     Department?            @relation(fields: [departmentId], references: [id])
+  department     Department?              @relation(fields: [departmentId], references: [id])
 
   @@map("operators")
 }
@@ -2222,18 +2222,26 @@ model OperatorRefreshToken {
   @@map("operator_refresh_tokens")
 }
 
-/// 운영자 인증 로그 테이블
-model OperatorAuthLog {
-  id         Int      @id @default(autoincrement())
-  operatorId Int      @map("operator_id")
-  action     String
-  ip         String?
-  userAgent  String?  @map("user_agent")
-  createdAt  DateTime @default(now()) @map("created_at")
-  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+/// 관리자 활동 로그 (인증 로그 통합)
+model OperatorActivityLog {
+  id          Int       @id @default(autoincrement())
+  operatorId  Int?      @map("operator_id")
+  method      String    @db.VarChar(10)
+  path        String    @db.VarChar(255)
+  action      String?   @db.VarChar(50)
+  statusCode  Int       @map("status_code")
+  ip          String?   @db.VarChar(45)
+  userAgent   String?   @map("user_agent") @db.Text
+  requestBody String?   @map("request_body") @db.Text
+  duration    Int
+  createdAt   DateTime  @default(now()) @map("created_at")
+  operator    Operator? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
 
   @@index([operatorId, createdAt])
-  @@map("operator_auth_logs")
+  @@index([path, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+  @@map("operator_activity_logs")
 }
 
 model datetime_tests {

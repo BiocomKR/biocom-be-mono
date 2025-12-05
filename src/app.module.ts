@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { LoggerModule } from './common/modules/logger.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { ActivityLogInterceptor } from './common/interceptors/activity-log.interceptor';
 import { HealthModule } from './health/health.module';
 import { validationSchema, configuration } from './common/config/env.validation';
 import { CommonModule } from './common/common.module';
@@ -129,6 +130,10 @@ import { CartService } from './cart/cart.service';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ActivityLogInterceptor,
     },
   ],
 })
