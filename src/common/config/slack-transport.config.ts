@@ -83,8 +83,8 @@ function formatSlackMessage(info: any): any {
     environment = NODE_ENV,
   } = info;
 
-  // 에러 레벨에 따른 이모지
-  const emoji = level === 'error' ? '🚨' : '⚠️';
+  // 상태 코드에 따른 이모지 (5xx: 🔴 서버에러, 4xx: 🟠 클라이언트에러)
+  const emoji = statusCode >= 500 ? '🔴' : '🟠';
 
   // 타임스탬프 KST 변환
   const kstTimestamp = new Date(timestamp).toLocaleString('ko-KR', {
