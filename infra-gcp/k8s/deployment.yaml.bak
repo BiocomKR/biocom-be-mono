@@ -1,0 +1,190 @@
+# 🚀 Deployment - biocom-mq Worker 배포 정의
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: biocom-mq
+  namespace: biocom-api
+  labels:
+    app: biocom-mq
+    version: v1
+    environment: dev
+spec:
+  replicas: 2  # Worker Pod 개수
+  selector:
+    matchLabels:
+      app: biocom-mq
+  template:
+    metadata:
+      labels:
+        app: biocom-mq
+        version: v1
+      annotations:
+        # Prometheus 메트릭 수집을 위한 어노테이션
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "20804"
+        prometheus.io/path: "/metrics"
+    spec:
+      # 서비스 계정 (Workload Identity용)
+      serviceAccountName: biocom-api-sa
+      
+      # 이미지 Pull Secret (Artifact Registry 접근용)
+      imagePullSecrets:
+      - name: gcr-json-key
+      
+      # Pod 보안 설정
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      
+      containers:
+      # biocom-mq Worker 컨테이너
+      - name: biocom-mq
+        image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-mq:20251202164936
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 20804
+          name: http
+          protocol: TCP
+
+        # 환경 변수 (ConfigMap에서 가져오기)
+        envFrom:
+        - configMapRef:
+            name: biocom-mq-config
+        - secretRef:
+            name: biocom-mq-secrets
+        
+        # 추가 환경 변수
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        
+        # 리소스 제한 (AWS EKS와 동일한 개념)
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        
+        # Startup probe - Worker 초기 시작 체크
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 20804
+          initialDelaySeconds: 10    # 10초 후 첫 체크 (Worker는 빠름)
+          periodSeconds: 5           # 5초마다 체크
+          timeoutSeconds: 3          # 3초 타임아웃
+          failureThreshold: 20       # 20번 실패까지 허용
+          successThreshold: 1        # 1번 성공하면 완료
+
+        # Liveness probe - Worker 생존 여부 체크
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 20804
+          initialDelaySeconds: 0     # startup 완료 후 바로 시작
+          periodSeconds: 30          # 30초마다 체크
+          timeoutSeconds: 5          # 5초 타임아웃
+          failureThreshold: 3        # 3번 실패하면 재시작
+
+        # Readiness probe - Worker가 Job 처리 준비 완료 체크
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 20804
+          initialDelaySeconds: 0     # startup 완료 후 바로 시작
+          periodSeconds: 10          # 10초마다 체크
+          timeoutSeconds: 3          # 3초 타임아웃
+          failureThreshold: 3        # 3번 실패하면 트래픽 차단
+        
+        # 볼륨 마운트 (biocom-mq는 로그만 필요)
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+
+      # 볼륨 정의
+      volumes:
+      - name: logs
+        emptyDir: {}
+      
+      # Pod 재시작 정책
+      restartPolicy: Always
+      
+      # 노드 선택 (필요한 경우)
+      # nodeSelector:
+      #   cloud.google.com/gke-nodepool: app-nodes
+      
+      # Pod 분산 정책 (고가용성)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - biocom-mq
+              topologyKey: kubernetes.io/hostname
+
+---
+# 🔄 HorizontalPodAutoscaler - Worker 자동 스케일링
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: biocom-mq-hpa
+  namespace: biocom-api
+  labels:
+    app: biocom-mq
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: biocom-mq
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # 5분 안정화
+      policies:
+      - type: Percent
+        value: 50  # 한 번에 50%까지 줄이기
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60   # 1분 안정화
+      policies:
+      - type: Percent
+        value: 100  # 한 번에 2배까지 늘리기
+        periodSeconds: 60
+
+---
+# 🔧 ServiceAccount - biocom-api와 동일한 SA 사용
+# biocom-api-sa를 공유하여 동일한 권한 사용

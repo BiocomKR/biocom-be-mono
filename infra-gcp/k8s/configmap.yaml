@@ -1,0 +1,29 @@
+# ⚙️ ConfigMap - biocom-mq Worker 설정 관리
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biocom-mq-config
+  namespace: biocom-api
+  labels:
+    app: biocom-mq
+    environment: dev
+data:
+  # 애플리케이션 설정
+  NODE_ENV: "production"
+  PORT: "20804"
+  LOG_LEVEL: "info"
+
+  # Redis 설정 (BullMQ Queue)
+  REDIS_HOST: "10.213.120.195"
+  REDIS_PORT: "6379"
+
+  # Neo4j 설정 (민감하지 않은 정보)
+  NEO4J_DATABASE: "neo4j"
+
+  # Bull Board 설정
+  BULL_BOARD_ENABLED: "true"
+  BULL_BOARD_PATH: "/admin/queues"
+
+  # 기타 설정
+  TIMEZONE: "Asia/Seoul"

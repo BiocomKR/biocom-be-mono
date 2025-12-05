@@ -1,0 +1,231 @@
+# 🌐 Load Balancer 설정
+# AWS ALB(Application Load Balancer)와 완전히 동일한 기능
+
+# ===========================================
+# 🔗 백엔드 서비스 설정
+# ===========================================
+
+# 백엔드 서비스 (AWS Target Group과 동일한 역할)
+resource "google_compute_backend_service" "api_backend" {
+  name                  = "${var.cluster_name}-api-backend"
+  project               = var.project_id
+  protocol              = "HTTP"
+  port_name             = "http"
+  timeout_sec           = 30
+  
+  # 헬스체크 설정
+  health_checks = [google_compute_health_check.api_health_check.id]
+  
+  # 백엔드 설정을 NEG로 변경 (GKE Ingress와 통합)
+  # backend 블록은 주석 처리 - Ingress가 자동으로 NEG 생성
+  # backend {
+  #   group = "NEG will be created by Ingress"
+  #   balancing_mode = "UTILIZATION"
+  #   capacity_scaler = 1.0
+  # }
+  
+  # 로드 밸런싱 설정
+  load_balancing_scheme = "EXTERNAL_MANAGED"  # 외부 로드 밸런서
+  
+  # 세션 어피니티 (필요에 따라 설정)
+  session_affinity = "NONE"  # 또는 "CLIENT_IP", "GENERATED_COOKIE"
+  
+  description = "BIOCOM API 백엔드 서비스"
+}
+
+# ===========================================
+# 🏥 헬스체크 설정
+# ===========================================
+
+# 헬스체크 (AWS Target Group Health Check와 동일)
+resource "google_compute_health_check" "api_health_check" {
+  name               = "${var.cluster_name}-api-health-check"
+  project            = var.project_id
+  check_interval_sec = 10
+  timeout_sec        = 5
+  healthy_threshold  = 2
+  unhealthy_threshold = 3
+  
+  http_health_check {
+    port         = 80    # Kubernetes Service 포트
+    request_path = "/health"  # 헬스체크 엔드포인트
+  }
+  
+  description = "BIOCOM API 헬스체크"
+}
+
+# ===========================================
+# 🌍 Global Forwarding Rule (외부 IP)
+# ===========================================
+
+# 정적 외부 IP 예약
+resource "google_compute_global_address" "api_external_ip" {
+  name         = "${var.cluster_name}-external-ip"
+  project      = var.project_id
+  address_type = "EXTERNAL"
+  ip_version   = "IPV4"
+  
+  description = "BIOCOM API 외부 IP 주소"
+}
+
+# HTTPS 포워딩 규칙 (메인 트래픽)
+resource "google_compute_global_forwarding_rule" "api_https_forwarding_rule" {
+  name       = "${var.cluster_name}-https-forwarding-rule"
+  project    = var.project_id
+  target     = google_compute_target_https_proxy.api_https_proxy.id
+  port_range = "443"
+  ip_address = google_compute_global_address.api_external_ip.id
+  
+  description = "BIOCOM API HTTPS 포워딩 규칙"
+}
+
+# HTTP 포워딩 규칙 (HTTPS로 리다이렉트용)
+resource "google_compute_global_forwarding_rule" "api_http_forwarding_rule" {
+  name       = "${var.cluster_name}-http-forwarding-rule"
+  project    = var.project_id
+  target     = google_compute_target_http_proxy.api_http_proxy.id
+  port_range = "80"
+  ip_address = google_compute_global_address.api_external_ip.id
+  
+  description = "BIOCOM API HTTP 포워딩 규칙 (HTTPS 리다이렉트용)"
+}
+
+# ===========================================
+# 🎯 Target Proxy 설정
+# ===========================================
+
+# HTTPS Target Proxy
+resource "google_compute_target_https_proxy" "api_https_proxy" {
+  name             = "${var.cluster_name}-https-proxy"
+  project          = var.project_id
+  url_map          = google_compute_url_map.api_url_map.id
+  certificate_map  = "//certificatemanager.googleapis.com/${google_certificate_manager_certificate_map.api_certificate_map.id}"
+  
+  description = "BIOCOM API HTTPS 프록시"
+}
+
+# HTTP Target Proxy (HTTPS 리다이렉트용)
+resource "google_compute_target_http_proxy" "api_http_proxy" {
+  name    = "${var.cluster_name}-http-proxy"
+  project = var.project_id
+  url_map = google_compute_url_map.api_redirect_url_map.id
+  
+  description = "BIOCOM API HTTP 프록시 (HTTPS 리다이렉트용)"
+}
+
+# ===========================================
+# 🗺️ URL Map 설정
+# ===========================================
+
+# 메인 URL Map (HTTPS 트래픽용)
+resource "google_compute_url_map" "api_url_map" {
+  name            = "${var.cluster_name}-url-map"
+  project         = var.project_id
+  default_service = google_compute_backend_service.api_backend.id
+  
+  # 라우팅 규칙 (필요에 따라 추가)
+  host_rule {
+    hosts        = ["${var.api_subdomain}.${var.domain_name}"]
+    path_matcher = "api-paths"
+  }
+  
+  path_matcher {
+    name            = "api-paths"
+    default_service = google_compute_backend_service.api_backend.id
+    
+    # API 경로별 라우팅 (예시)
+    path_rule {
+      paths   = ["/api/*"]
+      service = google_compute_backend_service.api_backend.id
+    }
+    
+    path_rule {
+      paths   = ["/docs", "/docs/*"]
+      service = google_compute_backend_service.api_backend.id
+    }
+  }
+  
+  description = "BIOCOM API URL 맵"
+}
+
+# HTTP → HTTPS 리다이렉트 URL Map
+resource "google_compute_url_map" "api_redirect_url_map" {
+  name    = "${var.cluster_name}-redirect-url-map"
+  project = var.project_id
+  
+  default_url_redirect {
+    redirect_response_code = "MOVED_PERMANENTLY_DEFAULT"  # 301 리다이렉트
+    strip_query            = false
+    https_redirect         = true  # HTTPS로 리다이렉트
+  }
+  
+  description = "HTTP → HTTPS 리다이렉트 URL 맵"
+}
+
+# ===========================================
+# 📤 출력값
+# ===========================================
+
+# 외부 IP 주소 출력 (DNS 설정용)
+output "external_ip_address" {
+  description = "로드 밸런서 외부 IP 주소 (가비아 DNS A 레코드로 설정)"
+  value       = google_compute_global_address.api_external_ip.address
+}
+
+# API 접속 URL 출력
+output "api_url" {
+  description = "API 접속 URL"
+  value       = "https://${var.api_subdomain}.${var.domain_name}"
+}
+
+# ===========================================
+# 📋 설명 및 비교
+# ===========================================
+
+# 📚 Google Cloud Load Balancer vs AWS ALB 비교:
+#
+# 1. 아키텍처:
+#    - GCP: Global Load Balancer (전 세계 단일 IP)
+#    - AWS: Regional Load Balancer (리전별 IP)
+#
+# 2. 구성 요소:
+#    - GCP: Forwarding Rule → Target Proxy → URL Map → Backend Service
+#    - AWS: ALB → Target Group → EC2/EKS
+#
+# 3. SSL 종료:
+#    - GCP: Target HTTPS Proxy에서 SSL 종료
+#    - AWS: ALB에서 SSL 종료
+#
+# 4. 헬스체크:
+#    - GCP: Health Check 리소스
+#    - AWS: Target Group Health Check
+#    - 기능은 동일
+#
+# 5. 라우팅:
+#    - GCP: URL Map으로 경로별 라우팅
+#    - AWS: ALB Listener Rule로 라우팅
+#    - 기능은 거의 동일
+#
+# 🔧 가비아 DNS 설정:
+#
+# 1. A 레코드 설정:
+#    - 이름: api-gcp
+#    - 타입: A
+#    - 값: [terraform output external_ip_address에서 확인한 IP]
+#    - TTL: 300 (5분)
+#
+# 2. 루트 도메인 설정 (선택사항):
+#    - 이름: @
+#    - 타입: A
+#    - 값: [동일한 IP]
+#
+# 🚀 AWS ALB에서 이관 시 주의사항:
+# - AWS Route53 A 레코드 → 가비아 A 레코드로 변경
+# - ALB Security Group → GCP 방화벽 규칙로 변경
+# - Target Group → Backend Service로 개념 변경
+# - Listener → URL Map으로 라우팅 규칙 변경
+#
+# 💡 로드 밸런서 문제 해결:
+# - 백엔드 서비스 헬스 체크 상태 확인
+# - 방화벽 규칙으로 80/443 포트 허용 여부 확인
+# - Certificate Manager 인증서 상태 확인

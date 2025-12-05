@@ -1,0 +1,172 @@
+# 📝 테라폼 변수 설정 파일 예시
+# 이 파일을 복사해서 terraform.tfvars로 이름을 바꾸고 실제 값으로 수정하세요
+# ⚠️ terraform.tfvars 파일은 민감한 정보가 포함되므로 Git에 커밋하지 마세요!
+
+# ===========================================
+# 🌏 기본 GCP 설정
+# ===========================================
+
+# GCP 프로젝트 ID (실제 프로젝트 ID로 변경)
+project_id = "biocom-api-123456"
+
+# 배포할 리전 (서울)
+region = "asia-northeast3"
+
+# 가용 영역 (서울 A존)
+zone = "asia-northeast3-a"
+
+# 환경 구분 (dev, staging, prod)
+environment = "dev"
+
+# ===========================================
+# 🌐 네트워크 설정
+# ===========================================
+
+# VPC IP 대역 (기존 AWS VPC와 겹치지 않게 설정)
+vpc_cidr = "10.0.0.0/16"
+
+# 서브넷 IP 대역
+subnet_cidr = "10.0.1.0/24"
+
+# GKE Pod용 IP 대역 (GCP 전용)
+pods_cidr = "10.1.0.0/16"
+
+# GKE Service용 IP 대역 (GCP 전용)  
+services_cidr = "10.2.0.0/16"
+
+# ===========================================
+# 🚢 GKE 클러스터 설정
+# ===========================================
+
+# 클러스터 이름
+cluster_name = "biocom-cluster-dev"
+
+# 쿠버네티스 버전 (빈 값이면 GCP 권장 버전 사용)
+kubernetes_version = ""
+
+# 노드 풀 이름
+node_pool_name = "app-nodes"
+
+# 노드 머신 타입 (AWS t3.medium과 비슷한 사양)
+# - e2-micro: 0.25-2 vCPU, 1GB RAM (무료 등급)
+# - e2-small: 0.5-2 vCPU, 2GB RAM  
+# - e2-medium: 1-2 vCPU, 4GB RAM
+# - e2-standard-2: 2 vCPU, 8GB RAM (권장)
+# - e2-standard-4: 4 vCPU, 16GB RAM
+node_machine_type = "e2-standard-2"
+
+# 노드 디스크 크기 (GB)
+node_disk_size = 30
+
+# 노드 디스크 타입
+# - pd-standard: 표준 디스크 (저렴)
+# - pd-ssd: SSD 디스크 (빠름)
+# - pd-balanced: 균형 디스크 (권장)
+node_disk_type = "pd-standard"
+
+# 노드 개수 설정
+node_min_count = 1      # 최소 1개 (비용 절약)
+node_max_count = 4      # 최대 4개 (트래픽 증가 대응)
+node_initial_count = 2  # 시작 시 2개
+
+# 스팟 인스턴스 사용 여부 (70% 저렴하지만 언제든 종료될 수 있음)
+# 개발환경: true, 운영환경: false
+use_spot_instances = true
+
+# ===========================================
+# 🗄️ Cloud SQL 설정  
+# ===========================================
+
+# 데이터베이스 인스턴스 이름
+db_instance_name = "biocom-postgres-dev"
+
+# PostgreSQL 버전
+db_version = "POSTGRES_15"
+
+# 인스턴스 크기
+# 개발환경 옵션:
+# - db-f1-micro: 0.6GB RAM (무료 등급, 매우 느림)
+# - db-g1-small: 1.7GB RAM (최소 권장)
+# - db-custom-1-3840: 1 vCPU, 3.75GB RAM
+# 운영환경 옵션:
+# - db-standard-2: 2 vCPU, 7.5GB RAM
+# - db-standard-4: 4 vCPU, 15GB RAM
+db_tier = "db-g1-small"
+
+# 디스크 크기 (GB)
+db_disk_size = 20
+
+# 데이터베이스 이름
+db_name = "biocom"
+
+# 데이터베이스 사용자명
+db_username = "postgres"
+
+# ===========================================
+# 🔐 도메인 및 SSL 설정
+# ===========================================
+
+# 메인 도메인 (가비아에서 구입한 도메인)
+domain_name = "biocom.ai.kr"
+
+# API 서브도메인 (최종 API 주소: api-gcp.biocom.ai.kr)
+api_subdomain = "api-gcp"
+
+# ===========================================
+# 🏷️ 공통 라벨 (선택사항)
+# ===========================================
+
+common_labels = {
+  project     = "biocom-api"
+  owner       = "biocom-team"
+  managed-by  = "terraform"
+  environment = "dev"
+  cost-center = "development"
+  team        = "backend"
+}
+
+# ===========================================
+# 💰 비용 최적화 설정 (참고)
+# ===========================================
+
+# 💡 비용을 줄이는 설정들:
+#
+# 1. 스팟 인스턴스 사용:
+#    use_spot_instances = true  # 70% 저렴
+#
+# 2. 작은 노드 타입 사용:
+#    node_machine_type = "e2-small"  # 2GB RAM
+#
+# 3. 최소 노드 개수 설정:
+#    node_min_count = 1
+#
+# 4. 작은 DB 인스턴스:
+#    db_tier = "db-f1-micro"  # 무료 등급 (느림)
+#
+# 5. 표준 디스크 사용:
+#    node_disk_type = "pd-standard"
+#    
+# 📊 예상 월 비용 (서울 리전, 24시간 운영):
+# - GKE 클러스터: 무료 (노드만 과금)
+# - e2-standard-2 노드 2개: 약 $50
+# - db-g1-small: 약 $25
+# - 로드 밸런서: 약 $18
+# - 네트워크 트래픽: 약 $5
+# 총 예상 비용: 약 $100/월
+#
+# 🎯 운영환경에서는 다음 설정 권장:
+# - use_spot_instances = false
+# - node_machine_type = "e2-standard-4"
+# - db_tier = "db-standard-2"
+# - node_min_count = 3 (고가용성)
+
+# ===========================================
+# 🔧 실제 사용 예시
+# ===========================================
+
+# 이 파일을 terraform.tfvars로 복사 후:
+# 1. project_id를 실제 GCP 프로젝트 ID로 변경
+# 2. domain_name을 실제 도메인으로 변경
+# 3. cluster_name에 환경별 구분자 추가 (dev, staging, prod)
+# 4. 환경에 맞는 리소스 크기 조정
+# 5. terraform apply 실행
