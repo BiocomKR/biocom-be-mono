@@ -46,7 +46,12 @@ resource "google_storage_bucket" "uploads" {
   
   # CORS 설정 (웹에서 직접 업로드 가능)
   cors {
-    origin          = ["https://${var.api_subdomain}.${var.domain_name}", "https://${var.domain_name}"]
+    origin          = [
+      "https://${var.api_subdomain}.${var.domain_name}",
+      "https://${var.domain_name}",
+      "http://localhost:3000",
+      "https://bo-dev.biocom.ai.kr"
+    ]
     method          = ["GET", "HEAD", "PUT", "POST", "DELETE"]
     response_header = ["*"]
     max_age_seconds = 3600
