@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { TossPaymentsService } from './toss-payments.service';
+import { PlayautoService } from '../../playauto/services/playauto.service';
 import {
   PreparePaymentDto,
   ConfirmPaymentDto,
@@ -18,6 +19,7 @@ import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { ChallengeTicketStatus, OrderStatus, PaymentStatus } from '../../common/enums';
+import { CryptoUtil } from '../../common/utils/crypto.util';
 
 @Injectable()
 export class PaymentService {
@@ -25,7 +27,8 @@ export class PaymentService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tossPayments: TossPaymentsService
+    private readonly tossPayments: TossPaymentsService,
+    private readonly playauto: PlayautoService
   ) {}
 
   /**
@@ -221,6 +224,11 @@ export class PaymentService {
         }
 
         this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
+
+        // 플레이오토 주문 생성 (비동기)
+        this.createPlayautoOrder(order.id).catch((error) => {
+          this.logger.error(`플레이오토 주문 생성 비동기 실패: 주문ID=${order.id}`, error);
+        });
 
         return {
           orderId: order.id,
@@ -523,6 +531,62 @@ export class PaymentService {
 
       default:
         this.logger.warn(`처리되지 않은 웹훅 타입: ${dto.eventType}`);
+    }
+  }
+
+  /**
+   * 플레이오토 주문 생성 (비동기)
+   * - 결제 승인 후 자동 호출
+   * - DB에서 주문 정보 조회 (복호화 포함)
+   * - 플레이오토 API 호출 (3회 재시도)
+   * - 성공 시 uniq, bundle_no를 Order 테이블에 저장
+   */
+  private async createPlayautoOrder(orderId: number): Promise<void> {
+    try {
+      this.logger.log(`플레이오토 주문 생성 시작: 주문ID=${orderId}`);
+
+      // 주문 정보 조회 (OrderItems 포함)
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          OrderItems: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new Error(`주문을 찾을 수 없습니다: orderId=${orderId}`);
+      }
+
+      // 개인정보 복호화
+      const decryptedOrder = {
+        ...order,
+        recipientName: CryptoUtil.decrypt(order.recipientName),
+        recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
+        address: CryptoUtil.decrypt(order.address),
+        addressDetail: order.addressDetail ? CryptoUtil.decrypt(order.addressDetail) : null,
+        deliveryMessage: order.deliveryMessage ? CryptoUtil.decrypt(order.deliveryMessage) : null,
+      };
+
+      // 플레이오토 주문 생성
+      const { uniq, bundleNo } = await this.playauto.createOrder(decryptedOrder);
+
+      // DB에 uniq, bundle_no 저장
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          playautoUniq: uniq,
+          playautoBundleNo: bundleNo,
+        },
+      });
+
+      this.logger.log(`플레이오토 주문 생성 완료: 주문ID=${orderId}, uniq=${uniq}, bundle_no=${bundleNo}`);
+    } catch (error: any) {
+      this.logger.error(`플레이오토 주문 생성 실패: 주문ID=${orderId}`, error.message);
+      // 에러를 throw하지 않고 로그만 남김 (비동기 처리이므로)
     }
   }
 

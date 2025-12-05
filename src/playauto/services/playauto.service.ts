@@ -197,6 +197,119 @@ export class PlayautoService {
   }
 
   /**
+   * 플레이오토 주문 생성
+   * - 결제 승인 후 호출
+   * - 주문 정보를 플레이오토에 전달
+   * - 성공 시 uniq, bundle_no 반환
+   *
+   * @param order 주문 정보 (OrderItems 포함)
+   * @returns { uniq: string, bundleNo: string }
+   */
+  async createOrder(order: any): Promise<{ uniq: string; bundleNo: string }> {
+    const startTime = Date.now();
+
+    try {
+      this.logger.log(`플레이오토 주문 생성 시작: 주문번호 ${order.orderNumber}`);
+
+      // 주문 아이템을 opts 배열로 변환
+      const opts = order.OrderItems.map((item: any) => ({
+        opt_nm: item.productName,
+        opt_qty: item.quantity,
+        opt_price: item.productPrice,
+      }));
+
+      // 배송비 0이면 "무료배송", 아니면 "선결제"
+      const shipMethod = order.shippingFee === 0 ? '무료배송' : '선결제';
+
+      // 플레이오토 API 요청 바디
+      const requestData = {
+        shop_cd: process.env.PLAYAUTO_SHOP_CD, // "UVP2"
+        shop_id: process.env.PLAYAUTO_SHOP_ID, // "biocom@biocom.kr"
+        shop_ord_no: '__AUTO__', // 플레이오토가 주문번호 생성
+        ord_date: new Date(order.orderedAt).toISOString().split('T')[0], // YYYY-MM-DD
+        ord_nm: order.recipientName,
+        ord_tel: order.recipientMobile,
+        ord_mobile: order.recipientMobile,
+        ord_post: order.postalCode,
+        ord_addr: order.address,
+        ord_addr_dtl: order.addressDetail || '',
+        memo: order.deliveryMessage || '',
+        opts,
+        ship_method: shipMethod,
+        ship_price: order.shippingFee,
+      };
+
+      // API 호출
+      const response = await this.callApi<any>(
+        'POST',
+        '/order/add',
+        requestData,
+      );
+
+      const { uniq, bundle_no } = response;
+
+      if (!uniq || !bundle_no) {
+        throw new Error('플레이오토 응답에 uniq 또는 bundle_no가 없습니다');
+      }
+
+      // 성공 로그 기록
+      await this.prisma.playautoApiLog.create({
+        data: {
+          orderId: order.id,
+          endpoint: '/order/add',
+          method: 'POST',
+          requestData,
+          responseData: response,
+          status: 'SUCCESS',
+          errorMessage: null,
+          retryCount: 0,
+          createdAt: getNowKST(),
+        },
+      });
+
+      const duration = Date.now() - startTime;
+      this.logger.log(
+        `플레이오토 주문 생성 성공: 주문번호 ${order.orderNumber}, uniq=${uniq}, bundle_no=${bundle_no} (${duration}ms)`,
+      );
+
+      return { uniq, bundleNo: bundle_no };
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      const errorMessage =
+        error.response?.data?.message || error.message || '알 수 없는 오류';
+
+      // 실패 로그 기록
+      await this.prisma.playautoApiLog.create({
+        data: {
+          orderId: order.id,
+          endpoint: '/order/add',
+          method: 'POST',
+          requestData: {
+            shop_cd: process.env.PLAYAUTO_SHOP_CD,
+            shop_id: process.env.PLAYAUTO_SHOP_ID,
+            shop_ord_no: '__AUTO__',
+            ord_date: new Date(order.orderedAt).toISOString().split('T')[0],
+            ord_nm: order.recipientName,
+          },
+          responseData: error.response?.data || null,
+          status: 'FAILURE',
+          errorMessage,
+          retryCount: 3, // callApi에서 3회 재시도 후 실패
+          createdAt: getNowKST(),
+        },
+      });
+
+      this.logger.error(
+        `플레이오토 주문 생성 최종 실패: 주문번호 ${order.orderNumber}, 오류=${errorMessage} (${duration}ms)`,
+      );
+
+      throw new Error(
+        `플레이오토 주문 생성 실패 (주문번호: ${order.orderNumber}): ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
    * 딜레이 헬퍼
    */
   private delay(ms: number): Promise<void> {

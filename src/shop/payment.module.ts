@@ -8,9 +8,13 @@ import { TossPaymentsService } from './services/toss-payments.service';
 import { WebhooksService } from './services/webhooks.service';
 import { SubscriptionService } from './services/subscription.service';
 import { SubscriptionSchedulerService } from './services/subscription-scheduler.service';
+import { PlayautoModule } from '../playauto/playauto.module';
 
 @Module({
-  imports: [HttpModule],
+  imports: [
+    HttpModule,
+    PlayautoModule
+  ],
   controllers: [
     PaymentController,
     PaymentCallbackController,
