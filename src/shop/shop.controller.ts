@@ -13,7 +13,7 @@ import {
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShopService } from './shop.service';
@@ -83,13 +83,14 @@ export class ShopController {
    * 상품 이미지 업로드 (MAIN 타입)
    */
   @Post('products/:id/images')
+  @ApiConsumes('multipart/form-data')
   @UseInterceptors(FilesInterceptor('files', 10))
   async uploadProductImages(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],
-    @Body() dto: { deleteFileIds?: string }
+    @Body('deleteFileIds') deleteFileIds?: string,
   ) {
-    return this.shopService.uploadProductImages(id, files, dto.deleteFileIds);
+    return this.shopService.uploadProductImages(id, files, deleteFileIds);
   }
 
   /**
