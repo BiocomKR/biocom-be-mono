@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { PaymentController } from './controllers/payment.controller';
+import { PaymentController, PaymentCallbackController } from './controllers/payment.controller';
 import { WebhooksController } from './controllers/webhooks.controller';
 import { SubscriptionController } from './controllers/subscription.controller';
 import { PaymentService } from './services/payment.service';
@@ -11,7 +11,12 @@ import { SubscriptionSchedulerService } from './services/subscription-scheduler.
 
 @Module({
   imports: [HttpModule],
-  controllers: [PaymentController, WebhooksController, SubscriptionController],
+  controllers: [
+    PaymentController,
+    PaymentCallbackController,
+    WebhooksController,
+    SubscriptionController
+  ],
   providers: [
     PaymentService,
     TossPaymentsService,

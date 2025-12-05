@@ -16,19 +16,23 @@ export class TossPaymentsService {
 
   /**
    * 결제 승인
+   * 토스페이먼츠 공식 문서: https://docs.tosspayments.com/reference#%EA%B2%B0%EC%A0%9C-%EC%8A%B9%EC%9D%B8
    */
   async confirmPayment(paymentKey: string, orderId: string, amount: number): Promise<any> {
     try {
-      const url = `${this.baseUrl}/payments/${paymentKey}`;
+      const url = `${this.baseUrl}/payments/confirm`;
       const headers = {
         'Authorization': `Basic ${Buffer.from(this.secretKey + ':').toString('base64')}`,
         'Content-Type': 'application/json'
       };
 
       const body = {
+        paymentKey,
         orderId,
         amount
       };
+
+      this.logger.log(`결제 승인 요청: paymentKey=${paymentKey}, orderId=${orderId}, amount=${amount}`);
 
       const response = await firstValueFrom(
         this.httpService.post(url, body, { headers, timeout: 10000 })
@@ -36,7 +40,7 @@ export class TossPaymentsService {
 
       this.logger.log(`결제 승인 성공: ${paymentKey}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`결제 승인 실패: ${paymentKey}`, error.response?.data);
       throw error;
     }

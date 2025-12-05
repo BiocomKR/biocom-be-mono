@@ -1,14 +1,17 @@
-import { 
-  Controller, 
+import {
+  Controller,
   Get,
-  Post, 
-  Body, 
+  Post,
+  Body,
   Param,
+  Query,
   UseGuards,
   Request,
   HttpCode,
-  HttpStatus
+  HttpStatus,
+  Res
 } from '@nestjs/common';
+import { Response } from 'express';
 import { 
   ApiTags, 
   ApiOperation, 
@@ -137,4 +140,137 @@ export class PaymentController {
     };
   }
 
+}
+
+/**
+ * 토스페이먼츠 결제 콜백 컨트롤러
+ * WebView에서 URL 감지를 위한 단순 HTML 페이지 반환
+ */
+@Controller('payment')
+export class PaymentCallbackController {
+  /**
+   * 결제 성공 콜백
+   * 토스페이먼츠에서 결제 성공 시 리다이렉트되는 URL
+   * Query params: paymentKey, orderId, amount
+   */
+  @Get('success')
+  @ApiOperation({
+    summary: '토스 결제 성공 콜백',
+    description: 'WebView URL 감지용 단순 HTML 페이지 반환'
+  })
+  async paymentSuccess(
+    @Query('paymentKey') paymentKey: string,
+    @Query('orderId') orderId: string,
+    @Query('amount') amount: string,
+    @Res() res: Response
+  ): Promise<void> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>결제 처리중</title>
+        <style>
+          body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f5f5f5;
+          }
+          .container {
+            text-align: center;
+            padding: 20px;
+          }
+          .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          h1 { color: #333; font-size: 24px; margin: 0 0 10px 0; }
+          p { color: #666; font-size: 14px; margin: 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="spinner"></div>
+          <h1>결제 처리중입니다</h1>
+          <p>잠시만 기다려주세요...</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    res.status(200).send(html);
+  }
+
+  /**
+   * 결제 실패 콜백
+   * 토스페이먼츠에서 결제 실패 시 리다이렉트되는 URL
+   * Query params: code, message, orderId
+   */
+  @Get('fail')
+  @ApiOperation({
+    summary: '토스 결제 실패 콜백',
+    description: 'WebView URL 감지용 단순 HTML 페이지 반환'
+  })
+  async paymentFail(
+    @Query('code') code: string,
+    @Query('message') message: string,
+    @Query('orderId') orderId: string,
+    @Res() res: Response
+  ): Promise<void> {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>결제 실패</title>
+        <style>
+          body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: #f5f5f5;
+          }
+          .container {
+            text-align: center;
+            padding: 20px;
+          }
+          .icon {
+            font-size: 48px;
+            color: #e74c3c;
+            margin-bottom: 20px;
+          }
+          h1 { color: #333; font-size: 24px; margin: 0 0 10px 0; }
+          p { color: #666; font-size: 14px; margin: 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="icon">✕</div>
+          <h1>결제에 실패했습니다</h1>
+          <p>${message || '결제 중 오류가 발생했습니다'}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    res.status(200).send(html);
+  }
 }

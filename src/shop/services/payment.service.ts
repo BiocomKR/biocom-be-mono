@@ -128,20 +128,12 @@ export class PaymentService {
       }
 
       try {
-        // 토스페이먼츠 결제 승인 (Mock - 실제 운영 시 주석 해제)
-        // const tossResult = await this.tossPayments.confirmPayment(
-        //   dto.paymentKey,
-        //   dto.orderId,
-        //   dto.amount
-        // );
-
-        // Mock 결제 결과
-        const tossResult = {
-          paymentKey: dto.paymentKey,
-          orderId: dto.orderId,
-          method: '카드',
-          approvedAt: getNowKST().toISOString()
-        };
+        // 토스페이먼츠 결제 승인
+        const tossResult = await this.tossPayments.confirmPayment(
+          dto.paymentKey,
+          dto.orderId,
+          dto.amount
+        );
 
         // 결제 정보 업데이트
         await tx.payment.update({

@@ -48,7 +48,7 @@ export class BalanceGameService {
     }); 
 
     // 테스트를 위해 1일차로 고정
-    const challengeDay = 1;
+    const challengeDay = 5;
 
     // 해당 일차의 게임 찾기
     const game = await this.prisma.balanceGame.findFirst({

@@ -399,6 +399,8 @@ export class OrdersService {
 
       return {
         ...order,
+        // 토스 결제용 orderId 추가 (orderNumber와 동일)
+        orderId: order.orderNumber,
         // 개인정보 복호화
         recipientName: CryptoUtil.decrypt(order.recipientName),
         recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
@@ -456,6 +458,8 @@ export class OrdersService {
     return {
       items: orders.map(order => ({
         ...order,
+        // 토스 결제용 orderId 추가
+        orderId: order.orderNumber,
         // 개인정보 복호화
         recipientName: CryptoUtil.decrypt(order.recipientName),
         recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
@@ -655,6 +659,7 @@ export class OrdersService {
 
       return {
         ...updatedOrder,
+        orderId: updatedOrder.orderNumber,
         totalProductPrice: Number(updatedOrder.totalProductPrice),
         totalDiscount: Number(updatedOrder.totalDiscount),
         shippingFee: Number(updatedOrder.shippingFee),
@@ -734,6 +739,7 @@ export class OrdersService {
 
     return {
       ...updatedOrder,
+      orderId: updatedOrder.orderNumber,
       totalProductPrice: Number(updatedOrder.totalProductPrice),
       totalDiscount: Number(updatedOrder.totalDiscount),
       shippingFee: Number(updatedOrder.shippingFee),
@@ -805,6 +811,7 @@ export class OrdersService {
 
     return {
       ...updatedOrder,
+      orderId: updatedOrder.orderNumber,
       totalProductPrice: Number(updatedOrder.totalProductPrice),
       totalDiscount: Number(updatedOrder.totalDiscount),
       shippingFee: Number(updatedOrder.shippingFee),
@@ -844,6 +851,8 @@ export class OrdersService {
 
     return {
       ...order,
+      // 토스 결제용 orderId 추가
+      orderId: order.orderNumber,
       // 개인정보 복호화
       recipientName: CryptoUtil.decrypt(order.recipientName),
       recipientMobile: CryptoUtil.decrypt(order.recipientMobile),

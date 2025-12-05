@@ -151,11 +151,14 @@ export class OrderItemResponseDto {
  * 주문 응답 DTO
  */
 export class OrderResponseDto {
-  @ApiProperty({ description: '주문 ID' })
+  @ApiProperty({ description: '주문 ID (DB)' })
   id: number;
 
-  @ApiProperty({ description: '주문번호' })
+  @ApiProperty({ description: '주문번호 (토스 orderId로 사용)' })
   orderNumber: string;
+
+  @ApiProperty({ description: '토스 결제용 주문 ID (orderNumber와 동일)', example: 'O20250112123456789' })
+  orderId: string;
 
   @ApiProperty({ description: '사용자 ID' })
   userId: number;
