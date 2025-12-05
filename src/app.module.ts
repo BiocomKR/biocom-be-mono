@@ -45,6 +45,7 @@ import { AppEventsModule } from './app-events/app-events.module';
 import { ContentModule } from './content/content.module';
 import { GraphSyncModule } from './graph-sync/graph-sync.module';
 import { IapModule } from './iap/iap.module';
+import { AppVersionModule } from './app-version/app-version.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -144,6 +145,7 @@ import { IapModule } from './iap/iap.module';
     ContentModule,   // 컨텐츠 관리 모듈
     GraphSyncModule, // GraphDB 동기화 모듈 (BullMQ Producer)
     IapModule,       // 인앱결제 모듈 (Apple/Google)
+    AppVersionModule, // 앱 버전 관리 모듈
     // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
