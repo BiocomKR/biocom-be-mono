@@ -432,6 +432,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 플레이오토 테이블
   get playautoToken() { return this.prisma.playautoToken; }
+  get playautoApiLog() { return this.prisma.playautoApiLog; }
 
   // 메서드 바인딩
   $transaction(arg: any) {

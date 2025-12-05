@@ -809,10 +809,6 @@ model Order {
   completedAt       DateTime?        @map("completed_at")
   /// 취소일시
   cancelledAt       DateTime?        @map("cancelled_at")
-  /// 플레이오토 주문 고유번호
-  playautoUniq      String?          @map("playauto_uniq") @db.VarChar(50)
-  /// 플레이오토 주문 묶음번호
-  playautoBundleNo  String?          @map("playauto_bundle_no") @db.VarChar(50)
   /// 생성일시
   createdAt         DateTime         @map("created_at")
   /// 수정일시
@@ -2588,34 +2584,4 @@ model PlayautoToken {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("playauto_tokens")
-}
-
-/// 플레이오토 API 호출 로그 테이블
-/// API 호출 실패/성공 기록 (디버깅 및 재시도용)
-model PlayautoApiLog {
-  /// 고유 ID
-  id          Int       @id @default(autoincrement())
-  /// 주문 ID (주문 관련 API인 경우)
-  orderId     Int?      @map("order_id")
-  /// API 엔드포인트
-  endpoint    String    @db.VarChar(200)
-  /// HTTP 메서드
-  method      String    @db.VarChar(10)
-  /// 요청 데이터
-  requestData Json?     @map("request_data")
-  /// 응답 데이터
-  responseData Json?    @map("response_data")
-  /// 상태 (SUCCESS, FAILED)
-  status      String    @db.VarChar(20)
-  /// 에러 메시지
-  errorMessage String?  @map("error_message")
-  /// 재시도 횟수
-  retryCount  Int       @default(0) @map("retry_count")
-  /// 생성일시
-  createdAt   DateTime  @default(now()) @map("created_at")
-
-  @@index([orderId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("playauto_api_logs")
 }
