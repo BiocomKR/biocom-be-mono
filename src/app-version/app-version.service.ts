@@ -1,9 +1,6 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { CheckVersionDto } from './dto/check-version.dto';
-import { CreateAppVersionDto } from './dto/create-app-version.dto';
-import { UpdateAppVersionDto } from './dto/update-app-version.dto';
-import { getNowKST } from '../common/utils/kst-date.util';
 
 @Injectable()
 export class AppVersionService {
@@ -59,121 +56,6 @@ export class AppVersionService {
       maintenance: latestVersion.isMaintenanceMode,
       maintenanceMessage: latestVersion.maintenanceMessage,
     };
-  }
-
-  /**
-   * 버전 목록 조회 (어드민용)
-   */
-  async findAll(params: {
-    platform?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const { platform, page = 1, limit = 10 } = params;
-    const skip = (page - 1) * limit;
-
-    const where = platform ? { platform } : {};
-
-    const [items, total] = await Promise.all([
-      this.prisma.appVersion.findMany({
-        where,
-        orderBy: [{ platform: 'asc' }, { releasedAt: 'desc' }],
-        skip,
-        take: limit,
-      }),
-      this.prisma.appVersion.count({ where }),
-    ]);
-
-    return {
-      items,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
-  }
-
-  /**
-   * 버전 상세 조회 (어드민용)
-   */
-  async findOne(id: number) {
-    const version = await this.prisma.appVersion.findUnique({
-      where: { id },
-    });
-
-    if (!version) {
-      throw new NotFoundException(`버전 ID ${id}를 찾을 수 없습니다.`);
-    }
-
-    return version;
-  }
-
-  /**
-   * 버전 등록 (어드민용)
-   */
-  async create(dto: CreateAppVersionDto) {
-    this.logger.log(`버전 등록: ${dto.platform} v${dto.version}`);
-
-    const version = await this.prisma.appVersion.create({
-      data: {
-        platform: dto.platform,
-        version: dto.version,
-        buildNumber: dto.buildNumber,
-        minRequiredVersion: dto.minRequiredVersion,
-        isForceUpdate: dto.isForceUpdate ?? false,
-        isMaintenanceMode: dto.isMaintenanceMode ?? false,
-        maintenanceMessage: dto.maintenanceMessage,
-        releaseNotes: dto.releaseNotes,
-        storeUrl: dto.storeUrl,
-        isActive: dto.isActive ?? true,
-        releasedAt: dto.releasedAt ? new Date(dto.releasedAt) : getNowKST(),
-        createdAt: getNowKST(),
-      },
-    });
-
-    return version;
-  }
-
-  /**
-   * 버전 수정 (어드민용)
-   */
-  async update(id: number, dto: UpdateAppVersionDto) {
-    this.logger.log(`버전 수정: ID ${id}`);
-
-    await this.findOne(id);
-
-    const version = await this.prisma.appVersion.update({
-      where: { id },
-      data: {
-        ...(dto.version && { version: dto.version }),
-        ...(dto.buildNumber !== undefined && { buildNumber: dto.buildNumber }),
-        ...(dto.minRequiredVersion && { minRequiredVersion: dto.minRequiredVersion }),
-        ...(dto.isForceUpdate !== undefined && { isForceUpdate: dto.isForceUpdate }),
-        ...(dto.isMaintenanceMode !== undefined && { isMaintenanceMode: dto.isMaintenanceMode }),
-        ...(dto.maintenanceMessage !== undefined && { maintenanceMessage: dto.maintenanceMessage }),
-        ...(dto.releaseNotes !== undefined && { releaseNotes: dto.releaseNotes }),
-        ...(dto.storeUrl !== undefined && { storeUrl: dto.storeUrl }),
-        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-        ...(dto.releasedAt && { releasedAt: new Date(dto.releasedAt) }),
-      },
-    });
-
-    return version;
-  }
-
-  /**
-   * 버전 삭제 (어드민용)
-   */
-  async remove(id: number) {
-    this.logger.log(`버전 삭제: ID ${id}`);
-
-    await this.findOne(id);
-
-    await this.prisma.appVersion.delete({
-      where: { id },
-    });
-
-    return { success: true };
   }
 
   /**

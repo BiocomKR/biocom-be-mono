@@ -19,6 +19,10 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# 스크립트 경로 (스크립트 시작 시 한 번만 계산)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 # 사용법 출력
 usage() {
     cat << EOF
@@ -206,10 +210,9 @@ build_and_push_docker() {
     fi
     
     log_info "🔨 Docker 이미지 빌드 시작..."
-    
+
     # 프로젝트 루트로 이동
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cd "$SCRIPT_DIR/../.."
+    cd "$PROJECT_ROOT"
     
     # Artifact Registry 인증
     gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
@@ -240,16 +243,6 @@ run_db_migration() {
     fi
     
     log_info "🗄️ DB 마이그레이션 실행 중..."
-    
-    # 프로젝트 루트 결정
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    
-    # 스크립트가 infra-gcp/scripts에 있다면 상위 2레벨, 아니면 현재 디렉토리
-    if [[ "$SCRIPT_DIR" == *"/infra-gcp/scripts" ]]; then
-        PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-    else
-        PROJECT_ROOT="$SCRIPT_DIR"
-    fi
     
     log_info "스크립트 디렉토리: $SCRIPT_DIR"
     log_info "프로젝트 루트: $PROJECT_ROOT"
@@ -323,7 +316,6 @@ ensure_static_ip() {
 load_secrets() {
     log_info "🔐 민감정보 로드 중..."
 
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     SECRETS_FILE="$SCRIPT_DIR/../.env.secrets"
 
     if [[ ! -f "$SECRETS_FILE" ]]; then
@@ -344,9 +336,6 @@ load_secrets() {
 deploy_kubernetes() {
     log_info "☸️ Kubernetes 리소스 배포 시작..."
 
-    # k8s 디렉토리로 이동 (프로젝트 구조에 맞게 경로 수정)
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    
     # 여러 가능한 k8s 경로 확인
     if [[ -d "$SCRIPT_DIR/../k8s" ]]; then
         K8S_DIR="$SCRIPT_DIR/../k8s"
@@ -401,8 +390,6 @@ deploy_kubernetes() {
         log_info "Google Service Account Key Secret이 없습니다. 생성합니다..."
 
         # 프로젝트 루트에서 서비스 계정 키 파일 확인
-        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
         SERVICE_ACCOUNT_KEY_FILE="$PROJECT_ROOT/google-service-account-key.json"
 
         if [[ ! -f "$SERVICE_ACCOUNT_KEY_FILE" ]]; then
