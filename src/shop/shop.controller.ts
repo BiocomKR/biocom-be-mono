@@ -9,9 +9,12 @@ import {
   Query,
   Body,
   UseGuards,
-  ParseIntPipe
+  ParseIntPipe,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShopService } from './shop.service';
 
@@ -72,11 +75,14 @@ export class ShopController {
   }
 
   @Post('products/:id/images')
-        async addProductImage(
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FilesInterceptor('files', 10))
+  async uploadProductImages(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: any
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('deleteFileIds') deleteFileIds?: string,
   ) {
-    return this.shopService.addProductImage(id, dto);
+    return this.shopService.uploadProductImages(id, files, deleteFileIds);
   }
 
   /**
