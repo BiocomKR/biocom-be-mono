@@ -438,10 +438,7 @@ export class FeedbackService {
 
     this.logger.log(`베스트 리뷰 ${newIsBest ? '선정' : '해제'}: ID ${id}`);
 
-    return {
-      success: true,
-      isBest: newIsBest,
-    };
+    return { isBest: newIsBest };
   }
 
   /**
@@ -471,8 +468,6 @@ export class FeedbackService {
     });
 
     this.logger.log(`리뷰 숨김 처리: ID ${id}, 사유: ${hiddenReason}`);
-
-    return { success: true };
   }
 
   /**
@@ -501,8 +496,6 @@ export class FeedbackService {
     });
 
     this.logger.log(`리뷰 복원: ID ${id}`);
-
-    return { success: true };
   }
 
   /**
@@ -550,7 +543,68 @@ export class FeedbackService {
     });
 
     this.logger.log(`문의 답변 작성: 문의 ID ${questionId}, 관리자 ID ${operatorId}`);
+  }
 
-    return { success: true };
+  /**
+   * 문의 답변 수정
+   */
+  async updateAnswer(questionId: number, content: string, operatorId: number) {
+    const question = await this.prisma.productFeedback.findFirst({
+      where: {
+        id: questionId,
+        feedbackType: FeedbackType.QUESTION,
+        parentId: null,
+        hasAnswer: true,
+      },
+      include: {
+        replies: {
+          where: { status: FeedbackStatus.ACTIVE },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!question) {
+      throw new NotFoundException('답변된 문의를 찾을 수 없습니다');
+    }
+
+    const answer = question.replies[0];
+    const now = getNowKST();
+
+    if (answer) {
+      // 기존 답변이 있으면 수정
+      await this.prisma.productFeedback.update({
+        where: { id: answer.id },
+        data: {
+          content,
+          updatedAt: now,
+        },
+      });
+    } else {
+      // 답변 레코드가 없으면 새로 생성 (hasAnswer만 true인 잘못된 데이터 대응)
+      await this.prisma.productFeedback.create({
+        data: {
+          productId: question.productId,
+          userId: operatorId,
+          feedbackType: FeedbackType.QUESTION,
+          parentId: questionId,
+          content,
+          status: FeedbackStatus.ACTIVE,
+          createdAt: now,
+        },
+      });
+    }
+
+    // 원글 업데이트
+    await this.prisma.productFeedback.update({
+      where: { id: questionId },
+      data: {
+        answeredBy: operatorId,
+        answeredAt: now,
+      },
+    });
+
+    this.logger.log(`문의 답변 수정: 문의 ID ${questionId}, 관리자 ID ${operatorId}`);
   }
 }

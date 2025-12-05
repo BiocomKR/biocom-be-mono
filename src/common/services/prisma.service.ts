@@ -339,6 +339,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get category() { return this.prisma.category; }
   get product() { return this.prisma.product; }
   get productImage() { return this.prisma.productImage; }
+  get productFile() { return this.prisma.productFile; }
   get cart() { return this.prisma.cart; }
   get cartItem() { return this.prisma.cartItem; }
   get order() { return this.prisma.order; }
@@ -421,6 +422,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 앱 이벤트 테이블
   get appEvent() { return this.prisma.appEvent; }
+
+  // 앱 버전 테이블
+  get appVersion() { return this.prisma.appVersion; }
 
   // 메서드 바인딩
   $transaction(arg: any) {

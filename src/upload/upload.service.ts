@@ -374,4 +374,142 @@ export class UploadService {
 
     this.logger.log(`파일 삭제 완료 - ID: ${fileId}`);
   }
+
+  /**
+   * 상품 이미지 업로드 (UserFile 없이 File 테이블에만 저장)
+   * 관리자용 상품 이미지 업로드에 사용
+   */
+  async uploadProductImage(file: Express.Multer.File): Promise<{ id: number; filePath: string }> {
+    this.logger.log(`상품 이미지 업로드 시작 - 파일: ${file.originalname}`);
+
+    try {
+      // 1. 파일 존재 여부 확인
+      if (!file || (!file.buffer && !file.path)) {
+        throw new BadRequestException(this.config.errorMessages.fileNotFound);
+      }
+
+      // 파일 버퍼 준비
+      let fileBuffer: Buffer;
+      if (file.buffer) {
+        fileBuffer = file.buffer;
+      } else if (file.path) {
+        const fs = require('fs');
+        fileBuffer = fs.readFileSync(file.path);
+        setTimeout(() => {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (error) {
+            this.logger.warn(`임시 파일 삭제 실패: ${file.path}`);
+          }
+        }, 1000);
+      } else {
+        throw new BadRequestException('파일 데이터가 없습니다.');
+      }
+
+      // 2. 파일 크기 검증
+      if (file.size > this.config.limits.maxFileSize) {
+        throw new BadRequestException(this.config.errorMessages.fileSizeTooLarge);
+      }
+
+      if (file.size < this.config.limits.minFileSize) {
+        throw new BadRequestException(this.config.errorMessages.fileSizeTooSmall);
+      }
+
+      // 3. MIME 타입 검증
+      if (!this.config.allowedMimeTypes.has(file.mimetype)) {
+        throw new BadRequestException(this.config.errorMessages.invalidFileType);
+      }
+
+      // 4. 안전한 파일명 생성
+      const fileExt = extname(file.originalname).toLowerCase();
+      const safeFileName = `${crypto.randomBytes(16).toString('hex')}${fileExt}`;
+
+      // 5. Google Cloud Storage에 업로드
+      const publicUrl = await this.uploadToGoogleStorage(fileBuffer, safeFileName, file.mimetype);
+
+      // 6. File 테이블에만 저장 (UserFile 없이)
+      const fileRecord = await this.prisma.file.create({
+        data: {
+          originalName: file.originalname,
+          storedName: safeFileName,
+          filePath: publicUrl,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          storageType: 'gcs',
+          createdAt: getNowKST(),
+        },
+      });
+
+      this.logger.log(`상품 이미지 업로드 완료 - File ID: ${fileRecord.id}, URL: ${publicUrl}`);
+
+      return {
+        id: fileRecord.id,
+        filePath: publicUrl,
+      };
+    } catch (error) {
+      this.logger.error(`상품 이미지 업로드 중 오류 발생: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 상품 이미지 삭제 (GCS 파일 + File 레코드)
+   * ProductFile 삭제 시 호출하여 실제 파일까지 정리
+   * @param fileId File 테이블의 ID
+   */
+  async deleteProductImage(fileId: number): Promise<void> {
+    this.logger.log(`상품 이미지 삭제 시작 - File ID: ${fileId}`);
+
+    const file = await this.prisma.file.findUnique({
+      where: { id: fileId },
+    });
+
+    if (!file) {
+      this.logger.warn(`삭제할 파일을 찾을 수 없습니다 - File ID: ${fileId}`);
+      return;
+    }
+
+    // 1. Google Cloud Storage에서 파일 삭제
+    try {
+      // URL에서 파일명 추출 (https://storage.googleapis.com/bucket-name/filename.ext)
+      const urlParts = file.filePath.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+
+      if (fileName) {
+        const bucket = this.storage.bucket(this.bucketName);
+        const gcsFile = bucket.file(fileName);
+
+        await gcsFile.delete();
+        this.logger.log(`GCS 파일 삭제 완료: ${fileName}`);
+      }
+    } catch (error) {
+      // GCS 삭제 실패해도 DB 레코드는 삭제 진행 (404 등 이미 없는 경우 포함)
+      this.logger.warn(`GCS 파일 삭제 실패 (무시하고 진행): ${error.message}`);
+    }
+
+    // 2. File 레코드 삭제
+    try {
+      await this.prisma.file.delete({
+        where: { id: fileId },
+      });
+      this.logger.log(`File 레코드 삭제 완료 - ID: ${fileId}`);
+    } catch (error) {
+      this.logger.error(`File 레코드 삭제 실패: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 여러 상품 이미지 일괄 삭제
+   * @param fileIds File 테이블 ID 배열
+   */
+  async deleteProductImages(fileIds: number[]): Promise<void> {
+    this.logger.log(`상품 이미지 일괄 삭제 시작 - ${fileIds.length}개`);
+
+    for (const fileId of fileIds) {
+      await this.deleteProductImage(fileId);
+    }
+
+    this.logger.log(`상품 이미지 일괄 삭제 완료 - ${fileIds.length}개`);
+  }
 }
