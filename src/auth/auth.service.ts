@@ -182,12 +182,13 @@ export class AuthService {
     action: string,
     ip?: string,
     userAgent?: string,
+    path: string = '/api/auth/signin',
   ) {
     await this.prisma.operatorActivityLog.create({
       data: {
         operatorId,
         method: 'POST',
-        path: '/api/auth/login',
+        path,
         action,
         statusCode: action === 'LOGIN_SUCCESS' ? 200 : 401,
         ip,
@@ -338,7 +339,7 @@ export class AuthService {
       where: { operatorId },
     });
 
-    await this.logAuthAction(operatorId, 'LOGOUT', ip, userAgent);
+    await this.logAuthAction(operatorId, 'LOGOUT', ip, userAgent, '/api/auth/logout');
 
     this.logger.log(
       `운영자 로그아웃 성공: ID ${operatorId}, 삭제된 토큰 수: ${result.count}`,
