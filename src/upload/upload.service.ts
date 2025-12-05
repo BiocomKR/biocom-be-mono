@@ -451,4 +451,65 @@ export class UploadService {
       throw error;
     }
   }
+
+  /**
+   * 상품 이미지 삭제 (GCS 파일 + File 레코드)
+   * ProductFile 삭제 시 호출하여 실제 파일까지 정리
+   * @param fileId File 테이블의 ID
+   */
+  async deleteProductImage(fileId: number): Promise<void> {
+    this.logger.log(`상품 이미지 삭제 시작 - File ID: ${fileId}`);
+
+    const file = await this.prisma.file.findUnique({
+      where: { id: fileId },
+    });
+
+    if (!file) {
+      this.logger.warn(`삭제할 파일을 찾을 수 없습니다 - File ID: ${fileId}`);
+      return;
+    }
+
+    // 1. Google Cloud Storage에서 파일 삭제
+    try {
+      // URL에서 파일명 추출 (https://storage.googleapis.com/bucket-name/filename.ext)
+      const urlParts = file.filePath.split('/');
+      const fileName = urlParts[urlParts.length - 1];
+
+      if (fileName) {
+        const bucket = this.storage.bucket(this.bucketName);
+        const gcsFile = bucket.file(fileName);
+
+        await gcsFile.delete();
+        this.logger.log(`GCS 파일 삭제 완료: ${fileName}`);
+      }
+    } catch (error) {
+      // GCS 삭제 실패해도 DB 레코드는 삭제 진행 (404 등 이미 없는 경우 포함)
+      this.logger.warn(`GCS 파일 삭제 실패 (무시하고 진행): ${error.message}`);
+    }
+
+    // 2. File 레코드 삭제
+    try {
+      await this.prisma.file.delete({
+        where: { id: fileId },
+      });
+      this.logger.log(`File 레코드 삭제 완료 - ID: ${fileId}`);
+    } catch (error) {
+      this.logger.error(`File 레코드 삭제 실패: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 여러 상품 이미지 일괄 삭제
+   * @param fileIds File 테이블 ID 배열
+   */
+  async deleteProductImages(fileIds: number[]): Promise<void> {
+    this.logger.log(`상품 이미지 일괄 삭제 시작 - ${fileIds.length}개`);
+
+    for (const fileId of fileIds) {
+      await this.deleteProductImage(fileId);
+    }
+
+    this.logger.log(`상품 이미지 일괄 삭제 완료 - ${fileIds.length}개`);
+  }
 }

@@ -298,14 +298,27 @@ export class ShopService {
       throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
-    // 삭제할 파일 ID 파싱
-    let deleteFileIds: number[] = [];
+    // 삭제할 파일 ID 파싱 (ProductFile.id 배열)
+    let deleteProductFileIds: number[] = [];
     if (deleteFileIdsJson) {
       try {
-        deleteFileIds = JSON.parse(deleteFileIdsJson);
+        deleteProductFileIds = JSON.parse(deleteFileIdsJson);
       } catch {
         this.logger.warn(`deleteFileIds 파싱 실패: ${deleteFileIdsJson}`);
       }
+    }
+
+    // 삭제할 ProductFile들의 fileId를 미리 조회 (GCS + File 레코드 삭제용)
+    let fileIdsToDelete: number[] = [];
+    if (deleteProductFileIds.length > 0) {
+      const productFilesToDelete = await this.prisma.productFile.findMany({
+        where: {
+          productId,
+          id: { in: deleteProductFileIds },
+        },
+        select: { fileId: true },
+      });
+      fileIdsToDelete = productFilesToDelete.map(pf => pf.fileId);
     }
 
     // 새 파일 업로드 (트랜잭션 외부)
@@ -323,15 +336,15 @@ export class ShopService {
       : -1;
 
     await this.prisma.$transaction(async (tx) => {
-      // 삭제할 파일 관계 제거 (deleteFileIds는 ProductFile.id)
-      if (deleteFileIds.length > 0) {
+      // 삭제할 파일 관계 제거 (deleteProductFileIds는 ProductFile.id)
+      if (deleteProductFileIds.length > 0) {
         await tx.productFile.deleteMany({
           where: {
             productId,
-            id: { in: deleteFileIds },
+            id: { in: deleteProductFileIds },
           },
         });
-        this.logger.log(`상품 이미지 삭제: 상품 ID ${productId}, ProductFile IDs ${deleteFileIds.join(', ')}`);
+        this.logger.log(`상품 이미지 관계 삭제: 상품 ID ${productId}, ProductFile IDs ${deleteProductFileIds.join(', ')}`);
       }
 
       // 새 파일 추가 (MAIN 타입으로)
@@ -348,6 +361,11 @@ export class ShopService {
         this.logger.log(`상품 이미지 추가: 상품 ID ${productId}, ${newFileIds.length}개 파일`);
       }
     });
+
+    // GCS 파일 + File 레코드 삭제 (트랜잭션 외부 - 실패해도 DB는 정리된 상태)
+    if (fileIdsToDelete.length > 0) {
+      await this.uploadService.deleteProductImages(fileIdsToDelete);
+    }
 
     // 업데이트된 상품 정보 반환
     return this.getProductById(productId);

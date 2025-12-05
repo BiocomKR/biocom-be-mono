@@ -19,6 +19,7 @@ import { PushModule } from './push/push.module';
 import { ConsentModule } from './consent/consent.module';
 import { OperatorsModule } from './operators/operators.module';
 import { AppEventsModule } from './app-events/app-events.module';
+import { AppVersionModule } from './app-version/app-version.module';
 
 // Domain Controllers
 import { UsersController } from './users/users.controller';
@@ -92,6 +93,7 @@ import { CartService } from './cart/cart.service';
     ConsentModule,    // 약관 관리 모듈
     OperatorsModule,  // 운영자 관리 모듈
     AppEventsModule,  // 앱 이벤트 수집 모듈
+    AppVersionModule, // 앱 버전 관리 모듈
   ],
   controllers: [
     UsersController,
