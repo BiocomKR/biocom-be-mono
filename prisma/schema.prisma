@@ -2307,17 +2307,38 @@ enum MenuCode {
 /// 앱 이벤트 로그 테이블
 /// 앱에서 발생하는 모든 커스텀 이벤트를 저장 (GA4 대체/보조)
 model AppEvent {
-  id        Int      @id @default(autoincrement())
-  eventName String   @map("event_name") @db.VarChar(100)
-  userId    Int?     @map("user_id")
-  platform  String   @db.VarChar(20)
-  params    Json?
-  createdAt DateTime @default(now()) @map("created_at")
+  id            Int      @id @default(autoincrement())
 
-  @@index([eventName])
-  @@index([userId])
+  // 앱 구분
+  appId         String   @default("challenge") @map("app_id") @db.VarChar(50)
+
+  // 이벤트 기본
+  eventName     String   @map("event_name") @db.VarChar(100)
+  eventCategory String?  @map("event_category") @db.VarChar(50)
+
+  // 사용자/세션
+  userId        Int?     @map("user_id")
+  sessionId     String?  @map("session_id") @db.VarChar(100)
+  platform      String   @db.VarChar(20)
+
+  // 범용 아이템 (상품, 콘텐츠, 챌린지 등)
+  itemId        String?  @map("item_id") @db.VarChar(100)
+  itemType      String?  @map("item_type") @db.VarChar(50)
+
+  // 금액 (이커머스용)
+  amount        Decimal? @db.Decimal(12, 2)
+  quantity      Int?
+
+  // 나머지는 JSON
+  params        Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([appId, eventName, createdAt])
+  @@index([appId, eventCategory, createdAt])
+  @@index([userId, createdAt])
+  @@index([itemId, itemType])
+  @@index([eventCategory, itemType, createdAt])
   @@index([platform])
-  @@index([createdAt])
   @@map("app_events")
 }
 
