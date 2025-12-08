@@ -451,39 +451,42 @@ export class AuthService {
     // 1. 본인인증 검증
     await this.validatePhoneVerification(certNumber, mobile);
 
-    // 2. 활성화된 필수 약관 조회 (SIGNUP 카테고리)
-    const requiredConsents = await this.prisma.consent.findMany({
-      where: {
-        isRequired: true,
-        isActive: true,
-        category: 'SIGNUP',
-        deletedAt: null,
-      },
-    });
+    // 2. 약관 동의 검증 (consents가 있을 때만)
+    if (consents && consents.length > 0) {
+      // 활성화된 필수 약관 조회 (SIGNUP 카테고리)
+      const requiredConsents = await this.prisma.consent.findMany({
+        where: {
+          isRequired: true,
+          isActive: true,
+          category: 'SIGNUP',
+          deletedAt: null,
+        },
+      });
 
-    // 3. 필수 약관 동의 검증
-    for (const required of requiredConsents) {
-      const userConsent = consents.find(c => c.consentId === required.id);
+      // 필수 약관 동의 검증
+      for (const required of requiredConsents) {
+        const userConsent = consents.find(c => c.consentId === required.id);
 
-      if (!userConsent || !userConsent.isAgreed) {
-        this.logger.warn(`필수 약관 미동의: ${mobile}, 약관: ${required.title}`);
-        throw new ConflictException(`필수 약관 '${required.title}'에 동의해야 합니다.`);
+        if (!userConsent || !userConsent.isAgreed) {
+          this.logger.warn(`필수 약관 미동의: ${mobile}, 약관: ${required.title}`);
+          throw new ConflictException(`필수 약관 '${required.title}'에 동의해야 합니다.`);
+        }
       }
-    }
 
-    // 4. 전달된 consentId가 실제 존재하는지 검증
-    const consentIds = consents.map(c => c.consentId);
-    const existingConsents = await this.prisma.consent.findMany({
-      where: {
-        id: { in: consentIds },
-        isActive: true,
-        deletedAt: null,
-      },
-    });
+      // 전달된 consentId가 실제 존재하는지 검증
+      const consentIds = consents.map(c => c.consentId);
+      const existingConsents = await this.prisma.consent.findMany({
+        where: {
+          id: { in: consentIds },
+          isActive: true,
+          deletedAt: null,
+        },
+      });
 
-    if (existingConsents.length !== consentIds.length) {
-      this.logger.warn(`유효하지 않은 약관 ID: ${mobile}`);
-      throw new BadRequestException('유효하지 않은 약관 ID가 포함되어 있습니다.');
+      if (existingConsents.length !== consentIds.length) {
+        this.logger.warn(`유효하지 않은 약관 ID: ${mobile}`);
+        throw new BadRequestException('유효하지 않은 약관 ID가 포함되어 있습니다.');
+      }
     }
 
     // 5. 휴대폰 번호 중복 검사
@@ -525,16 +528,19 @@ export class AuthService {
         },
       });
 
-      // 각 약관별로 개별 레코드 생성
-      for (const consent of consents) {
-        await tx.userConsent.create({
-          data: {
-            userId: newUser.id,
-            consentId: consent.consentId,
-            isAgreed: consent.isAgreed,
-            agreedAt: now,
-          },
-        });
+      // 동의한 약관만 저장 (consents가 있을 때만)
+      // 프론트에서 동의한 항목만 전송하므로 isAgreed는 항상 true
+      if (consents && consents.length > 0) {
+        for (const consent of consents) {
+          await tx.userConsent.create({
+            data: {
+              userId: newUser.id,
+              consentId: consent.consentId,
+              isAgreed: true, // 동의한 항목만 전송받으므로 항상 true
+              agreedAt: now,
+            },
+          });
+        }
       }
 
       return newUser;

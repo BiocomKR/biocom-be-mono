@@ -55,6 +55,7 @@ model User {
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
   iapReceipts                  IAPReceipt[]
+  userConsents                 UserConsent[]
 
   @@map("users")
 }
@@ -2102,6 +2103,7 @@ model UserConsent {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   consentId Int      @map("consent_id")
   isAgreed  Boolean  @map("is_agreed")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_user_consents_user_id")
   consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
 
   @@unique([userId, consentId], map: "user_consents_user_id_consent_id_unique")
