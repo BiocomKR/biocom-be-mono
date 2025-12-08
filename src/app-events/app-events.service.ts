@@ -1,33 +1,59 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { GetAppEventsDto } from './dto/get-app-events.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AppEventsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(dto: GetAppEventsDto) {
-    const { eventName, userId, startDate, endDate, page = 1, limit = 20 } = dto;
+  private buildWhereClause(dto: {
+    appId?: string;
+    eventName?: string;
+    eventCategory?: string;
+    userId?: number;
+    itemType?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Prisma.AppEventWhereInput {
+    const where: Prisma.AppEventWhereInput = {};
 
-    const where: any = {};
-
-    if (eventName) {
-      where.eventName = eventName;
+    if (dto.appId) {
+      where.appId = dto.appId;
     }
 
-    if (userId) {
-      where.userId = userId;
+    if (dto.eventName) {
+      where.eventName = dto.eventName;
     }
 
-    if (startDate || endDate) {
+    if (dto.eventCategory) {
+      where.eventCategory = dto.eventCategory;
+    }
+
+    if (dto.userId) {
+      where.userId = dto.userId;
+    }
+
+    if (dto.itemType) {
+      where.itemType = dto.itemType;
+    }
+
+    if (dto.startDate || dto.endDate) {
       where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
+      if (dto.startDate) {
+        where.createdAt.gte = new Date(dto.startDate);
       }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate);
+      if (dto.endDate) {
+        where.createdAt.lte = new Date(dto.endDate);
       }
     }
+
+    return where;
+  }
+
+  async findAll(dto: GetAppEventsDto) {
+    const { page = 1, limit = 20 } = dto;
+    const where = this.buildWhereClause(dto);
 
     const [items, total] = await Promise.all([
       this.prisma.appEvent.findMany({
@@ -48,18 +74,13 @@ export class AppEventsService {
     };
   }
 
-  async getEventStats(startDate?: string, endDate?: string) {
-    const where: any = {};
-
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate);
-      }
-    }
+  async getEventStats(dto: {
+    appId?: string;
+    eventCategory?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const where = this.buildWhereClause(dto);
 
     const stats = await this.prisma.appEvent.groupBy({
       by: ['eventName'],
@@ -73,18 +94,13 @@ export class AppEventsService {
     }));
   }
 
-  async getPlatformStats(startDate?: string, endDate?: string) {
-    const where: any = {};
-
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate);
-      }
-    }
+  async getPlatformStats(dto: {
+    appId?: string;
+    eventCategory?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const where = this.buildWhereClause(dto);
 
     const stats = await this.prisma.appEvent.groupBy({
       by: ['platform'],
@@ -98,18 +114,62 @@ export class AppEventsService {
     }));
   }
 
-  async getSummary(startDate?: string, endDate?: string) {
-    const where: any = {};
+  async getCategoryStats(dto: {
+    appId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const where = this.buildWhereClause(dto);
 
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate);
-      }
-    }
+    const stats = await this.prisma.appEvent.groupBy({
+      by: ['eventCategory'],
+      where,
+      _count: { id: true },
+    });
+
+    return stats.map((s) => ({
+      eventCategory: s.eventCategory || 'unknown',
+      count: s._count.id,
+    }));
+  }
+
+  async getEcommerceStats(dto: {
+    appId?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const baseWhere = this.buildWhereClause(dto);
+    const where: Prisma.AppEventWhereInput = {
+      ...baseWhere,
+      eventCategory: 'ecommerce',
+      amount: { not: null },
+    };
+
+    const result = await this.prisma.appEvent.aggregate({
+      where,
+      _sum: { amount: true },
+      _count: { id: true },
+    });
+
+    // 주문 수 (purchase 이벤트)
+    const purchaseCount = await this.prisma.appEvent.count({
+      where: { ...where, eventName: 'purchase' },
+    });
+
+    return {
+      totalAmount: result._sum.amount || 0,
+      totalEvents: result._count.id,
+      purchaseCount,
+    };
+  }
+
+  async getSummary(dto: {
+    appId?: string;
+    eventCategory?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    const where = this.buildWhereClause(dto);
 
     // 오늘/어제 날짜 계산
     const today = new Date();
@@ -124,6 +184,11 @@ export class AppEventsService {
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
     const lastWeekEnd = new Date(thisWeekStart);
 
+    // appId, eventCategory 필터 유지
+    const baseFilter: Prisma.AppEventWhereInput = {};
+    if (dto.appId) baseFilter.appId = dto.appId;
+    if (dto.eventCategory) baseFilter.eventCategory = dto.eventCategory;
+
     const [
       todayEvents,
       yesterdayEvents,
@@ -133,19 +198,19 @@ export class AppEventsService {
     ] = await Promise.all([
       // 오늘 이벤트
       this.prisma.appEvent.count({
-        where: { createdAt: { gte: today } },
+        where: { ...baseFilter, createdAt: { gte: today } },
       }),
       // 어제 이벤트
       this.prisma.appEvent.count({
-        where: { createdAt: { gte: yesterday, lt: today } },
+        where: { ...baseFilter, createdAt: { gte: yesterday, lt: today } },
       }),
       // 이번 주 이벤트
       this.prisma.appEvent.count({
-        where: { createdAt: { gte: thisWeekStart } },
+        where: { ...baseFilter, createdAt: { gte: thisWeekStart } },
       }),
       // 지난 주 이벤트
       this.prisma.appEvent.count({
-        where: { createdAt: { gte: lastWeekStart, lt: lastWeekEnd } },
+        where: { ...baseFilter, createdAt: { gte: lastWeekStart, lt: lastWeekEnd } },
       }),
       // 활성 유저 수
       this.prisma.appEvent.groupBy({
@@ -175,24 +240,19 @@ export class AppEventsService {
   }
 
   // 시간대별 이벤트 (0~23시)
-  async getHourlyStats(startDate?: string, endDate?: string) {
-    const where: any = {};
-
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(startDate);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(endDate);
-      }
-    }
+  async getHourlyStats(dto: {
+    appId?: string;
+    eventCategory?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    let where = this.buildWhereClause(dto);
 
     // 기본: 오늘 데이터
-    if (!startDate && !endDate) {
+    if (!dto.startDate && !dto.endDate) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      where.createdAt = { gte: today };
+      where = { ...where, createdAt: { gte: today } };
     }
 
     const events = await this.prisma.appEvent.findMany({
@@ -215,10 +275,18 @@ export class AppEventsService {
   }
 
   // 일별 추이 (최근 7일)
-  async getDailyTrend() {
+  async getDailyTrend(dto: {
+    appId?: string;
+    eventCategory?: string;
+  }) {
     const result = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    // appId, eventCategory 필터
+    const baseFilter: Prisma.AppEventWhereInput = {};
+    if (dto.appId) baseFilter.appId = dto.appId;
+    if (dto.eventCategory) baseFilter.eventCategory = dto.eventCategory;
 
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
@@ -228,6 +296,7 @@ export class AppEventsService {
 
       const count = await this.prisma.appEvent.count({
         where: {
+          ...baseFilter,
           createdAt: { gte: date, lt: nextDate },
         },
       });

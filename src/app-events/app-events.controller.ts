@@ -15,38 +15,87 @@ export class AppEventsController {
 
   @Get('stats')
   async getStats(
+    @Query('appId') appId?: string,
+    @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.appEventsService.getEventStats(startDate, endDate);
+    return this.appEventsService.getEventStats({
+      appId,
+      eventCategory,
+      startDate,
+      endDate,
+    });
   }
 
   @Get('stats/platform')
   async getPlatformStats(
+    @Query('appId') appId?: string,
+    @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.appEventsService.getPlatformStats(startDate, endDate);
+    return this.appEventsService.getPlatformStats({
+      appId,
+      eventCategory,
+      startDate,
+      endDate,
+    });
+  }
+
+  @Get('stats/category')
+  async getCategoryStats(
+    @Query('appId') appId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.appEventsService.getCategoryStats({ appId, startDate, endDate });
+  }
+
+  @Get('stats/ecommerce')
+  async getEcommerceStats(
+    @Query('appId') appId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.appEventsService.getEcommerceStats({ appId, startDate, endDate });
   }
 
   @Get('stats/summary')
   async getSummary(
+    @Query('appId') appId?: string,
+    @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.appEventsService.getSummary(startDate, endDate);
+    return this.appEventsService.getSummary({
+      appId,
+      eventCategory,
+      startDate,
+      endDate,
+    });
   }
 
   @Get('stats/hourly')
   async getHourlyStats(
+    @Query('appId') appId?: string,
+    @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
-    return this.appEventsService.getHourlyStats(startDate, endDate);
+    return this.appEventsService.getHourlyStats({
+      appId,
+      eventCategory,
+      startDate,
+      endDate,
+    });
   }
 
   @Get('stats/daily-trend')
-  async getDailyTrend() {
-    return this.appEventsService.getDailyTrend();
+  async getDailyTrend(
+    @Query('appId') appId?: string,
+    @Query('eventCategory') eventCategory?: string,
+  ) {
+    return this.appEventsService.getDailyTrend({ appId, eventCategory });
   }
 }

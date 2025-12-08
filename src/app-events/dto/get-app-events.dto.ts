@@ -4,12 +4,24 @@ import { Type } from 'class-transformer';
 export class GetAppEventsDto {
   @IsOptional()
   @IsString()
+  appId?: string;
+
+  @IsOptional()
+  @IsString()
   eventName?: string;
+
+  @IsOptional()
+  @IsString()
+  eventCategory?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   userId?: number;
+
+  @IsOptional()
+  @IsString()
+  itemType?: string;
 
   @IsOptional()
   @IsDateString()
