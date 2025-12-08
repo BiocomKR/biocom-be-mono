@@ -2133,4 +2133,222 @@ export class StatisticsService {
     }
   }
 
+  /**
+   * AI Agent 경량화 통계 조회
+   * - 1차 API의 데이터를 배열 기반으로 경량화
+   * - 스키마 정보 포함하여 배열 구조 설명
+   * - 한글 key는 1차 API와 동일하게 유지
+   */
+  async getAiAgentStatisticsMinified(chartId: string, days: number = 7): Promise<any> {
+    this.logger.log(`AI Agent 경량화 통계 조회 시작: chartId=${chartId}, days=${days}`);
+
+    try {
+      // 1차 API와 동일한 데이터 조회
+      const rawData = await this.getAiAgentStatistics(chartId, days);
+
+      // 스키마 정의
+      const _schema = {
+        version: "2.0",
+        description: "정규화된 사용자 건강 데이터",
+        notes: {
+          "1일1미션": {
+            data: "[미션명, 수행일시]"
+          },
+          밸런스게임: "[title, description, option, keyword, linkedProduct, createdAt]",
+          뷰티: "[totalScore, innerScore, outerScore, [inner1,inner2,inner3,inner4], [outer1,outer2,outer3,outer4]]",
+          식단: {
+            "MEAL_TYPE": "[foodName, isFasting, [allergyFoods], allergyScore, [processedFoods], processedCount, [highFodmapFoods], highFodmapCount]"
+          },
+          영양제: {
+            "PRODUCT_NAME": {
+              "YYYY-MM-DD": "[intakeCount, recommendedCount]"
+            }
+          },
+          간헐적단식: "[startDateTime, endDateTime, fastingHours]",
+          수면: "[bedDateTime, wakeDateTime, sleepHours]",
+          활동: {
+            activityTypes: "[name, baseMinutes, calorieRate]",
+            data: "[activityTime, typeCode, durationMinutes, estimatedCalories]"
+          }
+        }
+      };
+
+      // 음식물과민증검사결과 경량화 (레벨별 배열로 변환)
+      const 음식물과민증검사결과: any = {};
+      if (rawData.음식물과민증검사결과 && rawData.음식물과민증검사결과.length > 0) {
+        const item = rawData.음식물과민증검사결과[0];
+
+        // level1~5 문자열을 배열로 변환
+        음식물과민증검사결과["1"] = item.level1 ? item.level1.split(',').map((s: string) => s.trim()) : [];
+        음식물과민증검사결과["2"] = item.level2 ? item.level2.split(',').map((s: string) => s.trim()) : [];
+        음식물과민증검사결과["3"] = item.level3 ? item.level3.split(',').map((s: string) => s.trim()) : [];
+        음식물과민증검사결과["4"] = item.level4 ? item.level4.split(',').map((s: string) => s.trim()) : [];
+        음식물과민증검사결과["5"] = item.level5 ? item.level5.split(',').map((s: string) => s.trim()) : [];
+      }
+
+      // 1일1미션 경량화
+      const 미션 = {
+        챌린지일차: rawData['1일1미션'].챌린지일차,
+        수행한미션수: rawData['1일1미션'].수행한미션수,
+        data: rawData['1일1미션'].data.map((m: any) => [
+          m.미션명,
+          m.수행일시
+        ])
+      };
+
+      // 밸런스게임 경량화
+      const 밸런스게임 = rawData.밸런스게임.map((bg: any) => [
+        bg.title,
+        bg.description,
+        bg.option,
+        bg.keyword,
+        bg.linkedProduct,
+        bg.createdAt
+      ]);
+
+      // 뷰티 경량화 (날짜별로 그룹핑)
+      const 뷰티Map = new Map<string, any[]>();
+      rawData.뷰티.forEach((b: any) => {
+        const 뷰티데이터 = [
+          b.totalScore,
+          b.innerBeautyScore,
+          b.outerBeautyScore,
+          b.innerBeauty.map((ib: any) => ib.score),
+          b.outerBeauty.map((ob: any) => ob.score)
+        ];
+
+        if (!뷰티Map.has(b.date)) {
+          뷰티Map.set(b.date, []);
+        }
+        뷰티Map.get(b.date)!.push(뷰티데이터);
+      });
+
+      const 뷰티 = Object.fromEntries(
+        Array.from(뷰티Map.entries()).map(([date, records]) => {
+          return [date, records.length === 1 ? records[0] : records];
+        })
+      );
+
+      // 식단 경량화 (날짜별 > 식사타입별)
+      const 식단Map = new Map<string, any>();
+      rawData.식단.forEach((d: any) => {
+        if (!식단Map.has(d.date)) {
+          식단Map.set(d.date, {});
+        }
+
+        const allergyNames = d.allergyFoods.map((af: any) => af.name);
+
+        식단Map.get(d.date)![d.diet] = [
+          d.foodName,
+          d.isFasting,
+          allergyNames,
+          d.allergyScore,
+          d.processedFoods,
+          d.processedCount,
+          d.highFodmapFoods,
+          d.highFodmapCount
+        ];
+      });
+
+      const 식단 = Object.fromEntries(식단Map.entries());
+
+      // 영양제 경량화 (제품명별 > 날짜별)
+      const 영양제Map = new Map<string, any>();
+      rawData.영양제.forEach((s: any) => {
+        if (!영양제Map.has(s.productName)) {
+          영양제Map.set(s.productName, {});
+        }
+        영양제Map.get(s.productName)![s.date] = [
+          s.intakeCount,
+          s.recommendedCount
+        ];
+      });
+
+      const 영양제 = Object.fromEntries(영양제Map.entries());
+
+      // 간헐적단식 경량화 (날짜별)
+      const 간헐적단식Map = new Map<string, any>();
+      rawData.간헐적단식.forEach((f: any) => {
+        간헐적단식Map.set(f.date, [
+          f.startDateTime,
+          f.endDateTime,
+          f.fastingHours
+        ]);
+      });
+
+      const 간헐적단식 = Object.fromEntries(간헐적단식Map.entries());
+
+      // 수면 경량화 (날짜별)
+      const 수면Map = new Map<string, any>();
+      rawData.수면.forEach((sl: any) => {
+        수면Map.set(sl.date, [
+          sl.bedDateTime,
+          sl.wakeDateTime,
+          sl.sleepHours
+        ]);
+      });
+
+      const 수면 = Object.fromEntries(수면Map.entries());
+
+      // 활동 경량화
+      // 1. activityTypes 추출 (중복 제거)
+      const activityTypesMap = new Map<string, any>();
+      rawData.활동.forEach((a: any) => {
+        const code = a.activityType.code;
+        if (!activityTypesMap.has(code)) {
+          activityTypesMap.set(code, [
+            a.activityType.name,
+            a.activityType.base_minutes,
+            a.activityType.calorie_rate
+          ]);
+        }
+      });
+
+      const activityTypes = Object.fromEntries(activityTypesMap.entries());
+
+      // 2. 활동 데이터 (날짜별)
+      const 활동Map = new Map<string, any[]>();
+      rawData.활동.forEach((a: any) => {
+        if (!활동Map.has(a.date)) {
+          활동Map.set(a.date, []);
+        }
+        활동Map.get(a.date)!.push([
+          a.activityTime,
+          a.activityType.code,
+          a.durationInMinutes,
+          a.estimatedCalories
+        ]);
+      });
+
+      const 활동데이터 = Object.fromEntries(활동Map.entries());
+
+      // 최종 응답 생성
+      return {
+        _schema,
+        음식물과민증검사결과,
+        이름: rawData.이름,
+        이너뷰티유형: rawData.이너뷰티유형,
+        AI코치유형: rawData.AI코치유형,
+        MBTI: rawData.MBTI,
+        자기선언문: rawData.자기선언문,
+        칭찬하기: rawData.칭찬하기,
+        '1일1미션': 미션,
+        밸런스게임,
+        뷰티,
+        식단,
+        영양제,
+        간헐적단식,
+        수면,
+        활동: {
+          activityTypes,
+          data: 활동데이터
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`AI Agent 경량화 통계 조회 실패: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
 }

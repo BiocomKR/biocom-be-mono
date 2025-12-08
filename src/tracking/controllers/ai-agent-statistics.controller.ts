@@ -67,4 +67,43 @@ export class AiAgentStatisticsController {
       message: 'AI Agent 통계 조회 성공',
     };
   }
+
+  /**
+   * AI Agent용 경량화된 통합 통계 조회
+   * @description 배열 기반으로 데이터 크기를 최소화한 버전 (스키마 정보 포함)
+   */
+  @Get('ai-agent/minify')
+  @UseGuards(AiAgentAuthGuard)
+  @ApiOperation({
+    summary: 'AI Agent용 경량화된 통합 통계 조회',
+    description: '배열 기반으로 데이터 크기를 최소화한 버전. 스키마 정보 포함. x-token 헤더에 암호화된 chartId 전달 필요',
+  })
+  @ApiQuery({
+    name: 'day',
+    required: false,
+    type: Number,
+    description: '조회 기간 (오늘 기준 N일 전부터 오늘까지, 기본값: 7)',
+    example: 7,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'AI Agent 경량화 통계 조회 성공',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'x-token 헤더 없음 또는 복호화 실패',
+  })
+  async getAiAgentStatisticsMinified(
+    @Request() req: any,
+    @Query('day') day?: number,
+  ) {
+    const chartId = req.chartId;
+    const days = day ? Number(day) : 7;
+    const data = await this.statisticsService.getAiAgentStatisticsMinified(chartId, days);
+    return {
+      success: true,
+      data,
+      message: 'AI Agent 경량화 통계 조회 성공',
+    };
+  }
 }
