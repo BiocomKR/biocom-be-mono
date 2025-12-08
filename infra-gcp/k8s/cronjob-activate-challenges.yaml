@@ -39,27 +39,31 @@ spec:
           imagePullSecrets:
           - name: gcr-json-key
 
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            fsGroup: 2000
-
           restartPolicy: Never
 
           containers:
           - name: activate-challenges
-            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251124182224
+            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:latest
             imagePullPolicy: Always
 
             command:
             - node
-            - dist/main.js
+            - dist/src/main.js
             - --run-scheduler
             - activate-challenges
 
             envFrom:
             - configMapRef:
                 name: biocom-api-config
+            - secretRef:
+                name: biocom-api-secrets
+
+            volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+            - name: kcp-cert-files
+              mountPath: /config/kcp-cert
+              readOnly: true
 
             resources:
               requests:
@@ -68,3 +72,10 @@ spec:
               limits:
                 memory: "1Gi"
                 cpu: "500m"
+
+          volumes:
+          - name: logs
+            emptyDir: {}
+          - name: kcp-cert-files
+            secret:
+              secretName: kcp-cert-files

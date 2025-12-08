@@ -51,24 +51,18 @@ spec:
           imagePullSecrets:
           - name: gcr-json-key
 
-          # Pod 보안 설정
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            fsGroup: 2000
-
           # Job 실패 시 재시작하지 않음
           restartPolicy: Never
 
           containers:
           - name: check-push-schedules
-            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251124182224
+            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:latest
             imagePullPolicy: Always
 
             # 배치 실행 명령어
             command:
             - node
-            - dist/main.js
+            - dist/src/main.js
             - --run-scheduler
             - check-push-schedules
 
@@ -79,10 +73,15 @@ spec:
             - secretRef:
                 name: biocom-api-secrets
 
-            # 볼륨 마운트 (Firebase 키 필요)
+            # 볼륨 마운트 (Firebase 키 + 로그 디렉토리 + KCP 인증서)
             volumeMounts:
             - name: firebase-service-account-key
               mountPath: /app/firebase
+              readOnly: true
+            - name: logs
+              mountPath: /app/logs
+            - name: kcp-cert-files
+              mountPath: /config/kcp-cert
               readOnly: true
 
             # 리소스 제한 (매분 실행이므로 가볍게)
@@ -99,3 +98,8 @@ spec:
           - name: firebase-service-account-key
             secret:
               secretName: firebase-service-account-key
+          - name: logs
+            emptyDir: {}
+          - name: kcp-cert-files
+            secret:
+              secretName: kcp-cert-files
