@@ -4,7 +4,7 @@ import { PushCampaignService } from './push-campaign.service';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { PushScheduleType } from '../enums';
-import { parseExpression } from 'cron-parser';
+import { CronExpressionParser } from 'cron-parser';
 
 /**
  * ============================================================================
@@ -263,7 +263,7 @@ export class PushSchedulerService {
       nowMinuteStart.setSeconds(0, 0);
 
       // 크론 표현식 파싱 (KST 기준)
-      const interval = parseExpression(cronExpression, {
+      const interval = CronExpressionParser.parse(cronExpression, {
         currentDate: now,
         tz: 'Asia/Seoul',
       });
