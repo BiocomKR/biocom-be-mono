@@ -152,14 +152,16 @@ export class ConsentController {
   /**
    * 약관 순서 일괄 변경 (드래그앤드롭)
    * NOTE: :id 라우트보다 먼저 정의해야 함
+   * 카테고리 내에서의 순서만 변경됨
    */
   @Post('reorder')
   async reorderConsents(
     @Body('orderedIds') orderedIds: number[],
+    @Body('category') category: string,
   ): Promise<ApiResponseDto<any>> {
-    this.logger.log(`약관 순서 일괄 변경: ${orderedIds.length}개`);
+    this.logger.log(`약관 순서 일괄 변경: ${category} 카테고리 ${orderedIds.length}개`);
 
-    await this.consentService.reorderConsents(orderedIds);
+    await this.consentService.reorderConsents(orderedIds, category);
 
     return {
       success: true,

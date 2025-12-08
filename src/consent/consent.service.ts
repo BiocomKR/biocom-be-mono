@@ -377,11 +377,25 @@ export class ConsentService {
 
   /**
    * 약관 순서 일괄 변경 (드래그앤드롭)
+   * 카테고리 내에서의 순서만 변경
    */
-  async reorderConsents(orderedIds: number[]) {
-    this.logger.log(`약관 순서 일괄 변경: ${orderedIds.join(', ')}`);
+  async reorderConsents(orderedIds: number[], category: string) {
+    this.logger.log(`약관 순서 일괄 변경: ${category} 카테고리 - ${orderedIds.join(', ')}`);
 
-    // 트랜잭션으로 모든 순서 업데이트
+    // 해당 카테고리의 약관인지 검증
+    const consents = await this.prisma.consent.findMany({
+      where: {
+        id: { in: orderedIds },
+        category,
+        deletedAt: null,
+      },
+    });
+
+    if (consents.length !== orderedIds.length) {
+      throw new BadRequestException('유효하지 않은 약관이 포함되어 있습니다.');
+    }
+
+    // 트랜잭션으로 해당 카테고리 내 순서만 업데이트
     await this.prisma.$transaction(
       orderedIds.map((id, index) =>
         this.prisma.consent.update({
