@@ -476,13 +476,23 @@ deploy_kubernetes() {
     log_info "Ingress 배포 중..."
     kubectl apply -f ingress.yaml
 
-    # CronJob 배포
+    # CronJob 검증 및 배포
+    log_info "CronJob 설정 검증 중..."
+    if ! bash "$SCRIPT_DIR/validate-cronjobs.sh"; then
+        log_error "CronJob 검증 실패! 배포를 중단합니다."
+        exit 1
+    fi
+
     log_info "CronJob 배포 중..."
-    kubectl apply -f cronjob-expire-challenges.yaml
-    kubectl apply -f cronjob-activate-challenges.yaml
-    kubectl apply -f cronjob-create-supplements.yaml
-    kubectl apply -f cronjob-check-push-schedules.yaml
-    log_success "✅ CronJob 4개 배포 완료 (만료, 활성화, 영양제, 푸시스케줄)"
+    # 모든 CronJob YAML 자동 감지 및 배포
+    for cronjob_file in cronjob-*.yaml; do
+        if [[ -f "$cronjob_file" ]]; then
+            kubectl apply -f "$cronjob_file"
+            log_info "  ✓ $cronjob_file 배포 완료"
+        fi
+    done
+
+    log_success "✅ 모든 CronJob 검증 및 배포 완료"
 
     # 배포 상태 확인
     log_info "배포 상태 확인 중..."

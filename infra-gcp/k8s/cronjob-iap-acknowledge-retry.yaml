@@ -65,6 +65,9 @@ spec:
               mountPath: /app/logs
             - name: kcp-cert-files
               mountPath: /config/kcp-cert
+            - name: firebase-service-account-key
+              mountPath: /app/firebase
+              readOnly: true
               readOnly: true
 
             resources:
@@ -81,3 +84,6 @@ spec:
           - name: kcp-cert-files
             secret:
               secretName: kcp-cert-files
+          - name: firebase-service-account-key
+            secret:
+              secretName: firebase-service-account-key
