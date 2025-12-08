@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
+  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,7 +32,13 @@ export class ConsentController {
   @Get('consents')
   @ApiOperation({
     summary: '약관 목록 조회',
-    description: '현재 활성화된 약관 목록을 조회합니다.',
+    description: '현재 활성화된 약관 목록을 조회합니다. category 파라미터로 특정 카테고리의 약관만 조회할 수 있습니다.',
+  })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: '약관 카테고리 (예: SIGNUP, PAYMENT)',
+    example: 'SIGNUP',
   })
   @ApiResponse({
     status: 200,
@@ -46,6 +54,7 @@ export class ConsentController {
             title: '서비스 이용약관',
             content: '제1조 (목적)...',
             version: '1.0',
+            category: 'SIGNUP',
             isRequired: true,
             displayOrder: 1,
           },
@@ -54,8 +63,10 @@ export class ConsentController {
       },
     },
   })
-  async getConsents(): Promise<ApiResponseDto> {
-    const consents = await this.consentService.getActiveConsents();
+  async getConsents(
+    @Query('category') category?: string,
+  ): Promise<ApiResponseDto> {
+    const consents = await this.consentService.getActiveConsents(category);
 
     return {
       success: true,

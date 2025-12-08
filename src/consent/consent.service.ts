@@ -11,14 +11,16 @@ export class ConsentService {
   /**
    * 활성 약관 목록 조회
    * 유저에게 보여줄 현재 활성화된 약관 목록
+   * @param category 카테고리 필터 (선택)
    */
-  async getActiveConsents() {
-    this.logger.log('활성 약관 목록 조회');
+  async getActiveConsents(category?: string) {
+    this.logger.log(`활성 약관 목록 조회${category ? ` (category: ${category})` : ''}`);
 
     const consents = await this.prisma.consent.findMany({
       where: {
         isActive: true,
         deletedAt: null,
+        ...(category && { category }),
       },
       select: {
         id: true,
@@ -26,6 +28,7 @@ export class ConsentService {
         title: true,
         content: true,
         version: true,
+        category: true,
         isRequired: true,
         displayOrder: true,
       },
