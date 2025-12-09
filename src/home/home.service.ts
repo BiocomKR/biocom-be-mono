@@ -8,8 +8,7 @@ import {
   SubscriberHomeDataDto,
 } from './dto/home.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
+import { SibApiService } from '../sib/services/sib-api.service';
 
 /**
  * 홈 화면 서비스
@@ -21,7 +20,7 @@ export class HomeService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly httpService: HttpService,
+    private readonly sibApiService: SibApiService,
   ) {}
 
   /**
@@ -338,13 +337,8 @@ export class HomeService {
     try {
       this.logger.log(`외부 API 차트 데이터 조회 시작 - 사용자 ID: ${userId}, 휴대폰: ${mobile}`);
 
-      // 외부 API 호출
-      const url = `https://sib.codns.com:3001/api/challenge/chartIdByMobile?mobile=${mobile}`;
-      const response = await firstValueFrom(
-        this.httpService.get(url, { timeout: 10000 })
-      );
-
-      const chartData = response.data;
+      // SibApiService를 통해 외부 API 호출
+      const chartData = await this.sibApiService.getChartIdByMobile(mobile);
 
       // 데이터가 없으면 종료
       if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
@@ -356,15 +350,15 @@ export class HomeService {
 
       // 각 차트 데이터를 DB에 저장 (중복 제외)
       for (const chart of chartData) {
-        const { chartID, receiptDate, resultYN, orderCode } = chart;
+        const { chartId, receiptDate, resultYN, examType } = chart;
 
         // 이미 존재하는 chartId인지 확인
         const existingChart = await this.prisma.userChart.findUnique({
-          where: { chartId: chartID },
+          where: { chartId },
         });
 
         if (existingChart) {
-          this.logger.log(`이미 존재하는 차트 ID: ${chartID} - 스킵`);
+          this.logger.log(`이미 존재하는 차트 ID: ${chartId} - 스킵`);
           continue;
         }
 
@@ -372,14 +366,14 @@ export class HomeService {
         await this.prisma.userChart.create({
           data: {
             userId,
-            chartId: chartID,
+            chartId,
             receiptDate: new Date(receiptDate),
             resultYn: resultYN,
-            orderCode,
+            orderCode: examType,
           },
         });
 
-        this.logger.log(`차트 데이터 저장 완료 - 차트 ID: ${chartID}`);
+        this.logger.log(`차트 데이터 저장 완료 - 차트 ID: ${chartId}`);
       }
 
       this.logger.log(`차트 데이터 처리 완료 - 사용자 ID: ${userId}`);
