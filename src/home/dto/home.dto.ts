@@ -99,6 +99,9 @@ export class ChallengeInfoDto {
   @ApiProperty({ description: '현재 챌린지 일차', example: 5 })
   currentDay: number;
 
+  @ApiProperty({ description: '챌린지 진행률 (%)', example: 35 })
+  challengePercent: number;
+
   @ApiProperty({ description: '챌린지 홈 최초 진입 여부', example: true })
   isFirstEntry: boolean;
 
@@ -115,9 +118,6 @@ export class NewHomeResponseDto {
 
   @ApiPropertyOptional({ description: '동물 유형 (사전문진 resultYN=Y일 때만)' })
   animalType: AnimalTypeDto | null;
-
-  @ApiProperty({ description: '챌린지 진행률 (%)', example: 35 })
-  challengePercent: number;
 
   @ApiPropertyOptional({ description: '페르소나 정보' })
   persona: PersonaInfoDto | null;

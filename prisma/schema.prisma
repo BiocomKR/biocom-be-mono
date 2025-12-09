@@ -56,6 +56,7 @@ model User {
   wishlist                     Wishlist[]
   iapReceipts                  IAPReceipt[]
   userConsents                 UserConsent[]
+  userCharts                   UserChart[]
 
   @@map("users")
 }
@@ -2074,6 +2075,8 @@ model UserChart {
   orderCode   String    @map("order_code") @db.VarChar(20)
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chartId], map: "idx_user_charts_chart_id")
   @@index([userId], map: "idx_user_charts_user_id")

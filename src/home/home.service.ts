@@ -377,7 +377,7 @@ export class HomeService {
     this.logger.log(`새 홈 화면 데이터 조회 시작 - 사용자 ID: ${userId}`);
 
     try {
-      // 1. 사용자 정보 조회 (페르소나, 동물유형, 포인트, 활성 챌린지 포함)
+      // 1. 사용자 정보 조회 (페르소나, 동물유형, 포인트, 활성 챌린지, 차트정보 포함)
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -449,6 +449,18 @@ export class HomeService {
               },
             },
           },
+          // 차트 정보 (D0004, D0060만 필터링하여 최신순 1개)
+          userCharts: {
+            where: {
+              orderCode: { in: ['D0004', 'D0060'] },
+            },
+            orderBy: { receiptDate: 'desc' },
+            take: 1,
+            select: {
+              chartId: true,
+              resultYn: true,
+            },
+          },
         },
       });
 
@@ -456,10 +468,27 @@ export class HomeService {
         throw new Error('사용자를 찾을 수 없습니다');
       }
 
-      // 2. SIB API로 검사 정보 조회 (지연성 알러지)
-      const reportInfo = await this.sibApiService.getHomeExamInfo(user.mobile);
+      // 2. DB 캐시에서 검사 정보 조회 (없으면 백그라운드로 SIB API 호출)
+      let reportInfo: { chartId: string | null; resultYN: YesNo; sibError?: boolean };
+      if (user.userCharts.length > 0) {
+        // DB 캐시 히트
+        const cachedChart = user.userCharts[0];
+        reportInfo = {
+          chartId: cachedChart.chartId,
+          resultYN: cachedChart.resultYn as YesNo,
+        };
+      } else {
+        // DB 캐시 미스 - 백그라운드로 SIB API 호출 후 기본값 반환
+        this.fetchAndSaveChartData(userId, user.mobile).catch((err) => {
+          this.logger.warn(`차트 데이터 백그라운드 저장 실패 - 사용자 ID: ${userId}`, err);
+        });
+        reportInfo = { chartId: null, resultYN: YesNo.N };
+      }
 
-      // 3. 동물 유형 (resultYN이 Y일 때만 제공)
+      // 3. 배너 조회
+      const banner = await this.getHomeBanner(user.status);
+
+      // 4. 동물 유형 (resultYN이 Y일 때만 제공)
       let animalType: AnimalTypeDto | null = null;
       if (reportInfo.resultYN === YesNo.Y && user.healthTypeAnimal) {
         animalType = {
@@ -469,7 +498,7 @@ export class HomeService {
         };
       }
 
-      // 4. 페르소나 정보
+      // 5. 페르소나 정보
       let persona: PersonaInfoDto | null = null;
       if (user.aiPersona) {
         persona = {
@@ -478,7 +507,7 @@ export class HomeService {
         };
       }
 
-      // 5. 챌린지 정보 (CHALLENGER만)
+      // 6. 챌린지 정보 (CHALLENGER만)
       let challengeInfo: ChallengeInfoDto | null = null;
       let challengePercent = 0;
 
@@ -536,6 +565,7 @@ export class HomeService {
             ? new Date(activeChallenge.endDate).toISOString().split('T')[0]
             : '',
           currentDay,
+          challengePercent,
           isFirstEntry: activeChallenge.isFirstEntry,
           missionList,
         };
@@ -551,9 +581,6 @@ export class HomeService {
         }
       }
 
-      // 배너 정보 조회 (공통) - 사용자 상태에 따른 필터링
-      const banner = await this.getHomeBanner(user.status);
-
       return {
         reportInfo: {
           chartId: reportInfo.chartId,
@@ -561,7 +588,6 @@ export class HomeService {
           sibError: reportInfo.sibError,
         },
         animalType,
-        challengePercent,
         persona,
         userPoint: user.points ?? 0,
         banner,
