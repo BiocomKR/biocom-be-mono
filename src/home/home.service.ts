@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
-import { UserChallengeStatus } from '../common/enums';
+import { UserChallengeStatus, YesNo } from '../common/enums';
 import {
   NewcomerHomeDataDto,
   ChallengerHomeDataDto,
   SubscriberHomeDataDto,
   NewHomeResponseDto,
-  ExamInfoDto,
+  ReportInfoDto,
   AnimalTypeDto,
   PersonaInfoDto,
   ChallengeInfoDto,
@@ -16,6 +16,37 @@ import {
 } from './dto/home.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
+import { BannersService } from '../shop/services/banners.service';
+
+/**
+ * 미션 목업 데이터
+ */
+const MOCK_MISSION_LIST: MissionItemDto[] = [
+  {
+    id: 1,
+    title: '뷰티 종합 점수 평가하고',
+    description: '오늘의 컨디션을 기록해보세요',
+    point: 100,
+    max: 1,
+    current: 0,
+  },
+  {
+    id: 2,
+    title: '자기 선언문 쓰고',
+    description: '오늘의 다짐을 작성해보세요',
+    point: 1000,
+    max: 1,
+    current: 0,
+  },
+  {
+    id: 3,
+    title: '식단 기록하고',
+    description: '오늘 먹은 음식을 기록해보세요',
+    point: 100,
+    max: 3,
+    current: 0,
+  },
+];
 
 /**
  * 홈 화면 서비스
@@ -28,6 +59,7 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sibApiService: SibApiService,
+    private readonly bannersService: BannersService,
   ) {}
 
   /**
@@ -336,7 +368,9 @@ export class HomeService {
   }
 
   /**
-   * 새 홈 화면 데이터 조회 (새 스펙)
+   * 새 홈 화면 데이터 조회 (v2 스펙)
+   * - status별 분기: NEWCOMER/SUBSCRIBER는 challengeInfo null
+   * - CHALLENGER만 challengeInfo 제공
    * @param userId 사용자 ID
    */
   async getNewHomeData(userId: number): Promise<NewHomeResponseDto> {
@@ -350,6 +384,7 @@ export class HomeService {
           id: true,
           mobile: true,
           points: true,
+          status: true,
           aiPersonaId: true,
           health_type_animal_id: true,
           aiPersona: {
@@ -378,6 +413,7 @@ export class HomeService {
               activatedAt: true,
               createdAt: true,
               totalPoints: true,
+              isFirstEntry: true,
               product: {
                 select: {
                   id: true,
@@ -421,11 +457,11 @@ export class HomeService {
       }
 
       // 2. SIB API로 검사 정보 조회 (지연성 알러지)
-      const examInfo = await this.sibApiService.getHomeExamInfo(user.mobile);
+      const reportInfo = await this.sibApiService.getHomeExamInfo(user.mobile);
 
       // 3. 동물 유형 (resultYN이 Y일 때만 제공)
       let animalType: AnimalTypeDto | null = null;
-      if (examInfo.resultYN === 'Y' && user.healthTypeAnimal) {
+      if (reportInfo.resultYN === YesNo.Y && user.healthTypeAnimal) {
         animalType = {
           name: user.healthTypeAnimal.animalName,
           description: user.healthTypeAnimal.catchphrase,
@@ -442,12 +478,13 @@ export class HomeService {
         };
       }
 
-      // 5. 챌린지 정보
+      // 5. 챌린지 정보 (CHALLENGER만)
       let challengeInfo: ChallengeInfoDto | null = null;
       let challengePercent = 0;
 
+      // status가 CHALLENGER이고 활성 챌린지가 있는 경우만 챌린지 정보 제공
       const activeChallenge = user.userChallenges[0];
-      if (activeChallenge) {
+      if (user.status === UserSubscriptionStatus.CHALLENGER && activeChallenge) {
         const today = getNowKST();
         const startDate = activeChallenge.startDate
           ? new Date(activeChallenge.startDate)
@@ -463,7 +500,7 @@ export class HomeService {
         );
 
         // 미션별 완료 횟수 계산
-        const missionList: MissionItemDto[] = todayMissions.map((cm) => {
+        let missionList: MissionItemDto[] = todayMissions.map((cm) => {
           const completedCount = activeChallenge.userMissions.filter(
             (um) => um.challengeMissionId === cm.id && um.day === currentDay,
           ).length;
@@ -478,6 +515,11 @@ export class HomeService {
           };
         });
 
+        // 미션 데이터가 없으면 목업 데이터 반환
+        if (missionList.length === 0) {
+          missionList = MOCK_MISSION_LIST;
+        }
+
         // 전체 미션 수 & 완료 미션 수 계산 (진행률)
         const totalMissions = activeChallenge.product.challengeMissions.length;
         const completedMissions = activeChallenge.userMissions.filter(
@@ -487,9 +529,6 @@ export class HomeService {
           ? Math.round((completedMissions / totalMissions) * 100)
           : 0;
 
-        // 최초 진입 여부 (userMissions가 없으면 최초)
-        const isFirstEntry = activeChallenge.userMissions.length === 0;
-
         challengeInfo = {
           challengeCode: activeChallenge.product.sku,
           startDate: startDate.toISOString().split('T')[0],
@@ -497,24 +536,34 @@ export class HomeService {
             ? new Date(activeChallenge.endDate).toISOString().split('T')[0]
             : '',
           currentDay,
-          isFirstEntry,
+          isFirstEntry: activeChallenge.isFirstEntry,
           missionList,
         };
+
+        // 최초 진입인 경우 false로 업데이트 (백그라운드)
+        if (activeChallenge.isFirstEntry) {
+          this.prisma.userChallenge.update({
+            where: { id: activeChallenge.id },
+            data: { isFirstEntry: false },
+          }).catch((err: Error) => {
+            this.logger.warn(`isFirstEntry 업데이트 실패 - UserChallenge ID: ${activeChallenge.id}`, err);
+          });
+        }
       }
 
-      // 배너 정보 조회 (챌린지 유무와 관계없이)
-      const banner = await this.getHomeBanner();
+      // 배너 정보 조회 (공통) - 사용자 상태에 따른 필터링
+      const banner = await this.getHomeBanner(user.status);
 
       return {
-        examInfo: {
-          chartId: examInfo.chartId,
-          resultYN: examInfo.resultYN,
-          sibError: examInfo.sibError,
+        reportInfo: {
+          chartId: reportInfo.chartId,
+          resultYN: reportInfo.resultYN,
+          sibError: reportInfo.sibError,
         },
         animalType,
         challengePercent,
         persona,
-        userPoint: user.points,
+        userPoint: user.points ?? 0,
         banner,
         challengeInfo,
       };
@@ -526,27 +575,14 @@ export class HomeService {
 
   /**
    * 홈 배너 정보 조회
+   * @param userStatus 사용자 상태 (NEWCOMER, CHALLENGER, SUBSCRIBER)
    */
-  private async getHomeBanner(): Promise<BannerInfoDto> {
-    const now = getNowKST();
+  private async getHomeBanner(userStatus?: string): Promise<BannerInfoDto> {
+    // BannersService를 통해 HOME 타입 배너 조회 (사용자 상태 기반 필터링)
+    const banners = await this.bannersService.getActiveBanners('HOME', userStatus);
 
-    // HOME 타입 배너 중 활성화된 것 조회
-    const banner = await this.prisma.banner.findFirst({
-      where: {
-        bannerType: 'HOME',
-        isActive: true,
-        OR: [
-          { startDate: null, endDate: null },
-          {
-            startDate: { lte: now },
-            endDate: { gte: now },
-          },
-        ],
-      },
-      orderBy: { sortOrder: 'asc' },
-    });
-
-    if (banner) {
+    if (banners.length > 0) {
+      const banner = banners[0]; // 첫 번째 배너 (sortOrder 기준 정렬됨)
       return {
         title: banner.title,
         description: banner.description || undefined,
@@ -586,35 +622,19 @@ export class HomeService {
 
       this.logger.log(`차트 데이터 ${chartData.length}건 조회 - 사용자 ID: ${userId}`);
 
-      // 각 차트 데이터를 DB에 저장 (중복 제외)
-      for (const chart of chartData) {
-        const { chartId, receiptDate, resultYN, examType } = chart;
+      // createMany + skipDuplicates로 한 번에 저장 (중복 자동 스킵)
+      const result = await this.prisma.userChart.createMany({
+        data: chartData.map((chart) => ({
+          userId,
+          chartId: chart.chartId,
+          receiptDate: new Date(chart.receiptDate),
+          resultYn: chart.resultYN,
+          orderCode: chart.examType,
+        })),
+        skipDuplicates: true,
+      });
 
-        // 이미 존재하는 chartId인지 확인
-        const existingChart = await this.prisma.userChart.findUnique({
-          where: { chartId },
-        });
-
-        if (existingChart) {
-          this.logger.log(`이미 존재하는 차트 ID: ${chartId} - 스킵`);
-          continue;
-        }
-
-        // 새 차트 데이터 저장
-        await this.prisma.userChart.create({
-          data: {
-            userId,
-            chartId,
-            receiptDate: new Date(receiptDate),
-            resultYn: resultYN,
-            orderCode: examType,
-          },
-        });
-
-        this.logger.log(`차트 데이터 저장 완료 - 차트 ID: ${chartId}`);
-      }
-
-      this.logger.log(`차트 데이터 처리 완료 - 사용자 ID: ${userId}`);
+      this.logger.log(`차트 데이터 ${result.count}건 저장 완료 - 사용자 ID: ${userId}`);
     } catch (error) {
       // 외부 API 호출 실패는 치명적이지 않으므로 로그만 남기고 계속 진행
       this.logger.warn(`차트 데이터 조회 실패 - 사용자 ID: ${userId}`, error.message);

@@ -18,3 +18,4 @@ export * from './review-status.enum';
 export * from './user-coupon-status.enum';
 export * from './exchange-return-status.enum';
 export * from './verification-status.enum';
+export * from './yes-no.enum';

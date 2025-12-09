@@ -501,6 +501,8 @@ model UserChallenge {
   endDate             DateTime?       @map("end_date") @db.Date
   purchasedAt         DateTime        @map("purchased_at")
   deliveryStartDate   DateTime?       @map("delivery_start_date") @db.Date
+  /// 챌린지 홈 최초 진입 여부 (true: 첫 진입, false: 재진입)
+  isFirstEntry        Boolean         @default(true) @map("is_first_entry")
   dailyProgress       DailyProgress[]
   surveyAnswers       SurveyAnswer[]
   product             Product         @relation(fields: [productId], references: [id])
@@ -1664,6 +1666,8 @@ model Banner {
   updatedAt   DateTime? @updatedAt @map("updated_at")
   /// 배너 타입 (SHOP: 쇼핑몰, HOME: 메인홈, EVENT: 이벤트)
   bannerType  String    @default("SHOP") @map("banner_type") @db.VarChar(20)
+  /// 노출 대상 유저 상태 (빈 배열 = 전체 공개, ["NEWCOMER", "CHALLENGER", "SUBSCRIBER"])
+  targetStatuses String[] @default([]) @map("target_statuses")
 
   @@index([bannerType, isActive, sortOrder])
   @@index([startDate, endDate])

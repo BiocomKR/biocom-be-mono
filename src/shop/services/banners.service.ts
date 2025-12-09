@@ -18,10 +18,11 @@ export class BannersService {
    * 현재 날짜 기준으로 표시 가능한 배너만 반환
    *
    * @param bannerType 배너 타입 (SHOP, HOME, EVENT 등) - 선택사항
+   * @param userStatus 유저 상태 (NEWCOMER, CHALLENGER, SUBSCRIBER) - 선택사항
    * @returns 배너 목록 (sortOrder 기준 정렬)
    */
-  async getActiveBanners(bannerType?: string): Promise<BannerDto[]> {
-    this.logger.log(`활성 배너 조회 시작 (타입: ${bannerType || '전체'})`);
+  async getActiveBanners(bannerType?: string, userStatus?: string): Promise<BannerDto[]> {
+    this.logger.log(`활성 배너 조회 시작 (타입: ${bannerType || '전체'}, 유저상태: ${userStatus || '전체'})`);
 
     const now = getNowKST();
 
@@ -70,12 +71,19 @@ export class BannersService {
         imageUrl: true,
         linkUrl: true,
         linkType: true,
-        description: true
+        description: true,
+        targetStatuses: true
       }
     });
 
-    this.logger.log(`활성 배너 ${banners.length}개 조회 완료`);
+    // userStatus 필터링 (빈 배열 = 전체 공개, 배열에 포함되면 노출)
+    const filteredBanners = userStatus
+      ? banners.filter((b: typeof banners[0]) => b.targetStatuses.length === 0 || b.targetStatuses.includes(userStatus))
+      : banners;
 
-    return banners;
+    this.logger.log(`활성 배너 ${filteredBanners.length}개 조회 완료 (전체: ${banners.length}개)`);
+
+    // targetStatuses 필드 제거 후 반환
+    return filteredBanners.map(({ targetStatuses, ...rest }) => rest);
   }
 }

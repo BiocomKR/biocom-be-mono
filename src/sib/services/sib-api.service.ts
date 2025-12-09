@@ -9,6 +9,7 @@ import {
   UgiAiSolutionResponse,
 } from '../interfaces/sib-response.interface';
 import { ExamType, IGG_EXAM_TYPES } from '../enums/exam-type.enum';
+import { YesNo } from '../../common/enums';
 
 /**
  * SIB 검사 데이터 API 서비스
@@ -54,7 +55,7 @@ export class SibApiService {
       const chartList = await this.getChartIdByMobile(mobile);
 
       if (!chartList || chartList.length === 0) {
-        return { chartId: null, resultYN: null };
+        return { chartId: null, resultYN: YesNo.N };
       }
 
       // D0004, D0060 필터링
@@ -63,7 +64,7 @@ export class SibApiService {
       );
 
       if (iggExams.length === 0) {
-        return { chartId: null, resultYN: null };
+        return { chartId: null, resultYN: YesNo.N };
       }
 
       // receiptDate 기준 최신순 정렬
@@ -78,7 +79,7 @@ export class SibApiService {
       };
     } catch (error) {
       this.logger.error(`홈 검사 정보 조회 실패 (mobile: ${mobile}):`, error);
-      return { chartId: null, resultYN: null, sibError: true };
+      return { chartId: null, resultYN: YesNo.N, sibError: true };
     }
   }
 

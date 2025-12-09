@@ -1,4 +1,4 @@
-import { ExamType } from '../enums/exam-type.enum';
+import { YesNo } from '../../common/enums';
 
 /**
  * 차트 ID 조회 응답 - 개별 검사 정보
@@ -11,7 +11,7 @@ export interface ChartExamInfo {
   examType: string;
 
   /** 결과 여부 (Y/N) */
-  resultYN: 'Y' | 'N';
+  resultYN: YesNo;
 
   /** 접수일 */
   receiptDate: string;
@@ -56,8 +56,8 @@ export interface HomeExamInfo {
   /** 차트 ID (없으면 null) */
   chartId: string | null;
 
-  /** 결과 여부 (Y/N, 없으면 null) */
-  resultYN: 'Y' | 'N' | null;
+  /** 결과 여부 (Y/N) */
+  resultYN: YesNo;
 
   /** SIB API 에러 발생 여부 */
   sibError?: boolean;

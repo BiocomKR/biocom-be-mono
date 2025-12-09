@@ -1,14 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { YesNo } from '../../common/enums';
 
 /**
- * 검사 정보 DTO (SIB API 연동)
+ * 검사 결과 정보 DTO (SIB API 연동)
  */
-export class ExamInfoDto {
+export class ReportInfoDto {
   @ApiPropertyOptional({ description: '차트 ID', example: 'BA2516182' })
   chartId: string | null;
 
-  @ApiPropertyOptional({ description: '결과 여부', example: 'Y', enum: ['Y', 'N'] })
-  resultYN: 'Y' | 'N' | null;
+  @ApiProperty({ description: '결과 여부', example: 'Y', enum: YesNo })
+  resultYN: YesNo;
 
   @ApiPropertyOptional({ description: 'SIB API 오류 여부' })
   sibError?: boolean;
@@ -98,7 +99,7 @@ export class ChallengeInfoDto {
   @ApiProperty({ description: '현재 챌린지 일차', example: 5 })
   currentDay: number;
 
-  @ApiProperty({ description: '챌린지 시작 후 최초 진입 여부', example: true })
+  @ApiProperty({ description: '챌린지 홈 최초 진입 여부', example: true })
   isFirstEntry: boolean;
 
   @ApiProperty({ description: '미션 리스트', type: [MissionItemDto] })
@@ -109,8 +110,8 @@ export class ChallengeInfoDto {
  * 홈 화면 응답 DTO (새 스펙)
  */
 export class NewHomeResponseDto {
-  @ApiProperty({ description: '검사 정보 (지연성 알러지)' })
-  examInfo: ExamInfoDto;
+  @ApiProperty({ description: '검사 결과 정보 (지연성 알러지)' })
+  reportInfo: ReportInfoDto;
 
   @ApiPropertyOptional({ description: '동물 유형 (사전문진 resultYN=Y일 때만)' })
   animalType: AnimalTypeDto | null;
@@ -124,10 +125,10 @@ export class NewHomeResponseDto {
   @ApiProperty({ description: '사용자 포인트', example: 1500 })
   userPoint: number;
 
-  @ApiPropertyOptional({ description: '배너 정보' })
-  banner: BannerInfoDto | null;
+  @ApiProperty({ description: '배너 정보' })
+  banner: BannerInfoDto;
 
-  @ApiPropertyOptional({ description: '챌린지 정보 (챌린지 구매 시)' })
+  @ApiPropertyOptional({ description: '챌린지 정보 (CHALLENGER만)' })
   challengeInfo: ChallengeInfoDto | null;
 }
 
