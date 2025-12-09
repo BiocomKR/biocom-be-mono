@@ -18,6 +18,7 @@ import {
   NewcomerHomeDataDto,
   ChallengerHomeDataDto,
   SubscriberHomeDataDto,
+  NewHomeResponseDto,
 } from './dto/home.dto';
 
 /**
@@ -61,9 +62,28 @@ export class HomeController {
   }
 
   /**
-   * 종합건강대사 검사 완료 여부 확인
-   * @description 챌린지 구매를 위한 종합건강대사 검사 완료 여부를 확인합니다
+   * 새 홈 화면 데이터 조회 (v2)
+   * @description 검사 정보, 동물 유형, 챌린지 정보 등을 포함한 새 스펙
    */
+  @Get('v2')
+  @ApiOperation({
+    summary: '홈 화면 데이터 조회 (v2)',
+    description: '검사 정보, 동물 유형, 페르소나, 챌린지 진행률, 미션 목록 등을 포함한 새 홈 화면 데이터를 반환합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '홈 화면 데이터 조회 성공',
+    type: NewHomeResponseDto,
+  })
+  async getNewHomeData(@Request() req: any) {
+    const data = await this.homeService.getNewHomeData(req.user.id);
+    return {
+      success: true,
+      data,
+      message: '홈 화면 데이터 조회 성공',
+    };
+  }
+
   @Get('health-exam-status')
   @ApiOperation({
     summary: '종합건강대사 검사 완료 여부 확인',
