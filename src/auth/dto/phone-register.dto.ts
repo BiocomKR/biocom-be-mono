@@ -1,5 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, Matches, IsIn, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, Matches, IsIn, IsArray, ValidateNested, IsNumber, IsBoolean } from 'class-validator';
+import { Type } from 'class-transformer';
+
+/**
+ * 약관 동의 항목 DTO
+ */
+export class ConsentAgreementDto {
+  @ApiProperty({
+    description: '약관 ID (consents 테이블의 id)',
+    example: 1,
+  })
+  @IsNumber()
+  consentId: number;
+
+  @ApiProperty({
+    description: '동의 여부',
+    example: true,
+  })
+  @IsBoolean()
+  isAgreed: boolean;
+}
 
 /**
  * 휴대폰 회원가입 DTO
@@ -79,39 +99,18 @@ export class PhoneRegisterDto {
   localCode: string;
 
   @ApiProperty({
-    description: '[필수] 서비스 이용약관 동의',
-    example: true,
+    description: '약관 동의 목록',
+    type: [ConsentAgreementDto],
+    example: [
+      { consentId: 1, isAgreed: true },
+      { consentId: 2, isAgreed: true },
+      { consentId: 3, isAgreed: true },
+      { consentId: 4, isAgreed: false },
+      { consentId: 5, isAgreed: true },
+    ],
   })
-  @IsNotEmpty({ message: '서비스 이용약관 동의는 필수입니다.' })
-  agreeToTerms: boolean;
-
-  @ApiProperty({
-    description: '[필수] 만 14세 이상 확인',
-    example: true,
-  })
-  @IsNotEmpty({ message: '만 14세 이상 확인은 필수입니다.' })
-  agreeToAge14: boolean;
-
-  @ApiProperty({
-    description: '[필수] 개인정보 수집 이용 동의',
-    example: true,
-  })
-  @IsNotEmpty({ message: '개인정보 수집 이용 동의는 필수입니다.' })
-  agreeToPrivacy: boolean;
-
-  @ApiProperty({
-    description: '[선택] 제3자 정보 제공 동의',
-    example: false,
-    required: false,
-  })
-  @IsOptional()
-  agreeToThirdParty?: boolean;
-
-  @ApiProperty({
-    description: '[선택] 마케팅 알림 수신 동의',
-    example: false,
-    required: false,
-  })
-  @IsOptional()
-  agreeToMarketing?: boolean;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ConsentAgreementDto)
+  consents: ConsentAgreementDto[];
 }

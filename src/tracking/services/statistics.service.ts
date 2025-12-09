@@ -158,6 +158,13 @@ export class StatisticsService {
    */
   async getBeautyStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<BeautyStatisticsDto> {
     try {
+      // startDate, endDate 없으면 기본값 설정
+      if (!startDate || !endDate) {
+        const dateRange = this.getWeekDateRange();
+        startDate = startDate || dateRange.startDate;
+        endDate = endDate || dateRange.endDate;
+      }
+
       this.logger.log(`이너뷰티 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
 
       // NEWCOMER는 예시 데이터 반환
@@ -332,6 +339,13 @@ export class StatisticsService {
    */
   async getDietStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<DietStatisticsDto> {
     try {
+      // startDate, endDate 없으면 기본값 설정
+      if (!startDate || !endDate) {
+        const dateRange = this.getWeekDateRange();
+        startDate = startDate || dateRange.startDate;
+        endDate = endDate || dateRange.endDate;
+      }
+
       this.logger.log(`식단 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
 
       // NEWCOMER는 예시 데이터 반환
@@ -453,6 +467,13 @@ export class StatisticsService {
     isNewcomer: boolean = false,
   ): Promise<SupplementStatisticsDto> {
     try {
+      // startDate, endDate 없으면 기본값 설정
+      if (!startDate || !endDate) {
+        const dateRange = this.getWeekDateRange();
+        startDate = startDate || dateRange.startDate;
+        endDate = endDate || dateRange.endDate;
+      }
+
       this.logger.log(
         `영양제 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate}~${endDate}, NEWCOMER: ${isNewcomer}`,
       );
@@ -816,6 +837,13 @@ export class StatisticsService {
    */
   async getFastingStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<FastingStatisticsDto> {
     try {
+      // startDate, endDate 없으면 기본값 설정
+      if (!startDate || !endDate) {
+        const dateRange = this.getWeekDateRange();
+        startDate = startDate || dateRange.startDate;
+        endDate = endDate || dateRange.endDate;
+      }
+
       this.logger.log(`간헐적단식 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
 
       // NEWCOMER는 예시 데이터 반환
@@ -924,6 +952,13 @@ export class StatisticsService {
    */
   async getSleepStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<SleepStatisticsDto> {
     try {
+      // startDate, endDate 없으면 기본값 설정
+      if (!startDate || !endDate) {
+        const dateRange = this.getWeekDateRange();
+        startDate = startDate || dateRange.startDate;
+        endDate = endDate || dateRange.endDate;
+      }
+
       this.logger.log(`수면 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
 
       // NEWCOMER는 예시 데이터 반환
@@ -1034,6 +1069,13 @@ export class StatisticsService {
    */
   async getActivityStatistics(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<ActivityStatisticsDto> {
     try {
+      // startDate, endDate 없으면 기본값 설정
+      if (!startDate || !endDate) {
+        const dateRange = this.getWeekDateRange();
+        startDate = startDate || dateRange.startDate;
+        endDate = endDate || dateRange.endDate;
+      }
+
       this.logger.log(`활동 통계 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
 
       // NEWCOMER는 예시 데이터 반환
@@ -1152,6 +1194,13 @@ export class StatisticsService {
    */
   async getStatisticsSummary(userId: number, startDate: string, endDate: string, isNewcomer: boolean = false): Promise<any> {
     try {
+      // startDate, endDate 없으면 기본값 설정 (전일 기준 7일)
+      if (!startDate || !endDate) {
+        const dateRange = this.getWeekDateRange();
+        startDate = startDate || dateRange.startDate;
+        endDate = endDate || dateRange.endDate;
+      }
+
       this.logger.log(`통계 목록 조회 시작 - 사용자: ${userId}, 기간: ${startDate} ~ ${endDate}, NEWCOMER: ${isNewcomer}`);
 
       // NEWCOMER는 예시 데이터 반환

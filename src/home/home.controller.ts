@@ -18,6 +18,7 @@ import {
   NewcomerHomeDataDto,
   ChallengerHomeDataDto,
   SubscriberHomeDataDto,
+  NewHomeResponseDto,
 } from './dto/home.dto';
 
 /**
@@ -37,22 +38,45 @@ import {
 export class HomeController {
   constructor(private readonly homeService: HomeService) {}
 
+  // /**
+  //  * 홈 화면 데이터 조회 (v1 - deprecated)
+  //  * @description 사용자의 구독 상태에 따라 적절한 홈 화면 데이터를 반환합니다
+  //  */
+  // @Get('v1')
+  // @ApiOperation({
+  //   summary: '홈 화면 데이터 조회 (v1 - deprecated)',
+  //   description: '사용자의 구독 상태(NEWCOMER/CHALLENGER/SUBSCRIBER)에 따라 적절한 홈 화면 구성을 반환합니다.',
+  // })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: '홈 화면 데이터 조회 성공',
+  //   type: HomeResponseDto,
+  // })
+  // async getHomeData(@Request() req: any) {
+  //   const data = await this.homeService.getHomeData(req.user.id);
+  //   return {
+  //     success: true,
+  //     data,
+  //     message: '홈 화면 데이터 조회 성공',
+  //   };
+  // }
+
   /**
    * 홈 화면 데이터 조회
-   * @description 사용자의 구독 상태에 따라 적절한 홈 화면 데이터를 반환합니다
+   * @description 검사 정보, 동물 유형, 챌린지 정보 등을 포함한 새 스펙
    */
   @Get()
   @ApiOperation({
     summary: '홈 화면 데이터 조회',
-    description: '사용자의 구독 상태(NEWCOMER/CHALLENGER/SUBSCRIBER)에 따라 적절한 홈 화면 구성을 반환합니다.',
+    description: '검사 정보, 동물 유형, 페르소나, 챌린지 진행률, 미션 목록 등을 포함한 새 홈 화면 데이터를 반환합니다.',
   })
   @ApiResponse({
     status: 200,
     description: '홈 화면 데이터 조회 성공',
-    type: HomeResponseDto,
+    type: NewHomeResponseDto,
   })
-  async getHomeData(@Request() req: any) {
-    const data = await this.homeService.getHomeData(req.user.id);
+  async getNewHomeData(@Request() req: any) {
+    const data = await this.homeService.getNewHomeData(req.user.id);
     return {
       success: true,
       data,
@@ -60,10 +84,6 @@ export class HomeController {
     };
   }
 
-  /**
-   * 종합건강대사 검사 완료 여부 확인
-   * @description 챌린지 구매를 위한 종합건강대사 검사 완료 여부를 확인합니다
-   */
   @Get('health-exam-status')
   @ApiOperation({
     summary: '종합건강대사 검사 완료 여부 확인',

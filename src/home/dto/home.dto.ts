@@ -1,4 +1,140 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { YesNo } from '../../common/enums';
+
+/**
+ * 검사 결과 정보 DTO (SIB API 연동)
+ */
+export class ReportInfoDto {
+  @ApiPropertyOptional({ description: '차트 ID', example: 'BA2516182' })
+  chartId: string | null;
+
+  @ApiProperty({ description: '결과 여부', example: 'Y', enum: YesNo })
+  resultYN: YesNo;
+
+  @ApiPropertyOptional({ description: 'SIB API 오류 여부' })
+  sibError?: boolean;
+}
+
+/**
+ * 동물 유형 정보 DTO
+ */
+export class AnimalTypeDto {
+  @ApiProperty({ description: '동물 유형 이름', example: '배 빵빵 펭귄' })
+  name: string;
+
+  @ApiProperty({ description: '동물 유형 설명', example: '장 건강에 주의가 필요한 타입' })
+  description: string;
+
+  @ApiProperty({ description: '동물 이미지 URL', example: 'https://...' })
+  imageUrl: string;
+}
+
+/**
+ * 페르소나 정보 DTO
+ */
+export class PersonaInfoDto {
+  @ApiProperty({ description: '페르소나 이름', example: '철민님' })
+  name: string;
+
+  @ApiProperty({ description: '페르소나 이미지 URL', example: 'https://...' })
+  imageUrl: string;
+}
+
+/**
+ * 배너 정보 DTO
+ */
+export class BannerInfoDto {
+  @ApiProperty({ description: '배너 제목', example: '오늘의 건강 팁' })
+  title: string;
+
+  @ApiPropertyOptional({ description: '배너 설명', example: '10살 어려지는 식단 비법' })
+  description?: string;
+
+  @ApiProperty({ description: '배너 이미지 URL', example: 'https://...' })
+  imageUrl: string;
+
+  @ApiPropertyOptional({ description: '클릭 시 이동 URL', example: '/content/1' })
+  linkUrl: string | null;
+
+  @ApiProperty({ description: '링크 타입', example: 'INTERNAL', enum: ['INTERNAL', 'EXTERNAL', 'PRODUCT'] })
+  linkType: string;
+}
+
+/**
+ * 미션 아이템 DTO
+ */
+export class MissionItemDto {
+  @ApiProperty({ description: '미션 ID', example: 1 })
+  id: number;
+
+  @ApiProperty({ description: '미션 제목', example: '아침 물 마시고' })
+  title: string;
+
+  @ApiProperty({ description: '미션 설명', example: '기상 후 물 500ml 마시기' })
+  description: string;
+
+  @ApiProperty({ description: '포인트', example: 100 })
+  point: number;
+
+  @ApiProperty({ description: '일일 최대 수행 횟수', example: 1 })
+  max: number;
+
+  @ApiProperty({ description: '오늘 수행한 횟수', example: 0 })
+  current: number;
+}
+
+/**
+ * 챌린지 정보 DTO
+ */
+export class ChallengeInfoDto {
+  @ApiProperty({ description: '챌린지 코드 (상품 SKU)', example: 'CHALLENGE_21' })
+  challengeCode: string;
+
+  @ApiProperty({ description: '챌린지 시작일', example: '2025-01-01' })
+  startDate: string;
+
+  @ApiProperty({ description: '챌린지 종료일', example: '2025-01-21' })
+  endDate: string;
+
+  @ApiProperty({ description: '현재 챌린지 일차', example: 5 })
+  currentDay: number;
+
+  @ApiProperty({ description: '챌린지 진행률 (%)', example: 35 })
+  challengePercent: number;
+
+  @ApiProperty({ description: '챌린지 홈 최초 진입 여부', example: true })
+  isFirstEntry: boolean;
+
+  @ApiProperty({ description: '미션 리스트', type: [MissionItemDto] })
+  missionList: MissionItemDto[];
+}
+
+/**
+ * 홈 화면 응답 DTO (새 스펙)
+ */
+export class NewHomeResponseDto {
+  @ApiProperty({ description: '검사 결과 정보 (지연성 알러지)' })
+  reportInfo: ReportInfoDto;
+
+  @ApiPropertyOptional({ description: '동물 유형 (사전문진 resultYN=Y일 때만)' })
+  animalType: AnimalTypeDto | null;
+
+  @ApiPropertyOptional({ description: '페르소나 정보' })
+  persona: PersonaInfoDto | null;
+
+  @ApiProperty({ description: '사용자 포인트', example: 1500 })
+  userPoint: number;
+
+  @ApiProperty({ description: '배너 정보' })
+  banner: BannerInfoDto;
+
+  @ApiPropertyOptional({ description: '챌린지 정보 (CHALLENGER만)' })
+  challengeInfo: ChallengeInfoDto | null;
+}
+
+// ============================================
+// 기존 DTO (하위 호환성 유지)
+// ============================================
 
 /**
  * 홈 화면 기본 데이터 DTO
