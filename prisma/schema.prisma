@@ -90,9 +90,10 @@ model File {
   isActive     Boolean       @default(true) @map("is_active")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime?     @updatedAt @map("updated_at")
-  contentFiles ContentFile[]
-  userFiles    UserFile[]
-  productFiles ProductFile[]
+  contentFiles          ContentFile[]
+  userFiles             UserFile[]
+  productFiles          ProductFile[]
+  healthTypeAnimalFiles HealthTypeAnimalFile[]
 
   @@index([createdAt], map: "idx_files_created_at")
   @@index([isActive], map: "idx_files_is_active")
@@ -272,14 +273,36 @@ model HealthTypeAnimal {
   animalName          String                    @map("animal_name") @db.VarChar(50)
   catchphrase         String
   symptoms            String
-  /// 동물 캐릭터 이미지 URL
-  imageUrl            String?                   @map("image_url") @db.VarChar(500)
   createdAt           DateTime                  @default(now()) @map("created_at")
   updatedAt           DateTime?                 @updatedAt @map("updated_at")
   recommendedProducts HealthTypeAnimalProduct[]
   users               User[]
+  images              HealthTypeAnimalFile[]
 
   @@map("health_type_animals")
+}
+
+/// 건강 타입 동물 파일 관계 테이블
+/// health_type_animals -< health_type_animal_files >- files 다대다 관계
+model HealthTypeAnimalFile {
+  id                 Int      @id @default(autoincrement())
+  /// 건강 타입 동물 ID
+  healthTypeAnimalId Int      @map("health_type_animal_id")
+  /// 파일 ID
+  fileId             Int      @map("file_id")
+  /// 이미지 타입 (THUMBNAIL: 썸네일, DESCRIPTION: 설명 이미지)
+  imageType          String   @map("image_type") @db.VarChar(20)
+  /// 정렬 순서 (같은 타입 내 정렬)
+  sortOrder          Int      @default(0) @map("sort_order")
+  /// 생성일시
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  healthTypeAnimal HealthTypeAnimal @relation(fields: [healthTypeAnimalId], references: [id], onDelete: Cascade)
+  file             File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([healthTypeAnimalId, imageType, sortOrder])
+  @@index([fileId])
+  @@map("health_type_animal_files")
 }
 
 /// 포인트 내역 테이블
