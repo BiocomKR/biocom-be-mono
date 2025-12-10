@@ -338,7 +338,7 @@ model Mission {
   category          String             @default("DAILY")
   type              String             @default("MISSION") @db.VarChar(20)
   recordType        String             @unique @map("record_type") @db.VarChar(50)
-  dailyLimit        Int                @default(1) @map("daily_limit")
+  dailyLimit        Int?               @map("daily_limit")
   specificDay       Int?               @map("specific_day")
   totalDays         Int                @default(21) @map("total_days")
   uploadType        String?            @map("upload_type")
