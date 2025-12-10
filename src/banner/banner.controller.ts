@@ -10,17 +10,24 @@ import {
   Body,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BannerService } from './banner.service';
+import { UploadService } from '../upload/upload.service';
 
 @ApiTags('배너 관리')
 @ApiBearerAuth()
 @Controller('banners')
 @UseGuards(JwtAuthGuard)
 export class BannerController {
-  constructor(private readonly bannerService: BannerService) {}
+  constructor(
+    private readonly bannerService: BannerService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   /**
    * 배너 목록 조회
@@ -103,5 +110,19 @@ export class BannerController {
   @Patch('orders')
   async updateBannerOrders(@Body() dto: { orders: { id: number; sortOrder: number }[] }) {
     return this.bannerService.updateBannerOrders(dto.orders);
+  }
+
+  /**
+   * 배너 이미지 업로드
+   */
+  @Post('upload-image')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBannerImage(@UploadedFile() file: Express.Multer.File) {
+    const result = await this.uploadService.uploadProductImage(file);
+    return {
+      imageUrl: result.filePath,
+      fileId: result.id,
+    };
   }
 }
