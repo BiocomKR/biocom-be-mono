@@ -399,7 +399,17 @@ export class HomeService {
               id: true,
               animalName: true,
               catchphrase: true,
-              imageUrl: true,
+              images: {
+                where: { imageType: 'THUMBNAIL' },
+                take: 1,
+                select: {
+                  file: {
+                    select: {
+                      filePath: true,
+                    },
+                  },
+                },
+              },
             },
           },
           userChallenges: {
@@ -491,10 +501,11 @@ export class HomeService {
       // 4. 동물 유형 (resultYN이 Y일 때만 제공)
       let animalType: AnimalTypeDto | null = null;
       if (reportInfo.resultYN === YesNo.Y && user.healthTypeAnimal) {
+        const thumbnailImage = user.healthTypeAnimal.images?.[0]?.file?.filePath || '';
         animalType = {
           name: user.healthTypeAnimal.animalName,
           description: user.healthTypeAnimal.catchphrase,
-          imageUrl: user.healthTypeAnimal.imageUrl || '',
+          imageUrl: thumbnailImage,
         };
       }
 
