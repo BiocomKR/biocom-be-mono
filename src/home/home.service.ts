@@ -17,42 +17,7 @@ import {
 import { getNowKST } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
 import { BannersService } from '../shop/services/banners.service';
-
-/**
- * 미션 목업 데이터
- */
-const MOCK_MISSION_LIST: MissionItemDto[] = [
-  {
-    id: 1,
-    title: '뷰티 종합 점수 평가하고',
-    description: '오늘의 컨디션을 기록해보세요',
-    point: 100,
-    max: 1,
-    current: 0,
-    recordType: 'BEAUTY',
-    sortOrder: 1,
-  },
-  {
-    id: 2,
-    title: '자기 선언문 쓰고',
-    description: '오늘의 다짐을 작성해보세요',
-    point: 1000,
-    max: 1,
-    current: 0,
-    recordType: 'DECLARATION',
-    sortOrder: 2,
-  },
-  {
-    id: 3,
-    title: '식단 기록하고',
-    description: '오늘 먹은 음식을 기록해보세요',
-    point: 100,
-    max: 3,
-    current: 0,
-    recordType: 'DIET',
-    sortOrder: 3,
-  },
-];
+import { MissionService } from '../mission/mission.service';
 
 /**
  * 홈 화면 서비스
@@ -66,6 +31,7 @@ export class HomeService {
     private readonly prisma: PrismaService,
     private readonly sibApiService: SibApiService,
     private readonly bannersService: BannersService,
+    private readonly missionService: MissionService,
   ) {}
 
   /**
@@ -544,7 +510,7 @@ export class HomeService {
 
       // 6. 챌린지 정보 (CHALLENGER만) & 미션 목록 (최상위)
       let challengeInfo: ChallengeInfoDto | null = null;
-      let missionList: MissionItemDto[] = MOCK_MISSION_LIST; // 기본값: 목업 데이터
+      let missionList: MissionItemDto[] = await this.missionService.getMissionsForHome(); // DB에서 조회
 
       // status가 CHALLENGER이고 활성 챌린지가 있는 경우만 챌린지 정보 제공
       const activeChallenge = user.userChallenges[0];

@@ -4,13 +4,14 @@ import { HomeService } from './home.service';
 import { PrismaService } from '../common/services/prisma.service';
 import { SibModule } from '../sib/sib.module';
 import { BannersModule } from '../shop/banners.module';
+import { MissionModule } from '../mission/mission.module';
 
 /**
  * 홈 화면 모듈
  * 사용자의 구독 상태에 따른 홈 화면 데이터 제공
  */
 @Module({
-  imports: [SibModule, BannersModule],
+  imports: [SibModule, BannersModule, MissionModule],
   controllers: [HomeController],
   providers: [HomeService, PrismaService],
   exports: [HomeService],
