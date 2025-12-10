@@ -381,8 +381,8 @@ export class ShippingService {
 
     // 오늘 배송 현황
     const today = getNowKST();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
+    today.setUTCHours(0, 0, 0, 0);
+    const tomorrow = new Date(today.getTime());
     tomorrow.setDate(tomorrow.getDate() + 1);
 
     const todayStats = await this.prisma.shipping.groupBy({

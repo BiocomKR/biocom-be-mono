@@ -172,18 +172,18 @@ export class AppEventsService {
   }) {
     const where = this.buildWhereClause(dto);
 
-    // 오늘/어제 날짜 계산 (KST 기준)
-    const today = getNowKST();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today.getTime());
+    // 오늘/어제 날짜 계산
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
     // 이번 주/지난 주 계산
-    const thisWeekStart = new Date(today.getTime());
+    const thisWeekStart = new Date(today);
     thisWeekStart.setDate(today.getDate() - today.getDay());
-    const lastWeekStart = new Date(thisWeekStart.getTime());
+    const lastWeekStart = new Date(thisWeekStart);
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-    const lastWeekEnd = new Date(thisWeekStart.getTime());
+    const lastWeekEnd = new Date(thisWeekStart);
 
     // appId, eventCategory 필터 유지
     const baseFilter: Prisma.AppEventWhereInput = {};
@@ -252,7 +252,7 @@ export class AppEventsService {
     // 기본: 오늘 데이터 (KST 기준)
     if (!dto.startDate && !dto.endDate) {
       const today = getNowKST();
-      today.setHours(0, 0, 0, 0);
+      today.setUTCHours(0, 0, 0, 0);
       where = { ...where, createdAt: { gte: today } };
     }
 
@@ -283,7 +283,7 @@ export class AppEventsService {
   }) {
     const result = [];
     const today = getNowKST();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     // appId, eventCategory 필터
     const baseFilter: Prisma.AppEventWhereInput = {};
@@ -291,9 +291,9 @@ export class AppEventsService {
     if (dto.eventCategory) baseFilter.eventCategory = dto.eventCategory;
 
     for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
+      const date = new Date(today.getTime());
       date.setDate(date.getDate() - i);
-      const nextDate = new Date(date);
+      const nextDate = new Date(date.getTime());
       nextDate.setDate(nextDate.getDate() + 1);
 
       const count = await this.prisma.appEvent.count({

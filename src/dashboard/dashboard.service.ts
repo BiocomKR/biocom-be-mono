@@ -14,7 +14,7 @@ export class DashboardService {
    */
   async getSummary() {
     const today = getNowKST();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
     
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -609,7 +609,7 @@ export class DashboardService {
   async getRealtimeStatus() {
     const now = getNowKST();
     const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 

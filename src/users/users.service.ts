@@ -413,8 +413,8 @@ export class UsersService {
    */
   async getStats() {
     const now = getNowKST();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
+    const todayStart = new Date(now.getTime());
+    todayStart.setUTCHours(0, 0, 0, 0);
 
     const weekStart = new Date(now);
     weekStart.setDate(weekStart.getDate() - 7);
