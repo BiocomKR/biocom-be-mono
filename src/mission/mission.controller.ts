@@ -62,6 +62,29 @@ export class MissionController {
   }
 
   /**
+   * recordType 중복 검사
+   */
+  @Get('check-record-type')
+  async checkRecordType(
+    @Query('recordType') recordType: string,
+    @Query('excludeId') excludeId?: string,
+  ) {
+    this.logger.log(`recordType 중복 검사 - recordType: ${recordType}, excludeId: ${excludeId}`);
+
+    const result = await this.managementMissionService.checkRecordTypeDuplicate(
+      recordType,
+      excludeId ? parseInt(excludeId) : undefined,
+    );
+
+    return {
+      success: true,
+      message: result.isDuplicate ? '이미 사용 중인 recordType입니다' : '사용 가능한 recordType입니다',
+      data: result,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
    * 미션 전체 통계 조회
    */
   @Get('stats')

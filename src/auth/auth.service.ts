@@ -65,7 +65,7 @@ export class AuthService {
 
     // 계정 잠금 상태 체크
     if (operator.lockedUntil) {
-      if (operator.lockedUntil > new Date()) {
+      if (operator.lockedUntil > getNowKST()) {
         const remainingMinutes = Math.ceil(
           (operator.lockedUntil.getTime() - Date.now()) / 60000,
         );
@@ -322,6 +322,85 @@ export class AuthService {
       accessToken,
       refreshToken: newRefreshToken,
     };
+  }
+
+  /**
+   * [개발용] 유저 ID로 액세스 토큰 발급
+   * 비밀번호 검증 없이 유저 ID만으로 토큰 발급
+   *
+   * @param userId 유저 ID
+   * @returns 유저 정보와 JWT 토큰
+   */
+  async devLoginByUserId(userId: number) {
+    this.logger.log(`[DEV] 유저 토큰 발급 시도 - ID: ${userId}`);
+
+    // 유저 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        mobile: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      this.logger.warn(`[DEV] 존재하지 않는 유저: ${userId}`);
+      throw new UnauthorizedException('유저를 찾을 수 없습니다.');
+    }
+
+    // JWT 토큰 생성 (biocom-api와 동일한 payload 구조)
+    const payload = {
+      sub: user.id,
+      name: user.name,
+    };
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: this.configService.jwt.accessTokenExpiresIn as any,
+    });
+
+    // Refresh Token 생성 및 저장
+    const refreshToken = await this.createUserRefreshToken(user.id);
+
+    this.logger.log(`[DEV] 유저 토큰 발급 성공 - ID: ${userId}, 이름: ${user.name}`);
+
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        mobile: user.mobile,
+        status: user.status,
+      },
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  /**
+   * [개발용] 유저 Refresh Token 생성 및 저장
+   */
+  private async createUserRefreshToken(userId: number): Promise<string> {
+    const token = crypto.randomBytes(64).toString('hex');
+
+    const expiresAt = getNowKST();
+    expiresAt.setDate(expiresAt.getDate() + 30); // 유저는 30일
+
+    // 기존 Refresh Token 삭제
+    await this.prisma.refreshToken.deleteMany({
+      where: { userId },
+    });
+
+    // 새로운 Refresh Token 저장
+    await this.prisma.refreshToken.create({
+      data: {
+        token,
+        userId,
+        expiresAt,
+        createdAt: getNowKST(),
+      },
+    });
+
+    return token;
   }
 
   /**

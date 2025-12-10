@@ -82,10 +82,40 @@ export class DashboardService {
       }
     });
 
-    // 재고 부족 상품
-    const lowStockCount = await this.prisma.inventoryCache.count({
+    // 재고 부족 상품 (InventoryCache 테이블 없음 - TODO: 재고 관리 기능 구현 시 활성화)
+    const lowStockCount = 0;
+
+    // 앱 지표: DAU (오늘 활성 사용자)
+    const dauResult = await this.prisma.appEvent.groupBy({
+      by: ['userId'],
       where: {
-        availableQty: { lt: 10 }
+        createdAt: {
+          gte: today,
+          lt: tomorrow
+        },
+        userId: { not: null }
+      }
+    });
+
+    // 앱 지표: MAU (이번 달 활성 사용자)
+    const mauResult = await this.prisma.appEvent.groupBy({
+      by: ['userId'],
+      where: {
+        createdAt: {
+          gte: thisMonth,
+          lt: nextMonth
+        },
+        userId: { not: null }
+      }
+    });
+
+    // 오늘 앱 이벤트 수
+    const todayEvents = await this.prisma.appEvent.count({
+      where: {
+        createdAt: {
+          gte: today,
+          lt: tomorrow
+        }
       }
     });
 
@@ -106,6 +136,11 @@ export class DashboardService {
       },
       alerts: {
         lowStock: lowStockCount
+      },
+      app: {
+        dau: dauResult.length,
+        mau: mauResult.length,
+        todayEvents
       }
     };
   }
@@ -469,44 +504,12 @@ export class DashboardService {
 
   /**
    * 재고 알림
+   * NOTE: InventoryCache 테이블이 없는 경우 빈 배열 반환
    */
   async getInventoryAlerts(threshold: number) {
-    const lowStockItems = await this.prisma.inventoryCache.findMany({
-      where: {
-        availableQty: { lt: threshold }
-      },
-      orderBy: {
-        availableQty: 'asc'
-      }
-    });
-
-    // SKU로 Product 직접 조회
-    const skus = lowStockItems.map(item => item.sku);
-    const products = await this.prisma.product.findMany({
-      where: { sku: { in: skus } },
-      select: {
-        id: true,
-        name: true,
-        sku: true,
-        status: true
-      }
-    });
-
-    const productMap = new Map(products.map(p => [p.sku, p]));
-
-    return lowStockItems.map(item => {
-      const product = productMap.get(item.sku) as { id: number; name: string; sku: string; status: string } | undefined;
-      return {
-        sku: item.sku,
-        availableQty: item.availableQty,
-        productId: product?.id ?? undefined,
-        productName: product?.name ?? 'Unknown',
-        productSku: product?.sku ?? undefined,
-        status: product?.status ?? undefined,
-        alertLevel: item.availableQty === 0 ? 'OUT_OF_STOCK' :
-                    item.availableQty < 5 ? 'CRITICAL' : 'LOW'
-      };
-    });
+    // InventoryCache 테이블이 스키마에 없으므로 빈 배열 반환
+    // TODO: 재고 관리 기능 구현 시 활성화
+    return [];
   }
 
   /**

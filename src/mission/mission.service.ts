@@ -145,6 +145,22 @@ export class MissionService {
     totalDays?: number;
     uploadType?: string;
     isActive?: boolean;
+    // 노출 조건
+    visibleFromDay?: number;
+    visibleToDay?: number;
+    recordableFromDay?: number;
+    recordableToDay?: number;
+    // 챌린지 종료 후 노출 설정 (복수)
+    visibleAfterSettings?: { productId: number; days: number | null }[];
+    // 권한
+    allowedUserTypes?: string[];
+    recordableUserTypes?: string[];
+    // 선행 조건
+    prerequisiteMissionId?: number;
+    // 포인트
+    maxPointsPerDay?: number;
+    // 주기
+    frequency?: string;
   }) {
     try {
       // recordType 중복 확인
@@ -172,6 +188,22 @@ export class MissionService {
           uploadType: data.uploadType,
           isActive: data.isActive ?? true,
           createdAt: getNowKST(),
+          // 노출 조건
+          visibleFromDay: data.visibleFromDay,
+          visibleToDay: data.visibleToDay,
+          recordableFromDay: data.recordableFromDay,
+          recordableToDay: data.recordableToDay,
+          // 챌린지 종료 후 노출 설정
+          visibleAfterSettings: data.visibleAfterSettings ?? [],
+          // 권한
+          allowedUserTypes: data.allowedUserTypes ?? [],
+          recordableUserTypes: data.recordableUserTypes ?? [],
+          // 선행 조건
+          prerequisiteMissionId: data.prerequisiteMissionId,
+          // 포인트
+          maxPointsPerDay: data.maxPointsPerDay,
+          // 주기
+          frequency: data.frequency ?? 'DAILY',
         }
       });
 
@@ -203,6 +235,22 @@ export class MissionService {
     totalDays?: number;
     uploadType?: string;
     isActive?: boolean;
+    // 노출 조건
+    visibleFromDay?: number | null;
+    visibleToDay?: number | null;
+    recordableFromDay?: number | null;
+    recordableToDay?: number | null;
+    // 챌린지 종료 후 노출 설정 (복수)
+    visibleAfterSettings?: { productId: number; days: number | null }[];
+    // 권한
+    allowedUserTypes?: string[];
+    recordableUserTypes?: string[];
+    // 선행 조건
+    prerequisiteMissionId?: number | null;
+    // 포인트
+    maxPointsPerDay?: number | null;
+    // 주기
+    frequency?: string;
   }) {
     try {
       // 미션 존재 여부 확인
@@ -347,6 +395,28 @@ export class MissionService {
       this.logger.error('미션 dailyLimit 업데이트 실패:', error);
       throw error;
     }
+  }
+
+  /**
+   * recordType 중복 검사
+   * @param recordType 검사할 recordType
+   * @param excludeId 제외할 미션 ID (수정 시)
+   */
+  async checkRecordTypeDuplicate(recordType: string, excludeId?: number) {
+    const where: Prisma.MissionWhereInput = {
+      recordType,
+    };
+
+    if (excludeId) {
+      where.id = { not: excludeId };
+    }
+
+    const existing = await this.prisma.mission.findFirst({ where });
+
+    return {
+      isDuplicate: !!existing,
+      message: existing ? '이미 사용 중인 recordType입니다' : '사용 가능한 recordType입니다',
+    };
   }
 
   /**

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Request, Ip, Headers } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Request, Ip, Headers, Param, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { SignInDto } from './dto/sign-in.dto';
@@ -160,6 +160,37 @@ export class AuthController {
         accessTier: req.user.accessTier,
         department: req.user.department,
       },
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * [개발용] 유저 ID로 액세스 토큰 발급
+   */
+  @Post('dev/user-token/:userId')
+  @Public()
+  @ApiOperation({
+    summary: '[개발용] 유저 토큰 발급',
+    description: '유저 ID만으로 액세스 토큰을 발급합니다. (비밀번호 검증 없음)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '토큰 발급 성공',
+  })
+  @ApiResponse({
+    status: 401,
+    description: '유저를 찾을 수 없습니다.',
+    type: UnauthorizedResponseDto,
+  })
+  async devUserToken(
+    @Param('userId', ParseIntPipe) userId: number,
+  ): Promise<ApiResponseDto> {
+    const result = await this.authService.devLoginByUserId(userId);
+
+    return {
+      success: true,
+      message: '유저 토큰 발급 성공',
+      data: result,
       timestamp: getNowKST(),
     };
   }

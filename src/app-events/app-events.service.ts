@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { GetAppEventsDto } from './dto/get-app-events.dto';
 import { Prisma } from '@prisma/client';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 @Injectable()
 export class AppEventsService {
@@ -171,18 +172,18 @@ export class AppEventsService {
   }) {
     const where = this.buildWhereClause(dto);
 
-    // 오늘/어제 날짜 계산
-    const today = new Date();
+    // 오늘/어제 날짜 계산 (KST 기준)
+    const today = getNowKST();
     today.setHours(0, 0, 0, 0);
-    const yesterday = new Date(today);
+    const yesterday = new Date(today.getTime());
     yesterday.setDate(yesterday.getDate() - 1);
 
     // 이번 주/지난 주 계산
-    const thisWeekStart = new Date(today);
+    const thisWeekStart = new Date(today.getTime());
     thisWeekStart.setDate(today.getDate() - today.getDay());
-    const lastWeekStart = new Date(thisWeekStart);
+    const lastWeekStart = new Date(thisWeekStart.getTime());
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-    const lastWeekEnd = new Date(thisWeekStart);
+    const lastWeekEnd = new Date(thisWeekStart.getTime());
 
     // appId, eventCategory 필터 유지
     const baseFilter: Prisma.AppEventWhereInput = {};
@@ -248,9 +249,9 @@ export class AppEventsService {
   }) {
     let where = this.buildWhereClause(dto);
 
-    // 기본: 오늘 데이터
+    // 기본: 오늘 데이터 (KST 기준)
     if (!dto.startDate && !dto.endDate) {
-      const today = new Date();
+      const today = getNowKST();
       today.setHours(0, 0, 0, 0);
       where = { ...where, createdAt: { gte: today } };
     }
@@ -267,7 +268,8 @@ export class AppEventsService {
     }));
 
     events.forEach((event) => {
-      const hour = new Date(event.createdAt).getHours();
+      // UTC 기준으로 시간 추출 (서버/로컬 환경 무관하게 동일한 결과)
+      const hour = new Date(event.createdAt).getUTCHours();
       hourlyData[hour].count++;
     });
 
@@ -280,7 +282,7 @@ export class AppEventsService {
     eventCategory?: string;
   }) {
     const result = [];
-    const today = new Date();
+    const today = getNowKST();
     today.setHours(0, 0, 0, 0);
 
     // appId, eventCategory 필터

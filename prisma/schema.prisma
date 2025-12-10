@@ -342,6 +342,30 @@ model Mission {
   specificDay       Int?               @map("specific_day")
   totalDays         Int                @default(21) @map("total_days")
   uploadType        String?            @map("upload_type")
+
+  // 노출 조건
+  visibleFromDay           Int?       @map("visible_from_day")
+  visibleToDay             Int?       @map("visible_to_day")
+  recordableFromDay        Int?       @map("recordable_from_day")
+  recordableToDay          Int?       @map("recordable_to_day")
+
+  // 챌린지 종료 후 노출 설정 (복수 챌린지별 설정)
+  // JSON 배열: [{ productId: number, days: number | null }]
+  visibleAfterSettings     Json?      @map("visible_after_settings")
+
+  // 권한
+  allowedUserTypes         String[]   @default([]) @map("allowed_user_types")
+  recordableUserTypes      String[]   @default([]) @map("recordable_user_types")
+
+  // 선행 조건
+  prerequisiteMissionId    Int?       @map("prerequisite_mission_id")
+
+  // 포인트
+  maxPointsPerDay          Int?       @map("max_points_per_day")
+
+  // 주기
+  frequency                String     @default("DAILY") @map("frequency") @db.VarChar(20)
+
   challengeMissions ChallengeMission[]
   dailyMissions     DailyMission[]
   missionQuizzes    MissionQuiz[]

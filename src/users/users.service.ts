@@ -84,7 +84,7 @@ export class UsersService {
 
     // 연령대 필터 (birthDate는 VARCHAR(8) 형식: YYYYMMDD)
     if (ageGroup) {
-      const now = new Date();
+      const now = getNowKST();
       const ageStart = parseInt(ageGroup);
       const ageEnd = ageStart === 60 ? 150 : ageStart + 9; // 60대+는 60세 이상 전부
 
@@ -333,7 +333,7 @@ export class UsersService {
         where: { userId: id, status: UserChallengeStatus.ACTIVE },
       }),
       this.prisma.userCoupon.count({
-        where: { userId: id, status: CouponStatus.ACTIVE, expiresAt: { gt: new Date() } },
+        where: { userId: id, status: CouponStatus.ACTIVE, expiresAt: { gt: getNowKST() } },
       }),
     ]);
 

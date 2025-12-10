@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 export interface CreateConsentDto {
   code: string;
@@ -199,7 +200,7 @@ export class ConsentService {
     await this.prisma.consent.updateMany({
       where: { code: existing.code },
       data: {
-        deletedAt: new Date(),
+        deletedAt: getNowKST(),
         isActive: false,
       },
     });
