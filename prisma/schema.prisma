@@ -55,6 +55,8 @@ model User {
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
   iapReceipts                  IAPReceipt[]
+  userConsents                 UserConsent[]
+  userCharts                   UserChart[]
 
   @@map("users")
 }
@@ -88,9 +90,10 @@ model File {
   isActive     Boolean       @default(true) @map("is_active")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime?     @updatedAt @map("updated_at")
-  contentFiles ContentFile[]
-  userFiles    UserFile[]
-  productFiles ProductFile[]
+  contentFiles          ContentFile[]
+  userFiles             UserFile[]
+  productFiles          ProductFile[]
+  healthTypeAnimalFiles HealthTypeAnimalFile[]
 
   @@index([createdAt], map: "idx_files_created_at")
   @@index([isActive], map: "idx_files_is_active")
@@ -274,8 +277,32 @@ model HealthTypeAnimal {
   updatedAt           DateTime?                 @updatedAt @map("updated_at")
   recommendedProducts HealthTypeAnimalProduct[]
   users               User[]
+  images              HealthTypeAnimalFile[]
 
   @@map("health_type_animals")
+}
+
+/// 건강 타입 동물 파일 관계 테이블
+/// health_type_animals -< health_type_animal_files >- files 다대다 관계
+model HealthTypeAnimalFile {
+  id                 Int      @id @default(autoincrement())
+  /// 건강 타입 동물 ID
+  healthTypeAnimalId Int      @map("health_type_animal_id")
+  /// 파일 ID
+  fileId             Int      @map("file_id")
+  /// 이미지 타입 (THUMBNAIL: 썸네일, DESCRIPTION: 설명 이미지)
+  imageType          String   @map("image_type") @db.VarChar(20)
+  /// 정렬 순서 (같은 타입 내 정렬)
+  sortOrder          Int      @default(0) @map("sort_order")
+  /// 생성일시
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  healthTypeAnimal HealthTypeAnimal @relation(fields: [healthTypeAnimalId], references: [id], onDelete: Cascade)
+  file             File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([healthTypeAnimalId, imageType, sortOrder])
+  @@index([fileId])
+  @@map("health_type_animal_files")
 }
 
 /// 포인트 내역 테이블
@@ -311,7 +338,7 @@ model Mission {
   category          String             @default("DAILY")
   type              String             @default("MISSION") @db.VarChar(20)
   recordType        String             @unique @map("record_type") @db.VarChar(50)
-  dailyLimit        Int                @default(1) @map("daily_limit")
+  dailyLimit        Int?               @map("daily_limit")
   specificDay       Int?               @map("specific_day")
   totalDays         Int                @default(21) @map("total_days")
   uploadType        String?            @map("upload_type")
@@ -498,6 +525,8 @@ model UserChallenge {
   endDate             DateTime?       @map("end_date") @db.Date
   purchasedAt         DateTime        @map("purchased_at")
   deliveryStartDate   DateTime?       @map("delivery_start_date") @db.Date
+  /// 챌린지 홈 최초 진입 여부 (true: 첫 진입, false: 재진입)
+  isFirstEntry        Boolean         @default(true) @map("is_first_entry")
   dailyProgress       DailyProgress[]
   surveyAnswers       SurveyAnswer[]
   product             Product         @relation(fields: [productId], references: [id])
@@ -809,6 +838,10 @@ model Order {
   completedAt       DateTime?        @map("completed_at")
   /// 취소일시
   cancelledAt       DateTime?        @map("cancelled_at")
+  /// 플레이오토 주문 고유번호
+  playautoUniq      String?          @map("playauto_uniq") @db.VarChar(50)
+  /// 플레이오토 주문 묶음번호
+  playautoBundleNo  String?          @map("playauto_bundle_no") @db.VarChar(50)
   /// 생성일시
   createdAt         DateTime         @map("created_at")
   /// 수정일시
@@ -1657,6 +1690,8 @@ model Banner {
   updatedAt   DateTime? @updatedAt @map("updated_at")
   /// 배너 타입 (SHOP: 쇼핑몰, HOME: 메인홈, EVENT: 이벤트)
   bannerType  String    @default("SHOP") @map("banner_type") @db.VarChar(20)
+  /// 노출 대상 유저 상태 (빈 배열 = 전체 공개, ["NEWCOMER", "CHALLENGER", "SUBSCRIBER"])
+  targetStatuses String[] @default([]) @map("target_statuses")
 
   @@index([bannerType, isActive, sortOrder])
   @@index([startDate, endDate])
@@ -2064,6 +2099,8 @@ model UserChart {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([chartId], map: "idx_user_charts_chart_id")
   @@index([userId], map: "idx_user_charts_user_id")
   @@map("user_charts")
@@ -2098,6 +2135,7 @@ model UserConsent {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   consentId Int      @map("consent_id")
   isAgreed  Boolean  @map("is_agreed")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_user_consents_user_id")
   consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
 
   @@unique([userId, consentId], map: "user_consents_user_id_consent_id_unique")
@@ -2586,4 +2624,53 @@ model AppVersion {
   @@unique([platform, version])
   @@index([platform, isActive])
   @@map("app_versions")
+}
+
+/// 플레이오토 인증 토큰 테이블
+/// 플레이오토 API 호출용 인증 토큰 관리 (24시간 유효)
+model PlayautoToken {
+  /// 고유 ID (항상 1개만 존재)
+  id        Int      @id @default(1)
+  /// 인증 토큰
+  token     String   @db.VarChar(500)
+  /// 솔루션 번호
+  solNo     Int      @map("sol_no")
+  /// 만료 시각 (발급시각 + 23시간, 1시간 버퍼)
+  expiresAt DateTime @map("expires_at")
+  /// 생성일시
+  createdAt DateTime @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("playauto_tokens")
+}
+
+/// 플레이오토 API 호출 로그 테이블
+/// API 호출 실패/성공 기록 (디버깅 및 재시도용)
+model PlayautoApiLog {
+  /// 고유 ID
+  id          Int       @id @default(autoincrement())
+  /// 주문 ID (주문 관련 API인 경우)
+  orderId     Int?      @map("order_id")
+  /// API 엔드포인트
+  endpoint    String    @db.VarChar(200)
+  /// HTTP 메서드
+  method      String    @db.VarChar(10)
+  /// 요청 데이터
+  requestData Json?     @map("request_data")
+  /// 응답 데이터
+  responseData Json?    @map("response_data")
+  /// 상태 (SUCCESS, FAILED)
+  status      String    @db.VarChar(20)
+  /// 에러 메시지
+  errorMessage String?  @map("error_message")
+  /// 재시도 횟수
+  retryCount  Int       @default(0) @map("retry_count")
+  /// 생성일시
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("playauto_api_logs")
 }

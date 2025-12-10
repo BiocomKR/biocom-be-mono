@@ -21,6 +21,7 @@ import { ConsentModule } from './consent/consent.module';
 import { OperatorsModule } from './operators/operators.module';
 import { AppEventsModule } from './app-events/app-events.module';
 import { AppVersionModule } from './app-version/app-version.module';
+import { HealthTypeAnimalsModule } from './health-type-animals/health-type-animals.module';
 
 // Domain Controllers
 import { UsersController } from './users/users.controller';
@@ -36,6 +37,7 @@ import { ShippingController } from './shipping/shipping.controller';
 import { RefundController } from './refund/refund.controller';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { CartController } from './cart/cart.controller';
+import { BannerController } from './banner/banner.controller';
 
 // Domain Services
 import { UsersService } from './users/users.service';
@@ -51,6 +53,7 @@ import { ShippingService } from './shipping/shipping.service';
 import { RefundService } from './refund/refund.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { CartService } from './cart/cart.service';
+import { BannerService } from './banner/banner.service';
 
 /**
  * 애플리케이션 루트 모듈
@@ -95,6 +98,7 @@ import { CartService } from './cart/cart.service';
     OperatorsModule,  // 운영자 관리 모듈
     AppEventsModule,  // 앱 이벤트 수집 모듈
     AppVersionModule, // 앱 버전 관리 모듈
+    HealthTypeAnimalsModule, // 건강 타입 동물 관리 모듈
   ],
   controllers: [
     UsersController,
@@ -110,6 +114,7 @@ import { CartService } from './cart/cart.service';
     RefundController,
     DashboardController,
     CartController,
+    BannerController,
   ],
   providers: [
     PrismaService,
@@ -127,6 +132,7 @@ import { CartService } from './cart/cart.service';
     RefundService,
     DashboardService,
     CartService,
+    BannerService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

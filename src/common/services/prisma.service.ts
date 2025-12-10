@@ -308,6 +308,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get surveyOption() { return this.prisma.surveyOption; }
   get surveyAnswer() { return this.prisma.surveyAnswer; }
   get healthTypeAnimal() { return this.prisma.healthTypeAnimal; }
+  get healthTypeAnimalFile() { return this.prisma.healthTypeAnimalFile; }
   get pointHistory() { return this.prisma.pointHistory; }
   get mission() { return this.prisma.mission; }
   get dailyMission() { return this.prisma.dailyMission; }
