@@ -385,11 +385,13 @@ export class HomeService {
             },
           },
           userChallenges: {
-            where: { status: UserChallengeStatus.ACTIVE },
-            take: 1,
+            where: { status: { in: [UserChallengeStatus.ACTIVE, UserChallengeStatus.PENDING] } },
+            orderBy: { createdAt: 'desc' },
+            take: 2, // ACTIVE와 PENDING 둘 다 가져올 수 있도록
             select: {
               id: true,
               productId: true,
+              status: true,
               startDate: true,
               endDate: true,
               activatedAt: true,
@@ -510,10 +512,29 @@ export class HomeService {
 
       // 6. 챌린지 정보 (CHALLENGER만) & 미션 목록 (최상위)
       let challengeInfo: ChallengeInfoDto | null = null;
+      let pendingStartDate: string | null = null;
+      let pendingEndDate: string | null = null;
       let missionList: MissionItemDto[] = await this.missionService.getMissionsForHome(); // DB에서 조회
 
+      // ACTIVE와 PENDING 챌린지 분리
+      const activeChallenge = user.userChallenges.find(
+        (uc) => uc.status === UserChallengeStatus.ACTIVE,
+      );
+      const pendingChallenge = user.userChallenges.find(
+        (uc) => uc.status === UserChallengeStatus.PENDING,
+      );
+
+      // PENDING 챌린지가 있으면 시작일/종료일 설정
+      if (pendingChallenge) {
+        pendingStartDate = pendingChallenge.startDate
+          ? new Date(pendingChallenge.startDate).toISOString().split('T')[0]
+          : null;
+        pendingEndDate = pendingChallenge.endDate
+          ? new Date(pendingChallenge.endDate).toISOString().split('T')[0]
+          : null;
+      }
+
       // status가 CHALLENGER이고 활성 챌린지가 있는 경우만 챌린지 정보 제공
-      const activeChallenge = user.userChallenges[0];
       if (user.status === UserSubscriptionStatus.CHALLENGER && activeChallenge) {
         const today = getNowKST();
         const startDate = activeChallenge.startDate
@@ -594,7 +615,9 @@ export class HomeService {
         userPoint: user.points ?? 0,
         banner,
         challengeInfo,
-        missionList, // 최상위로 추가
+        pendingStartDate,
+        pendingEndDate,
+        missionList,
       };
     } catch (error) {
       this.logger.error(`새 홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);

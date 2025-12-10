@@ -134,6 +134,12 @@ export class NewHomeResponseDto {
   @ApiPropertyOptional({ description: '챌린지 정보 (CHALLENGER만)' })
   challengeInfo: ChallengeInfoDto | null;
 
+  @ApiPropertyOptional({ description: '대기 중인 챌린지 시작일 (PENDING 상태)', example: '2025-01-01' })
+  pendingStartDate: string | null;
+
+  @ApiPropertyOptional({ description: '대기 중인 챌린지 종료일 (PENDING 상태)', example: '2025-01-21' })
+  pendingEndDate: string | null;
+
   @ApiProperty({ description: '오늘의 미션 목록 (챌린지 없어도 목업 데이터 제공)', type: [MissionItemDto] })
   missionList: MissionItemDto[];
 }
