@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { UpdateUserConsentsDto } from './dto/update-user-consents.dto';
+import { getNowKST } from '@/common/utils/kst-date.util';
 
 @Injectable()
 export class ConsentService {
@@ -112,7 +113,7 @@ export class ConsentService {
     }
 
     // 3. 동의 내역 저장 (upsert)
-    const now = new Date();
+    const now = getNowKST();
     const results = [];
 
     for (const consent of dto.consents) {

@@ -486,7 +486,7 @@ export class ChallengeService {
 
       const result = {
         currentDay,
-        todayDate: new Date(),
+        todayDate: getNowKST(),
         missions: missions.map(cm => ({
           id: cm.id,
           mission: cm.mission,
@@ -1069,7 +1069,7 @@ export class ChallengeService {
           }
         }
       },
-      timestamp: new Date()
+      timestamp: getNowKST()
     };
   }
 
@@ -1211,7 +1211,7 @@ export class ChallengeService {
         // 6. 시작일 설정 (기존 setStartDate 로직 재사용)
         const startDateString = startDate;
         const startDateObj = parseStringToDate(startDateString);
-        const today = new Date();
+        const today = getNowKST();
         today.setHours(0, 0, 0, 0);
 
         // 월요일 & 다음주부터 3주간 범위 검증
@@ -1392,7 +1392,7 @@ export class ChallengeService {
         // 4. 날짜 유효성 검증
         const startDateString = setStartDateDto.startDate; // "2025-11-03"
         const startDate = parseStringToDate(startDateString);
-        const today = new Date();
+        const today = getNowKST();
         today.setHours(0, 0, 0, 0);
 
         // 4-1. 월요일인지 확인 & 다음주부터 3주간 범위인지 확인
@@ -1436,7 +1436,7 @@ export class ChallengeService {
         const endDay = endDate.getDate();
         const endDateKST = stringToKSTDate(`${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`, 23, 59, 59); // 23:59:59
 
-        const now = new Date();
+        const now = getNowKST();
         const nowKST = stringToKSTDate(
           `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
           now.getHours(),

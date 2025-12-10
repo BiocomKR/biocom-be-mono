@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../common/services/prisma.service';
 import { SubscriptionService } from './subscription.service';
 import { SubscriptionStatus } from '../../common/enums';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 구독 자동결제 스케줄러
@@ -40,10 +41,10 @@ export class SubscriptionSchedulerService {
   async handleAutoBilling() {
     this.logger.log('🕐 자동결제 스케줄러 시작...');
 
-    const today = new Date();
+    const today = getNowKST();
     today.setHours(0, 0, 0, 0); // 오늘 00:00:00
 
-    const tomorrow = new Date(today);
+    const tomorrow = new Date(today.getTime());
     tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00
 
     // 오늘 결제해야 할 구독 찾기
@@ -110,7 +111,7 @@ export class SubscriptionSchedulerService {
   async handleExpiredSubscriptions() {
     this.logger.log('🕐 만료된 구독 정리 시작...');
 
-    const now = new Date();
+    const now = getNowKST();
 
     // CANCELED 상태이면서 nextBillingDate가 지난 구독을 EXPIRED로 전환
     const expiredSubscriptions = await this.prisma.subscription.updateMany({

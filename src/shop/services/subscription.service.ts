@@ -10,6 +10,7 @@ import { TossPaymentsService } from './toss-payments.service';
 import { RegisterBillingDto } from '../dto/subscription/register-billing.dto';
 import { CreateSubscriptionDto } from '../dto/subscription/create-subscription.dto';
 import { SubscriptionStatus } from '../../common/enums';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 구독 관리 서비스
@@ -72,7 +73,7 @@ export class SubscriptionService {
       data: {
         billingKey: billingKey,
         customerKey: customerKey,
-        updatedAt: new Date(),
+        updatedAt: getNowKST(),
       },
     });
 
@@ -110,8 +111,8 @@ export class SubscriptionService {
         },
         data: {
           status: SubscriptionStatus.CANCELLED,
-          endDate: new Date(),
-          updatedAt: new Date(),
+          endDate: getNowKST(),
+          updatedAt: getNowKST(),
         },
       });
 
@@ -123,7 +124,7 @@ export class SubscriptionService {
         data: {
           billingKey: null,
           customerKey: null,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
     });
@@ -208,8 +209,8 @@ export class SubscriptionService {
     this.logger.log(`첫 결제 성공: paymentKey=${paymentResult.paymentKey}`);
 
     // 구독 생성
-    const startDate = new Date();
-    const nextBillingDate = new Date();
+    const startDate = getNowKST();
+    const nextBillingDate = new Date(startDate.getTime());
     nextBillingDate.setDate(nextBillingDate.getDate() + billingCycle);
 
     const subscription = await this.prisma.subscription.create({
@@ -339,7 +340,7 @@ export class SubscriptionService {
       where: { id: subscriptionId },
       data: {
         status: SubscriptionStatus.CANCELED,
-        updatedAt: new Date(),
+        updatedAt: getNowKST(),
       },
     });
 
@@ -379,7 +380,7 @@ export class SubscriptionService {
           subscription.billingKey,
           subscription.customerKey,
           subscription.price,
-          `${subscription.product.name} 구독 - ${new Date().toISOString().split('T')[0]} 결제`,
+          `${subscription.product.name} 구독 - ${getNowKST().toISOString().split('T')[0]} 결제`,
         );
 
       this.logger.log(
@@ -396,7 +397,7 @@ export class SubscriptionService {
         where: { id: subscriptionId },
         data: {
           nextBillingDate: nextBillingDate,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 
@@ -413,7 +414,7 @@ export class SubscriptionService {
         where: { id: subscriptionId },
         data: {
           status: SubscriptionStatus.PAYMENT_FAILED,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 

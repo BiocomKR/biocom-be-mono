@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { OrderStatus, PaymentStatus, SubscriptionStatus } from '../../common/enums';
+import { getNowKST } from '../../common/utils/kst-date.util';
 
 /**
  * 토스페이먼츠 웹훅 처리 서비스
@@ -111,7 +112,7 @@ export class WebhooksService {
         where: { id: order.id },
         data: {
           status: OrderStatus.PAID,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 
@@ -131,7 +132,7 @@ export class WebhooksService {
             amount: amount,
             method: method || '가상계좌',
             status: PaymentStatus.COMPLETED,
-            approvedAt: approvedAt ? new Date(approvedAt) : new Date(),
+            approvedAt: approvedAt ? new Date(approvedAt) : getNowKST(),
           },
         });
       } else {
@@ -182,7 +183,7 @@ export class WebhooksService {
         where: { id: order.id },
         data: {
           status: OrderStatus.CANCELLED,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 
@@ -194,7 +195,7 @@ export class WebhooksService {
         },
         data: {
           status: PaymentStatus.CANCELLED,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 
@@ -233,7 +234,7 @@ export class WebhooksService {
         where: { id: order.id },
         data: {
           status: OrderStatus.PAYMENT_FAILED,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 
@@ -327,8 +328,8 @@ export class WebhooksService {
         },
         data: {
           status: SubscriptionStatus.BILLING_DELETED,
-          endDate: new Date(),
-          updatedAt: new Date(),
+          endDate: getNowKST(),
+          updatedAt: getNowKST(),
         },
       });
 
@@ -342,7 +343,7 @@ export class WebhooksService {
         data: {
           billingKey: null,
           customerKey: null,
-          updatedAt: new Date(),
+          updatedAt: getNowKST(),
         },
       });
 

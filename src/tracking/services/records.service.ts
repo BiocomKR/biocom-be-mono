@@ -1505,7 +1505,7 @@ export class RecordsService {
           where: { id: record.id },
           data: {
             metadata: updatedMetadata,
-            updatedAt: new Date(),
+            updatedAt: getNowKST(),
           },
         });
       });
@@ -1794,7 +1794,7 @@ export class RecordsService {
       const today = getKoreanToday(); // KST 기준 오늘 날짜 (YYYY-MM-DD)
 
       const result = await this.prisma.$transaction(async (tx) => {
-        const now = new Date();
+        const now = getNowKST();
         const todayDate = new Date(today);
 
         // ============ 페이즈 1: user_supplement_routine 수정 ============
