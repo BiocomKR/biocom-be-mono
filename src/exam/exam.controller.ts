@@ -56,6 +56,21 @@ export class ExamController {
                 },
               },
             },
+            hasChallenge: {
+              type: 'boolean',
+              example: true,
+              description: '활성 챌린지 유무',
+            },
+            hasAnimal: {
+              type: 'boolean',
+              example: true,
+              description: '동물 유형 유무 (사전문진 완료 여부)',
+            },
+            hasStartDate: {
+              type: 'boolean',
+              example: false,
+              description: '챌린지 시작일 지정 여부',
+            },
           },
         },
         message: { type: 'string', example: '식품 레벨 조회 성공' },
