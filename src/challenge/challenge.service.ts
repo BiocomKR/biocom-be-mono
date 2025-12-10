@@ -1212,7 +1212,7 @@ export class ChallengeService {
         const startDateString = startDate;
         const startDateObj = parseStringToDate(startDateString);
         const today = getNowKST();
-        today.setHours(0, 0, 0, 0);
+        today.setUTCHours(0, 0, 0, 0);
 
         // 월요일 & 다음주부터 3주간 범위 검증
         if (!isValidStartDate(startDateObj, today)) {
@@ -1393,7 +1393,7 @@ export class ChallengeService {
         const startDateString = setStartDateDto.startDate; // "2025-11-03"
         const startDate = parseStringToDate(startDateString);
         const today = getNowKST();
-        today.setHours(0, 0, 0, 0);
+        today.setUTCHours(0, 0, 0, 0);
 
         // 4-1. 월요일인지 확인 & 다음주부터 3주간 범위인지 확인
         if (!isValidStartDate(startDate, today)) {

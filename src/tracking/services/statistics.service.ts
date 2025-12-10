@@ -1770,11 +1770,11 @@ export class StatisticsService {
 
       // 날짜 필터 계산 (오늘 기준 N일 전부터 오늘까지, KST 기준)
       const today = getNowKST();
-      today.setHours(23, 59, 59, 999); // 오늘 23:59:59 (KST)
+      today.setUTCHours(23, 59, 59, 999); // 오늘 23:59:59 (KST)
 
       const startDate = getNowKST();
       startDate.setDate(today.getDate() - (days - 1)); // days=7이면 오늘 포함 7일
-      startDate.setHours(0, 0, 0, 0); // 시작일 00:00:00 (KST)
+      startDate.setUTCHours(0, 0, 0, 0); // 시작일 00:00:00 (KST)
 
       this.logger.log(`날짜 필터 (KST): ${startDate.toISOString()} ~ ${today.toISOString()}`);
 

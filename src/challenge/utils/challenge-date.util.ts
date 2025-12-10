@@ -130,8 +130,8 @@ export const isMonday = (date: Date): boolean => {
  */
 export const getAvailableStartDates = (applicationDate: Date): Date[] => {
   const result: Date[] = [];
-  const today = new Date(applicationDate);
-  today.setHours(0, 0, 0, 0);
+  const today = new Date(applicationDate.getTime());
+  today.setUTCHours(0, 0, 0, 0);
 
   const dayOfWeek = today.getDay(); // 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
 

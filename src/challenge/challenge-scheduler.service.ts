@@ -40,9 +40,9 @@ export class ChallengeSchedulerService {
     this.logger.log('🕐 챌린지 활성화 스케줄러 시작...');
 
     const today = getNowKST();
-    today.setHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
+    today.setUTCHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
 
-    const tomorrow = new Date(today);
+    const tomorrow = new Date(today.getTime());
     tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00 (KST)
 
     // 오늘 시작해야 할 PENDING 챌린지 찾기
@@ -111,7 +111,7 @@ export class ChallengeSchedulerService {
     this.logger.log('💊 영양제 주간 생성 스케줄러 시작...');
 
     const now = getNowKST();
-    now.setHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
+    now.setUTCHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
 
     // user_challenges 테이블에서 챌린지 경험자 조회 (중복 제거)
     const userChallenges = await this.prisma.userChallenge.findMany({
@@ -248,7 +248,7 @@ export class ChallengeSchedulerService {
       // KST 기준 날짜 생성
       const recordDate = getNowKST();
       recordDate.setDate(baseDate.getDate() + dayOffset);
-      recordDate.setHours(0, 0, 0, 0); // 00:00:00 (KST)
+      recordDate.setUTCHours(0, 0, 0, 0); // 00:00:00 (KST)
 
       // 각 영양제마다 기록 생성
       for (const routine of supplementRoutines) {
@@ -300,7 +300,7 @@ export class ChallengeSchedulerService {
     this.logger.log('⏰ 챌린지 만료 처리 스케줄러 시작...');
 
     const now = getNowKST();
-    now.setHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
+    now.setUTCHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
 
     // 오늘 기준으로 만료된 챌린지 찾기 (endDate < 오늘)
     const expiredChallenges = await this.prisma.userChallenge.findMany({

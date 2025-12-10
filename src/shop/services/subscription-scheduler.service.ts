@@ -42,7 +42,7 @@ export class SubscriptionSchedulerService {
     this.logger.log('🕐 자동결제 스케줄러 시작...');
 
     const today = getNowKST();
-    today.setHours(0, 0, 0, 0); // 오늘 00:00:00
+    today.setUTCHours(0, 0, 0, 0); // 오늘 00:00:00
 
     const tomorrow = new Date(today.getTime());
     tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00

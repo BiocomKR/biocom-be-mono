@@ -253,7 +253,7 @@ export class HomeService {
   private async getWeeklyStats(userId: number): Promise<{ recordsThisWeek: number; completedMissions: number; totalMissions: number }> {
     const startOfWeek = getNowKST();
     startOfWeek.setDate(startOfWeek.getDate() - 6);
-    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setUTCHours(0, 0, 0, 0);
 
     const endOfWeek = getNowKST();
     endOfWeek.setHours(23, 59, 59, 999);
