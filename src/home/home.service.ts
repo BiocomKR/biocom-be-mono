@@ -29,6 +29,8 @@ const MOCK_MISSION_LIST: MissionItemDto[] = [
     point: 100,
     max: 1,
     current: 0,
+    recordType: 'BEAUTY',
+    sortOrder: 1,
   },
   {
     id: 2,
@@ -37,6 +39,8 @@ const MOCK_MISSION_LIST: MissionItemDto[] = [
     point: 1000,
     max: 1,
     current: 0,
+    recordType: 'DECLARATION',
+    sortOrder: 2,
   },
   {
     id: 3,
@@ -45,6 +49,8 @@ const MOCK_MISSION_LIST: MissionItemDto[] = [
     point: 100,
     max: 3,
     current: 0,
+    recordType: 'DIET',
+    sortOrder: 3,
   },
 ];
 
@@ -435,12 +441,14 @@ export class HomeService {
                       id: true,
                       day: true,
                       points: true,
+                      sortOrder: true,
                       mission: {
                         select: {
                           id: true,
                           name: true,
                           description: true,
                           dailyLimit: true,
+                          recordType: true,
                         },
                       },
                     },
@@ -568,6 +576,8 @@ export class HomeService {
             point: cm.points,
             max: cm.mission.dailyLimit,
             current: completedCount,
+            recordType: cm.mission.recordType,
+            sortOrder: cm.sortOrder,
           };
         });
 

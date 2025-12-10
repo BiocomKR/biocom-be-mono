@@ -81,6 +81,12 @@ export class MissionItemDto {
 
   @ApiProperty({ description: '오늘 수행한 횟수', example: 0 })
   current: number;
+
+  @ApiProperty({ description: '기록유형', example: 'DIET' })
+  recordType: string;
+
+  @ApiProperty({ description: '정렬순서', example: 1 })
+  sortOrder: number;
 }
 
 /**
