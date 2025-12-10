@@ -36,7 +36,10 @@ export class ExamService {
    * 4. orderCode에 따라 신/구 API 호출
    * 5. 결과 반환 (챌린지 유무, 동물 유무 포함)
    */
-  async getFoodLevels(userId: number): Promise<{
+  async getFoodLevels(
+    userId: number,
+    chartId?: string,
+  ): Promise<{
     orderCode: string;
     data: IggLevelsResponse;
     hasChallenge: boolean;
@@ -93,17 +96,29 @@ export class ExamService {
       throw new NotFoundException('지연성 알러지 검사 결과가 없습니다');
     }
 
-    const latestExam = iggExams[0];
+    // chartId가 있으면 해당 검사, 없으면 최신 검사
+    let targetExam: ChartExamInfo;
+    if (chartId) {
+      const found = iggExams.find((exam) => exam.chartID === chartId);
+      if (!found) {
+        throw new NotFoundException(
+          `chartId(${chartId})에 해당하는 검사 결과가 없습니다`,
+        );
+      }
+      targetExam = found;
+    } else {
+      targetExam = iggExams[0];
+    }
     this.logger.log(
-      `식품 레벨 조회 - userId: ${userId}, chartID: ${latestExam.chartID}, orderCode: ${latestExam.orderCode}`,
+      `식품 레벨 조회 - userId: ${userId}, chartID: ${targetExam.chartID}, orderCode: ${targetExam.orderCode}`,
     );
 
     // 4. orderCode에 따라 신/구 API 호출
     let data: IggLevelsResponse | null;
-    if (latestExam.orderCode === IGG_OLD_EXAM_TYPE) {
-      data = await this.sibApiService.getIggLevelsOld(latestExam.chartID);
+    if (targetExam.orderCode === IGG_OLD_EXAM_TYPE) {
+      data = await this.sibApiService.getIggLevelsOld(targetExam.chartID);
     } else {
-      data = await this.sibApiService.getIggLevels(latestExam.chartID);
+      data = await this.sibApiService.getIggLevels(targetExam.chartID);
     }
 
     if (!data) {
@@ -112,7 +127,7 @@ export class ExamService {
 
     // 5. 결과 반환 (챌린지 유무, 동물 유무, 시작일 지정 여부 포함)
     return {
-      orderCode: latestExam.orderCode,
+      orderCode: targetExam.orderCode,
       data,
       hasChallenge,
       hasAnimal,

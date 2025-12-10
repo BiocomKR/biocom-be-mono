@@ -1,9 +1,10 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request, Query } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ExamService } from './exam.service';
@@ -28,7 +29,13 @@ export class ExamController {
   @ApiOperation({
     summary: '식품 레벨 조회',
     description:
-      '지연성 알러지 검사 결과(IgG Levels)를 조회합니다. D0004(구)/D0060(신) 중 최신 결과를 반환합니다.',
+      '지연성 알러지 검사 결과(IgG Levels)를 조회합니다. chartId 파라미터가 없으면 최신 결과, 있으면 해당 검사 결과를 반환합니다.',
+  })
+  @ApiQuery({
+    name: 'chartId',
+    required: false,
+    description: '특정 검사 chartId (없으면 최신 검사 결과 반환)',
+    example: 'BA2516182',
   })
   @ApiResponse({
     status: 200,
@@ -81,8 +88,11 @@ export class ExamController {
     status: 404,
     description: '검사 결과 없음',
   })
-  async getFoodLevels(@Request() req: any) {
-    const data = await this.examService.getFoodLevels(req.user.id);
+  async getFoodLevels(
+    @Request() req: any,
+    @Query('chartId') chartId?: string,
+  ) {
+    const data = await this.examService.getFoodLevels(req.user.id, chartId);
     return {
       success: true,
       data,
