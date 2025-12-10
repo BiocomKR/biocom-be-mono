@@ -104,9 +104,6 @@ export class ChallengeInfoDto {
 
   @ApiProperty({ description: '챌린지 홈 최초 진입 여부', example: true })
   isFirstEntry: boolean;
-
-  @ApiProperty({ description: '미션 리스트', type: [MissionItemDto] })
-  missionList: MissionItemDto[];
 }
 
 /**
@@ -130,6 +127,9 @@ export class NewHomeResponseDto {
 
   @ApiPropertyOptional({ description: '챌린지 정보 (CHALLENGER만)' })
   challengeInfo: ChallengeInfoDto | null;
+
+  @ApiProperty({ description: '오늘의 미션 목록 (챌린지 없어도 목업 데이터 제공)', type: [MissionItemDto] })
+  missionList: MissionItemDto[];
 }
 
 // ============================================

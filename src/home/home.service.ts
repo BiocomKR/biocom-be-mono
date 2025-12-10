@@ -534,9 +534,9 @@ export class HomeService {
         };
       }
 
-      // 6. 챌린지 정보 (CHALLENGER만)
+      // 6. 챌린지 정보 (CHALLENGER만) & 미션 목록 (최상위)
       let challengeInfo: ChallengeInfoDto | null = null;
-      let challengePercent = 0;
+      let missionList: MissionItemDto[] = MOCK_MISSION_LIST; // 기본값: 목업 데이터
 
       // status가 CHALLENGER이고 활성 챌린지가 있는 경우만 챌린지 정보 제공
       const activeChallenge = user.userChallenges[0];
@@ -556,7 +556,7 @@ export class HomeService {
         );
 
         // 미션별 완료 횟수 계산
-        let missionList: MissionItemDto[] = todayMissions.map((cm) => {
+        const challengeMissionList: MissionItemDto[] = todayMissions.map((cm) => {
           const completedCount = activeChallenge.userMissions.filter(
             (um) => um.challengeMissionId === cm.id && um.day === currentDay,
           ).length;
@@ -571,9 +571,9 @@ export class HomeService {
           };
         });
 
-        // 미션 데이터가 없으면 목업 데이터 반환
-        if (missionList.length === 0) {
-          missionList = MOCK_MISSION_LIST;
+        // 챌린지에 미션 데이터가 있으면 사용, 없으면 목업
+        if (challengeMissionList.length > 0) {
+          missionList = challengeMissionList;
         }
 
         // 전체 미션 수 & 완료 미션 수 계산 (진행률)
@@ -581,7 +581,7 @@ export class HomeService {
         const completedMissions = activeChallenge.userMissions.filter(
           (um) => um.isCompleted,
         ).length;
-        challengePercent = totalMissions > 0
+        const challengePercent = totalMissions > 0
           ? Math.round((completedMissions / totalMissions) * 100)
           : 0;
 
@@ -594,7 +594,6 @@ export class HomeService {
           currentDay,
           challengePercent,
           isFirstEntry: activeChallenge.isFirstEntry,
-          missionList,
         };
 
         // 최초 진입인 경우 false로 업데이트 (백그라운드)
@@ -619,6 +618,7 @@ export class HomeService {
         userPoint: user.points ?? 0,
         banner,
         challengeInfo,
+        missionList, // 최상위로 추가
       };
     } catch (error) {
       this.logger.error(`새 홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);
