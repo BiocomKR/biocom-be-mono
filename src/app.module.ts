@@ -48,6 +48,7 @@ import { IapModule } from './iap/iap.module';
 import { AppVersionModule } from './app-version/app-version.module';
 import { PlayautoModule } from './playauto/playauto.module';
 import { ConsentModule } from './consent/consent.module';
+import { ExamModule } from './exam/exam.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -150,6 +151,7 @@ import { ConsentModule } from './consent/consent.module';
     AppVersionModule, // 앱 버전 관리 모듈
     PlayautoModule,  // 플레이오토 물류/배송 연동 모듈
     ConsentModule,    // 약관 관리 모듈
+    ExamModule,       // 검사 결과 모듈
     // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음

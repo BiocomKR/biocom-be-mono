@@ -2,13 +2,14 @@ import { YesNo } from '../../common/enums';
 
 /**
  * 차트 ID 조회 응답 - 개별 검사 정보
+ * SIB API 실제 응답 필드명 사용 (chartID, orderCode)
  */
 export interface ChartExamInfo {
   /** 차트 ID */
-  chartId: string;
+  chartID: string;
 
   /** 검사 타입 코드 (D0004, D0060 등) */
-  examType: string;
+  orderCode: string;
 
   /** 결과 여부 (Y/N) */
   resultYN: YesNo;
@@ -27,11 +28,19 @@ export interface ChartIdByMobileResponse {
 
 /**
  * 지연성 알러지 검사 결과 (IgG Levels)
+ * 신규/구 API 동일한 응답 형태
  */
-export interface IggLevelsResponse {
+export interface FoodLevelItem {
+  userName: string;
   chartId: string;
-  data: any; // 실제 응답 구조에 맞게 확장 필요
+  level1: string;
+  level2: string;
+  level3: string;
+  level4: string;
+  level5: string;
 }
+
+export type IggLevelsResponse = FoodLevelItem[];
 
 /**
  * 종합대사기능 검사 결과 (UGI Levels)

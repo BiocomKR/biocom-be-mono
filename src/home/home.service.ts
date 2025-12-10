@@ -469,6 +469,7 @@ export class HomeService {
             select: {
               chartId: true,
               resultYn: true,
+              updatedAt: true,
             },
           },
         },
@@ -478,17 +479,32 @@ export class HomeService {
         throw new Error('사용자를 찾을 수 없습니다');
       }
 
-      // 2. DB 캐시에서 검사 정보 조회 (없으면 백그라운드로 SIB API 호출)
+      // 2. DB 캐시에서 검사 정보 조회 (TTL 1분, 만료 시 백그라운드 갱신)
+      const CACHE_TTL_MS = 60 * 1000; // 1분
       let reportInfo: { chartId: string | null; resultYN: YesNo; sibError?: boolean };
+
       if (user.userCharts.length > 0) {
-        // DB 캐시 히트
         const cachedChart = user.userCharts[0];
+        const now = getNowKST();
+        const cacheAge = cachedChart.updatedAt
+          ? now.getTime() - new Date(cachedChart.updatedAt).getTime()
+          : Infinity;
+
+        // 캐시 히트 - 현재 값 반환
         reportInfo = {
           chartId: cachedChart.chartId,
           resultYN: cachedChart.resultYn as YesNo,
         };
+
+        // TTL 만료 시 백그라운드로 갱신
+        if (cacheAge > CACHE_TTL_MS) {
+          this.logger.log(`캐시 TTL 만료 (${Math.round(cacheAge / 1000)}초) - 백그라운드 갱신`);
+          this.refreshChartData(userId, user.mobile).catch((err) => {
+            this.logger.warn(`차트 데이터 백그라운드 갱신 실패 - 사용자 ID: ${userId}`, err);
+          });
+        }
       } else {
-        // DB 캐시 미스 - 백그라운드로 SIB API 호출 후 기본값 반환
+        // 캐시 미스 - 백그라운드로 SIB API 호출 후 기본값 반환
         this.fetchAndSaveChartData(userId, user.mobile).catch((err) => {
           this.logger.warn(`차트 데이터 백그라운드 저장 실패 - 사용자 ID: ${userId}`, err);
         });
@@ -663,18 +679,61 @@ export class HomeService {
       const result = await this.prisma.userChart.createMany({
         data: chartData.map((chart) => ({
           userId,
-          chartId: chart.chartId,
+          chartId: chart.chartID,
           receiptDate: new Date(chart.receiptDate),
           resultYn: chart.resultYN,
-          orderCode: chart.examType,
+          orderCode: chart.orderCode,
         })),
         skipDuplicates: true,
       });
 
       this.logger.log(`차트 데이터 ${result.count}건 저장 완료 - 사용자 ID: ${userId}`);
-    } catch (error) {
+    } catch (error: any) {
       // 외부 API 호출 실패는 치명적이지 않으므로 로그만 남기고 계속 진행
       this.logger.warn(`차트 데이터 조회 실패 - 사용자 ID: ${userId}`, error.message);
+    }
+  }
+
+  /**
+   * 캐시된 차트 데이터 갱신 (TTL 만료 시 호출)
+   * - SIB API에서 최신 데이터 조회
+   * - 기존 데이터 upsert (새 데이터 추가 + 기존 데이터 updatedAt 갱신)
+   */
+  private async refreshChartData(userId: number, mobile: string): Promise<void> {
+    try {
+      this.logger.log(`차트 데이터 갱신 시작 - 사용자 ID: ${userId}`);
+
+      const chartData = await this.sibApiService.getChartIdByMobile(mobile);
+
+      if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
+        this.logger.log(`차트 데이터 없음 - 사용자 ID: ${userId}`);
+        return;
+      }
+
+      const now = getNowKST();
+
+      // upsert로 새 데이터 추가 + 기존 데이터 updatedAt 갱신
+      for (const chart of chartData) {
+        await this.prisma.userChart.upsert({
+          where: { chartId: chart.chartID },
+          create: {
+            userId,
+            chartId: chart.chartID,
+            receiptDate: new Date(chart.receiptDate),
+            resultYn: chart.resultYN,
+            orderCode: chart.orderCode,
+            updatedAt: now,
+          },
+          update: {
+            resultYn: chart.resultYN,
+            updatedAt: now,
+          },
+        });
+      }
+
+      this.logger.log(`차트 데이터 ${chartData.length}건 갱신 완료 - 사용자 ID: ${userId}`);
+    } catch (error: any) {
+      this.logger.warn(`차트 데이터 갱신 실패 - 사용자 ID: ${userId}`, error.message);
     }
   }
 }

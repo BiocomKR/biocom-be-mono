@@ -60,7 +60,7 @@ export class SibApiService {
 
       // D0004, D0060 필터링
       const iggExams = chartList.filter((exam) =>
-        IGG_EXAM_TYPES.includes(exam.examType as ExamType),
+        IGG_EXAM_TYPES.includes(exam.orderCode as ExamType),
       );
 
       if (iggExams.length === 0) {
@@ -74,7 +74,7 @@ export class SibApiService {
       )[0];
 
       return {
-        chartId: latestExam.chartId,
+        chartId: latestExam.chartID,
         resultYN: latestExam.resultYN,
       };
     } catch (error) {
