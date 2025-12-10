@@ -512,8 +512,8 @@ export class HomeService {
 
       // 6. 챌린지 정보 (CHALLENGER만) & 미션 목록 (최상위)
       let challengeInfo: ChallengeInfoDto | null = null;
-      let pendingStartDate: string | null = null;
-      let pendingEndDate: string | null = null;
+      let startDate: string | null = null;
+      let endDate: string | null = null;
       let missionList: MissionItemDto[] = await this.missionService.getMissionsForHome(); // DB에서 조회
 
       // ACTIVE와 PENDING 챌린지 분리
@@ -524,13 +524,14 @@ export class HomeService {
         (uc) => uc.status === UserChallengeStatus.PENDING,
       );
 
-      // PENDING 챌린지가 있으면 시작일/종료일 설정
-      if (pendingChallenge) {
-        pendingStartDate = pendingChallenge.startDate
-          ? new Date(pendingChallenge.startDate).toISOString().split('T')[0]
+      // 챌린지가 있으면 startDate/endDate 설정 (ACTIVE 우선, 없으면 PENDING)
+      const targetChallenge = activeChallenge || pendingChallenge;
+      if (targetChallenge) {
+        startDate = targetChallenge.startDate
+          ? new Date(targetChallenge.startDate).toISOString().split('T')[0]
           : null;
-        pendingEndDate = pendingChallenge.endDate
-          ? new Date(pendingChallenge.endDate).toISOString().split('T')[0]
+        endDate = targetChallenge.endDate
+          ? new Date(targetChallenge.endDate).toISOString().split('T')[0]
           : null;
       }
 
@@ -615,8 +616,8 @@ export class HomeService {
         userPoint: user.points ?? 0,
         banner,
         challengeInfo,
-        pendingStartDate,
-        pendingEndDate,
+        startDate,
+        endDate,
         missionList,
       };
     } catch (error) {
