@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
@@ -1762,7 +1762,7 @@ export class StatisticsService {
       });
 
       if (!userChart) {
-        throw new Error(`chartId에 해당하는 사용자를 찾을 수 없습니다: ${chartId}`);
+        throw new NotFoundException(`chartId에 해당하는 사용자를 찾을 수 없습니다: ${chartId}`);
       }
 
       const userId = userChart.userId;
@@ -1808,7 +1808,7 @@ export class StatisticsService {
       });
 
       if (!user) {
-        throw new Error(`사용자를 찾을 수 없습니다: userId=${userId}`);
+        throw new NotFoundException(`사용자를 찾을 수 없습니다: userId=${userId}`);
       }
 
       const 이름 = user.name || '없음';

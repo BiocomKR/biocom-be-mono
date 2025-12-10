@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService as NestConfigService } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BullModule } from '@nestjs/bullmq';
 import { APP_INTERCEPTOR, APP_GUARD, Reflector } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
@@ -43,7 +42,6 @@ import { PhoneVerificationModule } from './phone-verification/phone-verification
 import { PushModule } from './push/push.module';
 import { AppEventsModule } from './app-events/app-events.module';
 import { ContentModule } from './content/content.module';
-import { GraphSyncModule } from './graph-sync/graph-sync.module';
 import { IapModule } from './iap/iap.module';
 import { AppVersionModule } from './app-version/app-version.module';
 import { PlayautoModule } from './playauto/playauto.module';
@@ -81,14 +79,6 @@ import { ExamModule } from './exam/exam.module';
     // 스케줄러 모듈 (Cron Job)
     ScheduleModule.forRoot(),
 
-    // BullMQ 모듈 (GraphDB 동기화용 메시지 큐)
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        password: process.env.REDIS_PASSWORD || undefined,
-      },
-    }),
 
     // 정적 파일 서빙
     ServeStaticModule.forRootAsync({
@@ -146,7 +136,6 @@ import { ExamModule } from './exam/exam.module';
     PushModule,      // 푸시 알림 모듈 (FCM)
     AppEventsModule, // 앱 이벤트 수집 모듈 (GA4 대체/보조)
     ContentModule,   // 컨텐츠 관리 모듈
-    GraphSyncModule, // GraphDB 동기화 모듈 (BullMQ Producer)
     IapModule,       // 인앱결제 모듈 (Apple/Google)
     AppVersionModule, // 앱 버전 관리 모듈
     PlayautoModule,  // 플레이오토 물류/배송 연동 모듈
