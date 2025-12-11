@@ -543,16 +543,17 @@ export class PaymentService {
       // 물류 서비스 주문 생성
       const { uniq, bundleNo } = await this.logistics.createOrder(decryptedOrder);
 
-      // DB에 uniq, bundle_no 저장
+      // DB에 provider, uniq, bundleNo 저장
       await this.prisma.order.update({
         where: { id: orderId },
         data: {
-          playautoUniq: uniq,
-          playautoBundleNo: bundleNo,
+          logisticsProvider: this.logistics.name,
+          logisticsUniq: uniq,
+          logisticsBundleNo: bundleNo,
         },
       });
 
-      this.logger.log(`플레이오토 주문 생성 완료: 주문ID=${orderId}, uniq=${uniq}, bundle_no=${bundleNo}`);
+      this.logger.log(`물류 주문 생성 완료: 주문ID=${orderId}, provider=${this.logistics.name}, uniq=${uniq}, bundleNo=${bundleNo}`);
     } catch (error: any) {
       this.logger.error(`플레이오토 주문 생성 실패: 주문ID=${orderId}`, error.message);
       // 에러를 throw하지 않고 로그만 남김 (비동기 처리이므로)

@@ -860,10 +860,12 @@ model Order {
   completedAt       DateTime?        @map("completed_at")
   /// 취소일시
   cancelledAt       DateTime?        @map("cancelled_at")
-  /// 플레이오토 주문 고유번호
-  playautoUniq      String?          @map("playauto_uniq") @db.VarChar(50)
-  /// 플레이오토 주문 묶음번호
-  playautoBundleNo  String?          @map("playauto_bundle_no") @db.VarChar(50)
+  /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
+  logisticsProvider  String?          @map("logistics_provider") @db.VarChar(50)
+  /// 물류 서비스 주문 고유번호
+  logisticsUniq      String?          @map("logistics_uniq") @db.VarChar(50)
+  /// 물류 서비스 주문 묶음번호
+  logisticsBundleNo  String?          @map("logistics_bundle_no") @db.VarChar(50)
   /// 생성일시
   createdAt         DateTime         @map("created_at")
   /// 수정일시
