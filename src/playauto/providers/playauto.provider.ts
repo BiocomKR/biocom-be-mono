@@ -43,36 +43,48 @@ export class PlayautoProvider implements ILogisticsProvider {
     try {
       this.logger.log(`플레이오토 주문 생성 시작: 주문번호 ${order.orderNumber}`);
 
+      // 상품명 생성 (첫 번째 상품 + 외 N건)
+      const firstItem = order.items[0];
+      const shopSaleName =
+        order.items.length > 1
+          ? `${firstItem.productName} 외 ${order.items.length - 1}건`
+          : firstItem.productName;
+
       // 주문 아이템을 opts 배열로 변환
       const opts = order.items.map((item) => ({
-        opt_nm: item.productName,
-        opt_qty: item.quantity,
-        opt_price: item.productPrice,
+        shop_sale_name: item.productName,
+        sale_cnt: item.quantity,
+        sale_price: item.productPrice,
       }));
 
-      // 배송비 0이면 "무료배송", 아니면 "선결제"
-      const shipMethod = order.shippingFee === 0 ? '무료배송' : '선결제';
-
-      // 플레이오토 API 요청 바디
+      // 플레이오토 API 요청 바디 (OpenAPI 스펙 기준)
       const requestData = {
         shop_cd: process.env.PLAYAUTO_SHOP_CD,
         shop_id: process.env.PLAYAUTO_SHOP_ID,
-        shop_ord_no: '__AUTO__',
+        shop_ord_no: order.orderNumber,
         ord_date: new Date(order.orderedAt).toISOString().split('T')[0],
-        ord_nm: order.recipientName,
-        ord_tel: order.recipientMobile,
-        ord_mobile: order.recipientMobile,
-        ord_post: order.postalCode,
-        ord_addr: order.address,
-        ord_addr_dtl: order.addressDetail || '',
-        memo: order.deliveryMessage || '',
+        // 주문자 정보
+        order_name: order.recipientName,
+        order_htel: order.recipientMobile,
+        // 수령자 정보
+        to_name: order.recipientName,
+        to_htel: order.recipientMobile,
+        to_zipcd: order.postalCode,
+        to_addr1: order.address,
+        to_addr2: order.addressDetail || '',
+        // 상품 정보
+        shop_sale_name: shopSaleName,
         opts,
-        ship_method: shipMethod,
-        ship_price: order.shippingFee,
+        // 배송 정보
+        ship_cost: order.shippingFee,
+        ship_msg: order.deliveryMessage || '',
       };
 
       // API 호출
       const response = await this.callApi<any>('POST', '/order/add', requestData);
+
+      // 디버그: 응답 구조 확인
+      this.logger.log(`플레이오토 응답: ${JSON.stringify(response)}`);
 
       const { uniq, bundle_no } = response;
 

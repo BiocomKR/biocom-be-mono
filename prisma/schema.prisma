@@ -2657,8 +2657,8 @@ model LogisticsToken {
   id        Int      @id @default(1)
   /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
   provider  String   @default("PLAYAUTO") @db.VarChar(50)
-  /// 인증 토큰
-  token     String   @db.VarChar(500)
+  /// 인증 토큰 (JWT - 길이가 길어 TEXT 사용)
+  token     String   @db.Text
   /// 솔루션 번호 (플레이오토 등 서비스별 고유값)
   solNo     Int      @map("sol_no")
   /// 만료 시각 (발급시각 + 23시간, 1시간 버퍼)
