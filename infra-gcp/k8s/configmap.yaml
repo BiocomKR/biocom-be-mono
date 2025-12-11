@@ -43,7 +43,7 @@ data:
   JWT_REFRESH_TOKEN_EXPIRES_IN: "180d"  # Refresh Token 만료 시간: 180일 (약 6개월)
 
   # 토스페이먼츠 결제 설정
-  TOSS_PAYMENTS_CLIENT_KEY: "test_ck_d46qopOB89POOvXxk1EarZmM75y0"
+  TOSS_PAYMENTS_CLIENT_KEY: "test_ck_0RnYX2w532qNWYYLpqXP8NeyqApQ"
 
   # Google Cloud Storage 설정
   GOOGLE_CLOUD_PROJECT_ID: "api-dev-biocom"
