@@ -163,7 +163,7 @@ export class PaymentService {
     }
 
     // 3. DB 업데이트 (트랜잭션 안)
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 결제 정보 업데이트
       await tx.payment.update({
         where: { id: payment.id },
@@ -218,11 +218,6 @@ export class PaymentService {
 
       this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
 
-      // 플레이오토 주문 생성 (비동기)
-      this.createPlayautoOrder(order.id).catch((error) => {
-        this.logger.error(`플레이오토 주문 생성 비동기 실패: 주문ID=${order.id}`, error);
-      });
-
       return {
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -234,6 +229,13 @@ export class PaymentService {
         status: PaymentStatus.COMPLETED
       };
     });
+
+    // 플레이오토 주문 생성 (비동기 - 트랜잭션 커밋 후 실행)
+    this.createPlayautoOrder(order.id).catch((error) => {
+      this.logger.error(`플레이오토 주문 생성 비동기 실패: 주문ID=${order.id}`, error);
+    });
+
+    return result;
   }
 
   /**
@@ -505,20 +507,28 @@ export class PaymentService {
 
   /**
    * 플레이오토 주문 생성 (비동기)
-   * - 결제 승인 후 자동 호출
+   *
+   * 동작 방식:
+   * - 결제 승인 후 자동 호출 (트랜잭션 커밋 후 실행)
    * - DB에서 주문 정보 조회 (복호화 포함)
-   * - 플레이오토 API 호출 (3회 재시도)
+   * - 플레이오토 API 호출 (Provider 내부에서 3회 재시도)
    * - 성공 시 uniq, bundle_no를 Order 테이블에 저장
+   *
+   * 원자성 보장 전략:
+   * 1. 결제 트랜잭션과 분리 - 결제 실패 시 물류 등록 안 함
+   * 2. 물류 등록 실패해도 결제는 유지 (비즈니스 요구사항)
+   * 3. 실패 시 logisticsApiLog에 FAILURE 기록 → 배치로 재시도 가능
+   * 4. logisticsUniq가 null인 PAID 주문 = 물류 등록 필요
    */
   private async createPlayautoOrder(orderId: number): Promise<void> {
     try {
       this.logger.log(`플레이오토 주문 생성 시작: 주문ID=${orderId}`);
 
-      // 주문 정보 조회 (OrderItems 포함)
+      // 주문 정보 조회 (items 포함)
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
         include: {
-          OrderItems: {
+          items: {
             include: {
               product: true,
             },
@@ -528,6 +538,18 @@ export class PaymentService {
 
       if (!order) {
         throw new Error(`주문을 찾을 수 없습니다: orderId=${orderId}`);
+      }
+
+      // 이미 물류 등록된 주문인지 확인 (멱등성 보장)
+      if (order.logisticsUniq) {
+        this.logger.warn(`이미 물류 등록된 주문입니다: orderId=${orderId}, uniq=${order.logisticsUniq}`);
+        return;
+      }
+
+      // 결제 완료된 주문만 물류 등록
+      if (order.status !== OrderStatus.PAID) {
+        this.logger.warn(`결제 완료되지 않은 주문입니다: orderId=${orderId}, status=${order.status}`);
+        return;
       }
 
       // 개인정보 복호화
@@ -540,7 +562,7 @@ export class PaymentService {
         deliveryMessage: order.deliveryMessage ? CryptoUtil.decrypt(order.deliveryMessage) : null,
       };
 
-      // 물류 서비스 주문 생성
+      // 물류 서비스 주문 생성 (Provider 내부에서 3회 재시도 + 로그 기록)
       const { uniq, bundleNo } = await this.logistics.createOrder(decryptedOrder);
 
       // DB에 provider, uniq, bundleNo 저장
@@ -555,8 +577,9 @@ export class PaymentService {
 
       this.logger.log(`물류 주문 생성 완료: 주문ID=${orderId}, provider=${this.logistics.name}, uniq=${uniq}, bundleNo=${bundleNo}`);
     } catch (error: any) {
-      this.logger.error(`플레이오토 주문 생성 실패: 주문ID=${orderId}`, error.message);
-      // 에러를 throw하지 않고 로그만 남김 (비동기 처리이므로)
+      // 실패해도 결제는 유지됨 (의도된 동작)
+      // logisticsApiLog에 FAILURE로 기록됨 → 배치 재시도 가능
+      this.logger.error(`플레이오토 주문 생성 실패: 주문ID=${orderId}, error=${error.message}`);
     }
   }
 

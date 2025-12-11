@@ -44,7 +44,7 @@ export class PlayautoProvider implements ILogisticsProvider {
       this.logger.log(`플레이오토 주문 생성 시작: 주문번호 ${order.orderNumber}`);
 
       // 주문 아이템을 opts 배열로 변환
-      const opts = order.OrderItems.map((item) => ({
+      const opts = order.items.map((item) => ({
         opt_nm: item.productName,
         opt_qty: item.quantity,
         opt_price: item.productPrice,

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { WebhooksService } from '../services/webhooks.service';
+import { RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
 import * as crypto from 'crypto';
 
@@ -108,7 +109,7 @@ export class WebhooksController {
     },
   })
   async handleTossPaymentWebhook(
-    @Req() req: Request,
+    @Req() req: RawBodyRequest<Request>,
     @Body() webhookData: any,
     @Headers('tosspayments-webhook-signature') signature?: string,
     @Headers('tosspayments-webhook-transmission-time') transmissionTime?: string,
@@ -120,8 +121,8 @@ export class WebhooksController {
     try {
       // 1. 서명 검증 (헤더가 있는 경우에만)
       if (signature && transmissionTime) {
-        // 미들웨어에서 설정한 rawBody (Buffer)
-        const rawBody = (req as any).rawBody?.toString() || JSON.stringify(webhookData);
+        // NestJS rawBody 옵션으로 설정된 rawBody (Buffer)
+        const rawBody = req.rawBody?.toString() || JSON.stringify(webhookData);
         const isValid = this.verifyWebhookSignature(
           rawBody,
           signature,

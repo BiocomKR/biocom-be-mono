@@ -50,7 +50,7 @@ export interface LogisticsOrderData {
   shippingFee: number;
 
   /** 주문 아이템 목록 */
-  OrderItems: LogisticsOrderItem[];
+  items: LogisticsOrderItem[];
 }
 
 /**
