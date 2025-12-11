@@ -208,12 +208,31 @@ export class RecordsService {
           maxCount: 9,
         },
         {
-          id: null,
+          id: 9003,
           recordType: 'SUPPLEMENT',
-          date: null,
-          metadata: {},
-          currentCount: null,
-          maxCount: null,
+          date: sampleDate,
+          metadata: [
+            {
+              productId: 1,
+              productName: '메타드림',
+              intakeCount: 2,
+              recommendedCount: 2,
+            },
+            {
+              productId: 2,
+              productName: '리셋데이',
+              intakeCount: 1,
+              recommendedCount: 1,
+            },
+            {
+              productId: 3,
+              productName: '오메가3',
+              intakeCount: 0,
+              recommendedCount: 1,
+            },
+          ],
+          currentCount: 3,
+          maxCount: 10,
         },
         {
           id: 9004,

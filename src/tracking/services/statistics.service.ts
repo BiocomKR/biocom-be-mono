@@ -1352,8 +1352,62 @@ export class StatisticsService {
         }
       },
       supplement: {
-        summary: {},
-        detailData: {}
+        startDate,
+        endDate,
+        supplements: [
+          {
+            productId: 1,
+            productName: '메타드림',
+            displayOrder: 1,
+            dailyStats: weekDates.map((date, i) => ({
+              date,
+              intakeCount: i < 5 ? 2 : (i === 5 ? 1 : 0),
+              recommendedCount: 2,
+            })),
+          },
+          {
+            productId: 2,
+            productName: '리셋데이',
+            displayOrder: 2,
+            dailyStats: weekDates.map((date, i) => ({
+              date,
+              intakeCount: i < 6 ? 1 : 0,
+              recommendedCount: 1,
+            })),
+          },
+          {
+            productId: 3,
+            productName: '오메가3',
+            displayOrder: 3,
+            dailyStats: weekDates.map((date, i) => ({
+              date,
+              intakeCount: i < 4 ? 1 : 0,
+              recommendedCount: 1,
+            })),
+          },
+        ],
+        nutrients: [
+          {
+            nutrientName: '비타민D',
+            intakeCount: 11,
+            recommendedCount: 14,
+            supplementNames: ['메타드림'],
+          },
+          {
+            nutrientName: '오메가3',
+            intakeCount: 4,
+            recommendedCount: 7,
+            supplementNames: ['오메가3'],
+          },
+          {
+            nutrientName: '프로바이오틱스',
+            intakeCount: 6,
+            recommendedCount: 7,
+            supplementNames: ['리셋데이'],
+          },
+        ],
+        currentCount: 3,
+        maxCount: 10,
       },
       fasting: {
         summary: {
@@ -1678,23 +1732,14 @@ export class StatisticsService {
   }
 
   /**
-   * NEWCOMER용 예시 영양제 통계 데이터
-   */
-  /**
-   * NEWCOMER용 예시 영양제 통계 데이터
+   * NEWCOMER용 예시 영양제 통계 데이터 (getSampleStatisticsSummary에서 추출)
    */
   private getSampleSupplementStatistics(
     startDate: string,
     endDate: string,
   ): SupplementStatisticsDto {
-    return {
-      startDate,
-      endDate,
-      supplements: [],
-      nutrients: [],
-      currentCount: 0,
-      maxCount: 10,
-    };
+    const sampleData = this.getSampleStatisticsSummary(startDate, endDate);
+    return sampleData.supplement as SupplementStatisticsDto;
   }
 
   /**
