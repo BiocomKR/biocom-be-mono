@@ -72,11 +72,12 @@ export class WebhooksService {
    * @param data - 결제 승인 데이터
    */
   private async handlePaymentApproved(data: any) {
-    const { paymentKey, orderId, orderName, amount, method, approvedAt } =
-      data;
+    // PAYMENT_STATUS_CHANGED 웹훅에는 paymentKey, status, orderId만 포함됨
+    // amount는 포함되지 않음 (토스 공식 문서 참고)
+    const { paymentKey, orderId, status } = data;
 
     this.logger.log(
-      `💰 결제 승인 완료: 주문번호=${orderId}, 금액=${amount}원, 방식=${method}`,
+      `💰 결제 승인 웹훅 수신: 주문번호=${orderId}, paymentKey=${paymentKey}, status=${status}`,
     );
 
     // 트랜잭션으로 DB 업데이트 (원자성 보장)
@@ -97,17 +98,7 @@ export class WebhooksService {
         return; // 중복 처리 방지
       }
 
-      // 3. 금액 검증 (보안)
-      if (Number(order.totalAmount) !== amount) {
-        this.logger.error(
-          `❌ 금액 불일치: 주문=${order.totalAmount}원, 결제=${amount}원`,
-        );
-        throw new Error(
-          `결제 금액이 일치하지 않습니다. 주문: ${order.totalAmount}원, 결제: ${amount}원`,
-        );
-      }
-
-      // 4. 주문 상태 업데이트: PENDING → PAID
+      // 3. 주문 상태 업데이트: PENDING → PAID
       await tx.order.update({
         where: { id: order.id },
         data: {
@@ -116,7 +107,7 @@ export class WebhooksService {
         },
       });
 
-      // 5. 결제 정보 업데이트 (이미 createOrder에서 생성됨)
+      // 4. 결제 정보 업데이트 (이미 createOrder에서 생성됨)
       await tx.payment.updateMany({
         where: {
           orderId: order.id,
@@ -125,12 +116,12 @@ export class WebhooksService {
         data: {
           pgTransactionId: paymentKey,
           status: PaymentStatus.COMPLETED,
-          paidAt: approvedAt ? new Date(approvedAt) : getNowKST(),
+          paidAt: getNowKST(),
         },
       });
 
       this.logger.log(
-        `✅ 주문 상태 업데이트 완료: ${orderId} → PAID (${amount}원)`,
+        `✅ 주문 상태 업데이트 완료: ${orderId} → PAID`,
       );
     });
   }
