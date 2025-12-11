@@ -82,7 +82,7 @@ export class WebhooksService {
     // 트랜잭션으로 DB 업데이트 (원자성 보장)
     await this.prisma.$transaction(async (tx) => {
       // 1. 주문 조회
-      const order = await tx.orders.findFirst({
+      const order = await tx.order.findFirst({
         where: { orderNumber: orderId },
       });
 
@@ -98,46 +98,36 @@ export class WebhooksService {
       }
 
       // 3. 금액 검증 (보안)
-      if (order.finalPrice !== amount) {
+      if (Number(order.totalAmount) !== amount) {
         this.logger.error(
-          `❌ 금액 불일치: 주문=${order.finalPrice}원, 결제=${amount}원`,
+          `❌ 금액 불일치: 주문=${order.totalAmount}원, 결제=${amount}원`,
         );
         throw new Error(
-          `결제 금액이 일치하지 않습니다. 주문: ${order.finalPrice}원, 결제: ${amount}원`,
+          `결제 금액이 일치하지 않습니다. 주문: ${order.totalAmount}원, 결제: ${amount}원`,
         );
       }
 
       // 4. 주문 상태 업데이트: PENDING → PAID
-      await tx.orders.update({
+      await tx.order.update({
         where: { id: order.id },
         data: {
           status: OrderStatus.PAID,
-          updatedAt: getNowKST(),
+          paidAt: getNowKST(),
         },
       });
 
-      // 5. 결제 정보 저장 (중복 확인 후)
-      const existingPayment = await tx.payments.findFirst({
+      // 5. 결제 정보 업데이트 (이미 createOrder에서 생성됨)
+      await tx.payment.updateMany({
         where: {
           orderId: order.id,
+          status: PaymentStatus.PENDING,
+        },
+        data: {
           pgTransactionId: paymentKey,
+          status: PaymentStatus.COMPLETED,
+          paidAt: approvedAt ? new Date(approvedAt) : getNowKST(),
         },
       });
-
-      if (!existingPayment) {
-        await tx.payments.create({
-          data: {
-            orderId: order.id,
-            pgTransactionId: paymentKey,
-            amount: amount,
-            method: method || '가상계좌',
-            status: PaymentStatus.COMPLETED,
-            approvedAt: approvedAt ? new Date(approvedAt) : getNowKST(),
-          },
-        });
-      } else {
-        this.logger.warn(`⚠️  이미 결제 정보가 존재합니다: ${paymentKey}`);
-      }
 
       this.logger.log(
         `✅ 주문 상태 업데이트 완료: ${orderId} → PAID (${amount}원)`,
@@ -163,7 +153,7 @@ export class WebhooksService {
 
     await this.prisma.$transaction(async (tx) => {
       // 1. 주문 조회
-      const order = await tx.orders.findFirst({
+      const order = await tx.order.findFirst({
         where: { orderNumber: orderId },
       });
 
@@ -179,23 +169,21 @@ export class WebhooksService {
       }
 
       // 3. 주문 상태 업데이트: PAID → CANCELLED
-      await tx.orders.update({
+      await tx.order.update({
         where: { id: order.id },
         data: {
           status: OrderStatus.CANCELLED,
-          updatedAt: getNowKST(),
         },
       });
 
       // 4. 결제 정보 업데이트
-      await tx.payments.updateMany({
+      await tx.payment.updateMany({
         where: {
           orderId: order.id,
           pgTransactionId: paymentKey,
         },
         data: {
           status: PaymentStatus.CANCELLED,
-          updatedAt: getNowKST(),
         },
       });
 
@@ -220,7 +208,7 @@ export class WebhooksService {
 
     await this.prisma.$transaction(async (tx) => {
       // 1. 주문 조회
-      const order = await tx.orders.findFirst({
+      const order = await tx.order.findFirst({
         where: { orderNumber: orderId },
       });
 
@@ -230,11 +218,23 @@ export class WebhooksService {
       }
 
       // 2. 주문 상태 업데이트: PENDING → PAYMENT_FAILED
-      await tx.orders.update({
+      await tx.order.update({
         where: { id: order.id },
         data: {
           status: OrderStatus.PAYMENT_FAILED,
-          updatedAt: getNowKST(),
+        },
+      });
+
+      // 3. 결제 정보 업데이트
+      await tx.payment.updateMany({
+        where: {
+          orderId: order.id,
+          status: PaymentStatus.PENDING,
+        },
+        data: {
+          status: PaymentStatus.FAILED,
+          failedAt: getNowKST(),
+          failReason: failReason?.substring(0, 500) || 'Unknown error',
         },
       });
 
