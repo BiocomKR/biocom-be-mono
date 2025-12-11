@@ -138,14 +138,20 @@ export class PaymentService {
         dto.orderId,
         dto.amount
       );
-    } catch (error) {
+    } catch (error: any) {
+      // 토스 에러 정보 추출
+      const errorResponse = error.response;
+      const tossCode = errorResponse?.tossErrorCode || 'UNKNOWN_ERROR';
+      const tossMessage = errorResponse?.message || error.message || '알 수 없는 오류';
+      const failReason = `[${tossCode}] ${tossMessage}`;
+
       // 결제 실패 처리
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
           status: PaymentStatus.FAILED,
           failedAt: getNowKST(),
-          failReason: error.message?.substring(0, 500) || 'Unknown error'
+          failReason: failReason.substring(0, 500)
         }
       });
 
@@ -154,7 +160,7 @@ export class PaymentService {
           orderId: order.id,
           fromStatus: order.status,
           toStatus: order.status,
-          changeReason: `결제 실패: ${error.message}`,
+          changeReason: `결제 실패: ${failReason}`,
           createdAt: getNowKST(),
         }
       });

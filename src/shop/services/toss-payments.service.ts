@@ -1,6 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+
+/**
+ * 토스페이먼츠 에러 응답 인터페이스
+ */
+interface TossPaymentError {
+  code: string;
+  message: string;
+}
 
 /**
  * 토스페이먼츠 API 연동 서비스
@@ -13,6 +21,32 @@ export class TossPaymentsService {
   private readonly secretKey = process.env.TOSS_PAYMENTS_SECRET_KEY;
 
   constructor(private readonly httpService: HttpService) {}
+
+  /**
+   * 토스페이먼츠 에러를 파싱하여 BadRequestException으로 변환
+   */
+  private handleTossError(error: any, context: string): never {
+    const errorData: TossPaymentError = error.response?.data;
+    const statusCode = error.response?.status;
+
+    // 토스 에러 정보 추출
+    const tossCode = errorData?.code || 'UNKNOWN_ERROR';
+    const tossMessage = errorData?.message || '알 수 없는 결제 오류가 발생했습니다';
+
+    this.logger.error(
+      `[${context}] 토스페이먼츠 에러 - ` +
+      `status=${statusCode}, code=${tossCode}, message=${tossMessage}`
+    );
+
+    // 클라이언트에 전달할 에러 메시지 생성
+    throw new BadRequestException({
+      statusCode: 400,
+      error: 'Bad Request',
+      message: tossMessage,
+      tossErrorCode: tossCode,
+      tossStatusCode: statusCode,
+    });
+  }
 
   /**
    * 결제 승인
@@ -41,8 +75,7 @@ export class TossPaymentsService {
       this.logger.log(`결제 승인 성공: ${paymentKey}`);
       return response.data;
     } catch (error: any) {
-      this.logger.error(`결제 승인 실패: ${paymentKey}`, error.response?.data);
-      throw error;
+      this.handleTossError(error, `결제 승인 실패: ${paymentKey}`);
     }
   }
 
@@ -80,9 +113,8 @@ export class TossPaymentsService {
 
       this.logger.log(`결제 취소 성공: ${paymentKey}`);
       return response.data;
-    } catch (error) {
-      this.logger.error(`결제 취소 실패: ${paymentKey}`, error.response?.data);
-      throw error;
+    } catch (error: any) {
+      this.handleTossError(error, `결제 취소 실패: ${paymentKey}`);
     }
   }
 
@@ -102,9 +134,8 @@ export class TossPaymentsService {
       );
 
       return response.data;
-    } catch (error) {
-      this.logger.error(`결제 조회 실패: ${paymentKey}`, error.response?.data);
-      throw error;
+    } catch (error: any) {
+      this.handleTossError(error, `결제 조회 실패: ${paymentKey}`);
     }
   }
 
@@ -142,8 +173,7 @@ export class TossPaymentsService {
 
       return billingKey;
     } catch (error: any) {
-      this.logger.error(`빌링키 발급 실패: authKey=${authKey}`, error.response?.data);
-      throw error;
+      this.handleTossError(error, `빌링키 발급 실패: authKey=${authKey}`);
     }
   }
 
@@ -185,8 +215,7 @@ export class TossPaymentsService {
       this.logger.log(`빌링키 자동결제 성공: paymentKey=${response.data.paymentKey}`);
       return response.data;
     } catch (error: any) {
-      this.logger.error(`빌링키 자동결제 실패: ${billingKey}`, error.response?.data);
-      throw error;
+      this.handleTossError(error, `빌링키 자동결제 실패: ${billingKey}`);
     }
   }
 }
