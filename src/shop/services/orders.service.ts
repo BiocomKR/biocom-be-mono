@@ -281,6 +281,20 @@ export class OrdersService {
         })
       );
 
+      // 9-1. 결제 정보 생성 (PENDING 상태)
+      await tx.payment.create({
+        data: {
+          orderId: order.id,
+          pgProvider: 'TOSS',
+          paymentMethod: 'CARD', // 결제 완료 시 실제 결제수단으로 업데이트
+          status: PaymentStatus.PENDING,
+          amount: new Prisma.Decimal(totalAmount),
+          pointAmount: new Prisma.Decimal(pointUsed),
+          requestedAt: getNowKST(),
+          createdAt: getNowKST(),
+        },
+      });
+
       // 10. 챌린지/구독 상품인 경우 티켓 자동 생성
       const challengeTickets = await Promise.all(
         orderItems

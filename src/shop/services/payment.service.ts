@@ -96,176 +96,143 @@ export class PaymentService {
    * 토스페이먼츠 결제 승인 API 호출 및 주문 상태 업데이트
    */
   async confirmPayment(dto: ConfirmPaymentDto): Promise<PaymentResponseDto> {
+    // 1. 주문 및 결제 정보 조회 (트랜잭션 밖)
+    const order = await this.prisma.order.findFirst({
+      where: {
+        orderNumber: dto.orderId
+      },
+      include: {
+        items: {
+          include: {
+            product: true
+          }
+        }
+      }
+    });
+
+    if (!order) {
+      throw new NotFoundException('주문을 찾을 수 없습니다');
+    }
+
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        orderId: order.id,
+        status: PaymentStatus.PENDING
+      }
+    });
+
+    if (!payment) {
+      throw new NotFoundException('결제 정보를 찾을 수 없습니다');
+    }
+
+    // 금액 검증
+    if (convertDecimalToNumber(order.totalAmount) !== dto.amount) {
+      throw new BadRequestException('결제 금액이 일치하지 않습니다');
+    }
+
+    // 2. 토스페이먼츠 결제 승인 (외부 API 호출 - 트랜잭션 밖)
+    let tossResult: any;
+    try {
+      tossResult = await this.tossPayments.confirmPayment(
+        dto.paymentKey,
+        dto.orderId,
+        dto.amount
+      );
+    } catch (error) {
+      // 결제 실패 처리
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.FAILED,
+          failedAt: getNowKST(),
+          failReason: error.message?.substring(0, 500) || 'Unknown error'
+        }
+      });
+
+      await this.prisma.orderStateLog.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: order.status,
+          changeReason: `결제 실패: ${error.message}`,
+          createdAt: getNowKST(),
+        }
+      });
+
+      throw error;
+    }
+
+    // 3. DB 업데이트 (트랜잭션 안)
     return await this.prisma.$transaction(async (tx) => {
-      // 주문 조회
-      const order = await tx.order.findFirst({
-        where: {
-          orderNumber: dto.orderId
-        },
-        include: {
-          items: {
-            include: {
-              product: true
-            }
-          }
+      // 결제 정보 업데이트
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          pgTransactionId: tossResult.paymentKey,
+          paymentMethod: this.mapPaymentMethod(tossResult.method),
+          status: PaymentStatus.COMPLETED,
+          paidAt: new Date(tossResult.approvedAt),
+          paymentDetails: tossResult as any
         }
       });
 
-      if (!order) {
-        throw new NotFoundException('주문을 찾을 수 없습니다');
-      }
-
-      // 결제 정보 조회
-      const payment = await tx.payment.findFirst({
-        where: {
-          orderId: order.id,
-          status: PaymentStatus.PENDING
+      // 주문 상태 업데이트
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: OrderStatus.PAID,
+          paidAt: new Date(tossResult.approvedAt)
         }
       });
 
-      if (!payment) {
-        throw new NotFoundException('결제 정보를 찾을 수 없습니다');
-      }
-
-      // 금액 검증
-      if (convertDecimalToNumber(order.totalAmount) !== dto.amount) {
-        throw new BadRequestException('결제 금액이 일치하지 않습니다');
-      }
-
-      try {
-        // 토스페이먼츠 결제 승인
-        const tossResult = await this.tossPayments.confirmPayment(
-          dto.paymentKey,
-          dto.orderId,
-          dto.amount
-        );
-
-        // 결제 정보 업데이트
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: {
-            pgTransactionId: tossResult.paymentKey,
-            paymentMethod: this.mapPaymentMethod(tossResult.method),
-            status: PaymentStatus.COMPLETED,
-            paidAt: new Date(tossResult.approvedAt),
-            paymentDetails: tossResult as any
-          }
-        });
-
-        // 주문 상태 업데이트
-        await tx.order.update({
-          where: { id: order.id },
-          data: {
-            status: OrderStatus.PAID,
-            paidAt: new Date(tossResult.approvedAt)
-          }
-        });
-
-        // 주문 상태 로그
-        await tx.orderStateLog.create({
-          data: {
-            orderId: order.id,
-            fromStatus: 'PENDING_PAYMENT',
-            toStatus: 'PAID',
-            changeReason: '결제 완료',
-            createdAt: getNowKST(),
-          }
-        });
-
-        // 재고 차감 처리 (재고 테이블 제거됨 - 추후 구현 예정)
-        // for (const item of order.items) {
-        //   // 재고 캐시 업데이트 (실제 재고는 큐로 처리)
-        //   await tx.inventoryCache.upsert({
-        //     where: { sku: item.product.sku },
-        //     create: {
-        //       sku: item.product.sku,
-        //       quantity: -item.quantity,
-        //       lastUpdated: new Date()
-        //     },
-        //     update: {
-        //       quantity: {
-        //         decrement: item.quantity
-        //       },
-        //       lastUpdated: new Date()
-        //     }
-        //   });
-        //
-        //   // 재고 동기화 큐 상태 업데이트
-        //   await tx.inventorySyncQueue.updateMany({
-        //     where: {
-        //       orderId: order.id,
-        //       sku: item.product.sku,
-        //       status: PaymentStatus.PENDING
-        //     },
-        //     data: {
-        //       status: 'PROCESSING',
-        //       processedAt: new Date()
-        //     }
-        //   });
-        // }
-
-        // 챌린지 상품 티켓 발급
-        for (const item of order.items) {
-          if (item.product.categoryCode === 'CHALLENGE') {
-            // 구매 수량만큼 티켓 발급
-            for (let i = 0; i < item.quantity; i++) {
-              await tx.challengeTicket.create({
-                data: {
-                  userId: order.userId,
-                  productId: item.productId,
-                  orderItemId: item.id,
-                  purchaseDate: getNowKST(),
-                  status: ChallengeTicketStatus.PURCHASED,
-                  ticketType: 'CHALLENGE',
-                  createdAt: getNowKST(),
-                }
-              });
-            }
-            this.logger.log(`챌린지 티켓 발급 완료: productId=${item.productId}, quantity=${item.quantity}`);
-          }
-        }
-
-        this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
-
-        // 플레이오토 주문 생성 (비동기)
-        this.createPlayautoOrder(order.id).catch((error) => {
-          this.logger.error(`플레이오토 주문 생성 비동기 실패: 주문ID=${order.id}`, error);
-        });
-
-        return {
+      // 주문 상태 로그
+      await tx.orderStateLog.create({
+        data: {
           orderId: order.id,
-          orderNumber: order.orderNumber,
-          amount: dto.amount,
-          orderName: `주문번호: ${order.orderNumber}`,
-          customerName: order.recipientName,
-          customerEmail: '',
-          paymentKey: tossResult.paymentKey,
-          status: PaymentStatus.COMPLETED
-        };
-      } catch (error) {
-        // 결제 실패 처리
-        await tx.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: PaymentStatus.FAILED,
-            failedAt: getNowKST(),
-            failReason: error.message?.substring(0, 500) || 'Unknown error'
-          }
-        });
+          fromStatus: 'PENDING_PAYMENT',
+          toStatus: 'PAID',
+          changeReason: '결제 완료',
+          createdAt: getNowKST(),
+        }
+      });
 
-        // 주문 상태 로그
-        await tx.orderStateLog.create({
-          data: {
-            orderId: order.id,
-            fromStatus: order.status,
-            toStatus: order.status,
-            changeReason: `결제 실패: ${error.message}`,
-            createdAt: getNowKST(),
+      // 챌린지 상품 티켓 발급
+      for (const item of order.items) {
+        if (item.product.categoryCode === 'CHALLENGE') {
+          for (let i = 0; i < item.quantity; i++) {
+            await tx.challengeTicket.create({
+              data: {
+                userId: order.userId,
+                productId: item.productId,
+                orderItemId: item.id,
+                purchaseDate: getNowKST(),
+                status: ChallengeTicketStatus.PURCHASED,
+                ticketType: 'CHALLENGE',
+                createdAt: getNowKST(),
+              }
+            });
           }
-        });
-
-        throw error;
+          this.logger.log(`챌린지 티켓 발급 완료: productId=${item.productId}, quantity=${item.quantity}`);
+        }
       }
+
+      this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
+
+      // 플레이오토 주문 생성 (비동기)
+      this.createPlayautoOrder(order.id).catch((error) => {
+        this.logger.error(`플레이오토 주문 생성 비동기 실패: 주문ID=${order.id}`, error);
+      });
+
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        amount: dto.amount,
+        orderName: `주문번호: ${order.orderNumber}`,
+        customerName: order.recipientName,
+        customerEmail: '',
+        paymentKey: tossResult.paymentKey,
+        status: PaymentStatus.COMPLETED
+      };
     });
   }
 
