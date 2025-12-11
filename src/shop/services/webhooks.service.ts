@@ -243,20 +243,55 @@ export class WebhooksService {
    * @param data - 가상계좌 입금 데이터
    */
   private async handleDepositCallback(data: any) {
-    const { orderId, depositAmount, depositStatus } = data;
+    const { orderId, status } = data;
 
     this.logger.log(
-      `🏦 가상계좌 입금 콜백: 주문번호=${orderId}, 금액=${depositAmount}원, 상태=${depositStatus}`,
+      `🏦 가상계좌 입금 콜백: 주문번호=${orderId}, 상태=${status}`,
     );
 
-    if (depositStatus === 'DONE') {
-      // 입금 완료 - Payment.Approved와 동일하게 처리
-      await this.handlePaymentApproved(data);
-    } else if (depositStatus === 'CANCELED') {
+    if (status === 'DONE') {
+      // 입금 완료 처리
+      await this.prisma.$transaction(async (tx) => {
+        const order = await tx.order.findFirst({
+          where: { orderNumber: orderId },
+        });
+
+        if (!order) {
+          this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
+          return;
+        }
+
+        if (order.status === OrderStatus.PAID) {
+          this.logger.warn(`⚠️  이미 처리된 주문입니다: ${orderId}`);
+          return;
+        }
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: OrderStatus.PAID,
+            paidAt: getNowKST(),
+          },
+        });
+
+        await tx.payment.updateMany({
+          where: {
+            orderId: order.id,
+            status: PaymentStatus.PENDING,
+          },
+          data: {
+            status: PaymentStatus.COMPLETED,
+            paidAt: getNowKST(),
+          },
+        });
+
+        this.logger.log(`✅ 가상계좌 입금 완료 처리: ${orderId}`);
+      });
+    } else if (status === 'CANCELED') {
       // 입금 취소 (환불)
-      await this.handlePaymentCanceled(data);
+      await this.handlePaymentCanceled({ ...data, orderId });
     } else {
-      this.logger.warn(`⚠️  알 수 없는 입금 상태: ${depositStatus}`);
+      this.logger.warn(`⚠️  알 수 없는 입금 상태: ${status}`);
     }
   }
 

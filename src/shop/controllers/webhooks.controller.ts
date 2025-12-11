@@ -6,12 +6,13 @@ import {
   HttpCode,
   HttpStatus,
   Headers,
-  RawBodyRequest,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { WebhooksService } from '../services/webhooks.service';
 import { Request } from 'express';
+import * as crypto from 'crypto';
 
 /**
  * 토스페이먼츠 웹훅 컨트롤러
@@ -29,8 +30,54 @@ import { Request } from 'express';
 @Controller('webhooks/toss')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
+  private readonly webhookSecretKey = process.env.TOSS_WEBHOOK_SECRET_KEY;
 
   constructor(private readonly webhooksService: WebhooksService) {}
+
+  /**
+   * 토스 웹훅 서명 검증
+   *
+   * 토스페이먼츠 공식 문서 기준:
+   * - 서명 생성: HMAC_SHA256(secretKey, ${payload}:${transmissionTime})
+   * - 헤더: tosspayments-webhook-signature, tosspayments-webhook-transmission-time
+   *
+   * @param rawBody - Raw request body (문자열)
+   * @param signature - tosspayments-webhook-signature 헤더 값
+   * @param transmissionTime - tosspayments-webhook-transmission-time 헤더 값
+   * @returns 검증 성공 여부
+   */
+  private verifyWebhookSignature(
+    rawBody: string,
+    signature: string,
+    transmissionTime: string,
+  ): boolean {
+    if (!this.webhookSecretKey) {
+      this.logger.warn('⚠️ TOSS_WEBHOOK_SECRET_KEY 미설정 - 서명 검증 건너뜀');
+      return true; // 개발 환경에서 키 미설정 시 통과
+    }
+
+    try {
+      // 토스 공식 문서: HMAC_SHA256(secretKey, ${payload}:${transmissionTime})
+      const message = `${rawBody}:${transmissionTime}`;
+      const expectedSignature = crypto
+        .createHmac('sha256', this.webhookSecretKey)
+        .update(message)
+        .digest('base64');
+
+      const isValid = signature === expectedSignature;
+
+      if (!isValid) {
+        this.logger.error(
+          `❌ 웹훅 서명 불일치: expected=${expectedSignature}, received=${signature}`,
+        );
+      }
+
+      return isValid;
+    } catch (error: any) {
+      this.logger.error(`❌ 웹훅 서명 검증 오류: ${error.message}`);
+      return false;
+    }
+  }
 
   /**
    * 토스페이먼츠 결제 웹훅 수신
@@ -61,15 +108,37 @@ export class WebhooksController {
     },
   })
   async handleTossPaymentWebhook(
+    @Req() req: Request,
     @Body() webhookData: any,
-    @Headers('toss-signature') signature?: string,
+    @Headers('tosspayments-webhook-signature') signature?: string,
+    @Headers('tosspayments-webhook-transmission-time') transmissionTime?: string,
   ) {
     this.logger.log(
       `🔔 토스 웹훅 수신: ${JSON.stringify(webhookData, null, 2)}`,
     );
 
     try {
-      // 웹훅 데이터 처리
+      // 1. 서명 검증 (헤더가 있는 경우에만)
+      if (signature && transmissionTime) {
+        // 미들웨어에서 설정한 rawBody (Buffer)
+        const rawBody = (req as any).rawBody?.toString() || JSON.stringify(webhookData);
+        const isValid = this.verifyWebhookSignature(
+          rawBody,
+          signature,
+          transmissionTime,
+        );
+
+        if (!isValid) {
+          this.logger.error('❌ 웹훅 서명 검증 실패 - 요청 거부');
+          throw new UnauthorizedException('Invalid webhook signature');
+        }
+
+        this.logger.log('✅ 웹훅 서명 검증 성공');
+      } else {
+        this.logger.warn('⚠️ 웹훅 서명 헤더 없음 - 검증 건너뜀');
+      }
+
+      // 2. 웹훅 데이터 처리
       await this.webhooksService.handleTossWebhook(webhookData);
 
       this.logger.log(`✅ 토스 웹훅 처리 완료`);
@@ -80,7 +149,12 @@ export class WebhooksController {
       this.logger.error(`❌ 토스 웹훅 처리 실패: ${error.message}`);
       this.logger.error(error.stack);
 
-      // 에러가 발생해도 200 OK 반환 (토스 재시도 방지)
+      // 서명 검증 실패는 401 반환
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      // 그 외 에러는 200 OK 반환 (토스 재시도 방지)
       // 토스는 5xx 에러를 받으면 최대 10번 재시도함
       return { success: false, error: error.message };
     }

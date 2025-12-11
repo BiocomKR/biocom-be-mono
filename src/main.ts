@@ -9,6 +9,7 @@ import { ConfigService } from './common/services/config.service';
 import { LoggerService } from './common/services/logger.service';
 import { createCorsOptions } from './common/config/cors.config';
 import { RequestIdInterceptor, ResponseTransformInterceptor, TimeoutInterceptor } from './common/interceptors';
+import * as express from 'express';
 
 /**
  * 스케줄러 단독 실행 함수
@@ -111,6 +112,18 @@ async function bootstrap() {
   // 글로벌 API 접두사 설정
   app.setGlobalPrefix('api');
   logger.log('글로벌 API 접두사 설정 완료: /api');
+
+  // 웹훅 전용 rawBody 미들웨어 (토스페이먼츠 HMAC 서명 검증용)
+  // 전역 rawBody 대신 웹훅 경로에만 적용하여 메모리 효율성 확보
+  app.use(
+    '/api/webhooks',
+    express.json({
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+  logger.log('웹훅 rawBody 미들웨어 설정 완료: /api/webhooks');
 
   // ConfigService와 LoggerService 가져오기 (재사용)
   const configService = app.get(ConfigService);

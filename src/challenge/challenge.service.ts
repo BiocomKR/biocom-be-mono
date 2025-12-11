@@ -22,6 +22,7 @@ import { getKoreanNow } from '../common/utils/korea-date.util';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
 import { ChallengeTicketStatus, UserChallengeStatus } from '../common/enums/challenge-ticket-status.enum';
 import { ProductStatus } from '../common/enums';
+import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
  * 챌린지 서비스
@@ -1135,10 +1136,10 @@ export class ChallengeService {
               shippingFee: new Prisma.Decimal(0),
               pointUsed: new Prisma.Decimal(0),
               totalAmount: new Prisma.Decimal(0),
-              recipientName: 'QUICK_START',
-              recipientMobile: 'QUICK_START',
+              recipientName: CryptoUtil.encrypt('QUICK_START'),
+              recipientMobile: CryptoUtil.encrypt('QUICK_START'),
               postalCode: '00000',
-              address: 'QUICK_START',
+              address: CryptoUtil.encrypt('QUICK_START'),
               status: UserChallengeStatus.COMPLETED,
               orderedAt: now,
               createdAt: now
