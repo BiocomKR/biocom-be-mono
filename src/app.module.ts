@@ -47,6 +47,7 @@ import { AppVersionModule } from './app-version/app-version.module';
 import { PlayautoModule } from './playauto/playauto.module';
 import { ConsentModule } from './consent/consent.module';
 import { ExamModule } from './exam/exam.module';
+import { QueuesModule } from './queues/queues.module';
 // import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
@@ -106,6 +107,7 @@ import { ExamModule } from './exam/exam.module';
       inject: [ConfigService],
     }),
     
+    QueuesModule,     // BullMQ 큐 모듈 (Redis 연결 먼저)
     CommonModule,     // 공통 모듈 (글로벌)
     LoggerModule,     // 로깅 모듈 (글로벌)
     HealthModule,     // 헬스체크 모듈
