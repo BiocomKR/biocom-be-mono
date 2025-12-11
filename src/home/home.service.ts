@@ -392,8 +392,7 @@ export class HomeService {
               id: true,
               productId: true,
               status: true,
-              startDate: true,
-              endDate: true,
+              expiresAt: true,
               activatedAt: true,
               createdAt: true,
               totalPoints: true,
@@ -527,23 +526,21 @@ export class HomeService {
       // 챌린지가 있으면 startDate/endDate 설정 (ACTIVE 우선, 없으면 PENDING)
       const targetChallenge = activeChallenge || pendingChallenge;
       if (targetChallenge) {
-        startDate = targetChallenge.startDate
-          ? new Date(targetChallenge.startDate).toISOString().split('T')[0]
+        startDate = targetChallenge.activatedAt
+          ? new Date(targetChallenge.activatedAt).toISOString().split('T')[0]
           : null;
-        endDate = targetChallenge.endDate
-          ? new Date(targetChallenge.endDate).toISOString().split('T')[0]
+        endDate = targetChallenge.expiresAt
+          ? new Date(targetChallenge.expiresAt).toISOString().split('T')[0]
           : null;
       }
 
       // status가 CHALLENGER이고 활성 챌린지가 있는 경우만 챌린지 정보 제공
       if (user.status === UserSubscriptionStatus.CHALLENGER && activeChallenge) {
         const today = getNowKST();
-        const startDate = activeChallenge.startDate
-          ? new Date(activeChallenge.startDate)
-          : new Date(activeChallenge.activatedAt);
+        const activatedAt = new Date(activeChallenge.activatedAt);
 
-        // 현재 일차 계산
-        const diffTime = today.getTime() - startDate.getTime();
+        // 현재 일차 계산 (activatedAt 기준)
+        const diffTime = today.getTime() - activatedAt.getTime();
         const currentDay = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
         // 오늘 미션 목록 조회
@@ -585,9 +582,9 @@ export class HomeService {
 
         challengeInfo = {
           challengeCode: activeChallenge.product.sku,
-          startDate: startDate.toISOString().split('T')[0],
-          endDate: activeChallenge.endDate
-            ? new Date(activeChallenge.endDate).toISOString().split('T')[0]
+          startDate: activatedAt.toISOString().split('T')[0],
+          endDate: activeChallenge.expiresAt
+            ? new Date(activeChallenge.expiresAt).toISOString().split('T')[0]
             : '',
           currentDay,
           challengePercent,

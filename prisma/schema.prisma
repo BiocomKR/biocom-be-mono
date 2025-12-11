@@ -544,9 +544,7 @@ model UserChallenge {
   status              String          @default("ACTIVE") @db.VarChar(20)
   createdAt           DateTime        @map("created_at")
   updatedAt           DateTime?       @updatedAt @map("updated_at")
-  startDate           DateTime?       @map("start_date") @db.Date
   deliveryArrivalDate DateTime?       @map("delivery_arrival_date") @db.Date
-  endDate             DateTime?       @map("end_date") @db.Date
   purchasedAt         DateTime        @map("purchased_at")
   deliveryStartDate   DateTime?       @map("delivery_start_date") @db.Date
   /// 챌린지 홈 최초 진입 여부 (true: 첫 진입, false: 재진입)
