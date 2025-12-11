@@ -55,7 +55,7 @@ export class ExamService {
         userChallenges: {
           where: { status: 'ACTIVE' },
           take: 1,
-          select: { id: true, startDate: true },
+          select: { id: true, activatedAt: true, expiresAt: true },
         },
       },
     });
@@ -67,7 +67,7 @@ export class ExamService {
     const activeChallenge = user.userChallenges[0] ?? null;
     const hasChallenge = activeChallenge !== null;
     const hasAnimal = user.health_type_animal_id !== null;
-    const hasStartDate = activeChallenge?.startDate !== null;
+    const hasStartDate = activeChallenge?.activatedAt !== null;
 
     // 2. 검사 목록 조회
     let chartList: ChartExamInfo[];
