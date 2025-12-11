@@ -1,10 +1,31 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
+import { PlayautoProvider } from './providers/playauto.provider';
+import { LOGISTICS_PROVIDER_TOKEN } from './interfaces/logistics-provider.interface';
 import { PlayautoService } from './services/playauto.service';
 
+/**
+ * 물류 서비스 모듈
+ *
+ * 플레이오토 물류 API 연동
+ * - 주문 생성, 배송 추적, 주문 취소 기능 제공
+ * - ILogisticsProvider 인터페이스로 서비스 교체 용이
+ */
 @Module({
   imports: [HttpModule],
-  providers: [PlayautoService],
-  exports: [PlayautoService],
+  providers: [
+    // 물류 Provider DI 토큰 설정 (플레이오토 → 다른 서비스 교체 용이)
+    {
+      provide: LOGISTICS_PROVIDER_TOKEN,
+      useClass: PlayautoProvider,
+    },
+    PlayautoProvider, // 직접 주입 호환용
+    PlayautoService, // 기존 코드 호환용 (점진적 마이그레이션)
+  ],
+  exports: [
+    LOGISTICS_PROVIDER_TOKEN,
+    PlayautoProvider, // 직접 주입 호환용
+    PlayautoService, // 기존 코드 호환용 (점진적 마이그레이션)
+  ],
 })
 export class PlayautoModule {}

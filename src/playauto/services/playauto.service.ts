@@ -31,7 +31,7 @@ export class PlayautoService {
   async getValidToken(): Promise<string> {
     try {
       // 1. DB에서 토큰 조회
-      const tokenRecord = await this.prisma.playautoToken.findFirst({
+      const tokenRecord = await this.prisma.logisticsToken.findFirst({
         where: { id: 1 },
       });
 
@@ -94,7 +94,7 @@ export class PlayautoService {
       const expiresAt = new Date(now.getTime() + 23 * 60 * 60 * 1000);
 
       // DB에 저장 (UPSERT)
-      await this.prisma.playautoToken.upsert({
+      await this.prisma.logisticsToken.upsert({
         where: { id: 1 },
         create: {
           id: 1,
@@ -253,7 +253,7 @@ export class PlayautoService {
       }
 
       // 성공 로그 기록
-      await this.prisma.playautoApiLog.create({
+      await this.prisma.logisticsApiLog.create({
         data: {
           orderId: order.id,
           endpoint: '/order/add',
@@ -279,7 +279,7 @@ export class PlayautoService {
         error.response?.data?.message || error.message || '알 수 없는 오류';
 
       // 실패 로그 기록
-      await this.prisma.playautoApiLog.create({
+      await this.prisma.logisticsApiLog.create({
         data: {
           orderId: order.id,
           endpoint: '/order/add',

@@ -364,7 +364,7 @@ export class OrdersService {
       // 15. 포인트 사용 처리
       if (pointUsed > 0) {
         // 포인트 차감
-        await tx.user.update({
+        const updatedUser = await tx.user.update({
           where: { id: userId },
           data: {
             points: { decrement: pointUsed },
@@ -377,7 +377,7 @@ export class OrdersService {
             userId,
             type: 'USE',
             amount: -pointUsed,
-            balance: 0, // 추후 계산 필요
+            balance: updatedUser.points,
             description: `주문 사용 (${orderNumber})`,
             relatedType: 'ORDER',
             relatedId: order.id,
@@ -634,7 +634,7 @@ export class OrdersService {
 
       // 포인트 복구
       if (order.pointUsed > 0) {
-        await tx.user.update({
+        const updatedUser = await tx.user.update({
           where: { id: userId },
           data: {
             points: { increment: Number(order.pointUsed) },
@@ -646,7 +646,7 @@ export class OrdersService {
             userId,
             type: 'REFUND',
             amount: Number(order.pointUsed),
-            balance: 0, // 추후 계산
+            balance: updatedUser.points,
             description: `주문 취소 환불 (${order.orderNumber})`,
             relatedType: 'ORDER',
             relatedId: order.id,

@@ -2650,14 +2650,16 @@ model AppVersion {
   @@map("app_versions")
 }
 
-/// 플레이오토 인증 토큰 테이블
-/// 플레이오토 API 호출용 인증 토큰 관리 (24시간 유효)
-model PlayautoToken {
+/// 물류 서비스 인증 토큰 테이블
+/// 물류 API 호출용 인증 토큰 관리 (24시간 유효)
+model LogisticsToken {
   /// 고유 ID (항상 1개만 존재)
   id        Int      @id @default(1)
+  /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
+  provider  String   @default("PLAYAUTO") @db.VarChar(50)
   /// 인증 토큰
   token     String   @db.VarChar(500)
-  /// 솔루션 번호
+  /// 솔루션 번호 (플레이오토 등 서비스별 고유값)
   solNo     Int      @map("sol_no")
   /// 만료 시각 (발급시각 + 23시간, 1시간 버퍼)
   expiresAt DateTime @map("expires_at")
@@ -2666,14 +2668,16 @@ model PlayautoToken {
   /// 수정일시
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("playauto_tokens")
+  @@map("logistics_tokens")
 }
 
-/// 플레이오토 API 호출 로그 테이블
+/// 물류 서비스 API 호출 로그 테이블
 /// API 호출 실패/성공 기록 (디버깅 및 재시도용)
-model PlayautoApiLog {
+model LogisticsApiLog {
   /// 고유 ID
   id          Int       @id @default(autoincrement())
+  /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
+  provider    String    @default("PLAYAUTO") @db.VarChar(50)
   /// 주문 ID (주문 관련 API인 경우)
   orderId     Int?      @map("order_id")
   /// API 엔드포인트
@@ -2693,8 +2697,9 @@ model PlayautoApiLog {
   /// 생성일시
   createdAt   DateTime  @default(now()) @map("created_at")
 
+  @@index([provider])
   @@index([orderId])
   @@index([status])
   @@index([createdAt])
-  @@map("playauto_api_logs")
+  @@map("logistics_api_logs")
 }

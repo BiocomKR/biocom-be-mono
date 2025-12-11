@@ -430,9 +430,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 앱 버전 테이블
   get appVersion() { return this.prisma.appVersion; }
 
-  // 플레이오토 테이블
-  get playautoToken() { return this.prisma.playautoToken; }
-  get playautoApiLog() { return this.prisma.playautoApiLog; }
+  // 물류 서비스 테이블
+  get logisticsToken() { return this.prisma.logisticsToken; }
+  get logisticsApiLog() { return this.prisma.logisticsApiLog; }
 
   // 메서드 바인딩
   $transaction(arg: any) {

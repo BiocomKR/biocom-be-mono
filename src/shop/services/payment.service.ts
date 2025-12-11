@@ -3,13 +3,15 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
-  ConflictException
+  Inject
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { TossPaymentsService } from './toss-payments.service';
-import { PlayautoService } from '../../playauto/services/playauto.service';
 import {
-  PreparePaymentDto,
+  ILogisticsProvider,
+  LOGISTICS_PROVIDER_TOKEN,
+} from '../../playauto/interfaces/logistics-provider.interface';
+import {
   ConfirmPaymentDto,
   CancelPaymentDto,
   PaymentResponseDto,
@@ -28,7 +30,7 @@ export class PaymentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tossPayments: TossPaymentsService,
-    private readonly playauto: PlayautoService
+    @Inject(LOGISTICS_PROVIDER_TOKEN) private readonly logistics: ILogisticsProvider
   ) {}
 
   /**
@@ -402,7 +404,7 @@ export class PaymentService {
 
           // 포인트 복구
           if (convertDecimalToNumber(order.pointUsed) || 0 > 0) {
-            await tx.user.update({
+            const updatedUser = await tx.user.update({
               where: { id: userId },
               data: {
                 points: { increment: convertDecimalToNumber(order.pointUsed) || 0 }
@@ -414,7 +416,7 @@ export class PaymentService {
                 userId,
                 type: 'REFUND',
                 amount: convertDecimalToNumber(order.pointUsed) || 0,
-                balance: 0, // 추후 계산
+                balance: updatedUser.points,
                 description: `주문 취소 환불 (${order.orderNumber})`,
                 relatedType: 'ORDER',
                 relatedId: order.id,
@@ -571,8 +573,8 @@ export class PaymentService {
         deliveryMessage: order.deliveryMessage ? CryptoUtil.decrypt(order.deliveryMessage) : null,
       };
 
-      // 플레이오토 주문 생성
-      const { uniq, bundleNo } = await this.playauto.createOrder(decryptedOrder);
+      // 물류 서비스 주문 생성
+      const { uniq, bundleNo } = await this.logistics.createOrder(decryptedOrder);
 
       // DB에 uniq, bundle_no 저장
       await this.prisma.order.update({
