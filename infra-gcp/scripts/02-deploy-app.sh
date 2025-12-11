@@ -379,7 +379,10 @@ deploy_kubernetes() {
         --from-literal=GOOGLE_API_KEY="$GOOGLE_API_KEY" \
         --from-literal=KCP_PRIVATE_KEY_PASSWORD="$KCP_PRIVATE_KEY_PASSWORD" \
         --from-literal=TOSS_PAYMENTS_SECRET_KEY="$TOSS_PAYMENTS_SECRET_KEY" \
-        --from-literal=SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
+        --from-literal=SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL" \
+        --from-literal=PLAYAUTO_API_KEY="$PLAYAUTO_API_KEY" \
+        --from-literal=PLAYAUTO_EMAIL="$PLAYAUTO_EMAIL" \
+        --from-literal=PLAYAUTO_PASSWORD="$PLAYAUTO_PASSWORD"
     
     # Google Service Account Key Secret 확인/생성
     log_info "Google Service Account Key Secret 확인 중..."

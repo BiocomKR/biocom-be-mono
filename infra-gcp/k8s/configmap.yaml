@@ -73,6 +73,11 @@ data:
   GEMINI_MODEL: "gemini-2.5-flash-image-preview"
   FACE_SLIMMING_TIMEOUT: "60000"
 
+  # 플레이오토 물류 API 설정
+  PLAYAUTO_BASE_URL: "https://openapi.playauto.io/api"
+  PLAYAUTO_SHOP_CD: "UVP2"
+  PLAYAUTO_SHOP_ID: "biocom@biocom.kr"
+
   # NHN KCP 휴대폰 본인인증 설정
   KCP_SITE_CODE: "ALDXX"
   KCP_WEB_SITE_ID: "J25091911744"

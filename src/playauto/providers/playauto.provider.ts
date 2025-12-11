@@ -240,7 +240,9 @@ export class PlayautoProvider implements ILogisticsProvider {
         this.httpService.post(url, body, { headers, timeout: 10000 }),
       );
 
-      const { token, sol_no } = response.data;
+      // 응답이 배열인 경우 첫 번째 요소 사용
+      const data = Array.isArray(response.data) ? response.data[0] : response.data;
+      const { token, sol_no } = data;
 
       if (!token) {
         throw new Error('토큰이 응답에 없습니다');
