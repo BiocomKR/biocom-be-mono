@@ -1,7 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { Neo4jService } from '../neo4j/neo4j.service';
 
 /**
  * Base Processor
@@ -10,7 +9,7 @@ import { Neo4jService } from '../neo4j/neo4j.service';
 export abstract class BaseProcessor extends WorkerHost {
   protected readonly logger: Logger;
 
-  constructor(protected readonly neo4jService: Neo4jService) {
+  constructor() {
     super();
     this.logger = new Logger(this.constructor.name);
   }

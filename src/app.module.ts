@@ -4,7 +4,6 @@ import { BullModule } from '@nestjs/bullmq';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
 import { ConfigService } from '@nestjs/config';
-import { Neo4jModule } from './neo4j/neo4j.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
 
@@ -33,9 +32,6 @@ import { HealthModule } from './health/health.module';
       route: '/admin/queues',
       adapter: ExpressAdapter,
     }),
-
-    // Neo4j Module
-    Neo4jModule,
 
     // Queues Module
     QueuesModule,

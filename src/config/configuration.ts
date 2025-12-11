@@ -9,13 +9,6 @@ export default () => ({
     password: process.env.REDIS_PASSWORD || undefined,
   },
 
-  neo4j: {
-    uri: process.env.NEO4J_URI,
-    username: process.env.NEO4J_USERNAME,
-    password: process.env.NEO4J_PASSWORD,
-    database: process.env.NEO4J_DATABASE || 'neo4j',
-  },
-
   bullBoard: {
     enabled: process.env.BULL_BOARD_ENABLED === 'true',
     path: process.env.BULL_BOARD_PATH || '/admin/queues',
