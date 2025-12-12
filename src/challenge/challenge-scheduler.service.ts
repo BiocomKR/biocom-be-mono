@@ -46,10 +46,11 @@ export class ChallengeSchedulerService {
     tomorrow.setDate(tomorrow.getDate() + 1); // 내일 00:00:00 (KST)
 
     // 오늘 시작해야 할 PENDING 챌린지 찾기
+    // ⚠️ startDate 필드 제거됨 - activatedAt 사용
     const pendingChallenges = await this.prisma.userChallenge.findMany({
       where: {
         status: UserChallengeStatus.PENDING,
-        startDate: {
+        activatedAt: {
           gte: today,
           lt: tomorrow,
         },
@@ -287,7 +288,7 @@ export class ChallengeSchedulerService {
    * Cron 표현식: 0 0 * * * (초 분 시 일 월 요일)
    * - 0초, 0분, 0시, 매일, 매월, 매주
    *
-   * 참고: endDate가 오늘보다 이전인 ACTIVE 챌린지를 EXPIRED로 변경
+   * 참고: expiresAt가 오늘보다 이전인 ACTIVE 챌린지를 EXPIRED로 변경
    *       다른 활성 챌린지가 없으면 사용자 상태를 SUBSCRIBER 또는 NEWCOMER로 변경
    *
    * NOTE: Kubernetes CronJob으로 실행됨. NestJS @Cron은 멀티 파드 환경에서 중복 실행 방지를 위해 비활성화.
@@ -302,12 +303,13 @@ export class ChallengeSchedulerService {
     const now = getNowKST();
     now.setUTCHours(0, 0, 0, 0); // 오늘 00:00:00 (KST)
 
-    // 오늘 기준으로 만료된 챌린지 찾기 (endDate < 오늘)
+    // 오늘 기준으로 만료된 챌린지 찾기 (expiresAt < 오늘)
+    // ⚠️ endDate 필드 제거됨 - expiresAt 사용
     const expiredChallenges = await this.prisma.userChallenge.findMany({
       where: {
         status: UserChallengeStatus.ACTIVE,
-        endDate: {
-          lt: now, // endDate가 오늘보다 이전
+        expiresAt: {
+          lt: now, // expiresAt가 오늘보다 이전
         },
       },
       include: {
@@ -332,7 +334,7 @@ export class ChallengeSchedulerService {
     for (const challenge of expiredChallenges) {
       try {
         this.logger.log(
-          `처리 중: userChallengeId=${challenge.id}, 상품명=${challenge.product.name}, 사용자=${challenge.user.email}, 종료일=${challenge.endDate}`,
+          `처리 중: userChallengeId=${challenge.id}, 상품명=${challenge.product.name}, 사용자=${challenge.user.email}, 종료일=${challenge.expiresAt}`,
         );
 
         await this.expireChallenge(challenge.id, challenge.userId);
