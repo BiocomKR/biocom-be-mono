@@ -2,8 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
-import { getNowKST } from '../../common/utils/kst-date.util';
-import { getDayOfWeek, formatKoreanDate } from '../../common/utils/korea-date.util';
+import { getNowKST, getDayOfWeek, formatKoreanDate } from '../../common/utils/kst-date.util';
 import {
   BeautyStatisticsDto,
   DietStatisticsDto,

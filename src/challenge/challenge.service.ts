@@ -18,7 +18,6 @@ import {
   ChallengeScheduleResponseDto
 } from './dto/challenge-schedule.dto';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
-import { getKoreanNow } from '../common/utils/korea-date.util';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
 import { ChallengeTicketStatus, UserChallengeStatus } from '../common/enums/challenge-ticket-status.enum';
 import { ProductStatus } from '../common/enums';
@@ -1241,8 +1240,7 @@ export class ChallengeService {
         const userChallenge = await tx.userChallenge.update({
           where: { id: userChallengeId },
           data: {
-            startDate: startDateKST,
-            endDate: endDateKST,
+            activatedAt: startDateKST,
             expiresAt: endDateKST
           }
         });
@@ -1256,8 +1254,8 @@ export class ChallengeService {
         // 응답 데이터 생성
         const responseData: ChallengeScheduleResponseDto = {
           id: userChallenge.id,
-          startDate: formatDateToString(userChallenge.startDate!),
-          endDate: formatDateToString(userChallenge.endDate!),
+          startDate: formatDateToString(userChallenge.activatedAt),
+          endDate: formatDateToString(userChallenge.expiresAt),
           isConfirmed: true,
           canModify: false,
           purchasedAt: ticket.purchaseDate,
@@ -1302,14 +1300,11 @@ export class ChallengeService {
       const ticket = userChallenge.ticket;
 
       // ⚠️ challenge_schedules 테이블은 삭제되고 user_challenges로 통합되었음
-      // 일정 정보는 이제 userChallenge에 직접 저장됨
+      // 일정 정보는 이제 userChallenge에 직접 저장됨 (activatedAt/expiresAt 사용)
       const responseData: ChallengeScheduleResponseDto = {
         id: userChallenge.id,
-        startDate: userChallenge.startDate ? formatDateToString(userChallenge.startDate) : null,
-        // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
-        // deliveryStartDate: userChallenge.deliveryStartDate ? formatDateToString(userChallenge.deliveryStartDate) : null,
-        // deliveryArrivalDate: userChallenge.deliveryArrivalDate ? formatDateToString(userChallenge.deliveryArrivalDate) : null,
-        endDate: userChallenge.endDate ? formatDateToString(userChallenge.endDate) : null,
+        startDate: userChallenge.activatedAt ? formatDateToString(userChallenge.activatedAt) : null,
+        endDate: userChallenge.expiresAt ? formatDateToString(userChallenge.expiresAt) : null,
         isConfirmed: true, // 일정 설정 시 바로 확정됨
         canModify: false,   // 설정 후 수정 불가
         purchasedAt: ticket.purchaseDate,
@@ -1446,14 +1441,11 @@ export class ChallengeService {
         );
 
         // 7. UserChallenge 업데이트 (일정 정보 추가, PENDING 상태 유지)
+        // ⚠️ startDate/endDate 필드 제거됨 - activatedAt/expiresAt 사용
         const userChallenge = await tx.userChallenge.update({
           where: { id: pendingChallenge.id },
           data: {
-            startDate: startDateKST,
-            // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
-            // deliveryStartDate: deliveryStartDateKST,
-            // deliveryArrivalDate: deliveryArrivalDateKST,
-            endDate: endDateKST,
+            activatedAt: startDateKST,
             expiresAt: endDateKST,
             // status는 PENDING 유지 (크론잡에서 ACTIVE로 변경)
           }
@@ -1468,11 +1460,8 @@ export class ChallengeService {
         // 9. 응답 데이터 생성
         const responseData: ChallengeScheduleResponseDto = {
           id: userChallenge.id,
-          startDate: formatDateToString(userChallenge.startDate!),
-          // ⚠️ 배송 관련 필드 제거됨 (도시락 배송 정책 폐지)
-          // deliveryStartDate: formatDateToString(userChallenge.deliveryStartDate!),
-          // deliveryArrivalDate: formatDateToString(userChallenge.deliveryArrivalDate!),
-          endDate: formatDateToString(userChallenge.endDate!),
+          startDate: formatDateToString(userChallenge.activatedAt),
+          endDate: formatDateToString(userChallenge.expiresAt),
           isConfirmed: true,
           canModify: false,
           purchasedAt: ticket.purchaseDate,
@@ -1534,7 +1523,7 @@ export class ChallengeService {
         // 권한 우선순위: CHALLENGER > SUBSCRIBER > NEWCOMER
         if (otherActiveChallenges === 0) {
           // 활성 구독이 있는지 확인 (KST 기준)
-          const now = getKoreanNow();
+          const now = getNowKST();
           const activeSubscription = await tx.challengeTicket.findFirst({
             where: {
               userId,
@@ -1607,7 +1596,7 @@ export class ChallengeService {
         // 권한 우선순위: CHALLENGER > SUBSCRIBER > NEWCOMER
         if (otherActiveChallenges === 0) {
           // 활성 구독이 있는지 확인 (KST 기준)
-          const now = getKoreanNow();
+          const now = getNowKST();
           const activeSubscription = await tx.challengeTicket.findFirst({
             where: {
               userId,

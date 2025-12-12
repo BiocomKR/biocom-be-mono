@@ -2,11 +2,11 @@ import { Injectable, Logger, ConflictException, NotFoundException, BadRequestExc
 import { PrismaService } from '../../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { PointService } from '../../point/point.service';
-import { getKoreanToday } from '../../common/utils/korea-date.util';
 import {
   getNowKST,
   parseKSTDateTime,
-  extractKSTDate
+  extractKSTDate,
+  getKoreanToday
 } from '../../common/utils/kst-date.util';
 import {
   CreateBeautyRecordDto,

@@ -136,6 +136,14 @@ export const calculateChallengeDay = (activatedAt: Date): number => {
  * // 프론트: "2025-11-07 20:00:00" (KST) 전송
  * const dt = parseKSTDateTime("2025-11-07 20:00:00");
  * // dt는 2025-11-07 20:00:00 KST를 나타내는 Date 객체
+ *
+ * @example
+ * // 토스페이먼츠 approvedAt 파싱 (ISO 8601 → KST Date)
+ * // tossResult.approvedAt = "2025-12-12T05:44:24+09:00"
+ * const paidAt = parseKSTDateTime(
+ *   tossResult.approvedAt.replace('T', ' ').substring(0, 19)
+ * );
+ * // "2025-12-12 05:44:24" → DB에 2025-12-12 05:44:24로 저장
  */
 export function parseKSTDateTime(datetimeString: string): Date {
   // "YYYY-MM-DD HH:MM:SS" 형식을 파싱
@@ -177,4 +185,34 @@ export function extractKSTDate(date: Date): string {
 export function getKoreanToday(): string {
   const now = getNowKST();
   return extractKSTDate(now);
+}
+
+/**
+ * Date 객체를 KST 기준 YYYY-MM-DD 형식으로 변환
+ *
+ * @param date Date 객체
+ * @returns YYYY-MM-DD 형식의 문자열
+ *
+ * @example
+ * formatKoreanDate(new Date()) // "2025-12-12"
+ */
+export function formatKoreanDate(date: Date): string {
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kstTime = new Date(date.getTime() + kstOffset);
+  return kstTime.toISOString().split('T')[0];
+}
+
+/**
+ * 날짜 문자열을 요일로 변환
+ *
+ * @param dateString YYYY-MM-DD 형식의 날짜 문자열
+ * @returns 요일 (일, 월, 화, 수, 목, 금, 토)
+ *
+ * @example
+ * getDayOfWeek('2025-12-12') // "목"
+ */
+export function getDayOfWeek(dateString: string): string {
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const date = new Date(dateString);
+  return days[date.getDay()];
 }

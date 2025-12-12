@@ -19,7 +19,7 @@ import {
 } from '../dto/payment/payment.dto';
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
-import { getNowKST } from '../../common/utils/kst-date.util';
+import { getNowKST, parseKSTDateTime } from '../../common/utils/kst-date.util';
 import { ChallengeTicketStatus, OrderStatus, PaymentStatus } from '../../common/enums';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 
@@ -188,6 +188,11 @@ export class PaymentService {
 
     // 3. DB 업데이트 (트랜잭션 안)
     const result = await this.prisma.$transaction(async (tx) => {
+      // 토스 approvedAt을 KST Date로 변환 (예: "2025-12-12T05:44:24+09:00" → KST Date)
+      const approvedAtKST = parseKSTDateTime(
+        tossResult.approvedAt.replace('T', ' ').substring(0, 19),
+      );
+
       // 결제 정보 업데이트
       await tx.payment.update({
         where: { id: payment.id },
@@ -195,7 +200,7 @@ export class PaymentService {
           pgTransactionId: tossResult.paymentKey,
           paymentMethod: this.mapPaymentMethod(tossResult.method),
           status: PaymentStatus.COMPLETED,
-          paidAt: new Date(tossResult.approvedAt),
+          paidAt: approvedAtKST,
           paymentDetails: tossResult as any
         }
       });
@@ -205,7 +210,7 @@ export class PaymentService {
         where: { id: order.id },
         data: {
           status: OrderStatus.PAID,
-          paidAt: new Date(tossResult.approvedAt)
+          paidAt: approvedAtKST
         }
       });
 
