@@ -342,11 +342,14 @@ export class PlayautoProvider implements ILogisticsProvider {
       }
 
       this.logger.log(`플레이오토 API 성공: ${method} ${endpoint}`);
+      this.logger.log(`플레이오토 API 응답 상세: status=${response.status}, data=${JSON.stringify(response.data)}`);
       return response.data;
     } catch (error: any) {
       this.logger.error(
         `플레이오토 API 실패 (시도 ${retryCount + 1}/${maxRetries}): ${method} ${endpoint}`,
-        error.response?.data || error.message,
+      );
+      this.logger.error(
+        `플레이오토 API 에러 상세: status=${error.response?.status}, data=${JSON.stringify(error.response?.data)}, message=${error.message}`,
       );
 
       if (retryCount < maxRetries - 1) {
