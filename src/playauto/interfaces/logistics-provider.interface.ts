@@ -113,6 +113,52 @@ export interface LogisticsTrackingHistory {
 }
 
 /**
+ * 주문 리스트 조회 파라미터
+ */
+export interface LogisticsOrdersListParams {
+  /** 검색 시작일 (YYYY-MM-DD) */
+  sdate: string;
+  /** 검색 종료일 (YYYY-MM-DD) */
+  edate: string;
+  /** 날짜 타입 (wdate: 주문수집일, mdate: 주문변경일) */
+  dateType?: 'wdate' | 'mdate';
+  /** 주문상태 배열 */
+  status?: string[];
+  /** 시작 인덱스 */
+  start?: number;
+  /** 조회 개수 (최대 3000) */
+  length?: number;
+}
+
+/**
+ * 주문 리스트 조회 결과 아이템
+ */
+export interface LogisticsOrdersListItem {
+  /** 주문 고유번호 */
+  uniq: string;
+  /** 묶음번호 */
+  bundleNo: string;
+  /** 주문상태 */
+  status: string;
+  /** 택배사 이름 */
+  carrier?: string;
+  /** 운송장 번호 */
+  trackingNumber?: string;
+  /** 쇼핑몰 주문번호 */
+  shopOrderNo?: string;
+}
+
+/**
+ * 주문 리스트 조회 결과
+ */
+export interface LogisticsOrdersListResult {
+  /** 주문 목록 */
+  orders: LogisticsOrdersListItem[];
+  /** 전체 주문 수 */
+  total: number;
+}
+
+/**
  * 물류 제공자 공통 인터페이스
  *
  * 플레이오토, 굿스플로, 스윗트래커 등 모든 물류 서비스가 구현해야 하는 인터페이스
@@ -156,12 +202,20 @@ export interface ILogisticsProvider {
   createOrder(order: LogisticsOrderData): Promise<LogisticsCreateOrderResult>;
 
   /**
-   * 배송 추적 정보 조회
+   * 배송 추적 정보 조회 (개별)
    *
    * @param uniq - 물류 서비스 고유 ID
    * @returns 배송 추적 정보
    */
   getTrackingInfo(uniq: string): Promise<LogisticsTrackingInfo>;
+
+  /**
+   * 주문 리스트 벌크 조회
+   *
+   * @param params - 조회 파라미터
+   * @returns 주문 리스트
+   */
+  getOrdersList(params: LogisticsOrdersListParams): Promise<LogisticsOrdersListResult>;
 
   /**
    * 주문 취소

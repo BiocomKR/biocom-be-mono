@@ -4,49 +4,25 @@ import { getNowKST } from '../../common/utils/kst-date.util';
 import {
   ILogisticsProvider,
   LOGISTICS_PROVIDER_TOKEN,
+  LogisticsOrdersListItem,
 } from '../interfaces/logistics-provider.interface';
-
-/**
- * 플레이오토 상태 → 우리 DB 상태 매핑
- */
-const PLAYAUTO_STATUS_MAP: Record<string, { orderStatus?: string; shippingStatus?: string }> = {
-  // 주문 처리 중
-  '신규주문': { orderStatus: 'PAID', shippingStatus: 'PENDING' },
-  '결제완료': { orderStatus: 'PAID', shippingStatus: 'PENDING' },
-  '출고대기': { orderStatus: 'PAID', shippingStatus: 'PENDING' },
-  '출고보류': { orderStatus: 'PAID', shippingStatus: 'PENDING' },
-  '주문재확인': { orderStatus: 'PAID', shippingStatus: 'PENDING' },
-  '주문보류': { orderStatus: 'PAID', shippingStatus: 'PENDING' },
-
-  // 출고 진행
-  '운송장출력': { orderStatus: 'SHIPPING', shippingStatus: 'READY_FOR_SHIPMENT' },
-  '출고완료': { orderStatus: 'SHIPPING', shippingStatus: 'IN_TRANSIT' },
-  '배송중': { orderStatus: 'SHIPPING', shippingStatus: 'IN_TRANSIT' },
-
-  // 배송 완료
-  '배송완료': { orderStatus: 'DELIVERED', shippingStatus: 'DELIVERED' },
-  '구매결정': { orderStatus: 'COMPLETED', shippingStatus: 'DELIVERED' },
-  '판매완료': { orderStatus: 'COMPLETED', shippingStatus: 'DELIVERED' },
-
-  // 취소/반품/교환
-  '취소요청': { orderStatus: 'CANCEL_REQUESTED' },
-  '취소완료': { orderStatus: 'CANCELLED' },
-  '반품요청': { orderStatus: 'RETURN_REQUESTED' },
-  '반품접수': { orderStatus: 'RETURN_REQUESTED' },
-  '반품회수완료': { orderStatus: 'RETURN_REQUESTED' },
-  '반품완료': { orderStatus: 'RETURNED' },
-  '교환요청': { orderStatus: 'EXCHANGE_REQUESTED' },
-  '교환접수': { orderStatus: 'EXCHANGE_REQUESTED' },
-  '교환완료': { orderStatus: 'EXCHANGED' },
-};
+import {
+  PlayautoOrderStatus,
+  SYNC_TARGET_STATUSES,
+  PLAYAUTO_STATUS_MAP,
+} from '../enums/playauto-status.enum';
 
 /**
  * 배송 상태 동기화 스케줄러
  *
- * 30분마다 실행되어:
- * 1. 플레이오토에 등록된 주문 중 최종 완료 상태가 아닌 것 조회
- * 2. 플레이오토 API로 주문 상세 조회
- * 3. 송장번호, 택배사, 배송상태 가져와서 DB 업데이트
+ * ⚠️ Kubernetes CronJob 전용 - @Cron 데코레이터 사용 금지!
+ * 실행 방법: node dist/main.js --run-scheduler sync-shipping-status
+ * 실행 주기: K8s CronJob으로 30분마다 실행
+ *
+ * 동작:
+ * 1. 플레이오토 벌크 API로 주문 리스트 조회 (1회 API 호출)
+ * 2. DB 주문과 매칭하여 변경된 주문만 업데이트
+ * 3. 송장번호, 택배사, 배송상태 DB 업데이트
  */
 @Injectable()
 export class ShippingSyncSchedulerService {
@@ -59,7 +35,7 @@ export class ShippingSyncSchedulerService {
   ) {}
 
   /**
-   * 배송 상태 동기화 배치 실행
+   * 배송 상태 동기화 배치 실행 (벌크 조회 방식)
    */
   async handleShippingSync() {
     this.logger.log('🕐 배송 상태 동기화 배치 시작...');
@@ -67,9 +43,7 @@ export class ShippingSyncSchedulerService {
     const startTime = Date.now();
 
     try {
-      // 1. 동기화 대상 주문 조회
-      // - 플레이오토에 등록됨 (logisticsUniq 있음)
-      // - 최종 완료 상태가 아님 (COMPLETED, CANCELLED, RETURNED, EXCHANGED 제외)
+      // 1. 동기화 대상 주문 조회 (DB)
       const orders = await this.prisma.order.findMany({
         where: {
           logisticsUniq: { not: null },
@@ -89,14 +63,44 @@ export class ShippingSyncSchedulerService {
         return;
       }
 
+      // 2. 플레이오토 벌크 조회 (최근 30일, 진행중 상태만)
+      const now = getNowKST();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sdate = thirtyDaysAgo.toISOString().split('T')[0];
+      const edate = now.toISOString().split('T')[0];
+
+      const playautoResult = await this.logisticsProvider.getOrdersList({
+        sdate,
+        edate,
+        dateType: 'mdate',
+        status: SYNC_TARGET_STATUSES,
+        length: 3000,
+      });
+
+      this.logger.log(`📦 플레이오토 조회 결과: ${playautoResult.orders.length}건`);
+
+      // 3. uniq 기준으로 Map 생성
+      const playautoOrderMap = new Map<string, LogisticsOrdersListItem>();
+      for (const playautoOrder of playautoResult.orders) {
+        playautoOrderMap.set(playautoOrder.uniq, playautoOrder);
+      }
+
       let successCount = 0;
       let failCount = 0;
       let skipCount = 0;
 
-      // 2. 각 주문별로 플레이오토 조회 및 업데이트
+      // 4. 각 주문별로 매칭 및 업데이트
       for (const order of orders) {
         try {
-          const result = await this.syncOrderStatus(order);
+          const playautoOrder = playautoOrderMap.get(order.logisticsUniq);
+
+          if (!playautoOrder) {
+            this.logger.warn(`플레이오토에서 주문 찾지 못함: uniq=${order.logisticsUniq}`);
+            skipCount++;
+            continue;
+          }
+
+          const result = await this.syncOrderStatus(order, playautoOrder);
           if (result === 'updated') {
             successCount++;
           } else if (result === 'skipped') {
@@ -108,9 +112,6 @@ export class ShippingSyncSchedulerService {
           );
           failCount++;
         }
-
-        // API 호출 간격 조절 (rate limit 방지)
-        await this.delay(500);
       }
 
       const duration = Date.now() - startTime;
@@ -124,25 +125,16 @@ export class ShippingSyncSchedulerService {
   }
 
   /**
-   * 개별 주문 상태 동기화
+   * 개별 주문 상태 동기화 (벌크 조회 데이터 사용)
    */
-  private async syncOrderStatus(order: any): Promise<'updated' | 'skipped' | 'failed'> {
-    const uniq = order.logisticsUniq;
-
-    this.logger.log(`주문 동기화 시작: orderId=${order.id}, uniq=${uniq}`);
-
-    // 플레이오토 주문 상세 조회
-    const playautoOrder = await this.logisticsProvider.getTrackingInfo(uniq);
-
-    if (!playautoOrder) {
-      this.logger.warn(`플레이오토 주문 조회 실패: uniq=${uniq}`);
-      return 'failed';
-    }
-
+  private async syncOrderStatus(
+    order: any,
+    playautoOrder: LogisticsOrdersListItem,
+  ): Promise<'updated' | 'skipped' | 'failed'> {
     const { status: playautoStatus, carrier, trackingNumber } = playautoOrder;
 
-    // 상태 매핑
-    const statusMapping = PLAYAUTO_STATUS_MAP[playautoStatus];
+    // 상태 매핑 (enum 사용)
+    const statusMapping = PLAYAUTO_STATUS_MAP[playautoStatus as PlayautoOrderStatus];
     if (!statusMapping) {
       this.logger.warn(`알 수 없는 플레이오토 상태: ${playautoStatus}`);
       return 'skipped';
@@ -191,7 +183,6 @@ export class ShippingSyncSchedulerService {
 
     // 변경사항 없으면 스킵
     if (Object.keys(updates).length === 0 && Object.keys(shippingUpdates).length === 0) {
-      this.logger.log(`변경사항 없음: orderId=${order.id}`);
       return 'skipped';
     }
 
@@ -235,12 +226,5 @@ export class ShippingSyncSchedulerService {
     );
 
     return 'updated';
-  }
-
-  /**
-   * 딜레이 헬퍼
-   */
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

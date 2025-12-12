@@ -309,6 +309,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get surveyAnswer() { return this.prisma.surveyAnswer; }
   get healthTypeAnimal() { return this.prisma.healthTypeAnimal; }
   get healthTypeAnimalProduct() { return this.prisma.healthTypeAnimalProduct; }
+  get healthTypeAnimalFile() { return this.prisma.healthTypeAnimalFile; }
   get pointHistory() { return this.prisma.pointHistory; }
   get mission() { return this.prisma.mission; }
   get dailyMission() { return this.prisma.dailyMission; }
@@ -408,6 +409,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get pushNotificationSchedule() { return this.prisma.pushNotificationSchedule; }
   get pushNotificationCampaign() { return this.prisma.pushNotificationCampaign; }
   get pushNotificationLog() { return this.prisma.pushNotificationLog; }
+  get pushTemplateVariable() { return this.prisma.pushTemplateVariable; }
+  get pushSegmentCondition() { return this.prisma.pushSegmentCondition; }
 
   // 약관 테이블
   get consent() { return this.prisma.consent; }
@@ -417,6 +420,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get operator() { return this.prisma.operator; }
   get operatorRefreshToken() { return this.prisma.operatorRefreshToken; }
   get operatorAuthLog() { return this.prisma.operatorAuthLog; }
+  get operatorActivityLog() { return this.prisma.operatorActivityLog; }
   get department() { return this.prisma.department; }
 
   // 앱 이벤트 테이블

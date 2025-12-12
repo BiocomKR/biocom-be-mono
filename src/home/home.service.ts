@@ -589,7 +589,6 @@ export class HomeService {
             : '',
           currentDay,
           challengePercent,
-          isFirstChallengeEntry: activeChallenge.isFirstEntry,
         };
 
         // 최초 진입인 경우 false로 업데이트 (백그라운드)
@@ -621,6 +620,9 @@ export class HomeService {
         });
       }
 
+      // 챌린지 최초 진입 여부 (ACTIVE 챌린지가 있고 isFirstEntry가 true인 경우)
+      const isFirstChallengeEntry = activeChallenge?.isFirstEntry ?? false;
+
       return {
         reportInfo: {
           chartId: reportInfo.chartId,
@@ -636,6 +638,7 @@ export class HomeService {
         endDate,
         missionList,
         isFirstNewcomerEntry,
+        isFirstChallengeEntry,
       };
     } catch (error) {
       this.logger.error(`새 홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);

@@ -107,9 +107,6 @@ export class ChallengeInfoDto {
 
   @ApiProperty({ description: '챌린지 진행률 (%)', example: 35 })
   challengePercent: number;
-
-  @ApiProperty({ description: '챌린지 최초 진입 여부 (ACTIVE 챌린지 시작 후 최초 1회)', example: true })
-  isFirstChallengeEntry: boolean;
 }
 
 /**
@@ -145,6 +142,9 @@ export class NewHomeResponseDto {
 
   @ApiProperty({ description: '뉴커머 최초 진입 여부 (구매 이력 없음 + 결과지 없음 상태에서 최초 1회)', example: true })
   isFirstNewcomerEntry: boolean;
+
+  @ApiProperty({ description: '챌린지 최초 진입 여부 (ACTIVE 챌린지 시작 후 최초 1회)', example: false })
+  isFirstChallengeEntry: boolean;
 }
 
 // ============================================

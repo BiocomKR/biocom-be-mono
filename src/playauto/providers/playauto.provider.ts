@@ -8,6 +8,8 @@ import {
   LogisticsOrderData,
   LogisticsCreateOrderResult,
   LogisticsTrackingInfo,
+  LogisticsOrdersListParams,
+  LogisticsOrdersListResult,
 } from '../interfaces/logistics-provider.interface';
 
 /**
@@ -16,6 +18,8 @@ import {
  * ILogisticsProvider 인터페이스를 구현하여 서비스 중립적인 비즈니스 로직 지원
  * - 인증 토큰 자동 관리 (24시간 유효, DB 캐싱)
  * - 주문 생성, 송장 조회 등 물류/배송 API 호출
+ *
+ * @see https://developers.playauto.io/doc
  */
 @Injectable()
 export class PlayautoProvider implements ILogisticsProvider {
@@ -54,12 +58,18 @@ export class PlayautoProvider implements ILogisticsProvider {
       sale_price: Number(item.productPrice),
     }));
 
+    // 주문일시 포맷 (YYYY-MM-DD HH:mm:ss)
+    const orderedAtDate = new Date(order.orderedAt);
+    const ordTime = `${orderedAtDate.getFullYear()}-${String(orderedAtDate.getMonth() + 1).padStart(2, '0')}-${String(orderedAtDate.getDate()).padStart(2, '0')} ${String(orderedAtDate.getHours()).padStart(2, '0')}:${String(orderedAtDate.getMinutes()).padStart(2, '0')}:${String(orderedAtDate.getSeconds()).padStart(2, '0')}`;
+
     // 플레이오토 API 요청 바디 (OpenAPI 스펙 기준)
     const requestData = {
-      shop_cd: process.env.PLAYAUTO_SHOP_CD,
-      shop_id: process.env.PLAYAUTO_SHOP_ID,
+      // 직접입력 쇼핑몰 식별자
+      custom_shop_cd: process.env.PLAYAUTO_SHOP_CD,
+      custom_shop_id: process.env.PLAYAUTO_SHOP_ID,
+      // 주문 정보
       shop_ord_no: order.orderNumber,
-      ord_date: new Date(order.orderedAt).toISOString().split('T')[0],
+      ord_time: ordTime,
       // 주문자 정보
       order_name: order.recipientName,
       order_htel: order.recipientMobile,
@@ -201,21 +211,67 @@ export class PlayautoProvider implements ILogisticsProvider {
   }
 
   /**
-   * 주문 취소
+   * 주문 리스트 벌크 조회
+   * POST /orders API 사용
+   *
+   * @param params - 조회 파라미터
+   * @returns 주문 리스트
+   */
+  async getOrdersList(params: LogisticsOrdersListParams): Promise<LogisticsOrdersListResult> {
+    try {
+      this.logger.log(`주문 리스트 벌크 조회: ${params.sdate} ~ ${params.edate}`);
+
+      const requestData = {
+        date_type: params.dateType || 'mdate',
+        sdate: params.sdate,
+        edate: params.edate,
+        shop_cd: process.env.PLAYAUTO_SHOP_CD,
+        shop_id: process.env.PLAYAUTO_SHOP_ID,
+        status: params.status || ['ALL'],
+        start: params.start || 0,
+        length: params.length || 500,
+      };
+
+      const response = await this.callApi<any>('POST', '/orders', requestData);
+
+      const results = response.results || [];
+      const total = response.recordsTotal || 0;
+
+      this.logger.log(`주문 리스트 조회 완료: ${results.length}건 (전체 ${total}건)`);
+
+      const orders = results.map((item: any) => ({
+        uniq: item.uniq,
+        bundleNo: item.bundle_no,
+        status: item.ord_status,
+        carrier: item.carr_name || undefined,
+        trackingNumber: item.invoice_no || undefined,
+        shopOrderNo: item.shop_ord_no || undefined,
+      }));
+
+      return { orders, total };
+    } catch (error: any) {
+      this.logger.error(`주문 리스트 조회 실패: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 주문 삭제
+   * DELETE /order/delete API 사용
    *
    * @param uniq - 플레이오토 고유 ID
-   * @returns 취소 성공 여부
+   * @returns 삭제 성공 여부
    */
   async cancelOrder(uniq: string): Promise<boolean> {
     try {
-      this.logger.log(`플레이오토 주문 취소: uniq=${uniq}`);
+      this.logger.log(`플레이오토 주문 삭제: uniq=${uniq}`);
 
-      await this.callApi<any>('DELETE', `/order/${uniq}`);
+      await this.callApi<any>('DELETE', '/order/delete', { uniqList: [uniq] });
 
-      this.logger.log(`플레이오토 주문 취소 성공: uniq=${uniq}`);
+      this.logger.log(`플레이오토 주문 삭제 성공: uniq=${uniq}`);
       return true;
     } catch (error: any) {
-      this.logger.error(`플레이오토 주문 취소 실패: uniq=${uniq}`, error.message);
+      this.logger.error(`플레이오토 주문 삭제 실패: uniq=${uniq}`, error.message);
       return false;
     }
   }
