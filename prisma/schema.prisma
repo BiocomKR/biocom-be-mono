@@ -58,6 +58,11 @@ model User {
   iapReceipts                  IAPReceipt[]
   userConsents                 UserConsent[]
   userCharts                   UserChart[]
+  userAllergyReports           UserAllergyReport[]
+  userMetabolicReports         UserMetabolicReport[]
+  userChatHistories            UserChatHistory[]
+  userEmotionalState           UserEmotionalState?
+  userDeepReports              UserDeepReport[]
 
   @@map("users")
 }
@@ -81,16 +86,16 @@ model RefreshToken {
 /// 파일 마스터 테이블
 /// 모든 파일 정보를 중앙에서 관리
 model File {
-  id           Int           @id @default(autoincrement())
-  originalName String        @map("original_name") @db.VarChar(255)
-  storedName   String        @unique(map: "uq_files_stored_name") @map("stored_name") @db.VarChar(255)
-  filePath     String        @map("file_path")
-  fileSize     Int           @map("file_size")
-  mimeType     String        @map("mime_type") @db.VarChar(100)
-  storageType  String        @default("local") @map("storage_type") @db.VarChar(50)
-  isActive     Boolean       @default(true) @map("is_active")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime?     @updatedAt @map("updated_at")
+  id                    Int                    @id @default(autoincrement())
+  originalName          String                 @map("original_name") @db.VarChar(255)
+  storedName            String                 @unique(map: "uq_files_stored_name") @map("stored_name") @db.VarChar(255)
+  filePath              String                 @map("file_path")
+  fileSize              Int                    @map("file_size")
+  mimeType              String                 @map("mime_type") @db.VarChar(100)
+  storageType           String                 @default("local") @map("storage_type") @db.VarChar(50)
+  isActive              Boolean                @default(true) @map("is_active")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime?              @updatedAt @map("updated_at")
   contentFiles          ContentFile[]
   userFiles             UserFile[]
   productFiles          ProductFile[]
@@ -327,45 +332,45 @@ model PointHistory {
 /// 미션 정의 테이블
 /// 챌린지에서 수행할 모든 미션 타입 정의
 model Mission {
-  id                Int                @id @default(autoincrement())
-  name              String
-  description       String?
-  points            Int
-  requireUpload     Boolean            @default(false) @map("require_upload")
-  sortOrder         Int                @map("sort_order")
-  isActive          Boolean            @default(true) @map("is_active")
-  createdAt         DateTime           @map("created_at")
-  updatedAt         DateTime?          @updatedAt @map("updated_at")
-  category          String             @default("DAILY")
-  type              String             @default("MISSION") @db.VarChar(20)
-  recordType        String             @unique @map("record_type") @db.VarChar(50)
-  dailyLimit        Int?               @map("daily_limit")
-  specificDay       Int?               @map("specific_day")
-  totalDays         Int                @default(21) @map("total_days")
-  uploadType        String?            @map("upload_type")
+  id            Int       @id @default(autoincrement())
+  name          String
+  description   String?
+  points        Int
+  requireUpload Boolean   @default(false) @map("require_upload")
+  sortOrder     Int       @map("sort_order")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+  category      String    @default("DAILY")
+  type          String    @default("MISSION") @db.VarChar(20)
+  recordType    String    @unique @map("record_type") @db.VarChar(50)
+  dailyLimit    Int?      @map("daily_limit")
+  specificDay   Int?      @map("specific_day")
+  totalDays     Int       @default(21) @map("total_days")
+  uploadType    String?   @map("upload_type")
 
   // 노출 조건
-  visibleFromDay           Int?       @map("visible_from_day")
-  visibleToDay             Int?       @map("visible_to_day")
-  recordableFromDay        Int?       @map("recordable_from_day")
-  recordableToDay          Int?       @map("recordable_to_day")
+  visibleFromDay    Int? @map("visible_from_day")
+  visibleToDay      Int? @map("visible_to_day")
+  recordableFromDay Int? @map("recordable_from_day")
+  recordableToDay   Int? @map("recordable_to_day")
 
   // 챌린지 종료 후 노출 설정 (복수 챌린지별 설정)
   // JSON 배열: [{ productId: number, days: number | null }]
-  visibleAfterSettings     Json?      @map("visible_after_settings")
+  visibleAfterSettings Json? @map("visible_after_settings")
 
   // 권한
-  allowedUserTypes         String[]   @default([]) @map("allowed_user_types")
-  recordableUserTypes      String[]   @default([]) @map("recordable_user_types")
+  allowedUserTypes    String[] @default([]) @map("allowed_user_types")
+  recordableUserTypes String[] @default([]) @map("recordable_user_types")
 
   // 선행 조건
-  prerequisiteMissionId    Int?       @map("prerequisite_mission_id")
+  prerequisiteMissionId Int? @map("prerequisite_mission_id")
 
   // 포인트
-  maxPointsPerDay          Int?       @map("max_points_per_day")
+  maxPointsPerDay Int? @map("max_points_per_day")
 
   // 주기
-  frequency                String     @default("DAILY") @map("frequency") @db.VarChar(20)
+  frequency String @default("DAILY") @map("frequency") @db.VarChar(20)
 
   challengeMissions ChallengeMission[]
   dailyMissions     DailyMission[]
@@ -862,11 +867,11 @@ model Order {
   /// 취소일시
   cancelledAt       DateTime?        @map("cancelled_at")
   /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
-  logisticsProvider  String?          @map("logistics_provider") @db.VarChar(50)
+  logisticsProvider String?          @map("logistics_provider") @db.VarChar(50)
   /// 물류 서비스 주문 고유번호
-  logisticsUniq      String?          @map("logistics_uniq") @db.VarChar(50)
+  logisticsUniq     String?          @map("logistics_uniq") @db.VarChar(50)
   /// 물류 서비스 주문 묶음번호
-  logisticsBundleNo  String?          @map("logistics_bundle_no") @db.VarChar(50)
+  logisticsBundleNo String?          @map("logistics_bundle_no") @db.VarChar(50)
   /// 생성일시
   createdAt         DateTime         @map("created_at")
   /// 수정일시
@@ -1690,33 +1695,33 @@ model RefundWarranty {
 
 /// 공통 배너 테이블
 model Banner {
-  id          Int       @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   /// 배너 제목
-  title       String    @db.VarChar(100)
+  title          String    @db.VarChar(100)
   /// 배너 이미지 URL
-  imageUrl    String    @map("image_url") @db.VarChar(500)
+  imageUrl       String    @map("image_url") @db.VarChar(500)
   /// 클릭시 이동할 라우팅 URL
-  linkUrl     String?   @map("link_url") @db.VarChar(500)
+  linkUrl        String?   @map("link_url") @db.VarChar(500)
   /// 링크 타입 (INTERNAL: 앱 내부 라우팅, EXTERNAL: 외부 URL, PRODUCT: 상품 상세)
-  linkType    String    @default("INTERNAL") @map("link_type") @db.VarChar(20)
+  linkType       String    @default("INTERNAL") @map("link_type") @db.VarChar(20)
   /// 배너 설명 (선택)
-  description String?
+  description    String?
   /// 정렬 순서 (낮을수록 우선)
-  sortOrder   Int       @default(0) @map("sort_order")
+  sortOrder      Int       @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive    Boolean   @default(true) @map("is_active")
+  isActive       Boolean   @default(true) @map("is_active")
   /// 노출 시작일
-  startDate   DateTime? @map("start_date")
+  startDate      DateTime? @map("start_date")
   /// 노출 종료일
-  endDate     DateTime? @map("end_date")
+  endDate        DateTime? @map("end_date")
   /// 생성일시
-  createdAt   DateTime  @map("created_at")
+  createdAt      DateTime  @map("created_at")
   /// 수정일시
-  updatedAt   DateTime? @updatedAt @map("updated_at")
+  updatedAt      DateTime? @updatedAt @map("updated_at")
   /// 배너 타입 (SHOP: 쇼핑몰, HOME: 메인홈, EVENT: 이벤트)
-  bannerType  String    @default("SHOP") @map("banner_type") @db.VarChar(20)
+  bannerType     String    @default("SHOP") @map("banner_type") @db.VarChar(20)
   /// 노출 대상 유저 상태 (빈 배열 = 전체 공개, ["NEWCOMER", "CHALLENGER", "SUBSCRIBER"])
-  targetStatuses String[] @default([]) @map("target_statuses")
+  targetStatuses String[]  @default([]) @map("target_statuses")
 
   @@index([bannerType, isActive, sortOrder])
   @@index([startDate, endDate])
@@ -2124,7 +2129,11 @@ model UserChart {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime? @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAllergyReports   UserAllergyReport[]
+  userMetabolicReports UserMetabolicReport[]
+  userChatHistories    UserChatHistory[]
+  userDeepReports      UserDeepReport[]
 
   @@index([chartId], map: "idx_user_charts_chart_id")
   @@index([userId], map: "idx_user_charts_user_id")
@@ -2252,21 +2261,21 @@ model Department {
 
 /// 운영자 테이블
 model Operator {
-  id             Int                      @id @default(autoincrement())
-  email          String                   @unique
+  id             Int                    @id @default(autoincrement())
+  email          String                 @unique
   password       String
   name           String
-  accessTier     AccessTier               @default(VIEWER) @map("access_tier")
-  departmentId   Int?                     @map("department_id")
-  isActive       Boolean                  @default(true) @map("is_active")
-  failedAttempts Int                      @default(0) @map("failed_attempts")
-  lockedUntil    DateTime?                @map("locked_until")
-  lastLoginAt    DateTime?                @map("last_login_at")
-  createdAt      DateTime                 @default(now()) @map("created_at")
-  updatedAt      DateTime                 @updatedAt @map("updated_at")
+  accessTier     AccessTier             @default(VIEWER) @map("access_tier")
+  departmentId   Int?                   @map("department_id")
+  isActive       Boolean                @default(true) @map("is_active")
+  failedAttempts Int                    @default(0) @map("failed_attempts")
+  lockedUntil    DateTime?              @map("locked_until")
+  lastLoginAt    DateTime?              @map("last_login_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+  updatedAt      DateTime               @updatedAt @map("updated_at")
   activityLogs   OperatorActivityLog[]
   refreshTokens  OperatorRefreshToken[]
-  department     Department?              @relation(fields: [departmentId], references: [id])
+  department     Department?            @relation(fields: [departmentId], references: [id])
 
   @@map("operators")
 }
@@ -2366,31 +2375,31 @@ enum MenuCode {
 /// 앱 이벤트 로그 테이블
 /// 앱에서 발생하는 모든 커스텀 이벤트를 저장 (GA4 대체/보조)
 model AppEvent {
-  id            Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
   // 앱 구분
-  appId         String   @default("challenge") @map("app_id") @db.VarChar(50)
+  appId String @default("challenge") @map("app_id") @db.VarChar(50)
 
   // 이벤트 기본
-  eventName     String   @map("event_name") @db.VarChar(100)
-  eventCategory String?  @map("event_category") @db.VarChar(50)
+  eventName     String  @map("event_name") @db.VarChar(100)
+  eventCategory String? @map("event_category") @db.VarChar(50)
 
   // 사용자/세션
-  userId        Int?     @map("user_id")
-  sessionId     String?  @map("session_id") @db.VarChar(100)
-  platform      String   @db.VarChar(20)
+  userId    Int?    @map("user_id")
+  sessionId String? @map("session_id") @db.VarChar(100)
+  platform  String  @db.VarChar(20)
 
   // 범용 아이템 (상품, 콘텐츠, 챌린지 등)
-  itemId        String?  @map("item_id") @db.VarChar(100)
-  itemType      String?  @map("item_type") @db.VarChar(50)
+  itemId   String? @map("item_id") @db.VarChar(100)
+  itemType String? @map("item_type") @db.VarChar(50)
 
   // 금액 (이커머스용)
-  amount        Decimal? @db.Decimal(12, 2)
-  quantity      Int?
+  amount   Decimal? @db.Decimal(12, 2)
+  quantity Int?
 
   // 나머지는 JSON
-  params        Json?
-  createdAt     DateTime @default(now()) @map("created_at")
+  params    Json?
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([appId, eventName, createdAt])
   @@index([appId, eventCategory, createdAt])
@@ -2413,18 +2422,18 @@ enum IAPPlatform {
 
 /// IAP 영수증 상태 Enum
 enum IAPReceiptStatus {
-  PENDING    /// 검증 대기 중
-  VERIFIED   /// 검증 완료
-  FAILED     /// 검증 실패
-  REFUNDED   /// 환불됨
+  PENDING /// 검증 대기 중
+  VERIFIED /// 검증 완료
+  FAILED /// 검증 실패
+  REFUNDED /// 환불됨
 }
 
 /// IAP 상품 타입 Enum
 enum IAPProductType {
-  CONSUMABLE          /// 소모성 (챌린지 티켓 등)
-  NON_CONSUMABLE      /// 비소모성 (영구 해제)
-  AUTO_RENEWABLE      /// 자동 갱신 구독
-  NON_RENEWING        /// 비갱신 구독
+  CONSUMABLE /// 소모성 (챌린지 티켓 등)
+  NON_CONSUMABLE /// 비소모성 (영구 해제)
+  AUTO_RENEWABLE /// 자동 갱신 구독
+  NON_RENEWING /// 비갱신 구독
 }
 
 /// IAP 상품 마스터 테이블
@@ -2514,27 +2523,27 @@ model IAPReceipt {
 /// IAP 웹훅 로그 테이블
 /// Apple S2S Notification / Google RTDN 웹훅 이력 저장
 model IAPWebhookLog {
-  id              Int         @id @default(autoincrement())
+  id               Int         @id @default(autoincrement())
   /// 플랫폼 (APPLE, GOOGLE)
-  platform        IAPPlatform
+  platform         IAPPlatform
   /// 웹훅 메시지 ID (Apple: signedPayload의 일부, Google: messageId)
-  messageId       String      @unique @map("message_id") @db.VarChar(200)
+  messageId        String      @unique @map("message_id") @db.VarChar(200)
   /// 알림 타입 (Apple: notificationType, Google: notificationType)
-  notificationType String     @map("notification_type") @db.VarChar(100)
+  notificationType String      @map("notification_type") @db.VarChar(100)
   /// 알림 하위 타입 (Apple: subtype)
-  subtype         String?     @db.VarChar(100)
+  subtype          String?     @db.VarChar(100)
   /// 원본 페이로드 (JSON)
-  payload         Json
+  payload          Json
   /// 처리 상태 (RECEIVED, PROCESSED, FAILED)
-  processStatus   String      @default("RECEIVED") @map("process_status") @db.VarChar(20)
+  processStatus    String      @default("RECEIVED") @map("process_status") @db.VarChar(20)
   /// 처리 에러 메시지
-  errorMessage    String?     @map("error_message")
+  errorMessage     String?     @map("error_message")
   /// 관련 트랜잭션 ID
-  transactionId   String?     @map("transaction_id") @db.VarChar(200)
+  transactionId    String?     @map("transaction_id") @db.VarChar(200)
   /// 수신일시
-  receivedAt      DateTime    @default(now()) @map("received_at")
+  receivedAt       DateTime    @default(now()) @map("received_at")
   /// 처리완료일시
-  processedAt     DateTime?   @map("processed_at")
+  processedAt      DateTime?   @map("processed_at")
 
   @@index([platform])
   @@index([notificationType])
@@ -2548,29 +2557,29 @@ model IAPWebhookLog {
 /// 개인화 푸시에서 사용 가능한 변수 목록 관리
 model PushTemplateVariable {
   /// 고유 ID
-  id              Int       @id @default(autoincrement())
+  id               Int       @id @default(autoincrement())
   /// 카테고리 (사용자, 건강유형, 페르소나 등)
-  category        String    @db.VarChar(50)
+  category         String    @db.VarChar(50)
   /// 변수 키 (템플릿에서 사용: {{variableKey}})
-  variableKey     String    @unique @map("variable_key") @db.VarChar(50)
+  variableKey      String    @unique @map("variable_key") @db.VarChar(50)
   /// 표시 이름 (관리자 화면용)
-  displayName     String    @map("display_name") @db.VarChar(100)
+  displayName      String    @map("display_name") @db.VarChar(100)
   /// 설명
-  description     String?
+  description      String?
   /// 데이터 경로 (user.name, user.healthTypeAnimal.animalName 등)
-  dataPath        String    @map("data_path") @db.VarChar(200)
+  dataPath         String    @map("data_path") @db.VarChar(200)
   /// 필요한 관계 로딩 목록 (JSON: ["healthTypeAnimal", "aiPersona"])
-  requiredIncludes Json?    @map("required_includes")
+  requiredIncludes Json?     @map("required_includes")
   /// null일 때 기본값
-  defaultValue    String?   @map("default_value") @db.VarChar(200)
+  defaultValue     String?   @map("default_value") @db.VarChar(200)
   /// 정렬 순서
-  sortOrder       Int       @default(0) @map("sort_order")
+  sortOrder        Int       @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive        Boolean   @default(true) @map("is_active")
+  isActive         Boolean   @default(true) @map("is_active")
   /// 생성일시
-  createdAt       DateTime  @default(now()) @map("created_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt       DateTime? @updatedAt @map("updated_at")
+  updatedAt        DateTime? @updatedAt @map("updated_at")
 
   @@index([category])
   @@index([isActive])
@@ -2582,31 +2591,31 @@ model PushTemplateVariable {
 /// 개인화 푸시에서 사용 가능한 타겟팅 조건 목록 관리
 model PushSegmentCondition {
   /// 고유 ID
-  id                Int       @id @default(autoincrement())
+  id               Int       @id @default(autoincrement())
   /// 카테고리 (사용자, 구매, 챌린지, 접속 등)
-  category          String    @db.VarChar(50)
+  category         String    @db.VarChar(50)
   /// 표시 이름 (관리자 화면용)
-  displayName       String    @map("display_name") @db.VarChar(100)
+  displayName      String    @map("display_name") @db.VarChar(100)
   /// 설명
-  description       String?
+  description      String?
   /// 조건 키 (프론트엔드에서 사용)
-  conditionKey      String    @unique @map("condition_key") @db.VarChar(50)
+  conditionKey     String    @unique @map("condition_key") @db.VarChar(50)
   /// 필드 표현식 (SQL WHERE절 왼쪽: users.points, (SELECT ...) 등)
-  fieldExpression   String    @map("field_expression")
+  fieldExpression  String    @map("field_expression")
   /// 값 타입 (date, number, boolean, enum)
-  valueType         String    @map("value_type") @db.VarChar(20)
+  valueType        String    @map("value_type") @db.VarChar(20)
   /// enum일 경우 선택지 (JSON: ["M", "F"])
-  enumOptions       Json?     @map("enum_options")
+  enumOptions      Json?     @map("enum_options")
   /// 허용된 연산자 목록 (JSON: ["eq", "gte", "lte"])
-  allowedOperators  Json      @map("allowed_operators")
+  allowedOperators Json      @map("allowed_operators")
   /// 정렬 순서
-  sortOrder         Int       @default(0) @map("sort_order")
+  sortOrder        Int       @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive          Boolean   @default(true) @map("is_active")
+  isActive         Boolean   @default(true) @map("is_active")
   /// 생성일시
-  createdAt         DateTime  @default(now()) @map("created_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt         DateTime? @updatedAt @map("updated_at")
+  updatedAt        DateTime? @updatedAt @map("updated_at")
 
   @@index([category])
   @@index([isActive])
@@ -2676,31 +2685,141 @@ model LogisticsToken {
 /// API 호출 실패/성공 기록 (디버깅 및 재시도용)
 model LogisticsApiLog {
   /// 고유 ID
-  id          Int       @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
-  provider    String    @default("PLAYAUTO") @db.VarChar(50)
+  provider     String   @default("PLAYAUTO") @db.VarChar(50)
   /// 주문 ID (주문 관련 API인 경우)
-  orderId     Int?      @map("order_id")
+  orderId      Int?     @map("order_id")
   /// API 엔드포인트
-  endpoint    String    @db.VarChar(200)
+  endpoint     String   @db.VarChar(200)
   /// HTTP 메서드
-  method      String    @db.VarChar(10)
+  method       String   @db.VarChar(10)
   /// 요청 데이터
-  requestData Json?     @map("request_data")
+  requestData  Json?    @map("request_data")
   /// 응답 데이터
   responseData Json?    @map("response_data")
   /// 상태 (SUCCESS, FAILED)
-  status      String    @db.VarChar(20)
+  status       String   @db.VarChar(20)
   /// 에러 메시지
   errorMessage String?  @map("error_message")
   /// 재시도 횟수
-  retryCount  Int       @default(0) @map("retry_count")
+  retryCount   Int      @default(0) @map("retry_count")
   /// 생성일시
-  createdAt   DateTime  @default(now()) @map("created_at")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@index([provider])
   @@index([orderId])
   @@index([status])
   @@index([createdAt])
   @@map("logistics_api_logs")
+}
+
+// ========================================
+// AI Backend Tables for biocom Database
+// ========================================
+
+/// 사용자 알레르기 검사 리포트
+model UserAllergyReport {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  chartId    String    @map("chart_id") @db.VarChar(50)
+  userName   String    @map("user_name")
+  level1     String?   @db.Text
+  level2     String?   @db.Text
+  level3     String?   @db.Text
+  level4     String?   @db.Text
+  level5     String?   @db.Text
+  animalType String?   @map("animal_type") @db.Text
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userChart UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade)
+
+  @@index([userId], map: "idx_user_allergy_reports_user_id")
+  @@index([chartId], map: "idx_user_allergy_reports_chart_id")
+  @@map("user_allergy_reports")
+}
+
+/// 사용자 대사 기능 검사 리포트
+model UserMetabolicReport {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @map("user_id")
+  chartId       String    @map("chart_id") @db.VarChar(50)
+  username      String
+  categoryRanks Json?     @map("category_ranks") // 카테고리별 등급 정보
+  solutions     Json? // 영양 성분 추천
+  supplements   Json? // 영양제 추천
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userChart UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade)
+
+  @@index([userId], map: "idx_user_metabolic_reports_user_id")
+  @@index([chartId], map: "idx_user_metabolic_reports_chart_id")
+  @@map("user_metabolic_reports")
+}
+
+/// 사용자 챗봇 대화 히스토리 (통합)
+model UserChatHistory {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  chartId     String?  @map("chart_id") @db.VarChar(50) // nullable: 일반 대화 가능
+  sessionId   String?  @map("session_id") @db.VarChar(100)
+  testType    String?  @map("test_type") @db.VarChar(20) // 'allergy', 'metabolic', 'general'
+  userMessage String   @map("user_message") @db.Text
+  aiMessage   String   @map("ai_message") @db.Text
+  personaType String?  @map("persona_type") @db.VarChar(50)
+  gender      String?  @db.VarChar(10)
+  cached      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userChart UserChart? @relation(fields: [chartId], references: [chartId], onDelete: SetNull)
+
+  @@index([userId], map: "idx_user_chat_histories_user_id")
+  @@index([chartId], map: "idx_user_chat_histories_chart_id")
+  @@index([userId, createdAt], map: "idx_user_chat_histories_user_created")
+  @@map("user_chat_histories")
+}
+
+/// 사용자 감정 상태 (친밀도)
+model UserEmotionalState {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @unique @map("user_id")
+  intimacy          Int       @default(0) // 0-100
+  relationshipStage String    @default("stranger") @map("relationship_stage") @db.VarChar(20)
+  conversationCount Int       @default(0) @map("conversation_count")
+  lastChatAt        DateTime? @map("last_chat_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime? @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_user_emotional_states_user_id")
+  @@map("user_emotional_states")
+}
+
+/// 딥 리포트 (새로 추가)
+model UserDeepReport {
+  id                    Int       @id @default(autoincrement())
+  userId                Int       @map("user_id")
+  chartId               String?   @map("chart_id") @db.VarChar(50)
+  reportId              String    @unique @map("report_id") @db.VarChar(100)
+  provider              String    @db.VarChar(20) // 'openai' or 'claude'
+  content               Json
+  processingTimeSeconds Float?    @map("processing_time_seconds")
+  totalTokens           Int?      @map("total_tokens")
+  estimatedCostUsd      Float?    @map("estimated_cost_usd")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  expiresAt             DateTime? @map("expires_at") // TTL 7 days
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userChart UserChart? @relation(fields: [chartId], references: [chartId], onDelete: SetNull)
+
+  @@index([userId], map: "idx_user_deep_reports_user_id")
+  @@index([reportId], map: "idx_user_deep_reports_report_id")
+  @@index([chartId], map: "idx_user_deep_reports_chart_id")
+  @@map("user_deep_reports")
 }
