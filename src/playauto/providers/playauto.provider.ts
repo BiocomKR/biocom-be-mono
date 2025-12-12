@@ -40,61 +40,76 @@ export class PlayautoProvider implements ILogisticsProvider {
   async createOrder(order: LogisticsOrderData): Promise<LogisticsCreateOrderResult> {
     const startTime = Date.now();
 
+    // 상품명 생성 (첫 번째 상품 + 외 N건)
+    const firstItem = order.items[0];
+    const shopSaleName =
+      order.items.length > 1
+        ? `${firstItem.productName} 외 ${order.items.length - 1}건`
+        : firstItem.productName;
+
+    // 주문 아이템을 opts 배열로 변환
+    const opts = order.items.map((item) => ({
+      opt_name: item.productName,
+      sale_cnt: item.quantity,
+      sale_price: item.productPrice,
+    }));
+
+    // 플레이오토 API 요청 바디 (OpenAPI 스펙 기준)
+    const requestData = {
+      shop_cd: process.env.PLAYAUTO_SHOP_CD,
+      shop_id: process.env.PLAYAUTO_SHOP_ID,
+      shop_ord_no: order.orderNumber,
+      ord_date: new Date(order.orderedAt).toISOString().split('T')[0],
+      // 주문자 정보
+      order_name: order.recipientName,
+      order_htel: order.recipientMobile,
+      // 수령자 정보
+      to_name: order.recipientName,
+      to_htel: order.recipientMobile,
+      to_zipcd: order.postalCode,
+      to_addr1: order.address,
+      to_addr2: order.addressDetail || '',
+      // 상품 정보
+      shop_sale_name: shopSaleName,
+      opts,
+      // 배송 정보
+      ship_method: '선결제',
+      ship_cost: Number(order.shippingFee) || 0,
+      ship_msg: order.deliveryMessage || '',
+    };
+
     try {
+      // 요청 데이터 로그
       this.logger.log(`플레이오토 주문 생성 시작: 주문번호 ${order.orderNumber}`);
-
-      // 상품명 생성 (첫 번째 상품 + 외 N건)
-      const firstItem = order.items[0];
-      const shopSaleName =
-        order.items.length > 1
-          ? `${firstItem.productName} 외 ${order.items.length - 1}건`
-          : firstItem.productName;
-
-      // 주문 아이템을 opts 배열로 변환
-      const opts = order.items.map((item) => ({
-        shop_sale_name: item.productName,
-        sale_cnt: item.quantity,
-        sale_price: item.productPrice,
-      }));
-
-      // 플레이오토 API 요청 바디 (OpenAPI 스펙 기준)
-      const requestData = {
-        shop_cd: process.env.PLAYAUTO_SHOP_CD,
-        shop_id: process.env.PLAYAUTO_SHOP_ID,
-        shop_ord_no: order.orderNumber,
-        ord_date: new Date(order.orderedAt).toISOString().split('T')[0],
-        // 주문자 정보
-        order_name: order.recipientName,
-        order_htel: order.recipientMobile,
-        // 수령자 정보
-        to_name: order.recipientName,
-        to_htel: order.recipientMobile,
-        to_zipcd: order.postalCode,
-        to_addr1: order.address,
-        to_addr2: order.addressDetail || '',
-        // 상품 정보
-        shop_sale_name: shopSaleName,
-        opts,
-        // 배송 정보
-        ship_method: '택배',
-        ship_cost: Number(order.shippingFee) || 0,
-        ship_msg: order.deliveryMessage || '',
-      };
+      this.logger.log(`플레이오토 요청 데이터: ${JSON.stringify(requestData)}`);
 
       // API 호출
       const response = await this.callApi<any>('POST', '/order/add', requestData);
 
-      // 디버그: 응답 구조 확인
-      this.logger.log(`플레이오토 응답: ${JSON.stringify(response)}`);
+      // 응답 전체 로그
+      this.logger.log(`플레이오토 응답 원본: ${JSON.stringify(response)}`);
 
-      // 응답이 배열인 경우 첫 번째 요소 사용 (토큰 발급과 동일한 패턴)
+      // 응답이 배열인 경우 첫 번째 요소 사용
       const data = Array.isArray(response) ? response[0] : response;
-      this.logger.log(`플레이오토 파싱된 데이터: ${JSON.stringify(data)}`);
+
+      // 에러 응답 체크 (error_code가 있으면 실패)
+      if (data?.error_code) {
+        const errorMessages = data.messages || [];
+        throw {
+          response: {
+            data: {
+              error_code: data.error_code,
+              messages: errorMessages,
+            },
+          },
+        };
+      }
 
       const { uniq, bundle_no } = data || {};
 
       if (!uniq || !bundle_no) {
-        throw new Error('플레이오토 응답에 uniq 또는 bundle_no가 없습니다');
+        this.logger.error(`플레이오토 응답 파싱 실패: uniq=${uniq}, bundle_no=${bundle_no}, 원본=${JSON.stringify(data)}`);
+        throw new Error(`플레이오토 응답에 uniq 또는 bundle_no가 없습니다. 응답: ${JSON.stringify(data)}`);
       }
 
       // 성공 로그 기록
@@ -120,23 +135,23 @@ export class PlayautoProvider implements ILogisticsProvider {
       return { uniq, bundleNo: bundle_no };
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      const errorMessage =
-        error.response?.data?.message || error.message || '알 수 없는 오류';
 
-      // 실패 로그 기록
+      // 플레이오토 에러 응답 파싱 (error_code, messages)
+      const playautoError = error.response?.data;
+      const errorCode = playautoError?.error_code || 'UNKNOWN';
+      const errorMessages = playautoError?.messages || [];
+      const errorMessage = errorMessages.length > 0
+        ? `[${errorCode}] ${errorMessages.join(', ')}`
+        : error.message || '알 수 없는 오류';
+
+      // 실패 로그 기록 - 요청 데이터 전체 포함
       await this.prisma.logisticsApiLog.create({
         data: {
           orderId: order.id,
           endpoint: '/order/add',
           method: 'POST',
-          requestData: {
-            shop_cd: process.env.PLAYAUTO_SHOP_CD,
-            shop_id: process.env.PLAYAUTO_SHOP_ID,
-            shop_ord_no: '__AUTO__',
-            ord_date: new Date(order.orderedAt).toISOString().split('T')[0],
-            ord_nm: order.recipientName,
-          },
-          responseData: error.response?.data || null,
+          requestData,
+          responseData: playautoError || null,
           status: 'FAILURE',
           errorMessage,
           retryCount: 3,
@@ -147,6 +162,7 @@ export class PlayautoProvider implements ILogisticsProvider {
       this.logger.error(
         `플레이오토 주문 생성 최종 실패: 주문번호 ${order.orderNumber}, 오류=${errorMessage} (${duration}ms)`,
       );
+      this.logger.error(`플레이오토 에러 상세: ${JSON.stringify(playautoError)}`);
 
       throw new Error(
         `플레이오토 주문 생성 실패 (주문번호: ${order.orderNumber}): ${errorMessage}`,

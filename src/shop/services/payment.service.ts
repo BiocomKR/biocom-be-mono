@@ -114,6 +114,24 @@ export class PaymentService {
       throw new NotFoundException('주문을 찾을 수 없습니다');
     }
 
+    // 이미 결제 완료된 주문인지 확인 (멱등성 보장)
+    if (order.status === OrderStatus.PAID) {
+      this.logger.warn(`이미 결제 완료된 주문입니다: ${dto.orderId}`);
+      const completedPayment = await this.prisma.payment.findFirst({
+        where: { orderId: order.id, status: PaymentStatus.COMPLETED }
+      });
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        amount: dto.amount,
+        orderName: `주문번호: ${order.orderNumber}`,
+        customerName: order.recipientName,
+        customerEmail: '',
+        paymentKey: completedPayment?.pgTransactionId || dto.paymentKey,
+        status: PaymentStatus.COMPLETED
+      };
+    }
+
     const payment = await this.prisma.payment.findFirst({
       where: {
         orderId: order.id,

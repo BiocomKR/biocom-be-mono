@@ -208,6 +208,19 @@ export class PaymentCallbackController {
           <h1>결제 처리중입니다</h1>
           <p>잠시만 기다려주세요...</p>
         </div>
+        <script>
+          // 10초 후 웹뷰 닫기 메시지 전송
+          setTimeout(function() {
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'CLOSE_WEBVIEW',
+                paymentKey: '${paymentKey}',
+                orderId: '${orderId}',
+                amount: '${amount}'
+              }));
+            }
+          }, 10000);
+        </script>
       </body>
       </html>
     `;
