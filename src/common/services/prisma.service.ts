@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { CryptoUtil } from '../utils/crypto.util';
+import { getNowKST } from '../utils/kst-date.util';
 
 // 싱글톤 인스턴스
 let prismaInstance: any = null;
@@ -198,6 +199,17 @@ function createExtendedPrismaClient() {
           if (args.data.mobile && typeof args.data.mobile === 'string') {
             args.data.mobile = CryptoUtil.encryptDeterministic(args.data.mobile);
           }
+          return query(args);
+        },
+      },
+      // Order 테이블 updatedAt KST 자동 설정
+      order: {
+        async update({ args, query }) {
+          args.data.updatedAt = getNowKST();
+          return query(args);
+        },
+        async updateMany({ args, query }) {
+          args.data.updatedAt = getNowKST();
           return query(args);
         },
       },
