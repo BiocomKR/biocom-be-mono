@@ -35,6 +35,10 @@ export class WebhooksService {
     // 이벤트 타입별 처리
     switch (eventType) {
       case 'PAYMENT_STATUS_CHANGED':
+        // 토스 status 값에 따라 분기 처리
+        await this.handlePaymentStatusChanged(data);
+        break;
+
       case 'Payment.Approved':
         await this.handlePaymentApproved(data);
         break;
@@ -58,6 +62,49 @@ export class WebhooksService {
 
       default:
         this.logger.warn(`⚠️  알 수 없는 웹훅 이벤트: ${eventType}`);
+    }
+  }
+
+  /**
+   * PAYMENT_STATUS_CHANGED 이벤트 처리
+   * 토스의 status 값에 따라 적절한 핸들러로 분기
+   *
+   * @param data - 결제 상태 변경 데이터
+   */
+  private async handlePaymentStatusChanged(data: any) {
+    const { status, orderId } = data;
+
+    this.logger.log(`🔀 결제 상태 변경: 주문번호=${orderId}, status=${status}`);
+
+    switch (status) {
+      case 'DONE':
+        // 결제 승인 완료
+        await this.handlePaymentApproved(data);
+        break;
+
+      case 'CANCELED':
+        // 결제 취소
+        await this.handlePaymentCanceled(data);
+        break;
+
+      case 'PARTIAL_CANCELED':
+        // 부분 취소
+        await this.handlePaymentPartialCanceled(data);
+        break;
+
+      case 'ABORTED':
+      case 'EXPIRED':
+        // 결제 실패/만료
+        await this.handlePaymentFailed({ ...data, failReason: `결제 ${status}` });
+        break;
+
+      case 'WAITING_FOR_DEPOSIT':
+        // 가상계좌 입금 대기 (처리 불필요)
+        this.logger.log(`⏳ 가상계좌 입금 대기 중: ${orderId}`);
+        break;
+
+      default:
+        this.logger.warn(`⚠️ 알 수 없는 결제 상태: ${status}`);
     }
   }
 
@@ -196,6 +243,64 @@ export class WebhooksService {
       });
 
       this.logger.log(`✅ 결제 취소 처리 완료: ${orderId}`);
+    });
+  }
+
+  /**
+   * 부분 취소 처리
+   *
+   * 사용 시나리오:
+   * - 일부 상품만 취소/환불
+   *
+   * @param data - 부분 취소 데이터
+   */
+  private async handlePaymentPartialCanceled(data: any) {
+    const { paymentKey, orderId, cancels, balanceAmount } = data;
+
+    // 마지막 취소 정보 추출
+    const lastCancel = cancels?.[cancels.length - 1];
+    const cancelAmount = lastCancel?.cancelAmount || 0;
+    const cancelReason = lastCancel?.cancelReason || '부분 취소';
+
+    this.logger.log(
+      `🔄 부분 취소: 주문번호=${orderId}, 취소금액=${cancelAmount}원, 잔여금액=${balanceAmount}원, 사유=${cancelReason}`,
+    );
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. 주문 조회
+      const order = await tx.order.findFirst({
+        where: { orderNumber: orderId },
+      });
+
+      if (!order) {
+        this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
+        return;
+      }
+
+      // 2. 주문 상태는 유지하고 부분 취소 금액만 기록
+      // 전체 취소가 아니므로 CANCELLED로 변경하지 않음
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          // 부분 환불 금액 누적 (필드가 있다면)
+          // refundedAmount: { increment: cancelAmount },
+          updatedAt: getNowKST(),
+        },
+      });
+
+      // 3. 결제 정보에 부분 취소 기록
+      await tx.payment.updateMany({
+        where: {
+          orderId: order.id,
+          pgTransactionId: paymentKey,
+        },
+        data: {
+          status: PaymentStatus.PARTIAL_CANCELLED,
+          updatedAt: getNowKST(),
+        },
+      });
+
+      this.logger.log(`✅ 부분 취소 처리 완료: ${orderId}, 취소금액=${cancelAmount}원`);
     });
   }
 

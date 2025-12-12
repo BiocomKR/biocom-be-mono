@@ -23,10 +23,10 @@ export class BannersService {
    * 메모리 캐시 사용 (60초 TTL)
    *
    * @param bannerType 배너 타입 (SHOP, HOME, EVENT 등) - 선택사항
-   * @param userStatus 유저 상태 (NEWCOMER, CHALLENGER, SUBSCRIBER) - 선택사항
+   * @param userId 유저 ID - 페르소나 이미지 처리용
    * @returns 배너 목록 (sortOrder 기준 정렬)
    */
-  async getActiveBanners(bannerType?: string, userStatus?: string): Promise<BannerDto[]> {
+  async getActiveBanners(bannerType?: string, userId?: number): Promise<BannerDto[]> {
     // 캐시에서 전체 배너 조회
     const allBanners = await this.getAllBannersFromCache();
 
@@ -35,13 +35,40 @@ export class BannersService {
       ? allBanners.filter((b) => b.bannerType === bannerType)
       : allBanners;
 
+    // 유저의 상태 및 페르소나 정보 조회
+    let userStatus: string | undefined;
+    let personaImageUrl: string | undefined;
+
+    if (userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          status: true,
+          aiPersona: {
+            select: { personaUrl: true },
+          },
+        },
+      });
+
+      if (user) {
+        userStatus = user.status;
+        personaImageUrl = user.aiPersona?.personaUrl ?? undefined;
+      }
+    }
+
     // userStatus 필터링 (빈 배열 = 전체 공개, 배열에 포함되면 노출)
     filteredBanners = userStatus
       ? filteredBanners.filter((b) => b.targetStatuses.length === 0 || b.targetStatuses.includes(userStatus))
       : filteredBanners;
 
-    // targetStatuses 필드 제거 후 반환
-    return filteredBanners.map(({ targetStatuses, ...rest }) => rest);
+    // targetStatuses, usePersonaImage 필드 제거하고, 페르소나 이미지 적용
+    return filteredBanners.map(({ targetStatuses, usePersonaImage, ...rest }) => {
+      // usePersonaImage가 true이고 유저가 페르소나를 설정했으면 페르소나 이미지 사용
+      if (usePersonaImage && personaImageUrl) {
+        return { ...rest, imageUrl: personaImageUrl };
+      }
+      return rest;
+    });
   }
 
   /**
@@ -77,6 +104,7 @@ export class BannersService {
         linkType: true,
         description: true,
         targetStatuses: true,
+        usePersonaImage: true,
       },
     });
 

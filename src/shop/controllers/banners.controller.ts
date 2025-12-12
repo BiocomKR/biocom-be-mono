@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { BannersService } from '../services/banners.service';
 import { BannerDto } from '../dto/banner.dto';
@@ -39,8 +39,9 @@ export class BannersController {
     type: [BannerDto]
   })
   async getActiveBanners(
+    @Request() req: any,
     @Query('type') bannerType?: string
   ): Promise<BannerDto[]> {
-    return this.bannersService.getActiveBanners(bannerType);
+    return this.bannersService.getActiveBanners(bannerType, req.user.id);
   }
 }
