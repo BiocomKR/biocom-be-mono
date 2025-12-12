@@ -31,8 +31,13 @@ model User {
   localCode                    String?                        @map("local_code") @db.VarChar(2)
   health_type_animal_id        Int?
   isFirstAppEntry              Boolean                        @default(true) @map("is_first_app_entry")
+  refundAccountNo              String?                        @map("refund_account_no") @db.VarChar(30)
+  refundBankCode               String?                        @map("refund_bank_code") @db.VarChar(10)
+  refundBankName               String?                        @map("refund_bank_name") @db.VarChar(50)
+  refundHolder                 String?                        @map("refund_holder") @db.VarChar(50)
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
+  iapReceipts                  IAPReceipt[]
   orders                       Order[]
   pointHistories               PointHistory[]
   productFeedback              ProductFeedback[]
@@ -43,11 +48,19 @@ model User {
   refreshTokens                RefreshToken[]
   refundWarranties             RefundWarranty[]
   surveyAnswers                SurveyAnswer[]
+  addresses                    UserAddress[]
+  userAllergyReports           UserAllergyReport[]
   balanceGameHistories         UserBalanceGameHistory[]
   challengeSurveyResults       UserChallengeSurveyResult[]
   userChallenges               UserChallenge[]
+  userCharts                   UserChart[]
+  userChatHistories            UserChatHistory[]
+  userConsents                 UserConsent[]
   userCoupons                  UserCoupon[]
+  userDeepReports              UserDeepReport[]
+  userEmotionalState           UserEmotionalState?
   userFiles                    UserFile[]
+  userMetabolicReports         UserMetabolicReport[]
   userMissions                 UserMission[]
   userRecords                  UserRecord[]
   userSupplementRoutine        UserSupplementRoutine[]        @relation("UserSupplementRoutineUser")
@@ -55,14 +68,6 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
-  iapReceipts                  IAPReceipt[]
-  userConsents                 UserConsent[]
-  userCharts                   UserChart[]
-  userAllergyReports           UserAllergyReport[]
-  userMetabolicReports         UserMetabolicReport[]
-  userChatHistories            UserChatHistory[]
-  userEmotionalState           UserEmotionalState?
-  userDeepReports              UserDeepReport[]
 
   @@map("users")
 }
@@ -97,9 +102,9 @@ model File {
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime?              @updatedAt @map("updated_at")
   contentFiles          ContentFile[]
-  userFiles             UserFile[]
-  productFiles          ProductFile[]
   healthTypeAnimalFiles HealthTypeAnimalFile[]
+  productFiles          ProductFile[]
+  userFiles             UserFile[]
 
   @@index([createdAt], map: "idx_files_created_at")
   @@index([isActive], map: "idx_files_is_active")
@@ -281,9 +286,9 @@ model HealthTypeAnimal {
   symptoms            String
   createdAt           DateTime                  @default(now()) @map("created_at")
   updatedAt           DateTime?                 @updatedAt @map("updated_at")
+  images              HealthTypeAnimalFile[]
   recommendedProducts HealthTypeAnimalProduct[]
   users               User[]
-  images              HealthTypeAnimalFile[]
 
   @@map("health_type_animals")
 }
@@ -291,20 +296,19 @@ model HealthTypeAnimal {
 /// 건강 타입 동물 파일 관계 테이블
 /// health_type_animals -< health_type_animal_files >- files 다대다 관계
 model HealthTypeAnimalFile {
-  id                 Int      @id @default(autoincrement())
+  id                 Int              @id @default(autoincrement())
   /// 건강 타입 동물 ID
-  healthTypeAnimalId Int      @map("health_type_animal_id")
+  healthTypeAnimalId Int              @map("health_type_animal_id")
   /// 파일 ID
-  fileId             Int      @map("file_id")
+  fileId             Int              @map("file_id")
   /// 이미지 타입 (THUMBNAIL: 썸네일, DESCRIPTION: 설명 이미지)
-  imageType          String   @map("image_type") @db.VarChar(20)
+  imageType          String           @map("image_type") @db.VarChar(20)
   /// 정렬 순서 (같은 타입 내 정렬)
-  sortOrder          Int      @default(0) @map("sort_order")
+  sortOrder          Int              @default(0) @map("sort_order")
   /// 생성일시
-  createdAt          DateTime @default(now()) @map("created_at")
-
-  healthTypeAnimal HealthTypeAnimal @relation(fields: [healthTypeAnimalId], references: [id], onDelete: Cascade)
-  file             File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now()) @map("created_at")
+  file               File             @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  healthTypeAnimal   HealthTypeAnimal @relation(fields: [healthTypeAnimalId], references: [id], onDelete: Cascade)
 
   @@index([healthTypeAnimalId, imageType, sortOrder])
   @@index([fileId])
@@ -332,49 +336,35 @@ model PointHistory {
 /// 미션 정의 테이블
 /// 챌린지에서 수행할 모든 미션 타입 정의
 model Mission {
-  id            Int       @id @default(autoincrement())
-  name          String
-  description   String?
-  points        Int
-  requireUpload Boolean   @default(false) @map("require_upload")
-  sortOrder     Int       @map("sort_order")
-  isActive      Boolean   @default(true) @map("is_active")
-  createdAt     DateTime  @map("created_at")
-  updatedAt     DateTime? @updatedAt @map("updated_at")
-  category      String    @default("DAILY")
-  type          String    @default("MISSION") @db.VarChar(20)
-  recordType    String    @unique @map("record_type") @db.VarChar(50)
-  dailyLimit    Int?      @map("daily_limit")
-  specificDay   Int?      @map("specific_day")
-  totalDays     Int       @default(21) @map("total_days")
-  uploadType    String?   @map("upload_type")
-
-  // 노출 조건
-  visibleFromDay    Int? @map("visible_from_day")
-  visibleToDay      Int? @map("visible_to_day")
-  recordableFromDay Int? @map("recordable_from_day")
-  recordableToDay   Int? @map("recordable_to_day")
-
-  // 챌린지 종료 후 노출 설정 (복수 챌린지별 설정)
-  // JSON 배열: [{ productId: number, days: number | null }]
-  visibleAfterSettings Json? @map("visible_after_settings")
-
-  // 권한
-  allowedUserTypes    String[] @default([]) @map("allowed_user_types")
-  recordableUserTypes String[] @default([]) @map("recordable_user_types")
-
-  // 선행 조건
-  prerequisiteMissionId Int? @map("prerequisite_mission_id")
-
-  // 포인트
-  maxPointsPerDay Int? @map("max_points_per_day")
-
-  // 주기
-  frequency String @default("DAILY") @map("frequency") @db.VarChar(20)
-
-  challengeMissions ChallengeMission[]
-  dailyMissions     DailyMission[]
-  missionQuizzes    MissionQuiz[]
+  id                    Int                @id @default(autoincrement())
+  name                  String
+  description           String?
+  points                Int
+  requireUpload         Boolean            @default(false) @map("require_upload")
+  sortOrder             Int                @map("sort_order")
+  isActive              Boolean            @default(true) @map("is_active")
+  createdAt             DateTime           @map("created_at")
+  updatedAt             DateTime?          @updatedAt @map("updated_at")
+  category              String             @default("DAILY")
+  type                  String             @default("MISSION") @db.VarChar(20)
+  recordType            String             @unique @map("record_type") @db.VarChar(50)
+  dailyLimit            Int?               @map("daily_limit")
+  specificDay           Int?               @map("specific_day")
+  totalDays             Int                @default(21) @map("total_days")
+  uploadType            String?            @map("upload_type")
+  allowedUserTypes      String[]           @default([]) @map("allowed_user_types")
+  frequency             String             @default("DAILY") @map("frequency") @db.VarChar(20)
+  maxPointsPerDay       Int?               @map("max_points_per_day")
+  prerequisiteMissionId Int?               @map("prerequisite_mission_id")
+  recordableFromDay     Int?               @map("recordable_from_day")
+  recordableToDay       Int?               @map("recordable_to_day")
+  recordableUserTypes   String[]           @default([]) @map("recordable_user_types")
+  visibleFromDay        Int?               @map("visible_from_day")
+  visibleToDay          Int?               @map("visible_to_day")
+  visibleAfterSettings  Json?              @map("visible_after_settings")
+  challengeMissions     ChallengeMission[]
+  dailyMissions         DailyMission[]
+  missionQuizzes        MissionQuiz[]
 
   @@index([category, isActive])
   @@index([sortOrder])
@@ -530,8 +520,8 @@ model ChallengeTicket {
   orderItem      OrderItem?      @relation(fields: [orderItemId], references: [id])
   product        Product?        @relation(fields: [productId], references: [id])
   user           User            @relation(fields: [userId], references: [id])
-  userChallenges UserChallenge[]
   iapReceipt     IAPReceipt?
+  userChallenges UserChallenge[]
 
   @@index([userId, status, ticketType])
   @@map("challenge_tickets")
@@ -713,11 +703,12 @@ model Product {
   challengeContents            Content[]                      @relation("ChallengeContents")
   coupons                      Coupon[]
   healthTypeAnimalProducts     HealthTypeAnimalProduct[]
+  iapProducts                  IAPProduct[]
   lectureProducts              LectureProduct[]
   orderItems                   OrderItem[]
   feedback                     ProductFeedback[]
-  images                       ProductImage[]
   productFiles                 ProductFile[]
+  images                       ProductImage[]
   recentlyViewed               RecentlyViewed[]
   supplementNutrients          SupplementNutrient[]
   userChallengeSurveyResults   UserChallengeSurveyResult[]
@@ -725,7 +716,6 @@ model Product {
   userSupplementRoutine        UserSupplementRoutine[]        @relation("UserSupplementRoutineProduct")
   userSupplementRoutineHistory UserSupplementRoutineHistory[] @relation("UserSupplementRoutineHistoryProduct")
   wishlistItems                Wishlist[]
-  iapProducts                  IAPProduct[]
 
   @@index([sku])
   @@index([categoryCode, status])
@@ -770,9 +760,8 @@ model ProductFile {
   altText   String?  @map("alt_text") @db.VarChar(200)
   /// 생성일시
   createdAt DateTime @map("created_at")
-
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  file    File    @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, imageType, sortOrder])
   @@map("product_files")
@@ -866,16 +855,16 @@ model Order {
   completedAt       DateTime?        @map("completed_at")
   /// 취소일시
   cancelledAt       DateTime?        @map("cancelled_at")
+  /// 생성일시
+  createdAt         DateTime         @map("created_at")
+  /// 수정일시
+  updatedAt         DateTime?        @updatedAt @map("updated_at")
   /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
   logisticsProvider String?          @map("logistics_provider") @db.VarChar(50)
   /// 물류 서비스 주문 고유번호
   logisticsUniq     String?          @map("logistics_uniq") @db.VarChar(50)
   /// 물류 서비스 주문 묶음번호
   logisticsBundleNo String?          @map("logistics_bundle_no") @db.VarChar(50)
-  /// 생성일시
-  createdAt         DateTime         @map("created_at")
-  /// 수정일시
-  updatedAt         DateTime?        @updatedAt @map("updated_at")
   exchangeReturns   ExchangeReturn[]
   items             OrderItem[]
   stateLogs         OrderStateLog[]
@@ -2120,20 +2109,19 @@ model SupplementNutrient {
 }
 
 model UserChart {
-  id          Int       @id @default(autoincrement())
-  userId      Int       @map("user_id")
-  chartId     String    @unique @map("chart_id") @db.VarChar(50)
-  receiptDate DateTime  @map("receipt_date")
-  resultYn    String    @map("result_yn") @db.VarChar(1)
-  orderCode   String    @map("order_code") @db.VarChar(20)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime? @map("updated_at")
-
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   Int                   @id @default(autoincrement())
+  userId               Int                   @map("user_id")
+  chartId              String                @unique @map("chart_id") @db.VarChar(50)
+  receiptDate          DateTime              @map("receipt_date")
+  resultYn             String                @map("result_yn") @db.VarChar(1)
+  orderCode            String                @map("order_code") @db.VarChar(20)
+  createdAt            DateTime              @default(now()) @map("created_at")
+  updatedAt            DateTime?             @map("updated_at")
   userAllergyReports   UserAllergyReport[]
-  userMetabolicReports UserMetabolicReport[]
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   userChatHistories    UserChatHistory[]
   userDeepReports      UserDeepReport[]
+  userMetabolicReports UserMetabolicReport[]
 
   @@index([chartId], map: "idx_user_charts_chart_id")
   @@index([userId], map: "idx_user_charts_user_id")
@@ -2147,12 +2135,12 @@ model Consent {
   title        String        @db.VarChar(200)
   content      String?
   version      String        @db.VarChar(20)
-  category     String        @default("SIGNUP") @db.VarChar(50)
   isRequired   Boolean?      @default(false) @map("is_required")
   isActive     Boolean?      @default(false) @map("is_active")
   displayOrder Int?          @default(0) @map("display_order")
   createdAt    DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
   deletedAt    DateTime?     @map("deleted_at") @db.Timestamp(6)
+  category     String        @default("SIGNUP") @db.VarChar(50)
   userConsents UserConsent[]
 
   @@unique([code, version], map: "consents_code_version_unique")
@@ -2169,8 +2157,8 @@ model UserConsent {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   consentId Int      @map("consent_id")
   isAgreed  Boolean  @map("is_agreed")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_user_consents_user_id")
   consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
+  user      User     @relation(fields: [userId], references: [id], map: "fk_user_consents_user_id")
 
   @@unique([userId, consentId], map: "user_consents_user_id_consent_id_unique")
   @@index([userId], map: "idx_user_consents_user_id")
@@ -2303,11 +2291,11 @@ model OperatorActivityLog {
   action      String?   @db.VarChar(50)
   statusCode  Int       @map("status_code")
   ip          String?   @db.VarChar(45)
-  userAgent   String?   @map("user_agent") @db.Text
-  requestBody String?   @map("request_body") @db.Text
+  userAgent   String?   @map("user_agent")
+  requestBody String?   @map("request_body")
   duration    Int
   createdAt   DateTime  @default(now()) @map("created_at")
-  operator    Operator? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+  operator    Operator? @relation(fields: [operatorId], references: [id])
 
   @@index([operatorId, createdAt])
   @@index([path, createdAt])
@@ -2340,66 +2328,22 @@ model user_consents_backup {
   @@ignore
 }
 
-/// AI 페르소나 성별 Enum
-enum Gender {
-  M
-  F
-}
-
-/// 운영자 접근 등급
-enum AccessTier {
-  SYSTEM
-  MANAGER
-  STAFF
-  VIEWER
-}
-
-/// 메뉴 코드
-enum MenuCode {
-  DASHBOARD
-  USERS
-  CHALLENGE
-  MISSION
-  SURVEY
-  QUIZ
-  CONTENT
-  POINT
-  SHOP
-  ORDERS
-  SHIPPING
-  REFUNDS
-  PUSH
-  OPERATORS
-}
-
 /// 앱 이벤트 로그 테이블
 /// 앱에서 발생하는 모든 커스텀 이벤트를 저장 (GA4 대체/보조)
 model AppEvent {
-  id Int @id @default(autoincrement())
-
-  // 앱 구분
-  appId String @default("challenge") @map("app_id") @db.VarChar(50)
-
-  // 이벤트 기본
-  eventName     String  @map("event_name") @db.VarChar(100)
-  eventCategory String? @map("event_category") @db.VarChar(50)
-
-  // 사용자/세션
-  userId    Int?    @map("user_id")
-  sessionId String? @map("session_id") @db.VarChar(100)
-  platform  String  @db.VarChar(20)
-
-  // 범용 아이템 (상품, 콘텐츠, 챌린지 등)
-  itemId   String? @map("item_id") @db.VarChar(100)
-  itemType String? @map("item_type") @db.VarChar(50)
-
-  // 금액 (이커머스용)
-  amount   Decimal? @db.Decimal(12, 2)
-  quantity Int?
-
-  // 나머지는 JSON
-  params    Json?
-  createdAt DateTime @default(now()) @map("created_at")
+  id            Int      @id @default(autoincrement())
+  eventName     String   @map("event_name") @db.VarChar(100)
+  userId        Int?     @map("user_id")
+  params        Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  platform      String   @db.VarChar(20)
+  amount        Decimal? @db.Decimal(12, 2)
+  appId         String   @default("challenge") @map("app_id") @db.VarChar(50)
+  eventCategory String?  @map("event_category") @db.VarChar(50)
+  itemId        String?  @map("item_id") @db.VarChar(100)
+  itemType      String?  @map("item_type") @db.VarChar(50)
+  quantity      Int?
+  sessionId     String?  @map("session_id") @db.VarChar(100)
 
   @@index([appId, eventName, createdAt])
   @@index([appId, eventCategory, createdAt])
@@ -2408,32 +2352,6 @@ model AppEvent {
   @@index([eventCategory, itemType, createdAt])
   @@index([platform])
   @@map("app_events")
-}
-
-// ============================================
-// IAP (In-App Purchase) 관련 테이블
-// ============================================
-
-/// IAP 플랫폼 Enum
-enum IAPPlatform {
-  APPLE
-  GOOGLE
-}
-
-/// IAP 영수증 상태 Enum
-enum IAPReceiptStatus {
-  PENDING /// 검증 대기 중
-  VERIFIED /// 검증 완료
-  FAILED /// 검증 실패
-  REFUNDED /// 환불됨
-}
-
-/// IAP 상품 타입 Enum
-enum IAPProductType {
-  CONSUMABLE /// 소모성 (챌린지 티켓 등)
-  NON_CONSUMABLE /// 비소모성 (영구 해제)
-  AUTO_RENEWABLE /// 자동 갱신 구독
-  NON_RENEWING /// 비갱신 구독
 }
 
 /// IAP 상품 마스터 테이블
@@ -2458,9 +2376,7 @@ model IAPProduct {
   createdAt       DateTime       @default(now()) @map("created_at")
   /// 수정일시
   updatedAt       DateTime?      @updatedAt @map("updated_at")
-  /// 내부 상품 관계
   product         Product        @relation(fields: [productId], references: [id])
-  /// 영수증 관계
   receipts        IAPReceipt[]
 
   @@index([productId])
@@ -2487,7 +2403,7 @@ model IAPReceipt {
   /// 만료일시 (구독인 경우)
   expiresDate           DateTime?        @map("expires_date")
   /// 원본 영수증 데이터 (Apple: receipt-data, Google: purchaseToken)
-  receiptData           String           @map("receipt_data") @db.Text
+  receiptData           String           @map("receipt_data")
   /// 검증 응답 데이터 (JSON)
   verificationResponse  Json?            @map("verification_response")
   /// 영수증 상태
@@ -2498,18 +2414,15 @@ model IAPReceipt {
   refundReason          String?          @map("refund_reason") @db.VarChar(200)
   /// 발급된 챌린지 티켓 ID
   challengeTicketId     Int?             @unique @map("challenge_ticket_id")
-  /// Google Acknowledge 완료일시
-  acknowledgedAt        DateTime?        @map("acknowledged_at")
   /// 생성일시
   createdAt             DateTime         @default(now()) @map("created_at")
   /// 수정일시
   updatedAt             DateTime?        @updatedAt @map("updated_at")
-  /// 사용자 관계
-  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  /// IAP 상품 관계
-  iapProduct            IAPProduct       @relation(fields: [iapProductId], references: [id])
-  /// 챌린지 티켓 관계
+  /// Google Acknowledge 완료일시
+  acknowledgedAt        DateTime?        @map("acknowledged_at")
   challengeTicket       ChallengeTicket? @relation(fields: [challengeTicketId], references: [id])
+  iapProduct            IAPProduct       @relation(fields: [iapProductId], references: [id])
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([iapProductId])
@@ -2668,7 +2581,7 @@ model LogisticsToken {
   /// 물류 서비스명 (PLAYAUTO, GOODSFLOW 등)
   provider  String   @default("PLAYAUTO") @db.VarChar(50)
   /// 인증 토큰 (JWT - 길이가 길어 TEXT 사용)
-  token     String   @db.Text
+  token     String
   /// 솔루션 번호 (플레이오토 등 서비스별 고유값)
   solNo     Int      @map("sol_no")
   /// 만료 시각 (발급시각 + 23시간, 1시간 버퍼)
@@ -2714,27 +2627,22 @@ model LogisticsApiLog {
   @@map("logistics_api_logs")
 }
 
-// ========================================
-// AI Backend Tables for biocom Database
-// ========================================
-
 /// 사용자 알레르기 검사 리포트
 model UserAllergyReport {
   id         Int       @id @default(autoincrement())
   userId     Int       @map("user_id")
   chartId    String    @map("chart_id") @db.VarChar(50)
-  userName   String    @map("user_name")
-  level1     String?   @db.Text
-  level2     String?   @db.Text
-  level3     String?   @db.Text
-  level4     String?   @db.Text
-  level5     String?   @db.Text
-  animalType String?   @map("animal_type") @db.Text
+  userName   String    @map("user_name") @db.VarChar(255)
+  level1     String?
+  level2     String?
+  level3     String?
+  level4     String?
+  level5     String?
+  animalType String?   @map("animal_type")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime? @updatedAt @map("updated_at")
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userChart UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade)
+  userChart  UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_chart_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_user_id")
 
   @@index([userId], map: "idx_user_allergy_reports_user_id")
   @@index([chartId], map: "idx_user_allergy_reports_chart_id")
@@ -2746,15 +2654,14 @@ model UserMetabolicReport {
   id            Int       @id @default(autoincrement())
   userId        Int       @map("user_id")
   chartId       String    @map("chart_id") @db.VarChar(50)
-  username      String
-  categoryRanks Json?     @map("category_ranks") // 카테고리별 등급 정보
-  solutions     Json? // 영양 성분 추천
-  supplements   Json? // 영양제 추천
+  username      String    @db.VarChar(255)
+  categoryRanks Json?     @map("category_ranks")
+  solutions     Json?
+  supplements   Json?
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime? @updatedAt @map("updated_at")
-
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userChart UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade)
+  userChart     UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_metabolic_reports_chart_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_metabolic_reports_user_id")
 
   @@index([userId], map: "idx_user_metabolic_reports_user_id")
   @@index([chartId], map: "idx_user_metabolic_reports_chart_id")
@@ -2763,20 +2670,19 @@ model UserMetabolicReport {
 
 /// 사용자 챗봇 대화 히스토리 (통합)
 model UserChatHistory {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  chartId     String?  @map("chart_id") @db.VarChar(50) // nullable: 일반 대화 가능
-  sessionId   String?  @map("session_id") @db.VarChar(100)
-  testType    String?  @map("test_type") @db.VarChar(20) // 'allergy', 'metabolic', 'general'
-  userMessage String   @map("user_message") @db.Text
-  aiMessage   String   @map("ai_message") @db.Text
-  personaType String?  @map("persona_type") @db.VarChar(50)
-  gender      String?  @db.VarChar(10)
-  cached      Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userChart UserChart? @relation(fields: [chartId], references: [chartId], onDelete: SetNull)
+  id          Int        @id @default(autoincrement())
+  userId      Int        @map("user_id")
+  chartId     String?    @map("chart_id") @db.VarChar(50)
+  sessionId   String?    @map("session_id") @db.VarChar(100)
+  testType    String?    @map("test_type") @db.VarChar(20)
+  userMessage String     @map("user_message")
+  aiMessage   String     @map("ai_message")
+  personaType String?    @map("persona_type") @db.VarChar(50)
+  gender      String?    @db.VarChar(10)
+  cached      Boolean    @default(false)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  userChart   UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_chat_histories_chart_id")
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_chat_histories_user_id")
 
   @@index([userId], map: "idx_user_chat_histories_user_id")
   @@index([chartId], map: "idx_user_chat_histories_chart_id")
@@ -2788,14 +2694,13 @@ model UserChatHistory {
 model UserEmotionalState {
   id                Int       @id @default(autoincrement())
   userId            Int       @unique @map("user_id")
-  intimacy          Int       @default(0) // 0-100
+  intimacy          Int       @default(0)
   relationshipStage String    @default("stranger") @map("relationship_stage") @db.VarChar(20)
   conversationCount Int       @default(0) @map("conversation_count")
   lastChatAt        DateTime? @map("last_chat_at")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime? @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_emotional_states_user_id")
 
   @@index([userId], map: "idx_user_emotional_states_user_id")
   @@map("user_emotional_states")
@@ -2803,23 +2708,102 @@ model UserEmotionalState {
 
 /// 딥 리포트 (새로 추가)
 model UserDeepReport {
-  id                    Int       @id @default(autoincrement())
-  userId                Int       @map("user_id")
-  chartId               String?   @map("chart_id") @db.VarChar(50)
-  reportId              String    @unique @map("report_id") @db.VarChar(100)
-  provider              String    @db.VarChar(20) // 'openai' or 'claude'
+  id                    Int        @id @default(autoincrement())
+  userId                Int        @map("user_id")
+  chartId               String?    @map("chart_id") @db.VarChar(50)
+  reportId              String     @unique @map("report_id") @db.VarChar(100)
+  provider              String     @db.VarChar(20)
   content               Json
-  processingTimeSeconds Float?    @map("processing_time_seconds")
-  totalTokens           Int?      @map("total_tokens")
-  estimatedCostUsd      Float?    @map("estimated_cost_usd")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  expiresAt             DateTime? @map("expires_at") // TTL 7 days
-
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userChart UserChart? @relation(fields: [chartId], references: [chartId], onDelete: SetNull)
+  processingTimeSeconds Float?     @map("processing_time_seconds")
+  totalTokens           Int?       @map("total_tokens")
+  estimatedCostUsd      Float?     @map("estimated_cost_usd")
+  createdAt             DateTime   @default(now()) @map("created_at")
+  expiresAt             DateTime?  @map("expires_at")
+  userChart             UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_deep_reports_chart_id")
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_deep_reports_user_id")
 
   @@index([userId], map: "idx_user_deep_reports_user_id")
   @@index([reportId], map: "idx_user_deep_reports_report_id")
   @@index([chartId], map: "idx_user_deep_reports_chart_id")
   @@map("user_deep_reports")
+}
+
+model UserAddress {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  alias         String?  @db.VarChar(50)
+  recipientName String   @map("recipient_name") @db.VarChar(50)
+  recipientPhone String  @map("recipient_phone") @db.VarChar(20)
+  postalCode    String   @map("postal_code") @db.VarChar(10)
+  address       String   @db.VarChar(200)
+  addressDetail String?  @map("address_detail") @db.VarChar(100)
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_user_addresses_user_id")
+  @@map("user_addresses")
+}
+
+/// AI 페르소나 성별 Enum
+enum Gender {
+  M
+  F
+}
+
+/// 운영자 접근 등급
+enum AccessTier {
+  SYSTEM
+  MANAGER
+  STAFF
+  VIEWER
+}
+
+/// 메뉴 코드
+enum MenuCode {
+  DASHBOARD
+  USERS
+  CHALLENGE
+  MISSION
+  SURVEY
+  QUIZ
+  CONTENT
+  POINT
+  SHOP
+  ORDERS
+  SHIPPING
+  REFUNDS
+  PUSH
+  OPERATORS
+}
+
+/// IAP 플랫폼 Enum
+enum IAPPlatform {
+  APPLE
+  GOOGLE
+}
+
+/// IAP 영수증 상태 Enum
+enum IAPReceiptStatus {
+  /// 검증 대기 중
+  PENDING
+  /// 검증 완료
+  VERIFIED
+  /// 검증 실패
+  FAILED
+  /// 환불됨
+  REFUNDED
+}
+
+/// IAP 상품 타입 Enum
+enum IAPProductType {
+  /// 소모성 (챌린지 티켓 등)
+  CONSUMABLE
+  /// 비소모성 (영구 해제)
+  NON_CONSUMABLE
+  /// 자동 갱신 구독
+  AUTO_RENEWABLE
+  /// 비갱신 구독
+  NON_RENEWING
 }

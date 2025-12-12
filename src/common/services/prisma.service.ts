@@ -430,6 +430,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 앱 버전 테이블
   get appVersion() { return this.prisma.appVersion; }
 
+  // 사용자 주소 테이블
+  get userAddress() { return this.prisma.userAddress; }
+
   // 물류 서비스 테이블
   get logisticsToken() { return this.prisma.logisticsToken; }
   get logisticsApiLog() { return this.prisma.logisticsApiLog; }
