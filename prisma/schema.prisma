@@ -30,6 +30,7 @@ model User {
   sex                          String?                        @db.VarChar(2)
   localCode                    String?                        @map("local_code") @db.VarChar(2)
   health_type_animal_id        Int?
+  isFirstAppEntry              Boolean                        @default(true) @map("is_first_app_entry")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   orders                       Order[]

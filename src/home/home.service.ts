@@ -359,6 +359,7 @@ export class HomeService {
           status: true,
           aiPersonaId: true,
           health_type_animal_id: true,
+          isFirstAppEntry: true,
           aiPersona: {
             select: {
               id: true,
@@ -602,6 +603,16 @@ export class HomeService {
         }
       }
 
+      // 앱 최초 접속 시 false로 업데이트 (백그라운드)
+      if (user.isFirstAppEntry) {
+        this.prisma.user.update({
+          where: { id: userId },
+          data: { isFirstAppEntry: false },
+        }).catch((err: Error) => {
+          this.logger.warn(`isFirstAppEntry 업데이트 실패 - User ID: ${userId}`, err);
+        });
+      }
+
       return {
         reportInfo: {
           chartId: reportInfo.chartId,
@@ -616,6 +627,7 @@ export class HomeService {
         startDate,
         endDate,
         missionList,
+        isFirstAppEntry: user.isFirstAppEntry,
       };
     } catch (error) {
       this.logger.error(`새 홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);

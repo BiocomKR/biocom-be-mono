@@ -86,7 +86,11 @@ export class PlayautoProvider implements ILogisticsProvider {
       // 디버그: 응답 구조 확인
       this.logger.log(`플레이오토 응답: ${JSON.stringify(response)}`);
 
-      const { uniq, bundle_no } = response;
+      // 응답이 배열인 경우 첫 번째 요소 사용 (토큰 발급과 동일한 패턴)
+      const data = Array.isArray(response) ? response[0] : response;
+      this.logger.log(`플레이오토 파싱된 데이터: ${JSON.stringify(data)}`);
+
+      const { uniq, bundle_no } = data || {};
 
       if (!uniq || !bundle_no) {
         throw new Error('플레이오토 응답에 uniq 또는 bundle_no가 없습니다');

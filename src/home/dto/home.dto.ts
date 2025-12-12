@@ -142,6 +142,9 @@ export class NewHomeResponseDto {
 
   @ApiProperty({ description: '오늘의 미션 목록 (챌린지 없어도 목업 데이터 제공)', type: [MissionItemDto] })
   missionList: MissionItemDto[];
+
+  @ApiProperty({ description: '앱 최초 접속 여부 (회원가입 후 첫 홈 화면 진입)', example: true })
+  isFirstAppEntry: boolean;
 }
 
 // ============================================
