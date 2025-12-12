@@ -318,6 +318,12 @@ export class OrdersService {
               recipientName: true,
               recipientMobile: true,
               totalAmount: true,
+              items: {
+                select: {
+                  productName: true,
+                },
+                take: 1,
+              },
             },
           },
         },
@@ -326,17 +332,27 @@ export class OrdersService {
 
       for (const refund of refunds) {
         if (type && type !== refund.refundType && type !== 'CANCEL') continue;
+
+        // 상품명 생성 (첫 번째 상품명)
+        const productName = refund.order.items?.[0]?.productName || '-';
+
         claims.push({
           id: refund.id,
           claimType: refund.refundType === 'CANCEL' ? 'CANCEL' : 'RETURN_REFUND',
+          // 프론트엔드 호환용 type 필드 추가
+          type: refund.refundType === 'CANCEL' ? 'CANCEL' : 'RETURN_REFUND',
           source: 'refund',
           orderId: refund.orderId,
           orderNumber: refund.order.orderNumber,
-          recipientName: refund.order.recipientName,
+          // 프론트엔드 호환용 필드명
+          userName: CryptoUtil.decrypt(refund.order.recipientName),
+          userMobile: CryptoUtil.decryptDeterministic(refund.order.recipientMobile),
+          productName,
+          amount: Number(refund.order.totalAmount),
           status: refund.status,
           reason: refund.reason,
           reasonDetail: refund.reasonDetail,
-          refundAmount: refund.refundAmount,
+          refundAmount: Number(refund.refundAmount),
           requestedAt: refund.requestedAt,
           completedAt: refund.completedAt,
           adminMemo: refund.adminMemo,
@@ -354,6 +370,13 @@ export class OrdersService {
               orderNumber: true,
               recipientName: true,
               recipientMobile: true,
+              totalAmount: true,
+              items: {
+                select: {
+                  productName: true,
+                },
+                take: 1,
+              },
             },
           },
         },
@@ -362,17 +385,28 @@ export class OrdersService {
 
       for (const er of exchangeReturns) {
         if (type && type !== er.type) continue;
+
+        // 상품명 생성 (첫 번째 상품명)
+        const productName = er.order.items?.[0]?.productName || '-';
+
         claims.push({
           id: er.id,
           claimType: er.type,
+          // 프론트엔드 호환용 type 필드 추가
+          type: er.type,
           source: 'exchangeReturn',
           orderId: er.orderId,
           orderNumber: er.order.orderNumber,
-          recipientName: er.order.recipientName,
+          // 프론트엔드 호환용 필드명
+          userName: CryptoUtil.decrypt(er.order.recipientName),
+          userMobile: CryptoUtil.decryptDeterministic(er.order.recipientMobile),
+          productName,
+          amount: Number(er.order.totalAmount),
           status: er.status,
           reason: er.reason,
           reasonDetail: er.reasonDetail,
-          shippingFee: er.shippingFee,
+          refundAmount: Number(er.shippingFee) || 0,
+          shippingFee: Number(er.shippingFee),
           trackingNumber: er.trackingNumber,
           requestedAt: er.requestedAt,
           completedAt: er.completedAt,
