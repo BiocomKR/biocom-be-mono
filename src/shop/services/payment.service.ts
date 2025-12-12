@@ -201,6 +201,7 @@ export class PaymentService {
           paymentMethod: this.mapPaymentMethod(tossResult.method),
           status: PaymentStatus.COMPLETED,
           paidAt: approvedAtKST,
+          updatedAt: approvedAtKST, // @updatedAt이 UTC로 설정되는 것 방지
           paymentDetails: tossResult as any
         }
       });

@@ -258,6 +258,76 @@ function createExtendedPrismaClient() {
           return query(args);
         },
       },
+      // ========================================
+      // 전역 KST 날짜 자동 설정 ($allModels)
+      // @updatedAt, @default(now())가 UTC로 설정되는 것을 방지
+      // 명시적으로 값을 설정하면 Prisma 자동 설정이 무시됨
+      // ========================================
+      $allModels: {
+        async create({ args, query }) {
+          const now = getNowKST();
+          const data = args.data as any;
+          // createdAt이 없으면 자동 설정
+          if (data && !data.createdAt) {
+            data.createdAt = now;
+          }
+          // updatedAt도 함께 설정 (있는 모델만)
+          if (data && data.updatedAt === undefined) {
+            data.updatedAt = now;
+          }
+          return query(args);
+        },
+        async createMany({ args, query }) {
+          const now = getNowKST();
+          if (Array.isArray(args.data)) {
+            args.data = args.data.map((item: any) => ({
+              ...item,
+              createdAt: item.createdAt || now,
+              updatedAt: item.updatedAt === undefined ? now : item.updatedAt,
+            })) as any;
+          } else if (args.data) {
+            const data = args.data as any;
+            if (!data.createdAt) data.createdAt = now;
+            if (data.updatedAt === undefined) data.updatedAt = now;
+          }
+          return query(args);
+        },
+        async update({ args, query }) {
+          const now = getNowKST();
+          const data = args.data as any;
+          // updatedAt이 명시적으로 설정되지 않았으면 자동 설정
+          if (data && data.updatedAt === undefined) {
+            data.updatedAt = now;
+          }
+          return query(args);
+        },
+        async updateMany({ args, query }) {
+          const now = getNowKST();
+          const data = args.data as any;
+          // updatedAt이 명시적으로 설정되지 않았으면 자동 설정
+          if (data && data.updatedAt === undefined) {
+            data.updatedAt = now;
+          }
+          return query(args);
+        },
+        async upsert({ args, query }) {
+          const now = getNowKST();
+          const createData = args.create as any;
+          const updateData = args.update as any;
+          // create 데이터
+          if (createData && !createData.createdAt) {
+            createData.createdAt = now;
+          }
+          if (createData && createData.updatedAt === undefined) {
+            createData.updatedAt = now;
+          }
+          // update 데이터
+          if (updateData && updateData.updatedAt === undefined) {
+            updateData.updatedAt = now;
+          }
+          return query(args);
+        },
+      },
     },
   });
 
