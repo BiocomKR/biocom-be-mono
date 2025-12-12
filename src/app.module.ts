@@ -54,6 +54,10 @@ import { RefundService } from './refund/refund.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { CartService } from './cart/cart.service';
 import { BannerService } from './banner/banner.service';
+import { LogisticsLogController } from './logistics/logistics-log.controller';
+import { LogisticsLogService } from './logistics/logistics-log.service';
+import { OrdersController } from './orders/orders.controller';
+import { OrdersService } from './orders/orders.service';
 
 /**
  * 애플리케이션 루트 모듈
@@ -115,6 +119,8 @@ import { BannerService } from './banner/banner.service';
     DashboardController,
     CartController,
     BannerController,
+    LogisticsLogController,
+    OrdersController,
   ],
   providers: [
     PrismaService,
@@ -133,6 +139,8 @@ import { BannerService } from './banner/banner.service';
     DashboardService,
     CartService,
     BannerService,
+    LogisticsLogService,
+    OrdersService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

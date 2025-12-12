@@ -169,12 +169,12 @@ export class UsersService {
       take: limit,
     });
 
-    // 응답 형식 변환
+    // 응답 형식 변환 (이름/휴대폰 복호화)
     const userList = users.map(user => ({
       id: user.id,
       email: user.email,
-      name: user.name,
-      mobile: user.mobile,
+      name: CryptoUtil.decrypt(user.name),
+      mobile: CryptoUtil.decryptDeterministic(user.mobile),
       points: user.points,
       status: user.status,
       role: user.role,
@@ -268,8 +268,8 @@ export class UsersService {
           select: {
             id: true,
             status: true,
-            startDate: true,
-            endDate: true,
+            activatedAt: true,
+            expiresAt: true,
             totalPoints: true,
             product: {
               select: {
@@ -358,8 +358,8 @@ export class UsersService {
     return {
       id: user.id,
       email: user.email,
-      name: user.name,
-      mobile: user.mobile,
+      name: CryptoUtil.decrypt(user.name),
+      mobile: CryptoUtil.decryptDeterministic(user.mobile),
       points: user.points,
       status: user.status,
       role: user.role,
@@ -396,8 +396,8 @@ export class UsersService {
         id: uc.id,
         productName: uc.product.name,
         status: uc.status,
-        startDate: uc.startDate,
-        endDate: uc.endDate,
+        startDate: uc.activatedAt,
+        endDate: uc.expiresAt,
         totalPoints: uc.totalPoints,
       })),
       cart: {
