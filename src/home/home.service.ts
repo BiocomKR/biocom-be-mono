@@ -589,7 +589,7 @@ export class HomeService {
             : '',
           currentDay,
           challengePercent,
-          isFirstEntry: activeChallenge.isFirstEntry,
+          isFirstChallengeEntry: activeChallenge.isFirstEntry,
         };
 
         // 최초 진입인 경우 false로 업데이트 (백그라운드)
@@ -603,8 +603,16 @@ export class HomeService {
         }
       }
 
-      // 앱 최초 접속 시 false로 업데이트 (백그라운드)
-      if (user.isFirstAppEntry) {
+      // 뉴커머 최초 진입 조건:
+      // NEWCOMER 상태이고, 결과지가 없는 경우 (구매 이력 없음 + 결과지 없음) + isFirstAppEntry가 true인 경우
+      // => 최초 1회만 팝업 노출
+      const isFirstNewcomerEntry =
+        user.status === UserSubscriptionStatus.NEWCOMER &&
+        reportInfo.resultYN === YesNo.N &&
+        user.isFirstAppEntry === true;
+
+      // 뉴커머 최초 진입인 경우 false로 업데이트 (백그라운드)
+      if (isFirstNewcomerEntry) {
         this.prisma.user.update({
           where: { id: userId },
           data: { isFirstAppEntry: false },
@@ -627,7 +635,7 @@ export class HomeService {
         startDate,
         endDate,
         missionList,
-        isFirstAppEntry: user.isFirstAppEntry,
+        isFirstNewcomerEntry,
       };
     } catch (error) {
       this.logger.error(`새 홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);
