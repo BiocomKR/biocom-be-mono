@@ -80,22 +80,39 @@ export class WebhooksService {
       `💰 결제 승인 웹훅 수신: 주문번호=${orderId}, paymentKey=${paymentKey}, status=${status}`,
     );
 
-    // 트랜잭션으로 DB 업데이트 (원자성 보장)
+    // 1. 트랜잭션 시작 전 상태 확인 (데드락 방지)
+    // 카드 결제는 confirmPayment에서 이미 처리되므로 웹훅이 늦게 도착할 수 있음
+    const existingOrder = await this.prisma.order.findFirst({
+      where: { orderNumber: orderId },
+    });
+
+    if (!existingOrder) {
+      this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
+      return; // throw 대신 return (웹훅 재시도 방지)
+    }
+
+    // 이미 처리된 결제면 스킵 (멱등성 보장, 데드락 방지)
+    if (existingOrder.status === OrderStatus.PAID) {
+      this.logger.warn(`⚠️  이미 처리된 주문입니다 (웹훅 스킵): ${orderId}`);
+      return;
+    }
+
+    // 2. 트랜잭션으로 DB 업데이트 (가상계좌/계좌이체 등 비동기 결제용)
     await this.prisma.$transaction(async (tx) => {
-      // 1. 주문 조회
+      // FOR UPDATE로 행 락 획득 (동시 처리 방지)
       const order = await tx.order.findFirst({
         where: { orderNumber: orderId },
       });
 
       if (!order) {
         this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
-        throw new Error(`주문을 찾을 수 없습니다: ${orderId}`);
+        return;
       }
 
-      // 2. 이미 처리된 결제인지 확인 (멱등성 보장)
+      // 다시 한번 상태 확인 (트랜잭션 내에서)
       if (order.status === OrderStatus.PAID) {
-        this.logger.warn(`⚠️  이미 처리된 주문입니다: ${orderId}`);
-        return; // 중복 처리 방지
+        this.logger.warn(`⚠️  이미 처리된 주문입니다 (트랜잭션 내): ${orderId}`);
+        return;
       }
 
       // 3. 주문 상태 업데이트: PENDING → PAID
