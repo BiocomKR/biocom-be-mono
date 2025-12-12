@@ -108,7 +108,8 @@
 - **네 생각대로 하고 싶으면 혼자 개발해라**
 
 ### 기술적 함정들
-1. **JWT_SECRET**: 반드시 32자 이상!
+1. **API Prefix**: 모든 API 경로에 `/api` prefix 붙어있음 (예: `/api/app-events`, `/api/auth/signin`)
+2. **JWT_SECRET**: 반드시 32자 이상!
 2. **Cloud SQL 연결**: Private IP로만 접근 가능
 3. **이미지 태그**: latest 쓰면 업데이트 안 됨 (타임스탬프 태그 권장)
 4. **Readiness Probe**: 30초로 설정함
