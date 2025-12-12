@@ -545,6 +545,8 @@ model UserChallenge {
   deliveryStartDate   DateTime?       @map("delivery_start_date") @db.Date
   /// 챌린지 홈 최초 진입 여부 (true: 첫 진입, false: 재진입)
   isFirstEntry        Boolean         @default(true) @map("is_first_entry")
+  /// 챌린지 종료 후 첫 접속 여부 (true: 첫 접속, false: 재접속)
+  isFirstChallengeEnd Boolean         @default(true) @map("is_first_challenge_end")
   dailyProgress       DailyProgress[]
   surveyAnswers       SurveyAnswer[]
   product             Product         @relation(fields: [productId], references: [id])
