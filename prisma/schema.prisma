@@ -971,10 +971,37 @@ model Payment {
   updatedAt       DateTime? @updatedAt @map("updated_at")
   order           Order     @relation(fields: [orderId], references: [id])
   refunds         Refund[]
+  paymentLogs     PaymentLog[]
 
   @@index([status])
   @@index([pgTransactionId])
   @@map("payments")
+}
+
+/// 결제 상태 변경 로그 테이블
+/// 웹훅을 통한 결제 상태 변경 이력 추적
+model PaymentLog {
+  id             Int      @id @default(autoincrement())
+  /// 결제 ID
+  paymentId      Int      @map("payment_id")
+  /// 이전 상태
+  previousStatus String?  @map("previous_status") @db.VarChar(30)
+  /// 변경된 상태
+  newStatus      String   @map("new_status") @db.VarChar(30)
+  /// 금액 (취소/환불 시)
+  amount         Decimal? @db.Decimal(10, 0)
+  /// 변경 사유
+  reason         String?  @db.VarChar(500)
+  /// 토스 웹훅 원본 데이터
+  rawData        Json?    @map("raw_data")
+  /// 생성일시
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  payment        Payment  @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+  @@index([createdAt])
+  @@map("payment_logs")
 }
 
 /// 환불 정보 테이블

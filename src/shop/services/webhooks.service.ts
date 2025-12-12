@@ -23,6 +23,32 @@ export class WebhooksService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * 결제 로그 기록
+   */
+  private async createPaymentLog(
+    tx: any,
+    paymentId: number,
+    previousStatus: string | null,
+    newStatus: string,
+    data: {
+      amount?: number;
+      reason?: string;
+      rawData?: any;
+    } = {},
+  ) {
+    await tx.paymentLog.create({
+      data: {
+        paymentId,
+        previousStatus,
+        newStatus,
+        amount: data.amount,
+        reason: data.reason,
+        rawData: data.rawData,
+      },
+    });
+  }
+
+  /**
    * 토스페이먼츠 웹훅 처리 메인 함수
    *
    * @param webhookData - 토스가 보내는 웹훅 페이로드
@@ -172,17 +198,28 @@ export class WebhooksService {
       });
 
       // 4. 결제 정보 업데이트 (이미 createOrder에서 생성됨)
-      await tx.payment.updateMany({
-        where: {
-          orderId: order.id,
-          status: PaymentStatus.PENDING,
-        },
-        data: {
-          pgTransactionId: paymentKey,
-          status: PaymentStatus.COMPLETED,
-          paidAt: getNowKST(),
-        },
+      const payment = await tx.payment.findFirst({
+        where: { orderId: order.id },
       });
+
+      if (payment) {
+        const previousStatus = payment.status;
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            pgTransactionId: paymentKey,
+            status: PaymentStatus.COMPLETED,
+            paidAt: getNowKST(),
+          },
+        });
+
+        // 결제 로그 기록
+        await this.createPaymentLog(tx, payment.id, previousStatus, PaymentStatus.COMPLETED, {
+          reason: '결제 승인 완료',
+          rawData: data,
+        });
+      }
 
       this.logger.log(
         `✅ 주문 상태 업데이트 완료: ${orderId} → PAID`,
@@ -232,15 +269,30 @@ export class WebhooksService {
       });
 
       // 4. 결제 정보 업데이트
-      await tx.payment.updateMany({
+      const payment = await tx.payment.findFirst({
         where: {
           orderId: order.id,
           pgTransactionId: paymentKey,
         },
-        data: {
-          status: PaymentStatus.CANCELLED,
-        },
       });
+
+      if (payment) {
+        const previousStatus = payment.status;
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.CANCELLED,
+            cancelledAt: getNowKST(),
+          },
+        });
+
+        // 결제 로그 기록
+        await this.createPaymentLog(tx, payment.id, previousStatus, PaymentStatus.CANCELLED, {
+          reason: cancelReason || '결제 취소',
+          rawData: data,
+        });
+      }
 
       this.logger.log(`✅ 결제 취소 처리 완료: ${orderId}`);
     });
@@ -289,16 +341,31 @@ export class WebhooksService {
       });
 
       // 3. 결제 정보에 부분 취소 기록
-      await tx.payment.updateMany({
+      const payment = await tx.payment.findFirst({
         where: {
           orderId: order.id,
           pgTransactionId: paymentKey,
         },
-        data: {
-          status: PaymentStatus.PARTIAL_CANCELLED,
-          updatedAt: getNowKST(),
-        },
       });
+
+      if (payment) {
+        const previousStatus = payment.status;
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.PARTIAL_CANCELLED,
+            updatedAt: getNowKST(),
+          },
+        });
+
+        // 결제 로그 기록
+        await this.createPaymentLog(tx, payment.id, previousStatus, PaymentStatus.PARTIAL_CANCELLED, {
+          amount: cancelAmount,
+          reason: cancelReason,
+          rawData: data,
+        });
+      }
 
       this.logger.log(`✅ 부분 취소 처리 완료: ${orderId}, 취소금액=${cancelAmount}원`);
     });
@@ -339,17 +406,31 @@ export class WebhooksService {
       });
 
       // 3. 결제 정보 업데이트
-      await tx.payment.updateMany({
+      const payment = await tx.payment.findFirst({
         where: {
           orderId: order.id,
           status: PaymentStatus.PENDING,
         },
-        data: {
-          status: PaymentStatus.FAILED,
-          failedAt: getNowKST(),
-          failReason: failReason?.substring(0, 500) || 'Unknown error',
-        },
       });
+
+      if (payment) {
+        const previousStatus = payment.status;
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.FAILED,
+            failedAt: getNowKST(),
+            failReason: failReason?.substring(0, 500) || 'Unknown error',
+          },
+        });
+
+        // 결제 로그 기록
+        await this.createPaymentLog(tx, payment.id, previousStatus, PaymentStatus.FAILED, {
+          reason: failReason?.substring(0, 500) || 'Unknown error',
+          rawData: data,
+        });
+      }
 
       this.logger.log(`✅ 결제 실패 처리 완료: ${orderId}`);
     });
@@ -396,16 +477,30 @@ export class WebhooksService {
           },
         });
 
-        await tx.payment.updateMany({
+        const payment = await tx.payment.findFirst({
           where: {
             orderId: order.id,
             status: PaymentStatus.PENDING,
           },
-          data: {
-            status: PaymentStatus.COMPLETED,
-            paidAt: getNowKST(),
-          },
         });
+
+        if (payment) {
+          const previousStatus = payment.status;
+
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: PaymentStatus.COMPLETED,
+              paidAt: getNowKST(),
+            },
+          });
+
+          // 결제 로그 기록
+          await this.createPaymentLog(tx, payment.id, previousStatus, PaymentStatus.COMPLETED, {
+            reason: '가상계좌 입금 완료',
+            rawData: data,
+          });
+        }
 
         this.logger.log(`✅ 가상계좌 입금 완료 처리: ${orderId}`);
       });
