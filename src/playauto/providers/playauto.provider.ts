@@ -76,7 +76,8 @@ export class PlayautoProvider implements ILogisticsProvider {
         shop_sale_name: shopSaleName,
         opts,
         // 배송 정보
-        ship_cost: order.shippingFee,
+        ship_method: '택배',
+        ship_cost: Number(order.shippingFee) || 0,
         ship_msg: order.deliveryMessage || '',
       };
 
