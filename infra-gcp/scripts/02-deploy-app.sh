@@ -135,6 +135,12 @@ check_requirements() {
 setup_auth() {
     log_info "인증 설정 중..."
 
+    # 서비스 계정 키 파일이 있으면 활성화
+    if [ -f "google-service-account-key.json" ]; then
+        log_info "서비스 계정으로 인증 중..."
+        gcloud auth activate-service-account --key-file=google-service-account-key.json --quiet
+    fi
+
     gcloud config set project "$PROJECT_ID" --quiet
 
     gcloud container clusters get-credentials "$CLUSTER_NAME" \

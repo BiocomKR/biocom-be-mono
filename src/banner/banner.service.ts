@@ -103,6 +103,7 @@ export class BannerService {
     endDate?: Date;
     bannerType?: string;
     targetStatuses?: string[];
+    usePersonaImage?: boolean;
   }) {
     const banner = await this.prisma.banner.create({
       data: {
@@ -117,6 +118,7 @@ export class BannerService {
         endDate: dto.endDate,
         bannerType: dto.bannerType || 'HOME',
         targetStatuses: dto.targetStatuses ?? [],
+        usePersonaImage: dto.usePersonaImage ?? false,
         createdAt: getNowKST(),
       },
     });
@@ -143,6 +145,7 @@ export class BannerService {
       endDate?: Date;
       bannerType?: string;
       targetStatuses?: string[];
+      usePersonaImage?: boolean;
     },
   ) {
     const existing = await this.prisma.banner.findUnique({
