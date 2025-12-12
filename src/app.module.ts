@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
 import { ConfigService } from '@nestjs/config';
+import { CommonModule } from './common/common.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
 
@@ -32,6 +33,9 @@ import { HealthModule } from './health/health.module';
       route: '/admin/queues',
       adapter: ExpressAdapter,
     }),
+
+    // Common Module (Prisma)
+    CommonModule,
 
     // Queues Module
     QueuesModule,

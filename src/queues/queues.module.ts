@@ -2,148 +2,65 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
-import { UserProcessor } from '../processors/user.processor';
-import { BeautyProcessor } from '../processors/beauty.processor';
-import { FoodProcessor } from '../processors/food.processor';
-import { FastingProcessor } from '../processors/fasting.processor';
-import { SleepProcessor } from '../processors/sleep.processor';
-import { ActivityProcessor } from '../processors/activity.processor';
-import { AllergyProcessor } from '../processors/allergy.processor';
-import { MissionProcessor } from '../processors/mission.processor';
-import { BalanceGameProcessor } from '../processors/balance-game.processor';
-import { SupplementProcessor } from '../processors/supplement.processor';
+import { AppEventProcessor } from '../processors/app-event.processor';
+import { PushNotificationProcessor } from '../processors/push-notification.processor';
+import { OrderSyncProcessor } from '../processors/order-sync.processor';
+import { FirebaseAdminModule } from '../push/firebase-admin.module';
+import { FcmProvider } from '../push/providers/fcm.provider';
 
 /**
  * Queue 설정
  */
-const QUEUE_OPTIONS = {
+export const QUEUE_OPTIONS = {
   defaultJobOptions: {
-    attempts: 3, // 최대 재시도 3회
+    attempts: 3,
     backoff: {
       type: 'exponential' as const,
-      delay: 1000, // 1초 -> 2초 -> 4초
+      delay: 1000,
     },
-    removeOnComplete: 100, // 완료된 Job 100개만 유지
-    removeOnFail: 1000, // 실패한 Job 1000개 유지 (디버깅용)
+    removeOnComplete: 100,
+    removeOnFail: 1000,
   },
 };
 
 @Module({
   imports: [
-    // User Queue
+    // Firebase Admin SDK
+    FirebaseAdminModule,
+
+    // App Event Queue
     BullModule.registerQueue({
-      name: 'graph-sync-user',
+      name: 'app-event',
       ...QUEUE_OPTIONS,
     }),
 
-    // Beauty Queue
+    // Push Notification Queue
     BullModule.registerQueue({
-      name: 'graph-sync-beauty',
+      name: 'push-notification',
       ...QUEUE_OPTIONS,
     }),
 
-    // Food Queue
+    // Order Sync Queue
     BullModule.registerQueue({
-      name: 'graph-sync-food',
-      ...QUEUE_OPTIONS,
-    }),
-
-    // Fasting Queue
-    BullModule.registerQueue({
-      name: 'graph-sync-fasting',
-      ...QUEUE_OPTIONS,
-    }),
-
-    // Sleep Queue
-    BullModule.registerQueue({
-      name: 'graph-sync-sleep',
-      ...QUEUE_OPTIONS,
-    }),
-
-    // Activity Queue
-    BullModule.registerQueue({
-      name: 'graph-sync-activity',
-      ...QUEUE_OPTIONS,
-    }),
-
-    // Allergy Queue
-    BullModule.registerQueue({
-      name: 'graph-sync-allergy',
-      ...QUEUE_OPTIONS,
-    }),
-
-    // Mission Queue
-    BullModule.registerQueue({
-      name: 'graph-sync-mission',
-      ...QUEUE_OPTIONS,
-    }),
-
-    // BalanceGame Queue
-    BullModule.registerQueue({
-      name: 'graph-sync-balance-game',
-      ...QUEUE_OPTIONS,
-    }),
-
-    // Supplement Queue
-    BullModule.registerQueue({
-      name: 'graph-sync-supplement',
+      name: 'order-sync',
       ...QUEUE_OPTIONS,
     }),
 
     // Bull Board - Queue 모니터링
     BullBoardModule.forFeature({
-      name: 'graph-sync-user',
+      name: 'app-event',
       adapter: BullMQAdapter as any,
     }),
     BullBoardModule.forFeature({
-      name: 'graph-sync-beauty',
+      name: 'push-notification',
       adapter: BullMQAdapter as any,
     }),
     BullBoardModule.forFeature({
-      name: 'graph-sync-food',
-      adapter: BullMQAdapter as any,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graph-sync-fasting',
-      adapter: BullMQAdapter as any,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graph-sync-sleep',
-      adapter: BullMQAdapter as any,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graph-sync-activity',
-      adapter: BullMQAdapter as any,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graph-sync-allergy',
-      adapter: BullMQAdapter as any,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graph-sync-mission',
-      adapter: BullMQAdapter as any,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graph-sync-balance-game',
-      adapter: BullMQAdapter as any,
-    }),
-    BullBoardModule.forFeature({
-      name: 'graph-sync-supplement',
+      name: 'order-sync',
       adapter: BullMQAdapter as any,
     }),
   ],
-  providers: [
-    UserProcessor,
-    BeautyProcessor,
-    FoodProcessor,
-    FastingProcessor,
-    SleepProcessor,
-    ActivityProcessor,
-    AllergyProcessor,
-    MissionProcessor,
-    BalanceGameProcessor,
-    SupplementProcessor,
-  ],
+  providers: [AppEventProcessor, PushNotificationProcessor, OrderSyncProcessor, FcmProvider],
   exports: [],
 })
 export class QueuesModule {}

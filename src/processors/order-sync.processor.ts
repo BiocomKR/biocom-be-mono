@@ -1,0 +1,238 @@
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger } from '@nestjs/common';
+import { Job } from 'bullmq';
+import { PrismaService } from '../common/services/prisma.service';
+import { getNowKST } from '../common/utils/kst-date.util';
+
+/**
+ * 플레이오토 상태 → 우리 DB 상태 매핑 타입
+ */
+interface PlayautoStatusMapping {
+  orderStatus?: string;
+  shippingStatus?: string;
+}
+
+/**
+ * 플레이오토 상태 → 우리 DB 상태 매핑
+ */
+const PLAYAUTO_STATUS_MAP: Record<string, PlayautoStatusMapping> = {
+  // 주문 처리 중
+  신규주문: { orderStatus: 'PAID', shippingStatus: 'PENDING' },
+  결제완료: { orderStatus: 'PAID', shippingStatus: 'PENDING' },
+  출고대기: { orderStatus: 'PAID', shippingStatus: 'PENDING' },
+  출고보류: { orderStatus: 'PAID', shippingStatus: 'PENDING' },
+  주문재확인: { orderStatus: 'PAID', shippingStatus: 'PENDING' },
+  주문보류: { orderStatus: 'PAID', shippingStatus: 'PENDING' },
+
+  // 출고/배송 단계
+  운송장출력: { orderStatus: 'SHIPPING', shippingStatus: 'READY_FOR_SHIPMENT' },
+  출고완료: { orderStatus: 'SHIPPING', shippingStatus: 'IN_TRANSIT' },
+  배송중: { orderStatus: 'SHIPPING', shippingStatus: 'IN_TRANSIT' },
+
+  // 배송 완료
+  배송완료: { orderStatus: 'DELIVERED', shippingStatus: 'DELIVERED' },
+  구매결정: { orderStatus: 'COMPLETED', shippingStatus: 'DELIVERED' },
+  판매완료: { orderStatus: 'COMPLETED', shippingStatus: 'DELIVERED' },
+
+  // 취소
+  취소요청: { orderStatus: 'CANCEL_REQUESTED' },
+  취소완료: { orderStatus: 'CANCELLED' },
+
+  // 반품
+  반품요청: { orderStatus: 'RETURN_REQUESTED' },
+  반품접수: { orderStatus: 'RETURN_REQUESTED' },
+  반품회수완료: { orderStatus: 'RETURN_REQUESTED' },
+  반품교환요청: { orderStatus: 'RETURN_REQUESTED' },
+  반품완료: { orderStatus: 'RETURNED' },
+
+  // 교환
+  교환요청: { orderStatus: 'EXCHANGE_REQUESTED' },
+  교환접수: { orderStatus: 'EXCHANGE_REQUESTED' },
+  교환회수완료: { orderStatus: 'EXCHANGE_REQUESTED' },
+  교환완료: { orderStatus: 'EXCHANGED' },
+
+  // 맞교환
+  맞교환요청: { orderStatus: 'EXCHANGE_REQUESTED' },
+  맞교환완료: { orderStatus: 'EXCHANGED' },
+};
+
+/**
+ * 주문 동기화 Job 데이터 인터페이스
+ */
+export interface OrderSyncJobData {
+  /** DB Order ID */
+  orderId: number;
+
+  /** Playauto 상태 정보 */
+  playautoData: {
+    status: string;
+    carrier?: string;
+    trackingNumber?: string;
+  };
+}
+
+/**
+ * 주문 상태 동기화 프로세서 (MQ Worker)
+ *
+ * 배치에서 개별 주문 업데이트를 MQ Job으로 받아서 처리
+ * → DB 부하 분산
+ */
+@Processor('order-sync')
+export class OrderSyncProcessor extends WorkerHost {
+  private readonly logger = new Logger(OrderSyncProcessor.name);
+
+  constructor(private readonly prisma: PrismaService) {
+    super();
+  }
+
+  async process(job: Job<OrderSyncJobData>): Promise<any> {
+    const { orderId, playautoData } = job.data;
+
+    this.logger.log(
+      `📦 [OrderSyncProcessor] Job 시작: id=${job.id}, orderId=${orderId}, status=${playautoData.status}`,
+    );
+
+    try {
+      const result = await this.syncOrderStatus(orderId, playautoData);
+
+      this.logger.log(
+        `✅ [OrderSyncProcessor] Job 완료: id=${job.id}, orderId=${orderId}, result=${result}`,
+      );
+
+      return { success: true, result };
+    } catch (error) {
+      this.logger.error(
+        `❌ [OrderSyncProcessor] Job 실패: id=${job.id}, orderId=${orderId}, error=${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * 개별 주문 상태 동기화
+   */
+  private async syncOrderStatus(
+    orderId: number,
+    playautoData: { status: string; carrier?: string; trackingNumber?: string },
+  ): Promise<'updated' | 'skipped' | 'failed'> {
+    const { status: playautoStatus, carrier, trackingNumber } = playautoData;
+
+    // 1. 주문 조회
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { shipping: true },
+    });
+
+    if (!order) {
+      this.logger.warn(`주문을 찾을 수 없음: orderId=${orderId}`);
+      return 'failed';
+    }
+
+    // 2. 상태 매핑
+    const statusMapping = PLAYAUTO_STATUS_MAP[playautoStatus];
+    if (!statusMapping) {
+      this.logger.warn(`알 수 없는 플레이오토 상태: ${playautoStatus}`);
+      return 'skipped';
+    }
+
+    const now = getNowKST();
+    const updates: any = {};
+    const shippingUpdates: any = {};
+
+    // 3. 주문 상태 업데이트 필요 여부 확인
+    if (statusMapping.orderStatus && order.status !== statusMapping.orderStatus) {
+      updates.status = statusMapping.orderStatus;
+
+      // 상태별 타임스탬프 업데이트
+      if (statusMapping.orderStatus === 'SHIPPING' && !order.shippedAt) {
+        updates.shippedAt = now;
+      }
+      if (statusMapping.orderStatus === 'DELIVERED' && !order.deliveredAt) {
+        updates.deliveredAt = now;
+      }
+      if (statusMapping.orderStatus === 'COMPLETED' && !order.completedAt) {
+        updates.completedAt = now;
+      }
+    }
+
+    // 4. 배송 정보 업데이트
+    if (order.shipping) {
+      if (trackingNumber && order.shipping.trackingNumber !== trackingNumber) {
+        shippingUpdates.trackingNumber = trackingNumber;
+      }
+      if (carrier && order.shipping.courierName !== carrier) {
+        shippingUpdates.courierName = carrier;
+      }
+      if (
+        statusMapping.shippingStatus &&
+        order.shipping.status !== statusMapping.shippingStatus
+      ) {
+        shippingUpdates.status = statusMapping.shippingStatus;
+
+        // 상태별 타임스탬프
+        if (
+          statusMapping.shippingStatus === 'IN_TRANSIT' &&
+          !order.shipping.shippedAt
+        ) {
+          shippingUpdates.shippedAt = now;
+        }
+        if (
+          statusMapping.shippingStatus === 'DELIVERED' &&
+          !order.shipping.deliveredAt
+        ) {
+          shippingUpdates.deliveredAt = now;
+        }
+      }
+    }
+
+    // 5. 변경사항 없으면 스킵
+    if (
+      Object.keys(updates).length === 0 &&
+      Object.keys(shippingUpdates).length === 0
+    ) {
+      return 'skipped';
+    }
+
+    // 6. 트랜잭션으로 업데이트
+    await this.prisma.$transaction(async (tx) => {
+      // 주문 상태 업데이트
+      if (Object.keys(updates).length > 0) {
+        updates.updatedAt = now;
+        await tx.order.update({
+          where: { id: order.id },
+          data: updates,
+        });
+
+        // 상태 변경 로그
+        if (updates.status) {
+          await tx.orderStateLog.create({
+            data: {
+              orderId: order.id,
+              fromStatus: order.status,
+              toStatus: updates.status,
+              changeReason: `플레이오토 동기화: ${playautoStatus}`,
+              createdAt: now,
+            },
+          });
+        }
+      }
+
+      // 배송 정보 업데이트
+      if (order.shipping && Object.keys(shippingUpdates).length > 0) {
+        shippingUpdates.updatedAt = now;
+        await tx.shipping.update({
+          where: { id: order.shipping.id },
+          data: shippingUpdates,
+        });
+      }
+    });
+
+    this.logger.log(
+      `주문 동기화 완료: orderId=${order.id}, 플레이오토상태=${playautoStatus}, ` +
+        `주문상태=${updates.status || '변경없음'}, 송장=${trackingNumber || '없음'}`,
+    );
+
+    return 'updated';
+  }
+}
