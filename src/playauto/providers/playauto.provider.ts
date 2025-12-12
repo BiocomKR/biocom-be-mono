@@ -50,8 +50,8 @@ export class PlayautoProvider implements ILogisticsProvider {
     // 주문 아이템을 opts 배열로 변환
     const opts = order.items.map((item) => ({
       opt_name: item.productName,
-      sale_cnt: item.quantity,
-      sale_price: item.productPrice,
+      sale_cnt: Number(item.quantity),
+      sale_price: Number(item.productPrice),
     }));
 
     // 플레이오토 API 요청 바디 (OpenAPI 스펙 기준)
