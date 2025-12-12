@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -251,51 +251,19 @@ export class UsersService {
         throw new NotFoundException(`ID ${id}인 사용자를 찾을 수 없습니다.`);
       }
 
-      // 이메일 변경 시 중복 확인
-      if (updateUserDto.email && updateUserDto.email !== existingUser.email) {
-        const emailExists = await this.prisma.user.findUnique({
-          where: { email: updateUserDto.email },
-        });
-
-        if (emailExists) {
-          throw new ConflictException('이미 존재하는 이메일입니다.');
-        }
-      }
-
-      // AI 페르소나 변경 시 유효성 확인
-      if (updateUserDto.aiPersonaId !== undefined) {
-        const persona = await this.prisma.aiPersona.findUnique({
-          where: { id: updateUserDto.aiPersonaId },
-        });
-
-        if (!persona) {
-          throw new NotFoundException(`ID ${updateUserDto.aiPersonaId}인 페르소나를 찾을 수 없습니다.`);
-        }
-
-        if (!persona.isActive) {
-          throw new ConflictException('비활성화된 페르소나는 선택할 수 없습니다.');
-        }
-
-        this.logger.log(`사용자 ${id}의 페르소나 변경 - 기존: ${existingUser.aiPersonaId}, 새로운: ${updateUserDto.aiPersonaId}`);
-      }
-
-      // 비밀번호 변경 시 해싱
-      const updateData: any = { ...updateUserDto };
-      if (updateUserDto.password) {
-        updateData.password = await bcrypt.hash(updateUserDto.password, 10);
-      }
-
-      // 사용자 정보 수정
+      // 사용자 정보 수정 (이름, 휴대폰 번호만)
       const user = await this.prisma.user.update({
         where: { id },
-        data: updateData,
+        data: {
+          name: updateUserDto.name,
+          mobile: updateUserDto.mobile,
+        },
         select: {
           id: true,
           email: true,
           name: true,
           mobile: true,
           points: true,
-          characterId: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -304,7 +272,7 @@ export class UsersService {
       this.logger.log(`사용자 수정 성공 - ID: ${user.id}`);
       return user;
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof ConflictException) {
+      if (error instanceof NotFoundException) {
         throw error;
       }
       this.logger.error(`사용자 수정 실패 - ID: ${id}, ${error.message}`, error.stack);
