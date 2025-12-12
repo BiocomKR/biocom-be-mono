@@ -309,6 +309,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get surveyAnswer() { return this.prisma.surveyAnswer; }
   get healthTypeAnimal() { return this.prisma.healthTypeAnimal; }
   get healthTypeAnimalFile() { return this.prisma.healthTypeAnimalFile; }
+  get healthTypeAnimalProduct() { return this.prisma.healthTypeAnimalProduct; }
   get pointHistory() { return this.prisma.pointHistory; }
   get mission() { return this.prisma.mission; }
   get dailyMission() { return this.prisma.dailyMission; }
@@ -349,6 +350,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get payment() { return this.prisma.payment; }
   get refund() { return this.prisma.refund; }
   get refundPolicy() { return this.prisma.refundPolicy; }
+  get exchangeReturn() { return this.prisma.exchangeReturn; }
+  get exchangeReturnPolicy() { return this.prisma.exchangeReturnPolicy; }
+  get refundWarranty() { return this.prisma.refundWarranty; }
   get shipping() { return this.prisma.shipping; }
   get shippingTrack() { return this.prisma.shippingTrack; }
   get shippingPolicy() { return this.prisma.shippingPolicy; }
@@ -419,6 +423,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get operator() { return this.prisma.operator; }
   get operatorRefreshToken() { return this.prisma.operatorRefreshToken; }
   get operatorActivityLog() { return this.prisma.operatorActivityLog; }
+  get operatorAuthLog() { return this.prisma.operatorAuthLog; }
   get department() { return this.prisma.department; }
 
   // 앱 이벤트 테이블
@@ -426,6 +431,18 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 앱 버전 테이블
   get appVersion() { return this.prisma.appVersion; }
+
+  // 물류 서비스 테이블
+  get logisticsToken() { return this.prisma.logisticsToken; }
+  get logisticsApiLog() { return this.prisma.logisticsApiLog; }
+
+  // IAP(인앱결제) 테이블
+  get iAPProduct() { return this.prisma.iAPProduct; }
+  get iAPReceipt() { return this.prisma.iAPReceipt; }
+  get iAPWebhookLog() { return this.prisma.iAPWebhookLog; }
+
+  // 사용자 주소 테이블
+  get userAddress() { return this.prisma.userAddress; }
 
   // 메서드 바인딩
   $transaction(arg: any) {
