@@ -254,7 +254,7 @@ export class OrdersService {
           postalCode: dto.shippingAddress.postalCode,
           address: CryptoUtil.encrypt(dto.shippingAddress.address),
           addressDetail: dto.shippingAddress.addressDetail ? CryptoUtil.encrypt(dto.shippingAddress.addressDetail) : null,
-          deliveryMessage: dto.shippingAddress.deliveryMessage || null,
+          deliveryMessage: dto.shippingAddress.deliveryMessage ? CryptoUtil.encrypt(dto.shippingAddress.deliveryMessage) : null,
           orderedAt: getNowKST(),
           createdAt: getNowKST(),
           user: {
@@ -295,35 +295,8 @@ export class OrdersService {
         },
       });
 
-      // 10. 챌린지/구독 상품인 경우 티켓 자동 생성
-      const challengeTickets = await Promise.all(
-        orderItems
-          .filter((orderItem, idx) => {
-            const originalItem = orderItemsData[idx];
-            return ['CHALLENGE', 'SUBSCRIPTION'].includes(originalItem.product.categoryCode || '');
-          })
-          .map((orderItem, idx) => {
-            const originalItem = orderItemsData[idx];
-            const ticketType = originalItem.product.categoryCode === 'SUBSCRIPTION' ? 'SUBSCRIPTION' : 'CHALLENGE';
-            this.logger.log(`챌린지 티켓 생성: 상품 ${orderItem.productId}, 타입 ${ticketType}, orderItemId ${orderItem.id}`);
-
-            return tx.challengeTicket.create({
-              data: {
-                userId,
-                productId: orderItem.productId,
-                orderItemId: orderItem.id,
-                status: UserCouponStatus.PURCHASED,
-                ticketType,
-                purchaseDate: getNowKST(),
-                createdAt: getNowKST(),
-              },
-            });
-          })
-      );
-
-      if (challengeTickets.length > 0) {
-        this.logger.log(`챌린지 티켓 ${challengeTickets.length}개 생성 완료`);
-      }
+      // 10. 챌린지/구독 티켓은 결제 완료 시 생성 (PaymentService.confirmPayment에서 처리)
+      // 주문 생성 시점에는 티켓을 생성하지 않음 (미결제 상태에서 티켓 존재 방지)
 
       // 11. 배송 정보 생성
       await tx.shipping.create({
@@ -497,10 +470,14 @@ export class OrdersService {
 
   /**
    * 주문 취소
+   *
+   * 송장 등록 여부에 따른 분기 처리:
+   * - 송장 미등록: PG 자동 결제 취소 → CANCELLED
+   * - 송장 등록됨: CANCEL_REQUESTED 상태로 변경 (실무자 확인 필요)
    */
   async cancelOrder(userId: number, orderNumber: string, reason: string): Promise<OrderResponseDto> {
     return await this.prisma.$transaction(async (tx) => {
-      // 주문 조회
+      // 주문 조회 (배송 정보 포함)
       const order = await tx.order.findFirst({
         where: {
           orderNumber,
@@ -513,6 +490,7 @@ export class OrdersService {
             },
           },
           payment: true,
+          shipping: true,
         },
       });
 
@@ -521,12 +499,80 @@ export class OrdersService {
       }
 
       // 취소 가능 상태 확인
-      if (!['PENDING_PAYMENT', 'PAID', 'PREPARING'].includes(order.status)) {
+      if (!['PENDING_PAYMENT', 'PAID', 'PREPARING', 'SHIPPED'].includes(order.status)) {
         throw new BadRequestException('취소 가능한 상태가 아닙니다');
       }
 
+      // 이미 취소 요청 중인지 확인
+      if (order.status === OrderStatus.CANCEL_REQUESTED) {
+        throw new BadRequestException('이미 취소 요청 중인 주문입니다');
+      }
+
+      // 송장 등록 여부 확인
+      const hasTrackingNumber = order.shipping?.trackingNumber ? true : false;
+
+      // 송장 등록된 경우: CANCEL_REQUESTED 상태로만 변경 (실무자 확인 필요)
+      if (hasTrackingNumber) {
+        this.logger.log(`송장 등록된 주문 취소 요청: ${orderNumber} (송장: ${order.shipping?.trackingNumber})`);
+
+        const now = getNowKST();
+
+        // 1. 주문 상태 업데이트
+        const updatedOrder = await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: OrderStatus.CANCEL_REQUESTED,
+          },
+        });
+
+        // 2. 주문 상태 로그
+        await tx.orderStateLog.create({
+          data: {
+            orderId: order.id,
+            fromStatus: order.status,
+            toStatus: OrderStatus.CANCEL_REQUESTED,
+            changeReason: `취소 요청 - ${reason} (송장 등록됨, 실무자 확인 필요)`,
+            createdAt: now,
+          },
+        });
+
+        // 3. 환불 요청 레코드 생성 (관리자 페이지에서 조회용)
+        await tx.refund.create({
+          data: {
+            orderId: order.id,
+            paymentId: order.payment?.id || 0,
+            refundType: 'CANCEL',
+            status: 'REQUESTED',
+            refundAmount: order.totalAmount,
+            pointRefund: order.pointUsed,
+            reason: reason,
+            reasonDetail: `송장번호: ${order.shipping?.trackingNumber}`,
+            requestedAt: now,
+            createdAt: now,
+          },
+        });
+
+        this.logger.log(`주문 취소 요청 완료: ${orderNumber} (송장 등록으로 인해 실무자 확인 필요)`);
+
+        return {
+          ...updatedOrder,
+          orderId: updatedOrder.orderNumber,
+          totalProductPrice: Number(updatedOrder.totalProductPrice),
+          totalDiscount: Number(updatedOrder.totalDiscount),
+          shippingFee: Number(updatedOrder.shippingFee),
+          pointUsed: Number(updatedOrder.pointUsed),
+          totalAmount: Number(updatedOrder.totalAmount),
+          items: order.items.map(item => ({
+            ...item,
+            productPrice: Number(item.productPrice),
+            subtotal: Number(item.subtotal),
+          })),
+        };
+      }
+
+      // 송장 미등록: 기존 자동 취소 로직 수행
       // 토스페이먼츠 결제 취소 (결제 완료 상태인 경우만)
-      if (order.status === OrderStatus.PAID && order.payment) {
+      if ([OrderStatus.PAID, OrderStatus.PREPARING].includes(order.status as OrderStatus) && order.payment) {
         try {
           const tossResponse = await this.tossPaymentsService.cancelPayment(
             order.payment.pgTransactionId, // paymentKey
