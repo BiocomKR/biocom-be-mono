@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { PlayautoProvider } from './providers/playauto.provider';
 import { LOGISTICS_PROVIDER_TOKEN } from './interfaces/logistics-provider.interface';
 import { PlayautoService } from './services/playauto.service';
+import { ShippingSyncSchedulerService } from './services/shipping-sync-scheduler.service';
 
 /**
  * 물류 서비스 모듈
@@ -10,6 +11,7 @@ import { PlayautoService } from './services/playauto.service';
  * 플레이오토 물류 API 연동
  * - 주문 생성, 배송 추적, 주문 취소 기능 제공
  * - ILogisticsProvider 인터페이스로 서비스 교체 용이
+ * - 배송 상태 동기화 스케줄러 (K8s CronJob)
  */
 @Module({
   imports: [HttpModule],
@@ -21,11 +23,13 @@ import { PlayautoService } from './services/playauto.service';
     },
     PlayautoProvider, // 직접 주입 호환용
     PlayautoService, // 기존 코드 호환용 (점진적 마이그레이션)
+    ShippingSyncSchedulerService, // 배송 상태 동기화 배치
   ],
   exports: [
     LOGISTICS_PROVIDER_TOKEN,
     PlayautoProvider, // 직접 주입 호환용
     PlayautoService, // 기존 코드 호환용 (점진적 마이그레이션)
+    ShippingSyncSchedulerService, // main.ts에서 사용
   ],
 })
 export class PlayautoModule {}

@@ -61,6 +61,15 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'sync-shipping-status': {
+        // 배송 상태 동기화 배치 (30분마다 실행)
+        logger.log('배송 상태 동기화 배치 실행...');
+        const { ShippingSyncSchedulerService } = await import('./playauto/services/shipping-sync-scheduler.service');
+        const shippingSyncService = app.get(ShippingSyncSchedulerService);
+        await shippingSyncService.handleShippingSync();
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         process.exit(1);

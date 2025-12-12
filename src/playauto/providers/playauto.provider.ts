@@ -171,7 +171,7 @@ export class PlayautoProvider implements ILogisticsProvider {
   }
 
   /**
-   * 배송 추적 정보 조회
+   * 배송 추적 정보 조회 (주문 상세 조회 API 사용)
    *
    * @param uniq - 플레이오토 고유 ID
    * @returns 배송 추적 정보
@@ -180,18 +180,19 @@ export class PlayautoProvider implements ILogisticsProvider {
     try {
       this.logger.log(`배송 추적 조회: uniq=${uniq}`);
 
-      const response = await this.callApi<any>('GET', `/order/tracking/${uniq}`);
+      // 플레이오토 주문 상세 조회 API
+      const response = await this.callApi<any>('GET', `/order/${uniq}`);
+
+      // 응답 로깅
+      this.logger.log(`플레이오토 주문 상세 응답: ${JSON.stringify(response)}`);
+
+      const orderData = response.order_data || response;
 
       return {
-        status: response.status || 'UNKNOWN',
-        carrier: response.carrier,
-        trackingNumber: response.tracking_no,
-        history: response.history?.map((h: any) => ({
-          time: new Date(h.time),
-          status: h.status,
-          location: h.location,
-          description: h.description,
-        })),
+        status: orderData.ord_status || 'UNKNOWN',
+        carrier: orderData.carr_name || undefined,
+        trackingNumber: orderData.invoice_no || undefined,
+        history: [], // 플레이오토 상세 조회에는 배송 이력이 없음
       };
     } catch (error: any) {
       this.logger.error(`배송 추적 조회 실패: uniq=${uniq}`, error.message);
