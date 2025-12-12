@@ -22,6 +22,7 @@ import { OperatorsModule } from './operators/operators.module';
 import { AppEventsModule } from './app-events/app-events.module';
 import { AppVersionModule } from './app-version/app-version.module';
 import { HealthTypeAnimalsModule } from './health-type-animals/health-type-animals.module';
+import { QueuesModule } from './queues/queues.module';
 
 // Domain Controllers
 import { UsersController } from './users/users.controller';
@@ -103,6 +104,7 @@ import { OrdersService } from './orders/orders.service';
     AppEventsModule,  // 앱 이벤트 수집 모듈
     AppVersionModule, // 앱 버전 관리 모듈
     HealthTypeAnimalsModule, // 건강 타입 동물 관리 모듈
+    QueuesModule,     // BullMQ 메시지 큐 모듈
   ],
   controllers: [
     UsersController,
