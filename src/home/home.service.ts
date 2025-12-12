@@ -197,7 +197,7 @@ export class HomeService {
       }
 
       // 3. 배너 조회
-      const banner = await this.getHomeBanner(user.status);
+      const banner = await this.getHomeBanner(user.id);
 
       // 4. 동물 유형 (resultYN이 Y일 때만 제공)
       let animalType: AnimalTypeDto | null = null;
@@ -373,11 +373,11 @@ export class HomeService {
 
   /**
    * 홈 배너 정보 조회
-   * @param userStatus 사용자 상태 (NEWCOMER, CHALLENGER, SUBSCRIBER)
+   * @param userId 사용자 ID
    */
-  private async getHomeBanner(userStatus?: string): Promise<BannerInfoDto> {
+  private async getHomeBanner(userId?: number): Promise<BannerInfoDto> {
     // BannersService를 통해 HOME 타입 배너 조회 (사용자 상태 기반 필터링)
-    const banners = await this.bannersService.getActiveBanners('HOME', userStatus);
+    const banners = await this.bannersService.getActiveBanners('HOME', userId);
 
     if (banners.length > 0) {
       const banner = banners[0]; // 첫 번째 배너 (sortOrder 기준 정렬됨)
