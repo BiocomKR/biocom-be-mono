@@ -6,11 +6,8 @@ import {
   LOGISTICS_PROVIDER_TOKEN,
   LogisticsOrdersListItem,
 } from '../interfaces/logistics-provider.interface';
-import {
-  PlayautoOrderStatus,
-  SYNC_TARGET_STATUSES,
-  PLAYAUTO_STATUS_MAP,
-} from '../enums/playauto-status.enum';
+import { SYNC_TARGET_STATUSES } from '../enums/playauto-status.enum';
+import { QueueService } from '../../queues/queue.service';
 
 /**
  * 배송 상태 동기화 스케줄러
@@ -21,8 +18,8 @@ import {
  *
  * 동작:
  * 1. 플레이오토 벌크 API로 주문 리스트 조회 (1회 API 호출)
- * 2. DB 주문과 매칭하여 변경된 주문만 업데이트
- * 3. 송장번호, 택배사, 배송상태 DB 업데이트
+ * 2. DB 주문과 매칭하여 MQ Job으로 개별 주문 업데이트 분산 처리
+ * 3. biocom-mq 워커가 송장번호, 택배사, 배송상태 DB 업데이트
  */
 @Injectable()
 export class ShippingSyncSchedulerService {
@@ -32,6 +29,7 @@ export class ShippingSyncSchedulerService {
     private readonly prisma: PrismaService,
     @Inject(LOGISTICS_PROVIDER_TOKEN)
     private readonly logisticsProvider: ILogisticsProvider,
+    private readonly queueService: QueueService,
   ) {}
 
   /**
@@ -85,146 +83,35 @@ export class ShippingSyncSchedulerService {
         playautoOrderMap.set(playautoOrder.uniq, playautoOrder);
       }
 
-      let successCount = 0;
-      let failCount = 0;
+      let queuedCount = 0;
       let skipCount = 0;
 
-      // 4. 각 주문별로 매칭 및 업데이트
+      // 4. 각 주문별로 매칭하여 MQ Job 전송
       for (const order of orders) {
-        try {
-          const playautoOrder = playautoOrderMap.get(order.logisticsUniq);
+        const playautoOrder = playautoOrderMap.get(order.logisticsUniq);
 
-          if (!playautoOrder) {
-            this.logger.warn(`플레이오토에서 주문 찾지 못함: uniq=${order.logisticsUniq}`);
-            skipCount++;
-            continue;
-          }
-
-          const result = await this.syncOrderStatus(order, playautoOrder);
-          if (result === 'updated') {
-            successCount++;
-          } else if (result === 'skipped') {
-            skipCount++;
-          }
-        } catch (error: any) {
-          this.logger.error(
-            `주문 동기화 실패: orderId=${order.id}, error=${error.message}`,
-          );
-          failCount++;
+        if (!playautoOrder) {
+          this.logger.warn(`플레이오토에서 주문 찾지 못함: uniq=${order.logisticsUniq}`);
+          skipCount++;
+          continue;
         }
+
+        // MQ Job으로 전송 (개별 주문 업데이트는 biocom-mq가 처리)
+        await this.queueService.addOrderSync(order.id, {
+          status: playautoOrder.status,
+          carrier: playautoOrder.carrier,
+          trackingNumber: playautoOrder.trackingNumber,
+        });
+        queuedCount++;
       }
 
       const duration = Date.now() - startTime;
       this.logger.log(
-        `✅ 배송 상태 동기화 완료: 성공 ${successCount}건, 스킵 ${skipCount}건, 실패 ${failCount}건 (${duration}ms)`,
+        `✅ 배송 상태 동기화 Job 전송 완료: 큐 전송 ${queuedCount}건, 스킵 ${skipCount}건 (${duration}ms)`,
       );
     } catch (error: any) {
       this.logger.error(`배송 상태 동기화 배치 실패: ${error.message}`);
       throw error;
     }
-  }
-
-  /**
-   * 개별 주문 상태 동기화 (벌크 조회 데이터 사용)
-   */
-  private async syncOrderStatus(
-    order: any,
-    playautoOrder: LogisticsOrdersListItem,
-  ): Promise<'updated' | 'skipped' | 'failed'> {
-    const { status: playautoStatus, carrier, trackingNumber } = playautoOrder;
-
-    // 상태 매핑 (enum 사용)
-    const statusMapping = PLAYAUTO_STATUS_MAP[playautoStatus as PlayautoOrderStatus];
-    if (!statusMapping) {
-      this.logger.warn(`알 수 없는 플레이오토 상태: ${playautoStatus}`);
-      return 'skipped';
-    }
-
-    const now = getNowKST();
-    const updates: any = {};
-    const shippingUpdates: any = {};
-
-    // 주문 상태 업데이트 필요 여부 확인
-    if (statusMapping.orderStatus && order.status !== statusMapping.orderStatus) {
-      updates.status = statusMapping.orderStatus;
-
-      // 상태별 타임스탬프 업데이트
-      if (statusMapping.orderStatus === 'SHIPPING' && !order.shippedAt) {
-        updates.shippedAt = now;
-      }
-      if (statusMapping.orderStatus === 'DELIVERED' && !order.deliveredAt) {
-        updates.deliveredAt = now;
-      }
-      if (statusMapping.orderStatus === 'COMPLETED' && !order.completedAt) {
-        updates.completedAt = now;
-      }
-    }
-
-    // 배송 정보 업데이트
-    if (order.shipping) {
-      if (trackingNumber && order.shipping.trackingNumber !== trackingNumber) {
-        shippingUpdates.trackingNumber = trackingNumber;
-      }
-      if (carrier && order.shipping.courierName !== carrier) {
-        shippingUpdates.courierName = carrier;
-      }
-      if (statusMapping.shippingStatus && order.shipping.status !== statusMapping.shippingStatus) {
-        shippingUpdates.status = statusMapping.shippingStatus;
-
-        // 상태별 타임스탬프
-        if (statusMapping.shippingStatus === 'IN_TRANSIT' && !order.shipping.shippedAt) {
-          shippingUpdates.shippedAt = now;
-        }
-        if (statusMapping.shippingStatus === 'DELIVERED' && !order.shipping.deliveredAt) {
-          shippingUpdates.deliveredAt = now;
-        }
-      }
-    }
-
-    // 변경사항 없으면 스킵
-    if (Object.keys(updates).length === 0 && Object.keys(shippingUpdates).length === 0) {
-      return 'skipped';
-    }
-
-    // 트랜잭션으로 업데이트
-    await this.prisma.$transaction(async (tx) => {
-      // 주문 상태 업데이트
-      if (Object.keys(updates).length > 0) {
-        updates.updatedAt = now;
-        await tx.order.update({
-          where: { id: order.id },
-          data: updates,
-        });
-
-        // 상태 변경 로그
-        if (updates.status) {
-          await tx.orderStateLog.create({
-            data: {
-              orderId: order.id,
-              fromStatus: order.status,
-              toStatus: updates.status,
-              changeReason: `플레이오토 동기화: ${playautoStatus}`,
-              createdAt: now,
-            },
-          });
-        }
-      }
-
-      // 배송 정보 업데이트
-      if (order.shipping && Object.keys(shippingUpdates).length > 0) {
-        shippingUpdates.updatedAt = now;
-        await tx.shipping.update({
-          where: { id: order.shipping.id },
-          data: shippingUpdates,
-        });
-      }
-    });
-
-    this.logger.log(
-      `주문 동기화 완료: orderId=${order.id}, 플레이오토상태=${playautoStatus}, ` +
-        `주문상태=${updates.status || '변경없음'}, 송장=${trackingNumber || '없음'}`,
-    );
-
-    return 'updated';
   }
 }

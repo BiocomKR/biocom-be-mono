@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { PushNotificationService } from './push-notification.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { PushScheduleType, PushCampaignType, PushCampaignStatus } from '../enums';
+import { QueueService, PushNotificationType } from '../../queues/queue.service';
 
 /**
  * ============================================================================
@@ -47,7 +47,7 @@ export class PushCampaignService {
 
   constructor(
     private readonly prisma: PrismaService, // DB 접근용 (SQLAlchemy의 session과 유사)
-    private readonly pushNotificationService: PushNotificationService, // 실제 FCM 발송 서비스
+    private readonly queueService: QueueService, // MQ를 통한 푸시 발송
   ) {}
 
   /**
@@ -148,58 +148,33 @@ export class PushCampaignService {
       });
 
       // ---------------------------------------------------------------
-      // Step 4: 푸시 발송 (각 유저별)
-      // ★★★ 페르소나별 말투 적용은 이 루프 안에서 처리 ★★★
-      //
-      // 현재 로직:
-      //   모든 유저에게 schedule.bodyTemplate 동일하게 발송
-      //
-      // TODO [AI 개발자] - 변경할 로직:
-      //   1. 유저의 characterId로 AiPersona 조회
-      //   2. AiPersona.personality (말투 스타일 텍스트) 가져오기
-      //   3. AI 모델로 bodyTemplate을 personality 스타일로 변환
-      //   4. 변환된 메시지를 sendToUser()에 전달
-      //
-      // 예시 코드:
-      //   const user = await this.prisma.user.findUnique({
-      //     where: { id: userId },
-      //     include: { aiPersona: true }  // User.characterId → AiPersona
-      //   });
-      //   const personality = user.aiPersona?.personality;
-      //   const convertedBody = await aiService.convertStyle(
-      //     schedule.bodyTemplate,
-      //     personality
-      //   );
+      // Step 4: 푸시 발송 (MQ로 비동기 처리)
+      // - 대상 유저 전체를 한 번에 MQ Job으로 전달
+      // - 실제 FCM 발송은 MQ Worker가 처리
       // ---------------------------------------------------------------
-      let successCount = 0;
-      let failureCount = 0;
+      const job = await this.queueService.addPushToUsers(
+        targetUsers,
+        {
+          title: schedule.title,
+          body: schedule.bodyTemplate,
+          imageUrl: schedule.imageUrl,
+          data: {
+            ...schedule.data,
+            campaignId: campaign.id,
+          },
+        },
+        PushNotificationType.SYSTEM,
+        false, // isTest = false (실제 발송)
+      );
 
-      for (const userId of targetUsers) {
-        try {
-          // TODO [AI 개발자]: 여기서 유저별 페르소나 말투 변환 로직 추가
-          // const personalizedBody = await this.convertToPersonaStyle(userId, schedule.bodyTemplate);
+      this.logger.log(
+        `📤 [PushCampaignService] MQ Job 추가 완료: jobId=${job.id}, targetCount=${targetUsers.length}`,
+      );
 
-          const result = await this.pushNotificationService.sendToUser(
-            userId,
-            {
-              title: schedule.title,
-              body: schedule.bodyTemplate, // TODO: personalizedBody로 교체
-              imageUrl: schedule.imageUrl,
-              data: {
-                ...schedule.data,
-                campaignId: campaign.id,
-              },
-            },
-            false, // isTest = false (실제 발송)
-          );
-
-          successCount += result.sentCount;
-          failureCount += result.failureCount || 0;
-        } catch (error) {
-          this.logger.error(`❌ [PushCampaignService] 발송 실패: userId=${userId}, error=${error.message}`);
-          failureCount++;
-        }
-      }
+      // MQ에서 비동기 처리되므로 일단 대상 수만큼 성공으로 간주
+      // 실제 결과는 MQ Worker에서 로그로 기록됨
+      const successCount = targetUsers.length;
+      const failureCount = 0;
 
       // ---------------------------------------------------------------
       // Step 5: 캠페인 상태 → COMPLETED 또는 FAILED

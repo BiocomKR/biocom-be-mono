@@ -1,21 +1,18 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import {
-  IPushProvider,
-  PushMessage,
-  PushSendResult,
-  PUSH_PROVIDER_TOKEN,
-} from '../interfaces/push-provider.interface';
+import { PushMessage } from '../interfaces/push-provider.interface';
 import { PushNotificationType, PushLogStatus } from '../enums';
 import { PushLogQueryDto } from '../dto/push-log-query.dto';
 import { PushLogListResponseDto, PushLogResponseDto } from '../dto/push-log-response.dto';
 import { PushStatsResponseDto } from '../dto/push-stats-response.dto';
 import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
+import { QueueService, PushNotificationType as QueuePushType } from '../../queues/queue.service';
 
 /**
  * 푸시 알림 전송 서비스
  *
  * 유저에게 푸시 알림을 전송하는 비즈니스 로직
+ * FCM 직접 발송 대신 MQ Worker에게 위임
  */
 @Injectable()
 export class PushNotificationService {
@@ -23,115 +20,65 @@ export class PushNotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(PUSH_PROVIDER_TOKEN) private readonly pushProvider: IPushProvider,
+    private readonly queueService: QueueService,
   ) {}
+
+  /**
+   * PushNotificationType을 Queue용 타입으로 변환
+   */
+  private toQueuePushType(type?: PushNotificationType): QueuePushType {
+    switch (type) {
+      case PushNotificationType.SYSTEM:
+        return QueuePushType.SYSTEM;
+      case PushNotificationType.REMIND:
+        return QueuePushType.REMIND;
+      case PushNotificationType.MARKETING:
+        return QueuePushType.MARKETING;
+      case PushNotificationType.TRANSACTIONAL:
+        return QueuePushType.TRANSACTIONAL;
+      default:
+        return QueuePushType.ETC;
+    }
+  }
 
   /**
    * 특정 유저에게 푸시 알림 전송
    *
+   * MQ Worker에게 위임하여 비동기 처리
+   *
    * @param userId - 유저 ID
    * @param message - 푸시 메시지
    * @param isTest - 테스트 발송 여부 (기본값: false)
-   * @returns 전송 결과
+   * @returns Job 추가 결과
    */
   async sendToUser(userId: number, message: PushMessage, isTest: boolean = false) {
     this.logger.log(
-      `📤 [PushNotificationService] 유저에게 푸시 전송: userId=${userId}, title="${message.title}"`,
+      `📤 [PushNotificationService] 유저 푸시 전송 요청 (MQ): userId=${userId}, title="${message.title}"`,
     );
 
     try {
-      // 1. 활성화된 FCM 푸시 토큰 조회
-      const pushTokens = await this.prisma.pushToken.findMany({
-        where: {
-          userId,
-          isActive: true,
-          provider: 'FCM',
-        },
-      });
-
-      if (pushTokens.length === 0) {
-        this.logger.warn(
-          `⚠️ [PushNotificationService] 활성 푸시 토큰 없음: userId=${userId}`,
-        );
-        return {
-          success: false,
-          message: '활성화된 푸시 토큰이 없습니다',
-          sentCount: 0,
-          failureCount: 0,
-        };
-      }
-
-      this.logger.log(
-        `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
+      const job = await this.queueService.addPushToUser(
+        userId,
+        message,
+        this.toQueuePushType(PushNotificationType.ETC),
+        isTest,
       );
 
-      // 2. 각 토큰별로 로그 생성 후 전송
-      const results: PushSendResult[] = [];
-      let successCount = 0;
-      let failureCount = 0;
-
-      for (const pushToken of pushTokens) {
-        this.logger.debug(
-          `🔍 [PushNotificationService] 토큰 확인: tokenId=${pushToken.id}, token=${pushToken.token?.substring(0, 20)}..., deviceId=${pushToken.deviceId}`,
-        );
-
-        // 2-1. 로그 미리 생성 (success=true로 가정)
-        const logId = await this.createPendingLog(
-          pushToken,
-          message,
-          PushNotificationType.ETC,
-          isTest,
-        );
-
-        // 2-2. logId를 포함한 메시지 생성
-        const enrichedMessage: PushMessage = {
-          ...message,
-          data: {
-            ...message.data,
-            logId: logId?.toString(),
-          },
-        };
-
-        // 2-3. FCM 전송
-        this.logger.debug(
-          `📤 [PushNotificationService] FCM 전송 시도: token=${pushToken.token ? '있음' : '없음'}`,
-        );
-        const result = await this.pushProvider.sendToToken(
-          pushToken.token,
-          enrichedMessage,
-        );
-        results.push(result);
-
-        // 2-4. 로그 업데이트 (실패 시)
-        if (logId && !result.success) {
-          await this.updateLogWithFailure(logId, result);
-        }
-
-        // 2-5. PushToken 상태 업데이트
-        await this.updateTokenStats(pushToken.id, result.success);
-
-        // 2-6. 실패한 토큰 비활성화
-        if (this.shouldInvalidateToken(result)) {
-          await this.invalidateToken(pushToken, result.errorCode);
-        }
-
-        if (result.success) successCount++;
-        else failureCount++;
-      }
-
       this.logger.log(
-        `✅ [PushNotificationService] 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
+        `✅ [PushNotificationService] MQ Job 추가 완료: jobId=${job.id}, userId=${userId}`,
       );
 
+      // Job이 추가되었으므로 일단 성공 반환 (실제 발송은 MQ Worker가 처리)
       return {
-        success: successCount > 0,
-        message: `${successCount}개 기기에 전송 성공`,
-        sentCount: successCount,
-        failureCount,
+        success: true,
+        message: 'MQ에 푸시 발송 요청이 추가되었습니다',
+        jobId: job.id,
+        sentCount: 0, // MQ에서 처리되므로 0으로 반환
+        failureCount: 0,
       };
     } catch (error) {
       this.logger.error(
-        `❌ [PushNotificationService] 유저 푸시 전송 실패: userId=${userId}, ${error.message}`,
+        `❌ [PushNotificationService] MQ Job 추가 실패: userId=${userId}, ${error.message}`,
         error.stack,
       );
       throw error;
@@ -141,37 +88,40 @@ export class PushNotificationService {
   /**
    * 여러 유저에게 푸시 알림 전송 (배치)
    *
+   * MQ Worker에게 위임하여 비동기 처리
+   *
    * @param userIds - 유저 ID 배열
    * @param message - 푸시 메시지
    * @param isTest - 테스트 발송 여부 (기본값: false)
-   * @returns 전송 결과
+   * @returns Job 추가 결과
    */
   async sendToUsers(userIds: number[], message: PushMessage, isTest: boolean = false) {
     this.logger.log(
-      `📤 [PushNotificationService] 다수 유저에게 푸시 전송: ${userIds.length}명, title="${message.title}"`,
+      `📤 [PushNotificationService] 다수 유저 푸시 전송 요청 (MQ): ${userIds.length}명, title="${message.title}"`,
     );
 
     try {
-      const results = await Promise.all(
-        userIds.map((userId) => this.sendToUser(userId, message, isTest)),
+      const job = await this.queueService.addPushToUsers(
+        userIds,
+        message,
+        this.toQueuePushType(PushNotificationType.ETC),
+        isTest,
       );
 
-      const totalSent = results.reduce((sum, r) => sum + r.sentCount, 0);
-      const totalFailed = results.reduce((sum, r) => sum + (r.failureCount || 0), 0);
-
       this.logger.log(
-        `✅ [PushNotificationService] 배치 전송 완료: 성공 ${totalSent}, 실패 ${totalFailed}`,
+        `✅ [PushNotificationService] MQ Job 추가 완료: jobId=${job.id}, count=${userIds.length}`,
       );
 
       return {
-        success: totalSent > 0,
-        message: `${totalSent}개 기기에 전송 성공`,
-        sentCount: totalSent,
-        failureCount: totalFailed,
+        success: true,
+        message: 'MQ에 푸시 발송 요청이 추가되었습니다',
+        jobId: job.id,
+        sentCount: 0,
+        failureCount: 0,
       };
     } catch (error) {
       this.logger.error(
-        `❌ [PushNotificationService] 배치 전송 실패: ${error.message}`,
+        `❌ [PushNotificationService] MQ Job 추가 실패: ${error.message}`,
         error.stack,
       );
       throw error;
@@ -181,14 +131,12 @@ export class PushNotificationService {
   /**
    * 모든 유저에게 푸시 알림 전송 (공지사항 등)
    *
-   * FCM Multicast API를 활용하여 배치 단위로 효율적으로 발송
-   * - FCM 제약: 최대 500개 토큰을 한 번에 발송 가능
-   * - 각 토큰별 로그 생성, 결과 업데이트, 토큰 상태 관리 수행
+   * MQ Worker에게 위임하여 비동기 처리
    *
    * @param message - 푸시 메시지
    * @param filter - 선택적 필터 (예: 마케팅 동의 여부)
    * @param isTest - 테스트 발송 여부 (기본값: false)
-   * @returns 전송 결과
+   * @returns Job 추가 결과
    */
   async sendToAll(
     message: PushMessage,
@@ -196,140 +144,35 @@ export class PushNotificationService {
     isTest: boolean = false,
   ) {
     this.logger.log(
-      `📣 [PushNotificationService] 전체 푸시 전송: title="${message.title}"`,
+      `📣 [PushNotificationService] 전체 푸시 전송 요청 (MQ): title="${message.title}"`,
     );
 
     try {
-      // 활성화된 모든 FCM 푸시 토큰 조회
-      const pushTokens = await this.prisma.pushToken.findMany({
-        where: {
-          isActive: true,
-          provider: 'FCM',
-          ...(filter?.marketingEnabled !== undefined && {
-            marketingEnabled: filter.marketingEnabled,
-          }),
-        },
-      });
-
-      if (pushTokens.length === 0) {
-        this.logger.warn(
-          `⚠️ [PushNotificationService] 전송 대상 없음 (필터 적용됨)`,
-        );
-        return {
-          success: false,
-          message: '전송 대상이 없습니다',
-          sentCount: 0,
-          failureCount: 0,
-        };
-      }
-
-      this.logger.log(
-        `🎯 [PushNotificationService] 전송 대상: ${pushTokens.length}개 기기`,
+      const job = await this.queueService.addPushToAll(
+        message,
+        this.toQueuePushType(PushNotificationType.SYSTEM),
+        isTest,
+        filter,
       );
 
-      // FCM Multicast 배치 크기 (최대 500개)
-      const BATCH_SIZE = 500;
-      let successCount = 0;
-      let failureCount = 0;
-
-      // 배치 단위로 Multicast 발송
-      for (let i = 0; i < pushTokens.length; i += BATCH_SIZE) {
-        const batch = pushTokens.slice(i, i + BATCH_SIZE);
-
-        // 1. 배치 내 모든 토큰에 대해 로그 미리 생성
-        const logIds: (number | null)[] = await Promise.all(
-          batch.map((pushToken) =>
-            this.createPendingLog(pushToken, message, PushNotificationType.SYSTEM, isTest),
-          ),
-        );
-
-        // 2. FCM Multicast 발송 (sendToMultiple 활용)
-        const batchResults = await this.pushProvider.sendToMultiple(batch, message);
-
-        // 3. 각 토큰별 결과 처리
-        await Promise.all(
-          batch.map(async (pushToken, index) => {
-            const result = batchResults[index];
-            const logId = logIds[index];
-
-            // 로그 실패 업데이트
-            if (logId && !result.success) {
-              await this.updateLogWithFailure(logId, result);
-            }
-
-            // 토큰 통계 업데이트
-            await this.updateTokenStats(pushToken.id, result.success);
-
-            // 무효 토큰 비활성화
-            if (this.shouldInvalidateToken(result)) {
-              await this.invalidateToken(pushToken, result.errorCode);
-            }
-
-            // 결과 집계
-            if (result.success) successCount++;
-            else failureCount++;
-          }),
-        );
-
-        this.logger.debug(
-          `📦 [PushNotificationService] 배치 ${Math.floor(i / BATCH_SIZE) + 1} 완료: ${batch.length}개 처리 (Multicast)`,
-        );
-      }
-
       this.logger.log(
-        `✅ [PushNotificationService] 전체 전송 완료: 성공 ${successCount}/${pushTokens.length}`,
+        `✅ [PushNotificationService] MQ Job 추가 완료: jobId=${job.id}`,
       );
 
       return {
-        success: successCount > 0,
-        message: `${successCount}개 기기에 전송 성공`,
-        sentCount: successCount,
-        failureCount,
+        success: true,
+        message: 'MQ에 푸시 발송 요청이 추가되었습니다',
+        jobId: job.id,
+        sentCount: 0,
+        failureCount: 0,
       };
     } catch (error) {
       this.logger.error(
-        `❌ [PushNotificationService] 전체 전송 실패: ${error.message}`,
+        `❌ [PushNotificationService] MQ Job 추가 실패: ${error.message}`,
         error.stack,
       );
       throw error;
     }
-  }
-
-  /**
-   * 토큰 무효화 여부 판단
-   *
-   * @param result - FCM 전송 결과
-   * @returns 토큰 무효화 필요 여부
-   * @private
-   */
-  private shouldInvalidateToken(result: PushSendResult): boolean {
-    return (
-      !result.success &&
-      (result.errorCode === 'messaging/invalid-registration-token' ||
-        result.errorCode === 'messaging/registration-token-not-registered')
-    );
-  }
-
-  /**
-   * 토큰 비활성화
-   *
-   * @param pushToken - 푸시 토큰
-   * @param errorCode - 에러 코드
-   * @private
-   */
-  private async invalidateToken(pushToken: any, errorCode?: string) {
-    this.logger.warn(
-      `⚠️ [PushNotificationService] 토큰 무효화: deviceId=${pushToken.deviceId}, errorCode=${errorCode}`,
-    );
-
-    await this.prisma.pushToken.update({
-      where: { id: pushToken.id },
-      data: {
-        isActive: false,
-        invalidatedAt: getNowKST(),
-        invalidReason: errorCode,
-      },
-    });
   }
 
   /**
@@ -358,7 +201,6 @@ export class PushNotificationService {
       if (type) {
         where.type = type;
       }
-      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
       if (isTest !== undefined) {
         where.isTest = isTest;
       }
@@ -409,10 +251,6 @@ export class PushNotificationService {
 
   /**
    * PushNotificationLog 엔티티를 ResponseDto로 변환
-   *
-   * @param log - Prisma PushNotificationLog 엔티티
-   * @returns PushLogResponseDto
-   * @private
    */
   private mapToLogResponseDto(log: any): PushLogResponseDto {
     return {
@@ -436,18 +274,15 @@ export class PushNotificationService {
   /**
    * 푸시 통계 조회 (관리자용)
    *
-   * 데이터베이스에서 집계된 통계를 반환합니다
-   *
    * @param startDate - 시작 날짜 (YYYY-MM-DD)
    * @param endDate - 종료 날짜 (YYYY-MM-DD)
-   * @param isTest - 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
+   * @param isTest - 테스트 발송 필터
    * @returns 푸시 통계
    */
   async getPushStats(startDate?: string, endDate?: string, isTest?: boolean): Promise<PushStatsResponseDto> {
     this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회 (isTest=${isTest})`);
 
     try {
-      // WHERE 조건 구성
       const whereFilter: any = {};
 
       if (startDate) {
@@ -462,32 +297,24 @@ export class PushNotificationService {
           lte: stringToKSTDate(endDate, 23, 59, 59),
         };
       }
-      // 테스트 발송 필터 (true: 테스트만, false: 실제 발송만, undefined: 전체)
       if (isTest !== undefined) {
         whereFilter.isTest = isTest;
       }
 
-      // Prisma ORM을 사용한 통계 조회 (병렬 실행)
       const [totalSent, successCount, failureCount, readCount, clickedCount, typeStats] = await Promise.all([
-        // 전체 전송 수
         this.prisma.pushNotificationLog.count({ where: whereFilter }),
-        // 성공 수
         this.prisma.pushNotificationLog.count({
           where: { ...whereFilter, success: true },
         }),
-        // 실패 수
         this.prisma.pushNotificationLog.count({
           where: { ...whereFilter, success: false },
         }),
-        // 읽음 수
         this.prisma.pushNotificationLog.count({
           where: { ...whereFilter, readAt: { not: null } },
         }),
-        // 클릭 수
         this.prisma.pushNotificationLog.count({
           where: { ...whereFilter, clickedAt: { not: null } },
         }),
-        // 타입별 집계
         this.prisma.pushNotificationLog.groupBy({
           by: ['type'],
           where: whereFilter,
@@ -495,14 +322,13 @@ export class PushNotificationService {
         }),
       ]);
 
-      // 타입별 통계를 Record 형태로 변환
       const byType: Record<string, number> = {};
       typeStats.forEach((item: { type: string; _count: { type: number } }) => {
         byType[item.type] = item._count.type;
       });
 
       this.logger.log(
-        `✅ [PushNotificationService] 통계 조회 완료: 총 ${totalSent}건, 성공 ${successCount}건, 실패 ${failureCount}건, 읽음 ${readCount}건, 클릭 ${clickedCount}건`,
+        `✅ [PushNotificationService] 통계 조회 완료: 총 ${totalSent}건, 성공 ${successCount}건`,
       );
 
       return {
@@ -540,7 +366,6 @@ export class PushNotificationService {
     );
 
     try {
-      // 1. 로그 조회 및 권한 확인
       const log = await this.prisma.pushNotificationLog.findFirst({
         where: {
           id: logId,
@@ -558,19 +383,16 @@ export class PushNotificationService {
         };
       }
 
-      // 2. 상태에 따라 업데이트
       const updateData: any = {};
       if (status === PushLogStatus.READ && !log.readAt) {
         updateData.readAt = getNowKST();
       } else if (status === PushLogStatus.CLICKED && !log.clickedAt) {
         updateData.clickedAt = getNowKST();
-        // CLICKED는 READ를 포함하므로 readAt도 함께 설정
         if (!log.readAt) {
           updateData.readAt = getNowKST();
         }
       }
 
-      // 이미 업데이트된 경우
       if (Object.keys(updateData).length === 0) {
         this.logger.log(
           `ℹ️ [PushNotificationService] 이미 업데이트됨: logId=${logId}, status=${status}`,
@@ -581,7 +403,6 @@ export class PushNotificationService {
         };
       }
 
-      // 3. 업데이트 실행
       await this.prisma.pushNotificationLog.update({
         where: { id: logId },
         data: updateData,
@@ -601,92 +422,6 @@ export class PushNotificationService {
         error.stack,
       );
       throw error;
-    }
-  }
-
-  /**
-   * 푸시 로그 미리 생성 (전송 전)
-   *
-   * @param pushToken - 푸시 토큰
-   * @param message - 푸시 메시지
-   * @param type - 푸시 타입
-   * @returns 생성된 로그 ID (실패 시 null)
-   * @private
-   */
-  private async createPendingLog(
-    pushToken: any,
-    message: PushMessage,
-    type: PushNotificationType,
-    isTest: boolean = false,
-  ): Promise<number | null> {
-    try {
-      const log = await this.prisma.pushNotificationLog.create({
-        data: {
-          userId: pushToken.userId,
-          pushTokenId: pushToken.id,
-          title: message.title,
-          body: message.body,
-          type,
-          data: message.data,
-          success: true, // 기본값 true (실패 시 업데이트)
-          sentAt: getNowKST(),
-          isTest, // 테스트 발송 여부
-        },
-      });
-      return log.id;
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] 로그 생성 실패: ${error.message}`,
-      );
-      return null;
-    }
-  }
-
-  /**
-   * 푸시 로그를 실패로 업데이트
-   *
-   * @param logId - 로그 ID
-   * @param result - FCM 전송 결과
-   * @private
-   */
-  private async updateLogWithFailure(logId: number, result: PushSendResult) {
-    try {
-      await this.prisma.pushNotificationLog.update({
-        where: { id: logId },
-        data: {
-          success: false,
-          errorCode: result.errorCode,
-          errorMessage: result.errorMessage,
-        },
-      });
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] 로그 업데이트 실패: ${error.message}`,
-      );
-    }
-  }
-
-  /**
-   * PushToken 상태 업데이트 (lastUsedAt, successCount, failureCount)
-   *
-   * @param tokenId - 토큰 ID
-   * @param success - 전송 성공 여부
-   * @private
-   */
-  private async updateTokenStats(tokenId: number, success: boolean) {
-    try {
-      await this.prisma.pushToken.update({
-        where: { id: tokenId },
-        data: {
-          lastUsedAt: getNowKST(),
-          successCount: success ? { increment: 1 } : undefined,
-          failureCount: success ? undefined : { increment: 1 },
-        },
-      });
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] 토큰 상태 업데이트 실패: ${error.message}`,
-      );
     }
   }
 }

@@ -18,6 +18,7 @@ export { QUEUE_NAMES };
     BullModule.registerQueue(
       { name: QUEUE_NAMES.APP_EVENT },
       { name: QUEUE_NAMES.PUSH_NOTIFICATION },
+      { name: QUEUE_NAMES.ORDER_SYNC },
     ),
   ],
   controllers: [QueueTestController],
