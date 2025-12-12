@@ -226,9 +226,10 @@ export class PaymentService {
         }
       });
 
-      // 챌린지 상품 티켓 발급
+      // 챌린지/구독 상품 티켓 발급 (결제 완료 시 단일 소스)
       for (const item of order.items) {
-        if (item.product.categoryCode === 'CHALLENGE') {
+        if (['CHALLENGE', 'SUBSCRIPTION'].includes(item.product.categoryCode || '')) {
+          const ticketType = item.product.categoryCode === 'SUBSCRIPTION' ? 'SUBSCRIPTION' : 'CHALLENGE';
           for (let i = 0; i < item.quantity; i++) {
             await tx.challengeTicket.create({
               data: {
@@ -237,12 +238,12 @@ export class PaymentService {
                 orderItemId: item.id,
                 purchaseDate: getNowKST(),
                 status: ChallengeTicketStatus.PURCHASED,
-                ticketType: 'CHALLENGE',
+                ticketType,
                 createdAt: getNowKST(),
               }
             });
           }
-          this.logger.log(`챌린지 티켓 발급 완료: productId=${item.productId}, quantity=${item.quantity}`);
+          this.logger.log(`${ticketType} 티켓 발급 완료: productId=${item.productId}, quantity=${item.quantity}`);
         }
       }
 
@@ -430,7 +431,7 @@ export class PaymentService {
         return {
           orderId: order.id,
           orderNumber: order.orderNumber,
-          amount: convertDecimalToNumber(refund.amount) || 0,
+          amount: convertDecimalToNumber(refund.refundAmount) || 0,
           orderName: `주문번호: ${order.orderNumber}`,
           customerName: order.recipientName,
           customerEmail: '',
