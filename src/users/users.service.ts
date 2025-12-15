@@ -162,6 +162,7 @@ export class UsersService {
               mobile: true,
               points: true,
               aiPersonaId: true,
+              mbti: true,
               createdAt: true,
               updatedAt: true,
             },
@@ -251,12 +252,13 @@ export class UsersService {
         throw new NotFoundException(`ID ${id}인 사용자를 찾을 수 없습니다.`);
       }
 
-      // 사용자 정보 수정 (이름, 휴대폰 번호만)
+      // 사용자 정보 수정 (이름, 휴대폰 번호, MBTI)
       const user = await this.prisma.user.update({
         where: { id },
         data: {
           name: updateUserDto.name,
           mobile: updateUserDto.mobile,
+          mbti: updateUserDto.mbti,
         },
         select: {
           id: true,
@@ -264,6 +266,7 @@ export class UsersService {
           name: true,
           mobile: true,
           points: true,
+          mbti: true,
           createdAt: true,
           updatedAt: true,
         },

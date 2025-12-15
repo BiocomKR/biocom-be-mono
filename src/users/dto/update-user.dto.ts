@@ -32,4 +32,18 @@ export class UpdateUserDto {
   @IsString({ message: '휴대폰 번호는 문자열이어야 합니다.' })
   @Matches(/^01[0-9]{8,9}$/, { message: '올바른 휴대폰 번호 형식이 아닙니다.' })
   mobile?: string;
+
+  /**
+   * MBTI (선택사항)
+   */
+  @ApiProperty({
+    description: 'MBTI 유형',
+    example: 'INTJ',
+    required: false,
+    maxLength: 4,
+  })
+  @IsOptional()
+  @IsString({ message: 'MBTI는 문자열이어야 합니다.' })
+  @Matches(/^[EI][SN][TF][JP]$/, { message: '올바른 MBTI 형식이 아닙니다. (예: INTJ, ENFP)' })
+  mbti?: string;
 }
