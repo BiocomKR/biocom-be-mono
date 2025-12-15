@@ -266,11 +266,20 @@ export class SurveyService {
       totalScore += score;
     }
 
-    // 최고 점수 카테고리 찾기
+    // health_type_animals 테이블에 있는 유효한 건강 타입만 조회
+    const validHealthTypes = await prismaClient.healthTypeAnimal.findMany({
+      select: { healthType: true },
+    });
+    const validTypesSet = new Set(validHealthTypes.map((t) => t.healthType));
+
+    // 최고 점수 카테고리 찾기 (유효한 건강 타입만 대상)
     let dominantCategory: string | null = null;
     let maxScore = 0;
 
     for (const [category, score] of Object.entries(categoryScores)) {
+      // health_type_animals에 없는 카테고리(예: SLEEP)는 제외
+      if (!validTypesSet.has(category)) continue;
+
       if (score > maxScore) {
         maxScore = score;
         dominantCategory = category;
