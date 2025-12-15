@@ -216,3 +216,40 @@ export function getDayOfWeek(dateString: string): string {
   const date = new Date(dateString);
   return days[date.getDay()];
 }
+
+/**
+ * ISO 8601 형식의 타임존 포함 문자열을 KST Date로 변환
+ *
+ * 토스페이먼츠 approvedAt 같은 "+09:00" 타임존 포함 문자열을 안전하게 파싱
+ * 타임존 정보를 보존하여 환경에 무관하게 정확한 KST 시간을 추출
+ *
+ * @param isoString ISO 8601 형식 문자열 (예: "2025-12-12T05:44:24+09:00")
+ * @returns KST 기준 Date 객체
+ *
+ * @example
+ * // 토스 approvedAt 파싱
+ * const paidAt = parseISO8601ToKST("2025-12-12T05:44:24+09:00");
+ * // DB에 2025-12-12 05:44:24로 저장됨
+ */
+export function parseISO8601ToKST(isoString: string): Date {
+  // ISO 8601 파싱 (타임존 정보 포함)
+  const parsed = new Date(isoString);
+
+  if (isNaN(parsed.getTime())) {
+    throw new Error(`Invalid ISO 8601 format: ${isoString}`);
+  }
+
+  // KST = UTC + 9시간
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kstTime = new Date(parsed.getTime() + kstOffset);
+
+  // KST 시간값을 UTC Date 객체로 생성 (Prisma 저장용)
+  return createKSTDate(
+    kstTime.getUTCFullYear(),
+    kstTime.getUTCMonth() + 1,
+    kstTime.getUTCDate(),
+    kstTime.getUTCHours(),
+    kstTime.getUTCMinutes(),
+    kstTime.getUTCSeconds()
+  );
+}

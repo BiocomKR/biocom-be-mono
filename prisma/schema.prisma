@@ -511,6 +511,7 @@ model ChallengeTicket {
   userId         Int             @map("user_id")
   productId      Int?            @map("product_id")
   orderItemId    Int?            @map("order_item_id")
+  seq            Int             @default(1) @map("seq") // 동일 orderItem 내 티켓 순번 (1부터 시작)
   purchaseDate   DateTime        @map("purchase_date")
   status         String          @default("PURCHASED") @db.VarChar(20)
   createdAt      DateTime        @map("created_at")
@@ -524,6 +525,7 @@ model ChallengeTicket {
   iapReceipt     IAPReceipt?
   userChallenges UserChallenge[]
 
+  @@unique([orderItemId, seq]) // 동일 orderItem에서 seq 중복 방지 (레이스 컨디션 방어)
   @@index([userId, status, ticketType])
   @@map("challenge_tickets")
 }

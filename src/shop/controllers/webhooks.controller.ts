@@ -53,8 +53,13 @@ export class WebhooksController {
     transmissionTime: string,
   ): boolean {
     if (!this.webhookSecretKey) {
-      this.logger.warn('⚠️ TOSS_WEBHOOK_SECRET_KEY 미설정 - 서명 검증 건너뜀');
-      return true; // 개발 환경에서 키 미설정 시 통과
+      // 운영 환경에서는 키 미설정 시 무조건 실패 (보안 취약점 방지)
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.error('❌ TOSS_WEBHOOK_SECRET_KEY 미설정 - 운영 환경에서 필수');
+        return false;
+      }
+      this.logger.warn('⚠️ TOSS_WEBHOOK_SECRET_KEY 미설정 - 개발 환경이므로 검증 건너뜀');
+      return true;
     }
 
     try {
@@ -119,8 +124,15 @@ export class WebhooksController {
     );
 
     try {
-      // 1. 서명 검증 (헤더가 있는 경우에만)
-      if (signature && transmissionTime) {
+      // 1. 서명 검증
+      // 운영 환경에서는 서명 헤더 필수 (보안 강화)
+      if (!signature || !transmissionTime) {
+        if (process.env.NODE_ENV === 'production') {
+          this.logger.error('❌ 웹훅 서명 헤더 누락 - 운영 환경에서 요청 거부');
+          throw new UnauthorizedException('Missing webhook signature headers');
+        }
+        this.logger.warn('⚠️ 웹훅 서명 헤더 없음 - 개발 환경이므로 검증 건너뜀');
+      } else {
         // NestJS rawBody 옵션으로 설정된 rawBody (Buffer)
         const rawBody = req.rawBody?.toString() || JSON.stringify(webhookData);
         const isValid = this.verifyWebhookSignature(
@@ -135,8 +147,6 @@ export class WebhooksController {
         }
 
         this.logger.log('✅ 웹훅 서명 검증 성공');
-      } else {
-        this.logger.warn('⚠️ 웹훅 서명 헤더 없음 - 검증 건너뜀');
       }
 
       // 2. 웹훅 데이터 처리

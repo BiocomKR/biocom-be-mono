@@ -7,15 +7,13 @@ import {
   Query,
   UseGuards,
   Request,
-  HttpCode,
-  HttpStatus,
   Res
 } from '@nestjs/common';
 import { Response } from 'express';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
   ApiBearerAuth,
   ApiBody,
   ApiParam
@@ -27,7 +25,6 @@ import {
   ConfirmPaymentDto,
   CancelPaymentDto,
   PaymentResponseDto,
-  PaymentWebhookDto
 } from '../dto/payment/payment.dto';
 
 @Controller('shop/payment')
@@ -60,18 +57,23 @@ export class PaymentController {
    * 클라이언트에서 결제 완료 후 서버 승인 처리
    */
   @Post('confirm')
-  @ApiOperation({ 
-    summary: '결제 승인', 
-    description: '토스페이먼츠 결제를 승인하고 주문을 완료합니다' 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '결제 승인',
+    description: '토스페이먼츠 결제를 승인하고 주문을 완료합니다'
   })
   @ApiBody({ type: ConfirmPaymentDto })
   @ApiResponse({ status: 200, description: '성공', type: PaymentResponseDto })
   @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @ApiResponse({ status: 401, description: '인증 필요' })
+  @ApiResponse({ status: 403, description: '주문 소유자가 아님' })
   @ApiResponse({ status: 404, description: '주문을 찾을 수 없음' })
   async confirmPayment(
+    @Request() req,
     @Body() dto: ConfirmPaymentDto
   ): Promise<PaymentResponseDto> {
-    return this.paymentService.confirmPayment(dto);
+    return this.paymentService.confirmPayment(req.user.id, dto);
   }
 
   /**
@@ -93,25 +95,6 @@ export class PaymentController {
     @Body() dto: CancelPaymentDto
   ): Promise<PaymentResponseDto> {
     return this.paymentService.cancelPayment(req.user.id, dto);
-  }
-
-  /**
-   * 토스페이먼츠 웹훅
-   * 결제 상태 변경 알림 수신
-   */
-  @Post('webhook')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
-    summary: '토스페이먼츠 웹훅', 
-    description: '토스페이먼츠에서 전송하는 결제 상태 변경 웹훅을 처리합니다' 
-  })
-  @ApiBody({ type: PaymentWebhookDto })
-  @ApiResponse({ status: 200, description: '처리 완료' })
-  async handleWebhook(
-    @Body() dto: PaymentWebhookDto
-  ): Promise<{ received: boolean }> {
-    await this.paymentService.handleWebhook(dto);
-    return { received: true };
   }
 
   /**

@@ -4,6 +4,7 @@ import { PlayautoProvider } from './providers/playauto.provider';
 import { LOGISTICS_PROVIDER_TOKEN } from './interfaces/logistics-provider.interface';
 import { PlayautoService } from './services/playauto.service';
 import { ShippingSyncSchedulerService } from './services/shipping-sync-scheduler.service';
+import { LogisticsRetrySchedulerService } from './services/logistics-retry-scheduler.service';
 
 /**
  * 물류 서비스 모듈
@@ -24,12 +25,14 @@ import { ShippingSyncSchedulerService } from './services/shipping-sync-scheduler
     PlayautoProvider, // 직접 주입 호환용
     PlayautoService, // 기존 코드 호환용 (점진적 마이그레이션)
     ShippingSyncSchedulerService, // 배송 상태 동기화 배치
+    LogisticsRetrySchedulerService, // 물류 주문 생성 재시도 배치
   ],
   exports: [
     LOGISTICS_PROVIDER_TOKEN,
     PlayautoProvider, // 직접 주입 호환용
     PlayautoService, // 기존 코드 호환용 (점진적 마이그레이션)
     ShippingSyncSchedulerService, // main.ts에서 사용
+    LogisticsRetrySchedulerService, // main.ts에서 사용
   ],
 })
 export class PlayautoModule {}
