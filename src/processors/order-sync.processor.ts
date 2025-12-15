@@ -13,6 +13,37 @@ interface PlayautoStatusMapping {
 }
 
 /**
+ * 주문 상태 우선순위 (정상 흐름)
+ * 숫자가 클수록 진행된 상태
+ * 역행 방지: 현재 상태보다 낮은 우선순위로는 변경 불가
+ */
+const ORDER_STATUS_PRIORITY: Record<string, number> = {
+  PENDING_PAYMENT: 0,
+  PAID: 1,
+  PREPARING: 2,
+  SHIPPING: 3,
+  DELIVERED: 4,
+  COMPLETED: 5,
+  // 취소/반품/교환은 별도 흐름이므로 높은 우선순위 부여 (항상 허용)
+  CANCEL_REQUESTED: 100,
+  CANCELLED: 101,
+  RETURN_REQUESTED: 102,
+  RETURNED: 103,
+  EXCHANGE_REQUESTED: 104,
+  EXCHANGED: 105,
+};
+
+/**
+ * 배송 상태 우선순위
+ */
+const SHIPPING_STATUS_PRIORITY: Record<string, number> = {
+  PENDING: 0,
+  READY_FOR_SHIPMENT: 1,
+  IN_TRANSIT: 2,
+  DELIVERED: 3,
+};
+
+/**
  * 플레이오토 상태 → 우리 DB 상태 매핑
  */
 const PLAYAUTO_STATUS_MAP: Record<string, PlayautoStatusMapping> = {
@@ -140,23 +171,33 @@ export class OrderSyncProcessor extends WorkerHost {
     const updates: any = {};
     const shippingUpdates: any = {};
 
-    // 3. 주문 상태 업데이트 필요 여부 확인
+    // 3. 주문 상태 업데이트 필요 여부 확인 (역행 방지)
     if (statusMapping.orderStatus && order.status !== statusMapping.orderStatus) {
-      updates.status = statusMapping.orderStatus;
+      const currentPriority = ORDER_STATUS_PRIORITY[order.status] ?? -1;
+      const newPriority = ORDER_STATUS_PRIORITY[statusMapping.orderStatus] ?? -1;
 
-      // 상태별 타임스탬프 업데이트
-      if (statusMapping.orderStatus === 'SHIPPING' && !order.shippedAt) {
-        updates.shippedAt = now;
-      }
-      if (statusMapping.orderStatus === 'DELIVERED' && !order.deliveredAt) {
-        updates.deliveredAt = now;
-      }
-      if (statusMapping.orderStatus === 'COMPLETED' && !order.completedAt) {
-        updates.completedAt = now;
+      // 역행 방지: 현재 상태보다 낮은 우선순위로는 변경 불가
+      if (newPriority <= currentPriority) {
+        this.logger.warn(
+          `상태 역행 방지: orderId=${orderId}, 현재=${order.status}(${currentPriority}) → 시도=${statusMapping.orderStatus}(${newPriority}), 플레이오토=${playautoStatus}`,
+        );
+      } else {
+        updates.status = statusMapping.orderStatus;
+
+        // 상태별 타임스탬프 업데이트
+        if (statusMapping.orderStatus === 'SHIPPING' && !order.shippedAt) {
+          updates.shippedAt = now;
+        }
+        if (statusMapping.orderStatus === 'DELIVERED' && !order.deliveredAt) {
+          updates.deliveredAt = now;
+        }
+        if (statusMapping.orderStatus === 'COMPLETED' && !order.completedAt) {
+          updates.completedAt = now;
+        }
       }
     }
 
-    // 4. 배송 정보 업데이트
+    // 4. 배송 정보 업데이트 (역행 방지)
     if (order.shipping) {
       if (trackingNumber && order.shipping.trackingNumber !== trackingNumber) {
         shippingUpdates.trackingNumber = trackingNumber;
@@ -168,20 +209,26 @@ export class OrderSyncProcessor extends WorkerHost {
         statusMapping.shippingStatus &&
         order.shipping.status !== statusMapping.shippingStatus
       ) {
-        shippingUpdates.status = statusMapping.shippingStatus;
+        const currentShippingPriority = SHIPPING_STATUS_PRIORITY[order.shipping.status] ?? -1;
+        const newShippingPriority = SHIPPING_STATUS_PRIORITY[statusMapping.shippingStatus] ?? -1;
 
-        // 상태별 타임스탬프
-        if (
-          statusMapping.shippingStatus === 'IN_TRANSIT' &&
-          !order.shipping.shippedAt
-        ) {
-          shippingUpdates.shippedAt = now;
-        }
-        if (
-          statusMapping.shippingStatus === 'DELIVERED' &&
-          !order.shipping.deliveredAt
-        ) {
-          shippingUpdates.deliveredAt = now;
+        // 배송 상태도 역행 방지
+        if (newShippingPriority > currentShippingPriority) {
+          shippingUpdates.status = statusMapping.shippingStatus;
+
+          // 상태별 타임스탬프
+          if (
+            statusMapping.shippingStatus === 'IN_TRANSIT' &&
+            !order.shipping.shippedAt
+          ) {
+            shippingUpdates.shippedAt = now;
+          }
+          if (
+            statusMapping.shippingStatus === 'DELIVERED' &&
+            !order.shipping.deliveredAt
+          ) {
+            shippingUpdates.deliveredAt = now;
+          }
         }
       }
     }
