@@ -18,8 +18,8 @@ data:
   REDIS_HOST: "10.213.120.195"
   REDIS_PORT: "6379"
 
-  # Neo4j 설정 (민감하지 않은 정보)
-  NEO4J_DATABASE: "neo4j"
+  # Firebase 설정 (FCM 푸시용)
+  FIREBASE_SERVICE_ACCOUNT_PATH: "/app/firebase/firebase-key.json"
 
   # Bull Board 설정
   BULL_BOARD_ENABLED: "true"

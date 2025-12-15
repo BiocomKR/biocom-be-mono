@@ -39,6 +39,10 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 
+# Firebase Service Account (민감정보)
+*firebase-adminsdk*.json
+google-service-account*.json
+
 # Temp files
 *.swp
 *.swo
