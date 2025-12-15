@@ -35,6 +35,7 @@ model User {
   refundBankCode               String?                        @map("refund_bank_code") @db.VarChar(10)
   refundBankName               String?                        @map("refund_bank_name") @db.VarChar(50)
   refundHolder                 String?                        @map("refund_holder") @db.VarChar(50)
+  mbti                         String?                        @db.VarChar(4)
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
