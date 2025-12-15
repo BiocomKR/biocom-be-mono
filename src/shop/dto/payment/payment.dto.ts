@@ -18,9 +18,9 @@ export class ConfirmPaymentDto {
   @IsString()
   paymentKey: string;
 
-  @ApiProperty({ description: '주문번호' })
+  @ApiProperty({ description: '주문번호 (토스 orderId로 전달됨)' })
   @IsString()
-  orderId: string;
+  orderNumber: string;
 
   @ApiProperty({ description: '결제 금액' })
   @IsNumber()

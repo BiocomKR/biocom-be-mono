@@ -1,7 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { OrderStatus, PaymentStatus, SubscriptionStatus } from '../../common/enums';
-import { getNowKST } from '../../common/utils/kst-date.util';
+import { OrderStatus, PaymentStatus, SubscriptionStatus, ChallengeTicketStatus } from '../../common/enums';
+import { getNowKST, parseISO8601ToKST } from '../../common/utils/kst-date.util';
+import {
+  ILogisticsProvider,
+  LOGISTICS_PROVIDER_TOKEN,
+} from '../../playauto/interfaces/logistics-provider.interface';
+import { CryptoUtil } from '../../common/utils/crypto.util';
 
 /**
  * 토스페이먼츠 웹훅 처리 서비스
@@ -20,7 +25,10 @@ import { getNowKST } from '../../common/utils/kst-date.util';
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(LOGISTICS_PROVIDER_TOKEN) private readonly logistics: ILogisticsProvider,
+  ) {}
 
   /**
    * 결제 로그 기록
@@ -142,12 +150,21 @@ export class WebhooksService {
    * - 계좌이체 완료
    * - 휴대폰 결제 완료
    *
+   * 처리 내용:
+   * 1. 주문/결제 상태 업데이트 (PAID, COMPLETED)
+   * 2. 챌린지 티켓 발급
+   * 3. 플레이오토 물류 주문 생성 (비동기)
+   *
    * @param data - 결제 승인 데이터
    */
   private async handlePaymentApproved(data: any) {
-    // PAYMENT_STATUS_CHANGED 웹훅에는 paymentKey, status, orderId만 포함됨
+    // PAYMENT_STATUS_CHANGED 웹훅에는 paymentKey, status, orderId, approvedAt 포함
     // amount는 포함되지 않음 (토스 공식 문서 참고)
-    const { paymentKey, orderId, status } = data;
+    const { paymentKey, orderId, status, approvedAt } = data;
+
+    // 토스 approvedAt을 KST Date로 변환 (예: "2025-12-12T05:44:24+09:00")
+    // approvedAt이 없으면 현재 시간 사용 (하위 호환성)
+    const paidAtKST = approvedAt ? parseISO8601ToKST(approvedAt) : getNowKST();
 
     this.logger.log(
       `💰 결제 승인 웹훅 수신: 주문번호=${orderId}, paymentKey=${paymentKey}, status=${status}`,
@@ -157,6 +174,13 @@ export class WebhooksService {
     // 카드 결제는 confirmPayment에서 이미 처리되므로 웹훅이 늦게 도착할 수 있음
     const existingOrder = await this.prisma.order.findFirst({
       where: { orderNumber: orderId },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
     });
 
     if (!existingOrder) {
@@ -164,28 +188,36 @@ export class WebhooksService {
       return; // throw 대신 return (웹훅 재시도 방지)
     }
 
-    // 이미 처리된 결제면 스킵 (멱등성 보장, 데드락 방지)
+    // PAID 상태면 후처리 누락 여부 확인 후 보정 실행
     if (existingOrder.status === OrderStatus.PAID) {
-      this.logger.warn(`⚠️  이미 처리된 주문입니다 (웹훅 스킵): ${orderId}`);
+      this.logger.log(`✅ 이미 PAID 상태인 주문, 후처리 누락 확인: ${orderId}`);
+      await this.ensurePostPaymentProcessing(existingOrder);
       return;
     }
 
     // 2. 트랜잭션으로 DB 업데이트 (가상계좌/계좌이체 등 비동기 결제용)
-    await this.prisma.$transaction(async (tx) => {
+    const updatedOrderId = await this.prisma.$transaction(async (tx) => {
       // FOR UPDATE로 행 락 획득 (동시 처리 방지)
       const order = await tx.order.findFirst({
         where: { orderNumber: orderId },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
       });
 
       if (!order) {
         this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
-        return;
+        return null;
       }
 
       // 다시 한번 상태 확인 (트랜잭션 내에서)
       if (order.status === OrderStatus.PAID) {
         this.logger.warn(`⚠️  이미 처리된 주문입니다 (트랜잭션 내): ${orderId}`);
-        return;
+        return null;
       }
 
       // 3. 주문 상태 업데이트: PENDING → PAID
@@ -193,7 +225,7 @@ export class WebhooksService {
         where: { id: order.id },
         data: {
           status: OrderStatus.PAID,
-          paidAt: getNowKST(),
+          paidAt: paidAtKST,
         },
       });
 
@@ -205,26 +237,222 @@ export class WebhooksService {
       if (payment) {
         const previousStatus = payment.status;
 
+        // paymentDetails가 없으면 웹훅 데이터라도 저장 (confirmPayment가 먼저 처리하면 이미 있음)
+        const updateData: any = {
+          pgTransactionId: paymentKey,
+          status: PaymentStatus.COMPLETED,
+          paidAt: paidAtKST,
+        };
+
+        // confirmPayment에서 이미 paymentDetails를 저장했으면 덮어쓰지 않음
+        if (!payment.paymentDetails) {
+          updateData.paymentDetails = data; // 웹훅 원문 저장
+        }
+
         await tx.payment.update({
           where: { id: payment.id },
-          data: {
-            pgTransactionId: paymentKey,
-            status: PaymentStatus.COMPLETED,
-            paidAt: getNowKST(),
-          },
+          data: updateData,
         });
 
         // 결제 로그 기록
         await this.createPaymentLog(tx, payment.id, previousStatus, PaymentStatus.COMPLETED, {
-          reason: '결제 승인 완료',
+          reason: '결제 승인 완료 (웹훅)',
           rawData: data,
         });
       }
 
-      this.logger.log(
-        `✅ 주문 상태 업데이트 완료: ${orderId} → PAID`,
-      );
+      // 5. 주문 상태 로그
+      await tx.orderStateLog.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: OrderStatus.PAID,
+          changeReason: '결제 완료 (웹훅)',
+          createdAt: getNowKST(),
+        },
+      });
+
+      // 6. 챌린지 상품 티켓 발급 (동시성 방어: seq 기반 deterministic 생성 + DB unique 제약)
+      for (const item of order.items) {
+        if (item.product.categoryCode === 'CHALLENGE') {
+          // seq 기반으로 deterministic하게 티켓 생성 (1부터 quantity까지)
+          for (let seq = 1; seq <= item.quantity; seq++) {
+            try {
+              await tx.challengeTicket.create({
+                data: {
+                  userId: order.userId,
+                  productId: item.productId,
+                  orderItemId: item.id,
+                  seq, // 동일 orderItem 내 순번 (unique 제약으로 중복 방지)
+                  purchaseDate: getNowKST(),
+                  status: ChallengeTicketStatus.PURCHASED,
+                  ticketType: 'CHALLENGE',
+                  createdAt: getNowKST(),
+                },
+              });
+            } catch (error: any) {
+              // P2002: Unique constraint violation → 이미 존재하는 티켓 (정상 케이스)
+              if (error.code === 'P2002') {
+                this.logger.log(`챌린지 티켓 이미 존재 (웹훅): orderItemId=${item.id}, seq=${seq}`);
+                continue;
+              }
+              throw error;
+            }
+          }
+          this.logger.log(`챌린지 티켓 발급 완료 (웹훅): orderItemId=${item.id}, quantity=${item.quantity}`);
+        }
+      }
+
+      this.logger.log(`✅ 주문 상태 업데이트 완료: ${orderId} → PAID`);
+
+      return order.id;
     });
+
+    // 7. 플레이오토 주문 생성 (비동기 - 트랜잭션 커밋 후 실행)
+    if (updatedOrderId) {
+      this.createPlayautoOrder(updatedOrderId).catch((error) => {
+        this.logger.error(
+          `플레이오토 주문 생성 비동기 실패 (웹훅): 주문ID=${updatedOrderId}`,
+          error,
+        );
+      });
+    }
+  }
+
+  /**
+   * 후처리 누락 보정 (PAID 상태인 주문의 티켓/물류 누락 확인 및 보정)
+   *
+   * 사용 시나리오:
+   * - confirmPayment 트랜잭션 중 장애로 티켓/물류가 일부만 처리된 경우
+   * - 웹훅이 먼저 도착했으나 후처리가 누락된 경우
+   *
+   * 보정 대상:
+   * 1. 챌린지 티켓: orderItemId 기준으로 발급 여부 확인 후 미발급분 생성
+   * 2. 물류: logisticsUniq가 null이면 플레이오토 주문 생성
+   */
+  private async ensurePostPaymentProcessing(order: any): Promise<void> {
+    const orderId = order.id;
+    const orderNumber = order.orderNumber;
+
+    this.logger.log(`🔧 후처리 누락 보정 시작: orderId=${orderId}`);
+
+    // 1. 챌린지 티켓 누락 보정 (seq 기반 deterministic 생성 + DB unique 제약)
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of order.items) {
+        if (item.product.categoryCode === 'CHALLENGE') {
+          // seq 기반으로 deterministic하게 티켓 생성 (1부터 quantity까지)
+          let created = 0;
+          for (let seq = 1; seq <= item.quantity; seq++) {
+            try {
+              await tx.challengeTicket.create({
+                data: {
+                  userId: order.userId,
+                  productId: item.productId,
+                  orderItemId: item.id,
+                  seq,
+                  purchaseDate: getNowKST(),
+                  status: ChallengeTicketStatus.PURCHASED,
+                  ticketType: 'CHALLENGE',
+                  createdAt: getNowKST(),
+                },
+              });
+              created++;
+            } catch (error: any) {
+              // P2002: Unique constraint violation → 이미 존재 (정상)
+              if (error.code === 'P2002') continue;
+              throw error;
+            }
+          }
+          if (created > 0) {
+            this.logger.log(`✅ 티켓 보정 완료: orderItemId=${item.id}, 추가 발급=${created}`);
+          }
+        }
+      }
+    });
+
+    // 2. 물류 누락 보정
+    if (!order.logisticsUniq) {
+      this.logger.warn(`📦 물류 누락 발견: orderId=${orderId}`);
+      await this.createPlayautoOrder(orderId);
+    }
+
+    this.logger.log(`✅ 후처리 누락 보정 완료: ${orderNumber}`);
+  }
+
+  /**
+   * 플레이오토 주문 생성 (비동기)
+   *
+   * PaymentService.createPlayautoOrder와 동일한 로직
+   * 웹훅 경로에서도 물류 주문 생성이 가능하도록 함
+   */
+  private async createPlayautoOrder(orderId: number): Promise<void> {
+    try {
+      this.logger.log(`플레이오토 주문 생성 시작 (웹훅): 주문ID=${orderId}`);
+
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new Error(`주문을 찾을 수 없습니다: orderId=${orderId}`);
+      }
+
+      // 이미 물류 등록된 주문인지 확인 (멱등성 보장)
+      if (order.logisticsUniq) {
+        this.logger.warn(
+          `이미 물류 등록된 주문입니다: orderId=${orderId}, uniq=${order.logisticsUniq}`,
+        );
+        return;
+      }
+
+      // 결제 완료된 주문만 물류 등록
+      if (order.status !== OrderStatus.PAID) {
+        this.logger.warn(
+          `결제 완료되지 않은 주문입니다: orderId=${orderId}, status=${order.status}`,
+        );
+        return;
+      }
+
+      // 개인정보 복호화
+      const decryptedOrder = {
+        ...order,
+        recipientName: CryptoUtil.decrypt(order.recipientName),
+        recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
+        address: CryptoUtil.decrypt(order.address),
+        addressDetail: order.addressDetail ? CryptoUtil.decrypt(order.addressDetail) : null,
+        deliveryMessage: order.deliveryMessage ? CryptoUtil.decrypt(order.deliveryMessage) : null,
+      };
+
+      // 물류 서비스 주문 생성 (Provider 내부에서 3회 재시도 + 로그 기록)
+      const { uniq, bundleNo } = await this.logistics.createOrder(decryptedOrder);
+
+      // DB에 provider, uniq, bundleNo 저장
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          logisticsProvider: this.logistics.name,
+          logisticsUniq: uniq,
+          logisticsBundleNo: bundleNo,
+        },
+      });
+
+      this.logger.log(
+        `물류 주문 생성 완료 (웹훅): 주문ID=${orderId}, provider=${this.logistics.name}, uniq=${uniq}, bundleNo=${bundleNo}`,
+      );
+    } catch (error: any) {
+      // 실패해도 결제는 유지됨 (의도된 동작)
+      // logisticsApiLog에 FAILURE로 기록됨 → 배치 재시도 가능
+      this.logger.error(
+        `플레이오토 주문 생성 실패 (웹훅): 주문ID=${orderId}, error=${error.message}`,
+      );
+    }
   }
 
   /**

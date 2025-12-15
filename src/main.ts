@@ -70,6 +70,15 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'retry-logistics': {
+        // 물류 주문 생성 재시도 배치 (30분마다 실행)
+        logger.log('물류 주문 생성 재시도 배치 실행...');
+        const { LogisticsRetrySchedulerService } = await import('./playauto/services/logistics-retry-scheduler.service');
+        const logisticsRetryService = app.get(LogisticsRetrySchedulerService);
+        await logisticsRetryService.handleLogisticsRetry();
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         process.exit(1);

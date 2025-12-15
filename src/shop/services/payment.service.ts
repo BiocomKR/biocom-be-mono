@@ -15,12 +15,11 @@ import {
   ConfirmPaymentDto,
   CancelPaymentDto,
   PaymentResponseDto,
-  PaymentWebhookDto
 } from '../dto/payment/payment.dto';
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
-import { getNowKST, parseKSTDateTime } from '../../common/utils/kst-date.util';
-import { ChallengeTicketStatus, OrderStatus, PaymentStatus } from '../../common/enums';
+import { getNowKST, parseISO8601ToKST } from '../../common/utils/kst-date.util';
+import { ChallengeTicketStatus, OrderStatus, PaymentStatus, PgProvider } from '../../common/enums';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 
 @Injectable()
@@ -70,7 +69,7 @@ export class PaymentService {
           paymentMethod: 'CARD', // 기본값, 실제 결제 시 업데이트
           amount: convertDecimalToNumber(order.totalAmount) || 0,
           status: PaymentStatus.PENDING,
-          pgProvider: 'TOSS_PAYMENTS',
+          pgProvider: PgProvider.TOSS,
           requestedAt: getNowKST(),
           createdAt: getNowKST(),
         }
@@ -95,11 +94,11 @@ export class PaymentService {
    * 결제 승인
    * 토스페이먼츠 결제 승인 API 호출 및 주문 상태 업데이트
    */
-  async confirmPayment(dto: ConfirmPaymentDto): Promise<PaymentResponseDto> {
+  async confirmPayment(userId: number, dto: ConfirmPaymentDto): Promise<PaymentResponseDto> {
     // 1. 주문 및 결제 정보 조회 (트랜잭션 밖)
     const order = await this.prisma.order.findFirst({
       where: {
-        orderNumber: dto.orderId
+        orderNumber: dto.orderNumber
       },
       include: {
         items: {
@@ -114,9 +113,14 @@ export class PaymentService {
       throw new NotFoundException('주문을 찾을 수 없습니다');
     }
 
+    // 주문 소유자 검증
+    if (order.userId !== userId) {
+      throw new BadRequestException('본인의 주문만 결제할 수 있습니다');
+    }
+
     // 이미 결제 완료된 주문인지 확인 (멱등성 보장)
     if (order.status === OrderStatus.PAID) {
-      this.logger.warn(`이미 결제 완료된 주문입니다: ${dto.orderId}`);
+      this.logger.warn(`이미 결제 완료된 주문입니다: ${dto.orderNumber}`);
       const completedPayment = await this.prisma.payment.findFirst({
         where: { orderId: order.id, status: PaymentStatus.COMPLETED }
       });
@@ -151,9 +155,10 @@ export class PaymentService {
     // 2. 토스페이먼츠 결제 승인 (외부 API 호출 - 트랜잭션 밖)
     let tossResult: any;
     try {
+      // 토스 API에는 orderId 필드로 주문번호를 전달
       tossResult = await this.tossPayments.confirmPayment(
         dto.paymentKey,
-        dto.orderId,
+        dto.orderNumber,
         dto.amount
       );
     } catch (error: any) {
@@ -189,9 +194,8 @@ export class PaymentService {
     // 3. DB 업데이트 (트랜잭션 안)
     const result = await this.prisma.$transaction(async (tx) => {
       // 토스 approvedAt을 KST Date로 변환 (예: "2025-12-12T05:44:24+09:00" → KST Date)
-      const approvedAtKST = parseKSTDateTime(
-        tossResult.approvedAt.replace('T', ' ').substring(0, 19),
-      );
+      // 타임존 정보를 보존하여 환경에 무관하게 정확한 KST 시간 추출
+      const approvedAtKST = parseISO8601ToKST(tossResult.approvedAt);
 
       // 결제 정보 업데이트
       await tx.payment.update({
@@ -226,28 +230,40 @@ export class PaymentService {
         }
       });
 
-      // 챌린지/구독 상품 티켓 발급 (결제 완료 시 단일 소스)
+      // 챌린지/구독 상품 티켓 발급 (동시성 방어: seq 기반 deterministic 생성 + DB unique 제약)
+      // DB unique 제약: @@unique([orderItemId, seq])로 레이스 컨디션 완전 방어
       for (const item of order.items) {
         if (['CHALLENGE', 'SUBSCRIPTION'].includes(item.product.categoryCode || '')) {
           const ticketType = item.product.categoryCode === 'SUBSCRIPTION' ? 'SUBSCRIPTION' : 'CHALLENGE';
-          for (let i = 0; i < item.quantity; i++) {
-            await tx.challengeTicket.create({
-              data: {
-                userId: order.userId,
-                productId: item.productId,
-                orderItemId: item.id,
-                purchaseDate: getNowKST(),
-                status: ChallengeTicketStatus.PURCHASED,
-                ticketType,
-                createdAt: getNowKST(),
+          // seq 기반으로 deterministic하게 티켓 생성 (1부터 quantity까지)
+          for (let seq = 1; seq <= item.quantity; seq++) {
+            try {
+              await tx.challengeTicket.create({
+                data: {
+                  userId: order.userId,
+                  productId: item.productId,
+                  orderItemId: item.id,
+                  seq, // 동일 orderItem 내 순번 (unique 제약으로 중복 방지)
+                  purchaseDate: getNowKST(),
+                  status: ChallengeTicketStatus.PURCHASED,
+                  ticketType,
+                  createdAt: getNowKST(),
+                },
+              });
+            } catch (error: any) {
+              // P2002: Unique constraint violation → 이미 존재하는 티켓 (정상 케이스)
+              if (error.code === 'P2002') {
+                this.logger.log(`${ticketType} 티켓 이미 존재: orderItemId=${item.id}, seq=${seq}`);
+                continue;
               }
-            });
+              throw error; // 그 외 에러는 재throw
+            }
           }
-          this.logger.log(`${ticketType} 티켓 발급 완료: productId=${item.productId}, quantity=${item.quantity}`);
+          this.logger.log(`${ticketType} 티켓 발급 완료: orderItemId=${item.id}, quantity=${item.quantity}`);
         }
       }
 
-      this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
+      this.logger.log(`결제 승인 완료: ${dto.orderNumber} / ${dto.paymentKey}`);
 
       return {
         orderId: order.id,
@@ -403,7 +419,7 @@ export class PaymentService {
           // }
 
           // 포인트 복구
-          if (convertDecimalToNumber(order.pointUsed) || 0 > 0) {
+          if ((convertDecimalToNumber(order.pointUsed) || 0) > 0) {
             const updatedUser = await tx.user.update({
               where: { id: userId },
               data: {
@@ -457,83 +473,6 @@ export class PaymentService {
         throw error;
       }
     });
-  }
-
-  /**
-   * 웹훅 처리
-   * 토스페이먼츠에서 전송하는 결제 상태 변경 웹훅 처리
-   */
-  async handleWebhook(dto: PaymentWebhookDto): Promise<void> {
-    this.logger.log(`웹훅 수신: ${dto.eventType} / ${dto.data.paymentKey}`);
-
-    // 결제 정보 조회
-    const payment = await this.prisma.payment.findFirst({
-      where: {
-        pgTransactionId: dto.data.paymentKey
-      },
-      include: {
-        order: true
-      }
-    });
-
-    if (!payment) {
-      this.logger.warn(`결제 정보를 찾을 수 없음: ${dto.data.paymentKey}`);
-      return;
-    }
-
-    switch (dto.eventType) {
-      case 'PAYMENT.DONE':
-        // 결제 완료 처리 (이미 confirmPayment에서 처리됨)
-        break;
-
-      case 'PAYMENT.CANCELED':
-        // 결제 취소 처리
-        if (payment.status === PaymentStatus.COMPLETED) {
-          await this.prisma.$transaction(async (tx) => {
-            await tx.payment.update({
-              where: { id: payment.id },
-              data: {
-                status: OrderStatus.CANCELLED,
-                cancelledAt: getNowKST()
-              }
-            });
-
-            await tx.order.update({
-              where: { id: payment.orderId },
-              data: {
-                status: OrderStatus.CANCELLED,
-                cancelledAt: getNowKST()
-              }
-            });
-
-            await tx.orderStateLog.create({
-              data: {
-                orderId: payment.orderId,
-                fromStatus: 'PAID',
-                toStatus: 'CANCELLED',
-                changeReason: '토스페이먼츠 웹훅 취소',
-                createdAt: getNowKST(),
-              }
-            });
-          });
-        }
-        break;
-
-      case 'PAYMENT.FAILED':
-        // 결제 실패 처리
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: PaymentStatus.FAILED,
-            failedAt: getNowKST(),
-            failReason: dto.data.failure?.message
-          }
-        });
-        break;
-
-      default:
-        this.logger.warn(`처리되지 않은 웹훅 타입: ${dto.eventType}`);
-    }
   }
 
   /**
