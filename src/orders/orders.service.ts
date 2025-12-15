@@ -128,6 +128,7 @@ export class OrdersService {
                 id: true,
                 name: true,
                 price: true,
+                sku: true,
                 images: {
                   where: { imageType: 'MAIN' },
                   take: 1,
@@ -634,7 +635,7 @@ export class OrdersService {
 
       // 배송 정보
       recipientName: CryptoUtil.decrypt(order.recipientName),
-      recipientMobile: CryptoUtil.decryptDeterministic(order.recipientMobile),
+      recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
       postalCode: order.postalCode,
       address: CryptoUtil.decrypt(order.address),
       addressDetail: CryptoUtil.decrypt(order.addressDetail),
@@ -657,7 +658,7 @@ export class OrdersService {
         id: item.id,
         productId: item.productId,
         productName: item.productName,
-        productPrice: Number(item.productPrice),
+        unitPrice: Number(item.productPrice),
         quantity: item.quantity,
         subtotal: Number(item.subtotal),
         product: item.product,
