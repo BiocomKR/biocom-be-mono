@@ -41,7 +41,7 @@ spec:
       containers:
       # biocom-mq Worker 컨테이너
       - name: biocom-mq
-        image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-mq:20251202164936
+        image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-mq:20251202171431
         imagePullPolicy: Always
 
         ports:
@@ -111,15 +111,21 @@ spec:
           timeoutSeconds: 3          # 3초 타임아웃
           failureThreshold: 3        # 3번 실패하면 트래픽 차단
         
-        # 볼륨 마운트 (biocom-mq는 로그만 필요)
+        # 볼륨 마운트
         volumeMounts:
         - name: logs
           mountPath: /app/logs
+        - name: firebase-service-account-key
+          mountPath: /app/firebase
+          readOnly: true
 
       # 볼륨 정의
       volumes:
       - name: logs
         emptyDir: {}
+      - name: firebase-service-account-key
+        secret:
+          secretName: firebase-service-account-key
       
       # Pod 재시작 정책
       restartPolicy: Always

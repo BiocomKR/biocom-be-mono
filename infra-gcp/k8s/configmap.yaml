@@ -14,6 +14,9 @@ data:
   PORT: "20804"
   LOG_LEVEL: "info"
 
+  # 데이터베이스 설정
+  DATABASE_URL: "postgresql://biocom:bico0825%21%40%23@34.47.124.132:5432/biocom?connection_limit=5&pool_timeout=30&connect_timeout=10"
+
   # Redis 설정 (BullMQ Queue)
   REDIS_HOST: "10.213.120.195"
   REDIS_PORT: "6379"
