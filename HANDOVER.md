@@ -488,4 +488,67 @@ npx prisma generate # Client만 재생성
 **보안**: HTTPS-Only + SSL 인증서 자동 발급 ✅
 **다음 단계**: 운영환경 배포 분리 (dev/prod)
 
+---
+
+## 🔗 프로젝트 간 관계
+
+### 바이오컴 프로젝트 구조
+```
+biocom-api (유저 백엔드)
+    ↓ 같은 DB 사용, 스키마 공유
+biocom-bo-api (관리자 백엔드)
+    ↓ 같은 DB 사용, 스키마 공유
+biocom-mq (메시지 큐 워커)
+```
+
+### 동기화 필수 항목
+| 항목 | 파일 위치 | 동기화 대상 |
+|------|----------|------------|
+| Prisma Schema | `prisma/schema.prisma` | biocom-api, biocom-bo-api, biocom-mq |
+| OrderStatus enum | `src/common/enums/order-status.enum.ts` | biocom-api ↔ biocom-bo-api |
+| PaymentStatus enum | `src/common/enums/payment-status.enum.ts` | biocom-api ↔ biocom-bo-api |
+| ProductStatus enum | `src/common/enums/` | biocom-api ↔ biocom-bo-api |
+
+### 스키마 변경 시 주의사항
+1. 한 프로젝트에서만 변경하면 다른 프로젝트 빌드 실패
+2. CLAUDE.md의 `SCHEMA_CHANGE` 절차 반드시 따를 것
+3. enum 변경 시 양쪽 프로젝트 모두 수정 후 `prisma generate`
+
+---
+
+## 📦 도메인별 컨텍스트
+
+### Shop (주문/결제) 도메인
+
+#### 상태 전이 규칙
+```typescript
+// 정책 문서: docs/251212_결제주문상태관리.md
+PENDING_PAYMENT → PAID, CANCELLED, PAYMENT_FAILED
+PAID → PREPARING, CANCELLED
+PREPARING → SHIPPED, CANCELLED
+SHIPPED → DELIVERED, CANCEL_REQUESTED  // 송장 등록 후 취소 시
+DELIVERED → COMPLETED
+CANCEL_REQUESTED → CANCELLED  // 실무자 확인 후
+CANCELLED → (변경 불가)
+COMPLETED → (변경 불가)
+PAYMENT_FAILED → CANCELLED
+```
+
+#### 송장 등록 여부에 따른 취소 분기
+- **송장 미등록**: 즉시 PG 취소 → CANCELLED
+- **송장 등록됨**: CANCEL_REQUESTED → 실무자가 관리자페이지에서 확인 후 CANCELLED
+
+#### 주의사항
+- `validateCart`의 재고 검증은 현재 비활성화 (`isAvailable = true`)
+- 외부 재고 API 연동 시 실제 검증 로직 구현 필요
+- 결제 관련 로그에 민감 키는 `.slice(0,8)***` 마스킹 처리
+
+#### 관련 파일
+- 주문 서비스: `src/shop/services/orders.service.ts`
+- 결제 서비스: `src/shop/services/payment.service.ts`
+- 토스 연동: `src/shop/services/toss-payments.service.ts`
+- 웹훅 처리: `src/shop/controllers/webhooks.controller.ts`
+
+---
+
 형님, 화이팅! 💪
