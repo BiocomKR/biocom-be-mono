@@ -196,7 +196,7 @@ export class WebhooksService {
     }
 
     // 2. 트랜잭션으로 DB 업데이트 (가상계좌/계좌이체 등 비동기 결제용)
-    const updatedOrderId = await this.prisma.$transaction(async (tx) => {
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
       // FOR UPDATE로 행 락 획득 (동시 처리 방지)
       const order = await tx.order.findFirst({
         where: { orderNumber: orderId },
@@ -303,16 +303,20 @@ export class WebhooksService {
         }
       }
 
-      this.logger.log(`✅ 주문 상태 업데이트 완료: ${orderId} → PAID`);
+      this.logger.log(`✅ 주문 상태 업데이트 완료 (웹훅): ${orderId} → PAID`);
 
-      return order.id;
+      return order;
     });
 
     // 7. 플레이오토 주문 생성 (비동기 - 트랜잭션 커밋 후 실행)
-    if (updatedOrderId) {
-      this.createPlayautoOrder(updatedOrderId).catch((error) => {
+    // 카드/간편결제는 confirmPayment에서 이미 처리됨
+    // 웹훅에서는 가상계좌/계좌이체 등 비동기 결제만 처리
+    // logisticsUniq가 있으면 이미 처리된 것이므로 스킵
+    if (updatedOrder && !updatedOrder.logisticsUniq) {
+      this.logger.log(`📦 플레이오토 주문 생성 시작 (웹훅 - 비동기 결제): 주문ID=${updatedOrder.id}`);
+      this.createPlayautoOrder(updatedOrder.id).catch((error) => {
         this.logger.error(
-          `플레이오토 주문 생성 비동기 실패 (웹훅): 주문ID=${updatedOrderId}`,
+          `플레이오토 주문 생성 비동기 실패 (웹훅): 주문ID=${updatedOrder.id}`,
           error,
         );
       });
