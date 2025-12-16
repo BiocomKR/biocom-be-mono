@@ -11,6 +11,22 @@ import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { OrderStatus, ProductStatus } from '../common/enums';
 
+/**
+ * 주문 상태 전이 규칙
+ * key: 현재 상태, value: 전이 가능한 상태 목록
+ */
+const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  [OrderStatus.PENDING_PAYMENT]: [OrderStatus.PAID, OrderStatus.CANCELLED, OrderStatus.PAYMENT_FAILED],
+  [OrderStatus.PAID]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
+  [OrderStatus.PREPARING]: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+  [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.CANCEL_REQUESTED],
+  [OrderStatus.DELIVERED]: [OrderStatus.COMPLETED],
+  [OrderStatus.CANCEL_REQUESTED]: [OrderStatus.CANCELLED], // 실무자 확인 후 취소 처리
+  [OrderStatus.CANCELLED]: [], // 취소된 주문은 상태 변경 불가
+  [OrderStatus.COMPLETED]: [], // 완료된 주문은 상태 변경 불가
+  [OrderStatus.PAYMENT_FAILED]: [OrderStatus.CANCELLED], // 결제 실패 후 취소 처리
+};
+
 @Injectable()
 export class ShopService {
   private readonly logger = new Logger(ShopService.name);
@@ -511,6 +527,17 @@ export class ShopService {
 
     if (!order) {
       throw new NotFoundException('주문을 찾을 수 없습니다');
+    }
+
+    // 상태 전이 규칙 검증
+    const currentStatus = order.status as OrderStatus;
+    const newStatus = status as OrderStatus;
+    const allowedTransitions = ORDER_STATUS_TRANSITIONS[currentStatus] || [];
+
+    if (!allowedTransitions.includes(newStatus)) {
+      throw new BadRequestException(
+        `${currentStatus}에서 ${newStatus}로 변경할 수 없습니다. 허용된 전이: ${allowedTransitions.length > 0 ? allowedTransitions.join(', ') : '없음'}`
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {

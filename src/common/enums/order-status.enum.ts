@@ -35,6 +35,12 @@ export enum OrderStatus {
   DELIVERED = 'DELIVERED',
 
   /**
+   * 취소 요청
+   * - 송장 등록 후 취소 요청된 상태 (실무자 확인 필요)
+   */
+  CANCEL_REQUESTED = 'CANCEL_REQUESTED',
+
+  /**
    * 주문 취소
    * - 주문이 취소된 상태
    */
@@ -45,4 +51,10 @@ export enum OrderStatus {
    * - 모든 프로세스가 완료된 상태 (구매 확정)
    */
   COMPLETED = 'COMPLETED',
+
+  /**
+   * 결제 실패
+   * - 결제 처리 중 실패한 상태
+   */
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
 }
