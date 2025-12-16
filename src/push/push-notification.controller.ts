@@ -37,6 +37,7 @@ export class PushNotificationController {
   /**
    * 특정 유저에게 푸시 전송 (관리자 전용)
    * 템플릿 변수 {{userName}}, {{mobile}} 등 사용 가능
+   * MQ에 발송 요청을 추가하고 jobId를 반환 (비동기 처리)
    */
   @Post('send-to-user')
   async sendToUser(@Body() dto: SendPushToUserDto) {
@@ -59,10 +60,9 @@ export class PushNotificationController {
 
     return {
       success: result.success,
-      message: result.message,
+      message: '푸시 발송 요청이 접수되었습니다',
       data: {
-        sentCount: result.sentCount,
-        failureCount: result.failureCount,
+        jobId: result.jobId,
       },
     };
   }
@@ -70,6 +70,7 @@ export class PushNotificationController {
   /**
    * 여러 유저에게 푸시 전송 (관리자 전용)
    * 템플릿 변수 {{userName}}, {{mobile}} 등 사용 가능
+   * MQ에 발송 요청을 추가하고 jobIds를 반환 (비동기 처리)
    */
   @Post('send-to-users')
   async sendToUsers(@Body() dto: SendPushToUsersDto) {
@@ -78,8 +79,7 @@ export class PushNotificationController {
     const bodies = await this.templateService.substituteForUsers(dto.body, dto.userIds);
 
     // 개별 발송 (치환된 메시지 사용)
-    let sentCount = 0;
-    let failureCount = 0;
+    const jobIds: string[] = [];
 
     for (const userId of dto.userIds) {
       const title = titles.get(userId) || dto.title;
@@ -96,19 +96,17 @@ export class PushNotificationController {
         dto.isTest ?? false,
       );
 
-      if (result.success) {
-        sentCount += result.sentCount;
-      } else {
-        failureCount++;
+      if (result.jobId) {
+        jobIds.push(result.jobId);
       }
     }
 
     return {
-      success: sentCount > 0,
-      message: `${sentCount}개 기기에 전송 성공`,
+      success: true,
+      message: `${dto.userIds.length}명에게 푸시 발송 요청이 접수되었습니다`,
       data: {
-        sentCount,
-        failureCount,
+        targetCount: dto.userIds.length,
+        jobIds,
       },
     };
   }
@@ -116,6 +114,7 @@ export class PushNotificationController {
   /**
    * 전체 유저에게 푸시 전송 (관리자 전용)
    * 템플릿 변수 {{userName}}, {{mobile}} 등 사용 가능
+   * MQ에 발송 요청을 추가하고 jobId를 반환 (비동기 처리)
    */
   @Post('send-to-all')
   async sendToAll(@Body() dto: SendPushToAllDto) {
@@ -139,10 +138,9 @@ export class PushNotificationController {
 
       return {
         success: result.success,
-        message: result.message,
+        message: '전체 푸시 발송 요청이 접수되었습니다',
         data: {
-          sentCount: result.sentCount,
-          failureCount: result.failureCount,
+          jobId: result.jobId,
         },
       };
     }
@@ -158,13 +156,13 @@ export class PushNotificationController {
       distinct: ['userId'],
     });
 
-    const userIds = pushTokens.map((t) => t.userId).filter((id): id is number => id !== null);
+    const userIds = pushTokens.map((t: { userId: number | null }) => t.userId).filter((id): id is number => id !== null);
 
     if (userIds.length === 0) {
       return {
         success: false,
         message: '전송 대상이 없습니다',
-        data: { sentCount: 0, failureCount: 0 },
+        data: { targetCount: 0 },
       };
     }
 
@@ -172,9 +170,8 @@ export class PushNotificationController {
     const titles = await this.templateService.substituteForUsers(dto.title, userIds);
     const bodies = await this.templateService.substituteForUsers(dto.body, userIds);
 
-    // 3. 개별 발송
-    let sentCount = 0;
-    let failureCount = 0;
+    // 3. 개별 발송 (MQ에 요청 추가)
+    const jobIds: string[] = [];
 
     for (const userId of userIds) {
       const title = titles.get(userId) || dto.title;
@@ -191,19 +188,17 @@ export class PushNotificationController {
         dto.isTest ?? false,
       );
 
-      if (result.success) {
-        sentCount += result.sentCount;
-      } else {
-        failureCount++;
+      if (result.jobId) {
+        jobIds.push(result.jobId);
       }
     }
 
     return {
-      success: sentCount > 0,
-      message: `${sentCount}개 기기에 전송 성공`,
+      success: true,
+      message: `${userIds.length}명에게 푸시 발송 요청이 접수되었습니다`,
       data: {
-        sentCount,
-        failureCount,
+        targetCount: userIds.length,
+        jobIds,
       },
     };
   }

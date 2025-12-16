@@ -123,6 +123,7 @@ export class PushPersonalizedController {
 
   /**
    * 개인화 푸시 발송
+   * MQ에 발송 요청을 추가하고 jobIds를 반환 (비동기 처리)
    */
   @Post('send')
   @ApiOperation({ summary: '개인화 푸시 발송' })
@@ -139,7 +140,7 @@ export class PushPersonalizedController {
       return {
         success: false,
         message: '세그먼트 조건에 해당하는 사용자가 없습니다',
-        data: { targetCount: 0, sentCount: 0, failureCount: 0 },
+        data: { targetCount: 0 },
       };
     }
 
@@ -147,9 +148,8 @@ export class PushPersonalizedController {
     const titles = await this.templateService.substituteForUsers(dto.title, userIds);
     const bodies = await this.templateService.substituteForUsers(dto.body, userIds);
 
-    // 4. 개별 발송
-    let sentCount = 0;
-    let failureCount = 0;
+    // 4. 개별 발송 (MQ에 요청 추가)
+    const jobIds: string[] = [];
 
     for (const userId of userIds) {
       const title = titles.get(userId) || dto.title;
@@ -167,23 +167,20 @@ export class PushPersonalizedController {
           dto.isTest ?? false,
         );
 
-        if (result.success) {
-          sentCount += result.sentCount;
-        } else {
-          failureCount++;
+        if (result.jobId) {
+          jobIds.push(result.jobId);
         }
       } catch (error) {
-        failureCount++;
+        // MQ 추가 실패 시 로그만 남김
       }
     }
 
     return {
       success: true,
-      message: `개인화 푸시 발송 완료`,
+      message: `${userIds.length}명에게 개인화 푸시 발송 요청이 접수되었습니다`,
       data: {
         targetCount: userIds.length,
-        sentCount,
-        failureCount,
+        jobIds,
       },
     };
   }
