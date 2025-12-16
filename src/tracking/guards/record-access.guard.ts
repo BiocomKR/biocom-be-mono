@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../../common/enums/user-subscription-status.enum';
+import { UserChallengeStatus } from '../../common/enums/challenge-ticket-status.enum';
 
 /**
  * 기록 접근 권한 가드
@@ -31,7 +32,7 @@ export class RecordAccessGuard implements CanActivate {
           status: true,
           userChallenges: {
             where: {
-              status: 'ACTIVE'
+              status: UserChallengeStatus.ACTIVE
             },
             select: {
               id: true,
@@ -51,12 +52,19 @@ export class RecordAccessGuard implements CanActivate {
       // 2️⃣ 활성 챌린지 참여자 체크
       const hasActiveChallenge = user.userChallenges.length > 0;
 
-      // 3️⃣ 과거 챌린지 이력 체크 (NEWCOMER이지만 과거 챌린저였던 경우)
-      const hasChallengeHistory = await this.prisma.userChallenge.count({
-        where: { userId: userId }
-      }) > 0;
+      // 3️⃣ 가장 최근 챌린지 상태 체크 (PENDING이면 가짜 데이터 표시)
+      const latestChallenge = await this.prisma.userChallenge.findFirst({
+        where: { userId: userId },
+        orderBy: { id: 'desc' },
+        select: { status: true }
+      });
 
-      const hasRealAccess = isSubscriber || hasActiveChallenge || hasChallengeHistory;
+      // 최근 챌린지가 PENDING이 아닌 경우에만 실제 데이터 접근 허용
+      const hasValidChallengeHistory = latestChallenge
+        ? latestChallenge.status !== UserChallengeStatus.PENDING
+        : false;
+
+      const hasRealAccess = isSubscriber || hasActiveChallenge || hasValidChallengeHistory;
 
       // NEWCOMER 여부를 request에 플래그로 추가 (Service에서 분기 처리용)
       request.isNewcomer = !hasRealAccess;
@@ -66,14 +74,14 @@ export class RecordAccessGuard implements CanActivate {
           `기록 접근 권한 승인 (실제 데이터) - 사용자 ID: ${userId}, ` +
           `구독상태: ${user.status}, ` +
           `활성챌린지: ${hasActiveChallenge ? '있음' : '없음'}, ` +
-          `챌린지이력: ${hasChallengeHistory ? '있음' : '없음'}`
+          `챌린지이력: ${hasValidChallengeHistory ? '있음' : '없음'}`
         );
       } else {
         this.logger.log(
           `기록 접근 권한 승인 (예시 데이터) - 사용자 ID: ${userId}, ` +
           `구독상태: ${user.status}, ` +
           `활성챌린지: ${hasActiveChallenge ? '있음' : '없음'}, ` +
-          `챌린지이력: ${hasChallengeHistory ? '있음' : '없음'}`
+          `챌린지이력: ${hasValidChallengeHistory ? '있음' : '없음'}`
         );
       }
 
