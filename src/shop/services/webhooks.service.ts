@@ -374,13 +374,13 @@ export class WebhooksService {
       }
     });
 
-    // 2. 물류 누락 보정
-    if (!order.logisticsUniq) {
-      this.logger.warn(`📦 물류 누락 발견: orderId=${orderId}`);
-      await this.createPlayautoOrder(orderId);
-    }
+    // 2. 물류 누락 보정은 하지 않음
+    // 카드/간편결제는 confirmPayment에서 비동기로 처리 중
+    // 웹훅이 먼저 도착해도 confirmPayment의 플레이오토 호출이 완료될 때까지 대기해야 함
+    // 중복 호출 방지를 위해 여기서는 호출하지 않음
+    // 물류 누락 주문은 logistics-retry-scheduler 배치에서 재시도
 
-    this.logger.log(`✅ 후처리 누락 보정 완료: ${orderNumber}`);
+    this.logger.log(`✅ 후처리 보정 완료 (티켓만): ${orderNumber}`);
   }
 
   /**
