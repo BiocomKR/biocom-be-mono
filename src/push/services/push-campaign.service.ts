@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { PushNotificationService } from './push-notification.service';
 import { CampaignQueryDto } from '../dto/campaign-query.dto';
-import { CampaignResponseDto } from '../dto/campaign-response.dto';
+import { CampaignResponseDto, FailureSampleDto } from '../dto/campaign-response.dto';
 import { getNowKST, stringToKSTDate } from '../../common/utils/kst-date.util';
 import { PushScheduleType, PushCampaignType, PushCampaignStatus } from '../enums';
 
@@ -79,22 +79,46 @@ export class PushCampaignService {
     this.logger.log(`📋 [PushCampaignService] 캠페인 상세 조회: id=${id}`);
 
     try {
-      const campaign = await this.prisma.pushNotificationCampaign.findUnique({
-        where: { id },
-        include: {
-          schedule: true,
-          logs: {
-            take: 100,
-            orderBy: { sentAt: 'desc' },
+      const [campaign, failureSamples] = await Promise.all([
+        this.prisma.pushNotificationCampaign.findUnique({
+          where: { id },
+          include: {
+            schedule: true,
+            logs: {
+              take: 100,
+              orderBy: { sentAt: 'desc' },
+            },
           },
-        },
-      });
+        }),
+        // 최근 실패 5건 샘플 조회
+        this.prisma.pushNotificationLog.findMany({
+          where: {
+            campaignId: id,
+            success: false,
+            errorCode: { not: null },
+          },
+          select: {
+            errorCode: true,
+            errorMessage: true,
+            sentAt: true,
+          },
+          orderBy: { id: 'desc' },
+          take: 5,
+        }),
+      ]);
 
       if (!campaign) {
         throw new NotFoundException(`캠페인을 찾을 수 없습니다: id=${id}`);
       }
 
-      return campaign;
+      return {
+        ...campaign,
+        failureSamples: failureSamples.map((f) => ({
+          errorCode: f.errorCode || 'UNKNOWN',
+          errorMessage: f.errorMessage || '알 수 없는 오류',
+          sentAt: f.sentAt?.toISOString() || '',
+        })),
+      };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;

@@ -69,6 +69,23 @@ export class CampaignResponseDto {
 
   @ApiPropertyOptional({ description: '생성한 관리자 ID' })
   createdBy?: number;
+
+  @ApiPropertyOptional({ description: '최근 실패 샘플 (최대 5건)' })
+  failureSamples?: FailureSampleDto[];
+}
+
+/**
+ * 실패 샘플 DTO
+ */
+export class FailureSampleDto {
+  @ApiProperty({ description: '에러 코드' })
+  errorCode: string;
+
+  @ApiProperty({ description: '에러 메시지' })
+  errorMessage: string;
+
+  @ApiProperty({ description: '발송 시간' })
+  sentAt: string;
 }
 
 /**

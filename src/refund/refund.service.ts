@@ -169,12 +169,27 @@ export class RefundService {
   }
 
   /**
-   * 환불 승인
+   * 환불 승인 및 PG 취소 처리 (관리자용)
+   *
+   * CANCEL_REQUESTED 상태 주문의 취소 요청을 승인하고 실제 PG 취소를 진행합니다.
+   * - 토스페이먼츠 결제 취소 API 호출
+   * - 포인트 환불
+   * - 쿠폰 복구
+   * - 티켓 취소
+   * - 주문 상태 → CANCELLED
    */
   async approveRefund(id: number, adminMemo?: string) {
     const refund = await this.prisma.refund.findUnique({
       where: { id },
-      include: { order: true }
+      include: {
+        order: {
+          include: {
+            items: true,
+            shipping: true,
+          }
+        },
+        payment: true,
+      }
     });
 
     if (!refund) {
@@ -185,24 +200,158 @@ export class RefundService {
       throw new BadRequestException('대기 중인 환불 요청만 승인 가능합니다');
     }
 
-    const updated = await this.prisma.refund.update({
-      where: { id },
-      data: {
-        status: RefundStatus.APPROVED,
-        adminMemo: adminMemo || refund.adminMemo
+    const order = refund.order;
+    const payment = refund.payment;
+
+    // 결제 정보 확인
+    if (!payment?.pgTransactionId) {
+      throw new BadRequestException('결제 정보를 찾을 수 없습니다');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      const now = getNowKST();
+
+      // 1. 토스페이먼츠 결제 취소 API 호출
+      let tossResponse: any = null;
+      try {
+        tossResponse = await this.tossPaymentsService.cancelPayment(
+          payment.pgTransactionId,
+          `주문 취소 승인 - ${refund.reason || '관리자 승인'}`,
+          undefined // 전액 취소
+        );
+        this.logger.log(`토스페이먼츠 취소 완료: ${payment.pgTransactionId}`);
+      } catch (error: any) {
+        this.logger.error(`토스페이먼츠 취소 실패: ${error.message}`);
+
+        // 환불 상태를 FAILED로 업데이트
+        await tx.refund.update({
+          where: { id },
+          data: {
+            status: RefundStatus.FAILED,
+            rejectedAt: now,
+            reasonDetail: `토스페이먼츠 API 오류: ${error.message}`,
+            adminMemo: adminMemo || refund.adminMemo,
+          }
+        });
+
+        throw new BadRequestException(`결제 취소 처리 중 오류가 발생했습니다: ${error.message}`);
       }
+
+      // 2. 환불 레코드 업데이트
+      await tx.refund.update({
+        where: { id },
+        data: {
+          status: RefundStatus.COMPLETED,
+          completedAt: now,
+          tossResponse: tossResponse as any,
+          tossCancelId: tossResponse.cancels?.[0]?.transactionKey || null,
+          adminMemo: adminMemo || refund.adminMemo,
+        }
+      });
+
+      // 3. 결제 상태 업데이트
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: now,
+        }
+      });
+
+      // 4. 주문 상태 업데이트 → CANCELLED
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelledAt: now,
+        }
+      });
+
+      // 5. 주문 상태 로그
+      await tx.orderStateLog.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: OrderStatus.CANCELLED,
+          changeReason: `취소 승인 - ${refund.reason || '관리자 승인'}`,
+          createdAt: now,
+        }
+      });
+
+      // 6. 포인트 환불
+      if (Number(order.pointUsed) > 0) {
+        const updatedUser = await tx.user.update({
+          where: { id: order.userId },
+          data: {
+            points: { increment: Number(order.pointUsed) }
+          }
+        });
+
+        await tx.pointHistory.create({
+          data: {
+            userId: order.userId,
+            type: 'REFUND',
+            amount: Number(order.pointUsed),
+            balance: updatedUser.points,
+            description: `주문 취소 환불 (${order.orderNumber})`,
+            relatedType: 'ORDER',
+            relatedId: order.id,
+            createdAt: now,
+          }
+        });
+
+        this.logger.log(`포인트 환불: userId=${order.userId}, amount=${order.pointUsed}`);
+      }
+
+      // 7. 쿠폰 복구
+      const usedCoupon = await tx.userCoupon.findFirst({
+        where: {
+          usedOrderId: order.id,
+          status: 'USED'
+        }
+      });
+
+      if (usedCoupon) {
+        const newStatus = usedCoupon.expiresAt > now ? 'ACTIVE' : 'EXPIRED';
+        await tx.userCoupon.update({
+          where: { id: usedCoupon.id },
+          data: {
+            status: newStatus,
+            usedAt: null,
+            usedOrderId: null
+          }
+        });
+        this.logger.log(`쿠폰 복구: couponId=${usedCoupon.id}, status=${newStatus}`);
+      }
+
+      // 8. 챌린지/구독 티켓 취소
+      const cancelledTickets = await tx.challengeTicket.updateMany({
+        where: {
+          orderItemId: { in: order.items.map(item => item.id) },
+          status: 'PURCHASED', // 구매만 된 상태만 취소 가능
+        },
+        data: {
+          status: 'CANCELLED',
+        }
+      });
+
+      if (cancelledTickets.count > 0) {
+        this.logger.log(`티켓 취소: ${cancelledTickets.count}개`);
+      }
+
+      this.logger.log(`환불 승인 완료: ${order.orderNumber} / ${refund.refundAmount}원`);
+
+      return {
+        success: true,
+        message: '환불이 승인되었습니다. PG 취소 및 포인트/쿠폰 복구가 완료되었습니다.',
+        refundId: id,
+        orderNumber: order.orderNumber,
+        refundAmount: Number(refund.refundAmount),
+        pointRefunded: Number(order.pointUsed),
+        couponRestored: usedCoupon ? true : false,
+        ticketsCancelled: cancelledTickets.count,
+      };
     });
-
-    // TODO: 실제 환불 처리 큐에 추가
-    // 토스페이먼츠 API 호출하여 환불 처리
-
-    this.logger.log(`환불 승인: ${refund.order.orderNumber} / ${refund.refundAmount}원`);
-
-    return {
-      success: true,
-      message: '환불이 승인되었습니다',
-      refundId: id
-    };
   }
 
   /**
