@@ -7,7 +7,6 @@ import {
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { CouponService } from '../../coupons/services/coupon.service';
-import { TossPaymentsService } from './toss-payments.service';
 import { CreateOrderDto, OrderResponseDto } from '../dto/orders/create-order.dto';
 import {
   CreateReturnDto,
@@ -28,7 +27,6 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly pointService: PointService,
     private readonly couponService: CouponService,
-    private readonly tossPaymentsService: TossPaymentsService,
   ) {}
 
   /**
@@ -469,15 +467,15 @@ export class OrdersService {
   }
 
   /**
-   * 주문 취소
+   * 주문 취소 요청 (유저용)
    *
-   * 송장 등록 여부에 따른 분기 처리:
-   * - 송장 미등록: PG 자동 결제 취소 → CANCELLED
-   * - 송장 등록됨: CANCEL_REQUESTED 상태로 변경 (실무자 확인 필요)
+   * 유저는 취소 "요청"만 가능. 실제 PG 취소/환불은 관리자(biocom-bo-api)에서 처리.
+   * - PENDING_PAYMENT: 즉시 CANCELLED (결제 전이므로)
+   * - PAID/PREPARING/SHIPPED: CANCEL_REQUESTED → 관리자 승인 필요
    */
   async cancelOrder(userId: number, orderNumber: string, reason: string): Promise<OrderResponseDto> {
     return await this.prisma.$transaction(async (tx) => {
-      // 주문 조회 (배송 정보 포함)
+      // 주문 조회
       const order = await tx.order.findFirst({
         where: {
           orderNumber,
@@ -508,51 +506,29 @@ export class OrdersService {
         throw new BadRequestException('이미 취소 요청 중인 주문입니다');
       }
 
-      // 송장 등록 여부 확인
-      const hasTrackingNumber = order.shipping?.trackingNumber ? true : false;
+      const now = getNowKST();
 
-      // 송장 등록된 경우: CANCEL_REQUESTED 상태로만 변경 (실무자 확인 필요)
-      if (hasTrackingNumber) {
-        this.logger.log(`송장 등록된 주문 취소 요청: ${orderNumber} (송장: ${order.shipping?.trackingNumber})`);
-
-        const now = getNowKST();
-
-        // 1. 주문 상태 업데이트
+      // PENDING_PAYMENT 상태: 결제 전이므로 즉시 취소 처리
+      if (order.status === OrderStatus.PENDING_PAYMENT) {
         const updatedOrder = await tx.order.update({
           where: { id: order.id },
           data: {
-            status: OrderStatus.CANCEL_REQUESTED,
+            status: OrderStatus.CANCELLED,
+            cancelledAt: now,
           },
         });
 
-        // 2. 주문 상태 로그
         await tx.orderStateLog.create({
           data: {
             orderId: order.id,
             fromStatus: order.status,
-            toStatus: OrderStatus.CANCEL_REQUESTED,
-            changeReason: `취소 요청 - ${reason} (송장 등록됨, 실무자 확인 필요)`,
+            toStatus: OrderStatus.CANCELLED,
+            changeReason: `취소 - ${reason} (결제 전 취소)`,
             createdAt: now,
           },
         });
 
-        // 3. 환불 요청 레코드 생성 (관리자 페이지에서 조회용)
-        await tx.refund.create({
-          data: {
-            orderId: order.id,
-            paymentId: order.payment?.id || 0,
-            refundType: 'CANCEL',
-            status: 'REQUESTED',
-            refundAmount: order.totalAmount,
-            pointRefund: order.pointUsed,
-            reason: reason,
-            reasonDetail: `송장번호: ${order.shipping?.trackingNumber}`,
-            requestedAt: now,
-            createdAt: now,
-          },
-        });
-
-        this.logger.log(`주문 취소 요청 완료: ${orderNumber} (송장 등록으로 인해 실무자 확인 필요)`);
+        this.logger.log(`결제 전 주문 취소 완료: ${orderNumber}`);
 
         return {
           ...updatedOrder,
@@ -570,152 +546,43 @@ export class OrdersService {
         };
       }
 
-      // 송장 미등록: 기존 자동 취소 로직 수행
-      // 토스페이먼츠 결제 취소 (결제 완료 상태인 경우만)
-      if ([OrderStatus.PAID, OrderStatus.PREPARING].includes(order.status as OrderStatus) && order.payment) {
-        try {
-          const tossResponse = await this.tossPaymentsService.cancelPayment(
-            order.payment.pgTransactionId, // paymentKey
-            `주문 취소 - ${reason}`,
-            undefined // 전액 취소
-          );
-
-          this.logger.log(`토스페이먼츠 결제 취소 완료: ${order.payment.pgTransactionId}`);
-        } catch (error: any) {
-          this.logger.error(`토스페이먼츠 결제 취소 실패: ${error.message}`);
-          throw new BadRequestException(`결제 취소 처리 중 오류가 발생했습니다: ${error.message}`);
-        }
-      }
-
-      // 주문 상태 업데이트
+      // PAID/PREPARING/SHIPPED 상태: 취소 요청만 (관리자 승인 필요)
       const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: {
-          status: OrderStatus.CANCELLED,
-          cancelledAt: getNowKST(),
+          status: OrderStatus.CANCEL_REQUESTED,
         },
       });
 
-      // 주문 상태 로그
       await tx.orderStateLog.create({
         data: {
           orderId: order.id,
           fromStatus: order.status,
-          toStatus: 'CANCELLED',
-          changeReason: reason,
-          createdAt: getNowKST(),
+          toStatus: OrderStatus.CANCEL_REQUESTED,
+          changeReason: `취소 요청 - ${reason}`,
+          createdAt: now,
         },
       });
 
-      // TODO: 재고 복구 처리 필요
-      // 재고 관련 테이블(inventoryCache, inventorySyncQueue)이 삭제되어 주석 처리
-      // 추후 재고 시스템 재구축 시 다음 로직 적용:
-      // 1. 주문 취소 시 차감했던 재고를 복구
-      // 2. inventoryCache 테이블의 availableQty 증가
-      // 3. inventorySyncQueue에 RESTORE 액션 등록
-      // if (['PAID', 'PREPARING'].includes(order.status)) {
-      //   for (const item of order.items) {
-      //     await tx.inventoryCache.upsert({
-      //       where: { sku: item.product.sku },
-      //       create: {
-      //         sku: item.product.sku,
-      //         availableQty: item.quantity,
-      //         lastUpdated: getNowKST(),
-      //       },
-      //       update: {
-      //         availableQty: { increment: item.quantity },
-      //         lastUpdated: getNowKST(),
-      //       },
-      //     });
-      //     await tx.inventorySyncQueue.create({
-      //       data: {
-      //         orderId: order.id,
-      //         sku: item.product.sku,
-      //         quantity: item.quantity,
-      //         action: 'RESTORE',
-      //         status: 'PENDING',
-      //       },
-      //     });
-      //   }
-      // }
-
-      // 챌린지/구독 티켓 취소 처리
-      const cancelledTickets = await tx.challengeTicket.updateMany({
-        where: {
-          orderItemId: { in: order.items.map(item => item.id) },
-          status: UserCouponStatus.PURCHASED, // 구매만 된 상태만 취소 가능
-        },
+      // 환불 요청 레코드 생성 (관리자 페이지에서 조회용)
+      await tx.refund.create({
         data: {
-          status: OrderStatus.CANCELLED,
+          orderId: order.id,
+          paymentId: order.payment?.id || 0,
+          refundType: 'CANCEL',
+          status: 'REQUESTED',
+          refundAmount: order.totalAmount,
+          pointRefund: order.pointUsed,
+          reason: reason,
+          reasonDetail: order.shipping?.trackingNumber
+            ? `송장번호: ${order.shipping.trackingNumber}`
+            : null,
+          requestedAt: now,
+          createdAt: now,
         },
       });
 
-      if (cancelledTickets.count > 0) {
-        this.logger.log(`챌린지 티켓 ${cancelledTickets.count}개 취소 완료`);
-      }
-
-      // 이미 활성화된 티켓 확인 (환불 불가 경고)
-      const activatedTickets = await tx.challengeTicket.findMany({
-        where: {
-          orderItemId: { in: order.items.map(item => item.id) },
-          status: { in: ['ACTIVATED', 'USED'] },
-        },
-      });
-
-      if (activatedTickets.length > 0) {
-        this.logger.warn(`이미 활성화된 티켓 ${activatedTickets.length}개 존재 - 특별 처리 필요`);
-        // TODO: 이미 사용 중인 챌린지가 있는 경우 환불 정책에 따라 처리
-      }
-
-      // 쿠폰 복구
-      const usedCoupon = await tx.userCoupon.findFirst({
-        where: {
-          usedOrderId: order.id,
-          status: UserCouponStatus.USED
-        }
-      });
-
-      if (usedCoupon) {
-        // 만료되지 않았으면 ACTIVE로 복구, 만료되었으면 EXPIRED로
-        const now = getNowKST();
-        const newStatus = usedCoupon.expiresAt > now ? 'ACTIVE' : 'EXPIRED';
-
-        await tx.userCoupon.update({
-          where: { id: usedCoupon.id },
-          data: {
-            status: newStatus,
-            usedAt: null,
-            usedOrderId: null
-          }
-        });
-
-        this.logger.log(`쿠폰 ${usedCoupon.id} 복구 완료 (상태: ${newStatus})`);
-      }
-
-      // 포인트 복구
-      if (order.pointUsed > 0) {
-        const updatedUser = await tx.user.update({
-          where: { id: userId },
-          data: {
-            points: { increment: Number(order.pointUsed) },
-          },
-        });
-
-        await tx.pointHistory.create({
-          data: {
-            userId,
-            type: 'REFUND',
-            amount: Number(order.pointUsed),
-            balance: updatedUser.points,
-            description: `주문 취소 환불 (${order.orderNumber})`,
-            relatedType: 'ORDER',
-            relatedId: order.id,
-            createdAt: getNowKST(),
-          },
-        });
-      }
-
-      this.logger.log(`주문 취소 완료: ${orderNumber}`);
+      this.logger.log(`주문 취소 요청 완료: ${orderNumber} (관리자 승인 대기)`);
 
       return {
         ...updatedOrder,
