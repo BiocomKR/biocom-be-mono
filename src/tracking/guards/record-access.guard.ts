@@ -52,17 +52,16 @@ export class RecordAccessGuard implements CanActivate {
       // 2️⃣ 활성 챌린지 참여자 체크
       const hasActiveChallenge = user.userChallenges.length > 0;
 
-      // 3️⃣ 가장 최근 챌린지 상태 체크 (PENDING이면 가짜 데이터 표시)
-      const latestChallenge = await this.prisma.userChallenge.findFirst({
-        where: { userId: userId },
-        orderBy: { id: 'desc' },
-        select: { status: true }
+      // 3️⃣ 챌린지 참여 이력 체크 (COMPLETED 또는 EXPIRED가 하나라도 있으면 실제 데이터)
+      const completedChallengeCount = await this.prisma.userChallenge.count({
+        where: {
+          userId: userId,
+          status: { in: [UserChallengeStatus.COMPLETED, UserChallengeStatus.EXPIRED] }
+        }
       });
 
-      // 최근 챌린지가 PENDING이 아닌 경우에만 실제 데이터 접근 허용
-      const hasValidChallengeHistory = latestChallenge
-        ? latestChallenge.status !== UserChallengeStatus.PENDING
-        : false;
+      // 완료/만료된 챌린지가 하나라도 있으면 실제 데이터 접근 허용
+      const hasValidChallengeHistory = completedChallengeCount > 0;
 
       const hasRealAccess = isSubscriber || hasActiveChallenge || hasValidChallengeHistory;
 

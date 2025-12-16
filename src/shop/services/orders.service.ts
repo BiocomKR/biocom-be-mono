@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../../common/services/prisma.service';
 import { PointService } from '../../point/point.service';
 import { CouponService } from '../../coupons/services/coupon.service';
+import { OrderSyncService } from './order-sync.service';
+import { PaymentService } from './payment.service';
 import { CreateOrderDto, OrderResponseDto } from '../dto/orders/create-order.dto';
 import {
   CreateReturnDto,
@@ -27,6 +29,8 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly pointService: PointService,
     private readonly couponService: CouponService,
+    private readonly orderSyncService: OrderSyncService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   /**
@@ -469,84 +473,105 @@ export class OrdersService {
   /**
    * 주문 취소 요청 (유저용)
    *
-   * 유저는 취소 "요청"만 가능. 실제 PG 취소/환불은 관리자(biocom-bo-api)에서 처리.
-   * - PENDING_PAYMENT: 즉시 CANCELLED (결제 전이므로)
-   * - PAID/PREPARING/SHIPPED: CANCEL_REQUESTED → 관리자 승인 필요
+   * 정책: 송장 등록 여부를 기준으로 분기
+   * - PENDING_PAYMENT: 즉시 CANCELLED (결제 전)
+   * - 송장 미등록: PG 자동 결제 취소 + 즉시 CANCELLED
+   * - 송장 등록됨: CANCEL_REQUESTED → 실무자 확인 필요
    */
   async cancelOrder(userId: number, orderNumber: string, reason: string): Promise<OrderResponseDto> {
-    return await this.prisma.$transaction(async (tx) => {
-      // 주문 조회
-      const order = await tx.order.findFirst({
-        where: {
-          orderNumber,
-          userId,
-        },
-        include: {
-          items: {
-            include: {
-              product: true,
-            },
+    // 1. 주문 조회
+    const order = await this.prisma.order.findFirst({
+      where: {
+        orderNumber,
+        userId,
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
           },
-          payment: true,
-          shipping: true,
+        },
+        payment: true,
+        shipping: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('주문을 찾을 수 없습니다');
+    }
+
+    // 취소 가능 상태 확인
+    if (!['PENDING_PAYMENT', 'PAID', 'PREPARING', 'SHIPPING'].includes(order.status)) {
+      throw new BadRequestException('취소 가능한 상태가 아닙니다');
+    }
+
+    // 이미 취소 요청 중인지 확인
+    if (order.status === OrderStatus.CANCEL_REQUESTED) {
+      throw new BadRequestException('이미 취소 요청 중인 주문입니다');
+    }
+
+    const now = getNowKST();
+
+    // 2. PENDING_PAYMENT 상태: 결제 전이므로 즉시 취소 처리
+    if (order.status === OrderStatus.PENDING_PAYMENT) {
+      return await this.cancelOrderImmediately(order, reason, '결제 전 취소');
+    }
+
+    // 3. 플레이오토 등록된 주문이면 실시간 조회하여 DB 동기화
+    let hasTrackingNumber = !!order.shipping?.trackingNumber;
+
+    if (order.logisticsUniq) {
+      this.logger.log(`플레이오토 실시간 조회: orderId=${order.id}, uniq=${order.logisticsUniq}`);
+
+      const syncResult = await this.orderSyncService.syncFromPlayauto(order.id);
+
+      this.logger.log(
+        `플레이오토 동기화 결과: result=${syncResult.result}, trackingNumber=${syncResult.trackingNumber}`,
+      );
+
+      // 동기화 결과로 송장 여부 판단
+      hasTrackingNumber = !!syncResult.trackingNumber;
+    }
+
+    // 4. 송장 여부로 분기
+    if (!hasTrackingNumber) {
+      // 송장 미등록 → PG 자동 결제 취소 + 즉시 CANCELLED
+      this.logger.log(`송장 미등록 주문 자동 취소: ${orderNumber}`);
+
+      // PG 결제 취소 호출
+      await this.paymentService.cancelPayment(userId, {
+        orderNumber,
+        cancelReason: reason,
+      });
+
+      // 주문 다시 조회 (cancelPayment에서 상태 변경됨)
+      const cancelledOrder = await this.prisma.order.findFirst({
+        where: { orderNumber },
+        include: {
+          items: true,
         },
       });
 
-      if (!order) {
-        throw new NotFoundException('주문을 찾을 수 없습니다');
-      }
+      return {
+        ...cancelledOrder,
+        orderId: cancelledOrder.orderNumber,
+        totalProductPrice: Number(cancelledOrder.totalProductPrice),
+        totalDiscount: Number(cancelledOrder.totalDiscount),
+        shippingFee: Number(cancelledOrder.shippingFee),
+        pointUsed: Number(cancelledOrder.pointUsed),
+        totalAmount: Number(cancelledOrder.totalAmount),
+        items: cancelledOrder.items.map((item) => ({
+          ...item,
+          productPrice: Number(item.productPrice),
+          subtotal: Number(item.subtotal),
+        })),
+      };
+    }
 
-      // 취소 가능 상태 확인
-      if (!['PENDING_PAYMENT', 'PAID', 'PREPARING', 'SHIPPED'].includes(order.status)) {
-        throw new BadRequestException('취소 가능한 상태가 아닙니다');
-      }
+    // 5. 송장 등록됨 → CANCEL_REQUESTED (실무자 확인 필요)
+    this.logger.log(`송장 등록된 주문 취소 요청: ${orderNumber} (실무자 확인 필요)`);
 
-      // 이미 취소 요청 중인지 확인
-      if (order.status === OrderStatus.CANCEL_REQUESTED) {
-        throw new BadRequestException('이미 취소 요청 중인 주문입니다');
-      }
-
-      const now = getNowKST();
-
-      // PENDING_PAYMENT 상태: 결제 전이므로 즉시 취소 처리
-      if (order.status === OrderStatus.PENDING_PAYMENT) {
-        const updatedOrder = await tx.order.update({
-          where: { id: order.id },
-          data: {
-            status: OrderStatus.CANCELLED,
-            cancelledAt: now,
-          },
-        });
-
-        await tx.orderStateLog.create({
-          data: {
-            orderId: order.id,
-            fromStatus: order.status,
-            toStatus: OrderStatus.CANCELLED,
-            changeReason: `취소 - ${reason} (결제 전 취소)`,
-            createdAt: now,
-          },
-        });
-
-        this.logger.log(`결제 전 주문 취소 완료: ${orderNumber}`);
-
-        return {
-          ...updatedOrder,
-          orderId: updatedOrder.orderNumber,
-          totalProductPrice: Number(updatedOrder.totalProductPrice),
-          totalDiscount: Number(updatedOrder.totalDiscount),
-          shippingFee: Number(updatedOrder.shippingFee),
-          pointUsed: Number(updatedOrder.pointUsed),
-          totalAmount: Number(updatedOrder.totalAmount),
-          items: order.items.map(item => ({
-            ...item,
-            productPrice: Number(item.productPrice),
-            subtotal: Number(item.subtotal),
-          })),
-        };
-      }
-
-      // PAID/PREPARING/SHIPPED 상태: 취소 요청만 (관리자 승인 필요)
+    return await this.prisma.$transaction(async (tx) => {
       const updatedOrder = await tx.order.update({
         where: { id: order.id },
         data: {
@@ -559,7 +584,7 @@ export class OrdersService {
           orderId: order.id,
           fromStatus: order.status,
           toStatus: OrderStatus.CANCEL_REQUESTED,
-          changeReason: `취소 요청 - ${reason}`,
+          changeReason: `취소 요청 - ${reason} (송장 등록됨, 실무자 확인 필요)`,
           createdAt: now,
         },
       });
@@ -574,15 +599,13 @@ export class OrdersService {
           refundAmount: order.totalAmount,
           pointRefund: order.pointUsed,
           reason: reason,
-          reasonDetail: order.shipping?.trackingNumber
-            ? `송장번호: ${order.shipping.trackingNumber}`
-            : null,
+          reasonDetail: `송장번호: ${order.shipping?.trackingNumber || '확인필요'}`,
           requestedAt: now,
           createdAt: now,
         },
       });
 
-      this.logger.log(`주문 취소 요청 완료: ${orderNumber} (관리자 승인 대기)`);
+      this.logger.log(`주문 취소 요청 완료: ${orderNumber} (실무자 확인 대기)`);
 
       return {
         ...updatedOrder,
@@ -592,7 +615,55 @@ export class OrdersService {
         shippingFee: Number(updatedOrder.shippingFee),
         pointUsed: Number(updatedOrder.pointUsed),
         totalAmount: Number(updatedOrder.totalAmount),
-        items: order.items.map(item => ({
+        items: order.items.map((item) => ({
+          ...item,
+          productPrice: Number(item.productPrice),
+          subtotal: Number(item.subtotal),
+        })),
+      };
+    });
+  }
+
+  /**
+   * 주문 즉시 취소 (결제 전 주문용)
+   */
+  private async cancelOrderImmediately(
+    order: any,
+    reason: string,
+    logMessage: string,
+  ): Promise<OrderResponseDto> {
+    const now = getNowKST();
+
+    return await this.prisma.$transaction(async (tx) => {
+      const updatedOrder = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: OrderStatus.CANCELLED,
+          cancelledAt: now,
+        },
+      });
+
+      await tx.orderStateLog.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: OrderStatus.CANCELLED,
+          changeReason: `취소 - ${reason} (${logMessage})`,
+          createdAt: now,
+        },
+      });
+
+      this.logger.log(`${logMessage} 완료: ${order.orderNumber}`);
+
+      return {
+        ...updatedOrder,
+        orderId: updatedOrder.orderNumber,
+        totalProductPrice: Number(updatedOrder.totalProductPrice),
+        totalDiscount: Number(updatedOrder.totalDiscount),
+        shippingFee: Number(updatedOrder.shippingFee),
+        pointUsed: Number(updatedOrder.pointUsed),
+        totalAmount: Number(updatedOrder.totalAmount),
+        items: order.items.map((item: any) => ({
           ...item,
           productPrice: Number(item.productPrice),
           subtotal: Number(item.subtotal),
