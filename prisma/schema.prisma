@@ -56,6 +56,7 @@ model User {
   userChallenges               UserChallenge[]
   userCharts                   UserChart[]
   userChatHistories            UserChatHistory[]
+  userChatDailySummaries       UserChatDailySummary[]
   userConsents                 UserConsent[]
   userCoupons                  UserCoupon[]
   userDeepReports              UserDeepReport[]
@@ -2146,19 +2147,20 @@ model SupplementNutrient {
 }
 
 model UserChart {
-  id                   Int                   @id @default(autoincrement())
-  userId               Int                   @map("user_id")
-  chartId              String                @unique @map("chart_id") @db.VarChar(50)
-  receiptDate          DateTime              @map("receipt_date")
-  resultYn             String                @map("result_yn") @db.VarChar(1)
-  orderCode            String                @map("order_code") @db.VarChar(20)
-  createdAt            DateTime              @default(now()) @map("created_at")
-  updatedAt            DateTime?             @map("updated_at")
-  userAllergyReports   UserAllergyReport[]
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userChatHistories    UserChatHistory[]
-  userDeepReports      UserDeepReport[]
-  userMetabolicReports UserMetabolicReport[]
+  id                     Int                     @id @default(autoincrement())
+  userId                 Int                     @map("user_id")
+  chartId                String                  @unique @map("chart_id") @db.VarChar(50)
+  receiptDate            DateTime                @map("receipt_date")
+  resultYn               String                  @map("result_yn") @db.VarChar(1)
+  orderCode              String                  @map("order_code") @db.VarChar(20)
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime?               @map("updated_at")
+  userAllergyReports     UserAllergyReport[]
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userChatHistories      UserChatHistory[]
+  userChatDailySummaries UserChatDailySummary[]
+  userDeepReports        UserDeepReport[]
+  userMetabolicReports   UserMetabolicReport[]
 
   @@index([chartId], map: "idx_user_charts_chart_id")
   @@index([userId], map: "idx_user_charts_user_id")
@@ -2665,17 +2667,18 @@ model LogisticsApiLog {
 }
 
 /// 사용자 알레르기 검사 리포트
+/// 사용자 알레르기 검사 리포트
 model UserAllergyReport {
   id         Int       @id @default(autoincrement())
   userId     Int       @map("user_id")
   chartId    String    @map("chart_id") @db.VarChar(50)
-  userName   String    @map("user_name") @db.VarChar(255)
-  level1     String?
-  level2     String?
-  level3     String?
-  level4     String?
-  level5     String?
-  animalType String?   @map("animal_type")
+  userName   String    @map("user_name")
+  level1     String?   @db.Text
+  level2     String?   @db.Text
+  level3     String?   @db.Text
+  level4     String?   @db.Text
+  level5     String?   @db.Text
+  animalType String?   @map("animal_type") @db.Text
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime? @updatedAt @map("updated_at")
   userChart  UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_chart_id")
@@ -2705,26 +2708,42 @@ model UserMetabolicReport {
   @@map("user_metabolic_reports")
 }
 
-/// 사용자 챗봇 대화 히스토리 (통합)
+/// 사용자 챗봇 대화 히스토리 (JSONB message 구조)
+/// message JSONB 구조:
+/// - USER: {"role": "USER", "content": "메시지 내용"}
+/// - AI: {"role": "AI", "content": "메시지 내용", "persona_type": "헤이즐", "gender": "F", "cached": false}
 model UserChatHistory {
-  id          Int        @id @default(autoincrement())
-  userId      Int        @map("user_id")
-  chartId     String?    @map("chart_id") @db.VarChar(50)
-  sessionId   String?    @map("session_id") @db.VarChar(100)
-  testType    String?    @map("test_type") @db.VarChar(20)
-  userMessage String     @map("user_message")
-  aiMessage   String     @map("ai_message")
-  personaType String?    @map("persona_type") @db.VarChar(50)
-  gender      String?    @db.VarChar(10)
-  cached      Boolean    @default(false)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  userChart   UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_chat_histories_chart_id")
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_chat_histories_user_id")
+  id        Int        @id @default(autoincrement())
+  userId    Int        @map("user_id")
+  chartId   String?    @map("chart_id") @db.VarChar(50)
+  testType  String?    @map("test_type") @db.VarChar(20)
+  message   Json       @map("message")
+  createdAt DateTime   @default(now()) @map("created_at")
+  userChart UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_chat_histories_chart_id")
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_chat_histories_user_id")
 
   @@index([userId], map: "idx_user_chat_histories_user_id")
   @@index([chartId], map: "idx_user_chat_histories_chart_id")
   @@index([userId, createdAt], map: "idx_user_chat_histories_user_created")
   @@map("user_chat_histories")
+}
+
+/// 사용자 채팅 일별 요약 (하루 채팅을 1-2문장으로 요약)
+model UserChatDailySummary {
+  id            Int        @id @default(autoincrement())
+  userId        Int        @map("user_id")
+  chartId       String?    @map("chart_id") @db.VarChar(50)
+  date          DateTime   @map("date")
+  summary       String     @db.Text
+  totalMessages Int        @map("total_messages")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  userChart     UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_chat_daily_summaries_chart_id")
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_chat_daily_summaries_user_id")
+
+  @@unique([userId, date], map: "idx_user_chat_daily_summaries_user_date")
+  @@index([userId], map: "idx_user_chat_daily_summaries_user_id")
+  @@index([date], map: "idx_user_chat_daily_summaries_date")
+  @@map("user_chat_daily_summaries")
 }
 
 /// 사용자 감정 상태 (친밀도)
@@ -2743,25 +2762,30 @@ model UserEmotionalState {
   @@map("user_emotional_states")
 }
 
-/// 딥 리포트 (새로 추가)
+/// 딥 리포트 (7일 건강 데이터 분석)
 model UserDeepReport {
   id                    Int        @id @default(autoincrement())
   userId                Int        @map("user_id")
   chartId               String?    @map("chart_id") @db.VarChar(50)
   reportId              String     @unique @map("report_id") @db.VarChar(100)
   provider              String     @db.VarChar(20)
+  startDate             DateTime   @map("start_date")
+  endDate               DateTime   @map("end_date")
+  weekNumber            Int?       @map("week_number")
   content               Json
   processingTimeSeconds Float?     @map("processing_time_seconds")
   totalTokens           Int?       @map("total_tokens")
   estimatedCostUsd      Float?     @map("estimated_cost_usd")
   createdAt             DateTime   @default(now()) @map("created_at")
-  expiresAt             DateTime?  @map("expires_at")
   userChart             UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_deep_reports_chart_id")
   user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_deep_reports_user_id")
 
   @@index([userId], map: "idx_user_deep_reports_user_id")
   @@index([reportId], map: "idx_user_deep_reports_report_id")
   @@index([chartId], map: "idx_user_deep_reports_chart_id")
+  @@index([startDate], map: "idx_user_deep_reports_start_date")
+  @@index([endDate], map: "idx_user_deep_reports_end_date")
+  @@index([userId, startDate, endDate], map: "idx_user_date_range")
   @@map("user_deep_reports")
 }
 
