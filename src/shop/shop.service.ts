@@ -499,6 +499,12 @@ export class ShopService {
    * 주문 상태 변경
    */
   async updateOrderStatus(orderNumber: string, status: string, reason: string) {
+    // 유효한 주문 상태인지 검증
+    const validStatuses = Object.values(OrderStatus);
+    if (!validStatuses.includes(status as OrderStatus)) {
+      throw new BadRequestException(`유효하지 않은 주문 상태입니다: ${status}. 유효한 값: ${validStatuses.join(', ')}`);
+    }
+
     const order = await this.prisma.order.findFirst({
       where: { orderNumber }
     });

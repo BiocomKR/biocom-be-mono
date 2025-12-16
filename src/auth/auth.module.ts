@@ -5,7 +5,6 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { PrismaService } from '../common/services/prisma.service';
 import { ConfigService } from '../common/services/config.service';
 
 /**
@@ -32,7 +31,7 @@ import { ConfigService } from '../common/services/config.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PrismaService, ConfigService],
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService, PassportModule],
 })
 export class AuthModule {}

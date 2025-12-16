@@ -4,7 +4,6 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { join } from 'path';
-import { PrismaService } from './common/services/prisma.service';
 import { ConfigService } from './common/services/config.service';
 import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
@@ -125,8 +124,6 @@ import { OrdersService } from './orders/orders.service';
     OrdersController,
   ],
   providers: [
-    PrismaService,
-    ConfigService,
     UsersService,
     ChallengeService,
     MissionService,

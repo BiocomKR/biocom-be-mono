@@ -17,6 +17,7 @@ import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShopService } from './shop.service';
+import { stringToKSTDate } from '../common/utils/kst-date.util';
 
 @ApiTags('상품 관리')
 @ApiBearerAuth()
@@ -106,8 +107,8 @@ export class ShopController {
   ) {
     return this.shopService.getOrders({
       status,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      startDate: startDate ? stringToKSTDate(startDate, 0, 0, 0) : undefined,
+      endDate: endDate ? stringToKSTDate(endDate, 23, 59, 59) : undefined,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 20
     });
