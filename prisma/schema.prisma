@@ -1023,10 +1023,10 @@ model Refund {
   refundAmount         Decimal   @map("refund_amount") @db.Decimal(10, 0)
   /// 포인트 환불액
   pointRefund          Decimal   @default(0) @map("point_refund") @db.Decimal(10, 0)
-  /// 토스페이먼츠 취소 ID
-  tossCancelId         String?   @map("toss_cancel_id") @db.VarChar(100)
-  /// 토스페이먼츠 응답
-  tossResponse         Json?     @map("toss_response")
+  /// PG사 취소 거래 ID
+  pgCancelId           String?   @map("pg_cancel_id") @db.VarChar(100)
+  /// PG사 취소 응답 (JSON)
+  pgResponse           Json?     @map("pg_response")
   /// 환불 사유
   reason               String    @db.VarChar(200)
   /// 상세 사유
