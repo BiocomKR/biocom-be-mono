@@ -15,6 +15,7 @@ export * from './payment-status.enum';
 export * from './shipping-status.enum';
 export * from './refund-status.enum';
 export * from './exchange-return.enum';
+export * from './pg-provider.enum';
 
 // 상품 관련
 export * from './product-status.enum';

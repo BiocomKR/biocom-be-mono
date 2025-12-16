@@ -8,7 +8,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { TossPaymentsService } from '../toss/toss-payments.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
-import { RefundStatus, ExchangeReturnStatus, OrderStatus } from '../common/enums';
+import { RefundStatus, ExchangeReturnStatus, OrderStatus, PgProvider } from '../common/enums';
 
 @Injectable()
 export class RefundService {
@@ -243,6 +243,7 @@ export class RefundService {
         data: {
           status: RefundStatus.COMPLETED,
           completedAt: now,
+          pgProvider: PgProvider.TOSS,
           pgResponse: pgResponse as any,
           pgCancelId: pgResponse.cancels?.[0]?.transactionKey || null,
           adminMemo: adminMemo || refund.adminMemo,
@@ -781,6 +782,7 @@ export class RefundService {
         await tx.refund.update({
           where: { id: refund.id },
           data: {
+            pgProvider: PgProvider.TOSS,
             pgResponse: pgResponse as any,
             pgCancelId: pgResponse.cancels?.[0]?.transactionKey || null,
             status: RefundStatus.COMPLETED,
