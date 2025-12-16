@@ -1,13 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService as NestConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_INTERCEPTOR, APP_GUARD, Reflector } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'path';
-import { PrismaService } from './common/services/prisma.service';
 import { ConfigService } from './common/services/config.service';
-import { LoggerService } from './common/services/logger.service';
 import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { LoggerModule } from './common/modules/logger.module';
@@ -149,15 +147,13 @@ import { QueuesModule } from './queues/queues.module';
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [
-    PrismaService,  // 글로벌 데이터베이스 서비스
-    ConfigService,  // 타입 안전한 설정 서비스
     {
       provide: APP_INTERCEPTOR,
-      useClass: LoggingInterceptor,  // 전역 로깅 인터셉터
+      useClass: LoggingInterceptor,
     },
     {
       provide: APP_GUARD,
-      useClass: CustomThrottlerGuard,  // 전역 Rate Limiting
+      useClass: CustomThrottlerGuard,
     },
   ],
 })

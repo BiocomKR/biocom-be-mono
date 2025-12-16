@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { QnaController } from './controllers/qna.controller';
 import { QnaService } from './services/qna.service';
-import { PrismaService } from '../common/services/prisma.service';
 
 /**
  * 상품 Q&A 모듈
@@ -9,7 +8,7 @@ import { PrismaService } from '../common/services/prisma.service';
  */
 @Module({
   controllers: [QnaController],
-  providers: [QnaService, PrismaService],
-  exports: [QnaService]
+  providers: [QnaService],
+  exports: [QnaService],
 })
 export class QnaModule {}

@@ -72,10 +72,10 @@ export class TossPaymentsService {
         this.httpService.post(url, body, { headers, timeout: 10000 })
       );
 
-      this.logger.log(`결제 승인 성공: ${paymentKey}`);
+      this.logger.log(`결제 승인 성공: ${paymentKey.slice(0, 8)}***`);
       return response.data;
     } catch (error: any) {
-      this.handleTossError(error, `결제 승인 실패: ${paymentKey}`);
+      this.handleTossError(error, `결제 승인 실패: ${paymentKey.slice(0, 8)}***`);
     }
   }
 
@@ -111,10 +111,10 @@ export class TossPaymentsService {
         this.httpService.post(url, body, { headers, timeout: 10000 })
       );
 
-      this.logger.log(`결제 취소 성공: ${paymentKey}`);
+      this.logger.log(`결제 취소 성공: ${paymentKey.slice(0, 8)}***`);
       return response.data;
     } catch (error: any) {
-      this.handleTossError(error, `결제 취소 실패: ${paymentKey}`);
+      this.handleTossError(error, `결제 취소 실패: ${paymentKey.slice(0, 8)}***`);
     }
   }
 
@@ -135,7 +135,7 @@ export class TossPaymentsService {
 
       return response.data;
     } catch (error: any) {
-      this.handleTossError(error, `결제 조회 실패: ${paymentKey}`);
+      this.handleTossError(error, `결제 조회 실패: ${paymentKey.slice(0, 8)}***`);
     }
   }
 
@@ -162,18 +162,18 @@ export class TossPaymentsService {
         customerKey,
       };
 
-      this.logger.log(`빌링키 발급 요청: authKey=${authKey}, customerKey=${customerKey}`);
+      this.logger.log(`빌링키 발급 요청: authKey=${authKey.slice(0, 8)}***, customerKey=${customerKey}`);
 
       const response = await firstValueFrom(
         this.httpService.post(url, body, { headers, timeout: 10000 })
       );
 
       const billingKey = response.data.billingKey;
-      this.logger.log(`빌링키 발급 성공: billingKey=${billingKey}`);
+      this.logger.log(`빌링키 발급 성공: billingKey=${billingKey.slice(0, 8)}***`);
 
       return billingKey;
     } catch (error: any) {
-      this.handleTossError(error, `빌링키 발급 실패: authKey=${authKey}`);
+      this.handleTossError(error, `빌링키 발급 실패: authKey=${authKey.slice(0, 8)}***`);
     }
   }
 
@@ -206,16 +206,16 @@ export class TossPaymentsService {
         orderName,
       };
 
-      this.logger.log(`빌링키 자동결제 요청: billingKey=${billingKey}, amount=${amount}원`);
+      this.logger.log(`빌링키 자동결제 요청: billingKey=${billingKey.slice(0, 8)}***, amount=${amount}원`);
 
       const response = await firstValueFrom(
         this.httpService.post(url, body, { headers, timeout: 10000 })
       );
 
-      this.logger.log(`빌링키 자동결제 성공: paymentKey=${response.data.paymentKey}`);
+      this.logger.log(`빌링키 자동결제 성공: paymentKey=${response.data.paymentKey?.slice(0, 8)}***`);
       return response.data;
     } catch (error: any) {
-      this.handleTossError(error, `빌링키 자동결제 실패: ${billingKey}`);
+      this.handleTossError(error, `빌링키 자동결제 실패: ${billingKey.slice(0, 8)}***`);
     }
   }
 }

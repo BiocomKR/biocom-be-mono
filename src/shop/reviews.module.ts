@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ReviewsController } from './controllers/reviews.controller';
 import { ReviewsService } from './services/reviews.service';
-import { PrismaService } from '../common/services/prisma.service';
 
 /**
  * 상품 리뷰 모듈
@@ -9,7 +8,7 @@ import { PrismaService } from '../common/services/prisma.service';
  */
 @Module({
   controllers: [ReviewsController],
-  providers: [ReviewsService, PrismaService],
-  exports: [ReviewsService]
+  providers: [ReviewsService],
+  exports: [ReviewsService],
 })
 export class ReviewsModule {}

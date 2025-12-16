@@ -3,7 +3,6 @@ import { HttpModule } from '@nestjs/axios';
 import { StatisticsController } from './controllers/statistics.controller';
 import { AiAgentStatisticsController } from './controllers/ai-agent-statistics.controller';
 import { StatisticsService } from './services/statistics.service';
-import { PrismaService } from '../common/services/prisma.service';
 
 /**
  * 통계 모듈
@@ -18,9 +17,9 @@ import { PrismaService } from '../common/services/prisma.service';
  * - AI Agent 통계 (별도 인증 방식)
  */
 @Module({
-  imports: [HttpModule], // AI Agent API에서 외부 API 호출을 위해 필요
+  imports: [HttpModule],
   controllers: [StatisticsController, AiAgentStatisticsController],
-  providers: [StatisticsService, PrismaService],
-  exports: [StatisticsService], // 다른 모듈에서 사용 가능하도록 export
+  providers: [StatisticsService],
+  exports: [StatisticsService],
 })
 export class StatisticsModule {}

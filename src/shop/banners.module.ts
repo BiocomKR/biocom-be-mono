@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BannersController } from './controllers/banners.controller';
 import { BannersService } from './services/banners.service';
-import { PrismaService } from '../common/services/prisma.service';
 
 /**
  * 쇼핑몰 배너 모듈
@@ -9,7 +8,7 @@ import { PrismaService } from '../common/services/prisma.service';
  */
 @Module({
   controllers: [BannersController],
-  providers: [BannersService, PrismaService],
-  exports: [BannersService]
+  providers: [BannersService],
+  exports: [BannersService],
 })
 export class BannersModule {}

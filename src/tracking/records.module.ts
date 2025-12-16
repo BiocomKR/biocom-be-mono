@@ -5,7 +5,6 @@ import { RecordsService } from './services/records.service';
 import { RecordAccessGuard } from './guards/record-access.guard';
 import { RecordExtendedAccessGuard } from './guards/record-extended-access.guard';
 import { PointModule } from '../point/point.module';
-import { PrismaService } from '../common/services/prisma.service';
 
 /**
  * 기록 모듈
@@ -18,12 +17,9 @@ import { PrismaService } from '../common/services/prisma.service';
  * - 외부 분석실 API 연동 (알러지 검사 결과 조회)
  */
 @Module({
-  imports: [
-    PointModule,     // PointService 사용을 위해 import
-    HttpModule,      // 외부 API 호출을 위해 import
-  ],
+  imports: [PointModule, HttpModule],
   controllers: [RecordsController],
-  providers: [RecordsService, RecordAccessGuard, RecordExtendedAccessGuard, PrismaService],
-  exports: [RecordsService], // 다른 모듈에서 사용 가능하도록 export
+  providers: [RecordsService, RecordAccessGuard, RecordExtendedAccessGuard],
+  exports: [RecordsService],
 })
 export class RecordsModule {}
