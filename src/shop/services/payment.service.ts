@@ -96,9 +96,10 @@ export class PaymentService {
    */
   async confirmPayment(userId: number, dto: ConfirmPaymentDto): Promise<PaymentResponseDto> {
     // 1. 주문 및 결제 정보 조회 (트랜잭션 밖)
+    // dto.orderId는 앱에서 보내는 주문번호 (O2025... 형식)
     const order = await this.prisma.order.findFirst({
       where: {
-        orderNumber: dto.orderNumber
+        orderNumber: dto.orderId
       },
       include: {
         items: {
@@ -120,7 +121,7 @@ export class PaymentService {
 
     // 이미 결제 완료된 주문인지 확인 (멱등성 보장)
     if (order.status === OrderStatus.PAID) {
-      this.logger.warn(`이미 결제 완료된 주문입니다: ${dto.orderNumber}`);
+      this.logger.warn(`이미 결제 완료된 주문입니다: ${dto.orderId}`);
       const completedPayment = await this.prisma.payment.findFirst({
         where: { orderId: order.id, status: PaymentStatus.COMPLETED }
       });
@@ -155,10 +156,10 @@ export class PaymentService {
     // 2. 토스페이먼츠 결제 승인 (외부 API 호출 - 트랜잭션 밖)
     let tossResult: any;
     try {
-      // 토스 API에는 orderId 필드로 주문번호를 전달
+      // 토스 API에 orderId 필드로 주문번호를 전달
       tossResult = await this.tossPayments.confirmPayment(
         dto.paymentKey,
-        dto.orderNumber,
+        dto.orderId,
         dto.amount
       );
     } catch (error: any) {
@@ -263,7 +264,7 @@ export class PaymentService {
         }
       }
 
-      this.logger.log(`결제 승인 완료: ${dto.orderNumber} / ${dto.paymentKey}`);
+      this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
 
       return {
         orderId: order.id,
