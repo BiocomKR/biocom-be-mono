@@ -46,7 +46,7 @@ EOF
 
 # 기본값 설정
 PROJECT_ID=""
-CLUSTER_NAME="biocom-bo-cluster"
+CLUSTER_NAME="biocom-cluster-dev"
 ZONE="asia-northeast3-a"
 NAMESPACE="biocom-bo-api"
 SKIP_BUILD=false
@@ -159,7 +159,7 @@ check_infrastructure() {
         exit 1
     fi
 
-    if ! gcloud artifacts repositories describe biocom-bo-api --location="$REGION" --project="$PROJECT_ID" &>/dev/null; then
+    if ! gcloud artifacts repositories describe biocom-api --location="$REGION" --project="$PROJECT_ID" &>/dev/null; then
         log_error "Artifact Registry가 없습니다. 먼저 01-deploy-infrastructure.sh를 실행하세요."
         exit 1
     fi
@@ -194,7 +194,7 @@ build_and_push_docker() {
     if [[ "$SKIP_BUILD" == true ]]; then
         log_info "Docker 이미지 빌드를 건너뜁니다."
         # 최신 이미지 태그 가져오기
-        IMAGE_TAG=$(gcloud artifacts docker images list "$REGION-docker.pkg.dev/$PROJECT_ID/biocom-bo-api/biocom-bo-api" \
+        IMAGE_TAG=$(gcloud artifacts docker images list "$REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-bo-api" \
             --sort-by="~UPDATE_TIME" --limit=1 --format="value(version)" 2>/dev/null | head -1)
         if [[ -z "$IMAGE_TAG" ]]; then
             IMAGE_TAG="latest"
@@ -213,8 +213,8 @@ build_and_push_docker() {
 
     # 이미지 태그 생성
     IMAGE_TAG=$(date +%Y%m%d%H%M%S)
-    IMAGE_URL="$REGION-docker.pkg.dev/$PROJECT_ID/biocom-bo-api/biocom-bo-api:$IMAGE_TAG"
-    LATEST_URL="$REGION-docker.pkg.dev/$PROJECT_ID/biocom-bo-api/biocom-bo-api:latest"
+    IMAGE_URL="$REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-bo-api:$IMAGE_TAG"
+    LATEST_URL="$REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-bo-api:latest"
 
     # Docker 빌드
     log_info "Docker 이미지 빌드 중... (약 2-3분 소요)"
@@ -233,7 +233,7 @@ build_and_push_docker() {
 ensure_static_ip() {
     log_info "🌐 Static IP 확인/생성 중..."
 
-    local static_ip_name="biocom-bo-cluster-external-ip"
+    local static_ip_name="biocom-bo-api-external-ip"
 
     if gcloud compute addresses describe "$static_ip_name" --global --project="$PROJECT_ID" &>/dev/null; then
         local ip_address
@@ -324,7 +324,7 @@ deploy_kubernetes() {
 
     # Deployment 배포 (이미지 태그 업데이트)
     log_info "Deployment 배포 중..."
-    sed -i.bak "s|image: .*|image: $REGION-docker.pkg.dev/$PROJECT_ID/biocom-bo-api/biocom-bo-api:$IMAGE_TAG|" deployment.yaml
+    sed -i.bak "s|image: .*|image: $REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-bo-api:$IMAGE_TAG|" deployment.yaml
     kubectl apply -f deployment.yaml
 
     # Static IP 확인/생성

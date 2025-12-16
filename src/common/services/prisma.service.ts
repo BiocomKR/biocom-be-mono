@@ -202,6 +202,21 @@ function createExtendedPrismaClient() {
           return query(args);
         },
       },
+      // 모든 테이블 updatedAt KST 자동 설정
+      $allModels: {
+        async update({ args, query }) {
+          if (args.data && typeof args.data === 'object') {
+            (args.data as any).updatedAt = getNowKST();
+          }
+          return query(args);
+        },
+        async updateMany({ args, query }) {
+          if (args.data && typeof args.data === 'object') {
+            (args.data as any).updatedAt = getNowKST();
+          }
+          return query(args);
+        },
+      },
       phoneVerificationLog: {
         async create({ args, query }) {
           if ((args.data as any).mobile && typeof (args.data as any).mobile === 'string') {

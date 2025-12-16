@@ -13,7 +13,7 @@ metadata:
     networking.gke.io/managed-certificates: "biocom-bo-api-ssl-cert"
     cloud.google.com/backend-config: '{"default": "biocom-bo-api-backend-config"}'
     networking.gke.io/v1beta1.FrontendConfig: "biocom-bo-api-frontend-config"
-    kubernetes.io/ingress.global-static-ip-name: "biocom-bo-cluster-external-ip"
+    kubernetes.io/ingress.global-static-ip-name: "biocom-bo-api-external-ip"
     cloud.google.com/neg: '{"ingress": true}'
     cloud.google.com/load-balancer-type: "External"
 spec:
@@ -79,7 +79,7 @@ metadata:
   name: biocom-bo-api-frontend-config
   namespace: biocom-bo-api
 spec:
-  sslPolicy: "biocom-bo-cluster-ssl-policy"
+  sslPolicy: "biocom-ssl-policy"
   redirectToHttps:
     enabled: true
     responseCodeName: "MOVED_PERMANENTLY_DEFAULT"
