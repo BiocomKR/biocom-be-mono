@@ -12,15 +12,18 @@ export class PreparePaymentDto {
 
 /**
  * 결제 승인 요청 DTO
+ *
+ * 참고: 앱에서 orderId로 보내며, 이 값은 우리 시스템의 orderNumber(O2025...)입니다.
+ * 토스페이먼츠 API에도 orderId 필드로 그대로 전달됩니다.
  */
 export class ConfirmPaymentDto {
   @ApiProperty({ description: '토스페이먼츠 결제키' })
   @IsString()
   paymentKey: string;
 
-  @ApiProperty({ description: '주문번호 (토스 orderId로 전달됨)' })
+  @ApiProperty({ description: '주문번호 (O2025... 형식)' })
   @IsString()
-  orderNumber: string;
+  orderId: string;
 
   @ApiProperty({ description: '결제 금액' })
   @IsNumber()
