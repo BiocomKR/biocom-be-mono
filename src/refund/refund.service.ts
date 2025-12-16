@@ -163,7 +163,7 @@ export class RefundService {
         requestedAt: refund.requestedAt,
         completedAt: refund.completedAt,
         rejectedAt: refund.rejectedAt,
-        tossCancelId: refund.tossCancelId
+        pgCancelId: refund.pgCancelId
       }
     };
   }
@@ -211,15 +211,15 @@ export class RefundService {
     return await this.prisma.$transaction(async (tx) => {
       const now = getNowKST();
 
-      // 1. 토스페이먼츠 결제 취소 API 호출
-      let tossResponse: any = null;
+      // 1. PG사 결제 취소 API 호출
+      let pgResponse: any = null;
       try {
-        tossResponse = await this.tossPaymentsService.cancelPayment(
+        pgResponse = await this.tossPaymentsService.cancelPayment(
           payment.pgTransactionId,
           `주문 취소 승인 - ${refund.reason || '관리자 승인'}`,
           undefined // 전액 취소
         );
-        this.logger.log(`토스페이먼츠 취소 완료: ${payment.pgTransactionId}`);
+        this.logger.log(`PG 결제 취소 완료: ${payment.pgTransactionId}`);
       } catch (error: any) {
         this.logger.error(`토스페이먼츠 취소 실패: ${error.message}`);
 
@@ -243,8 +243,8 @@ export class RefundService {
         data: {
           status: RefundStatus.COMPLETED,
           completedAt: now,
-          tossResponse: tossResponse as any,
-          tossCancelId: tossResponse.cancels?.[0]?.transactionKey || null,
+          pgResponse: pgResponse as any,
+          pgCancelId: pgResponse.cancels?.[0]?.transactionKey || null,
           adminMemo: adminMemo || refund.adminMemo,
         }
       });
@@ -425,7 +425,7 @@ export class RefundService {
         data: {
           status: RefundStatus.COMPLETED,
           completedAt: getNowKST(),
-          tossCancelId: transactionId,
+          pgCancelId: transactionId,
           adminMemo: adminMemo || refund.adminMemo
         }
       });
@@ -769,26 +769,26 @@ export class RefundService {
         }
       });
 
-      // 3. 토스페이먼츠 결제 취소 API 호출
+      // 3. PG사 결제 취소 API 호출
       try {
-        const tossResponse = await this.tossPaymentsService.cancelPayment(
+        const pgResponse = await this.tossPaymentsService.cancelPayment(
           order.payment.pgTransactionId, // paymentKey
           `반품 환불 - ${exchangeReturn.reason}`,
           undefined // 전액 취소
         );
 
-        // 토스 응답 저장
+        // PG 응답 저장
         await tx.refund.update({
           where: { id: refund.id },
           data: {
-            tossResponse: tossResponse as any,
-            tossCancelId: tossResponse.cancels?.[0]?.transactionKey || null,
+            pgResponse: pgResponse as any,
+            pgCancelId: pgResponse.cancels?.[0]?.transactionKey || null,
             status: RefundStatus.COMPLETED,
             completedAt: getNowKST(),
           }
         });
 
-        this.logger.log(`토스페이먼츠 취소 완료: ${order.payment.pgTransactionId}`);
+        this.logger.log(`PG 결제 취소 완료: ${order.payment.pgTransactionId}`);
       } catch (error: any) {
         this.logger.error(`토스페이먼츠 취소 실패: ${error.message}`);
 
@@ -861,7 +861,7 @@ export class RefundService {
             id: refund.id,
             refundAmount: Number(refund.refundAmount),
             pointRefund: Number(refund.pointRefund),
-            tossCancelId: refund.tossCancelId
+            pgCancelId: refund.pgCancelId
           },
           completedAt: getNowKST()
         }

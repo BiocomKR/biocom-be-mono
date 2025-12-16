@@ -347,7 +347,7 @@ export class OrdersService {
           orderNumber: refund.order.orderNumber,
           // 프론트엔드 호환용 필드명
           userName: CryptoUtil.decrypt(refund.order.recipientName),
-          userMobile: CryptoUtil.decryptDeterministic(refund.order.recipientMobile),
+          userMobile: CryptoUtil.decrypt(refund.order.recipientMobile),
           productName,
           amount: Number(refund.order.totalAmount),
           status: refund.status,
@@ -400,7 +400,7 @@ export class OrdersService {
           orderNumber: er.order.orderNumber,
           // 프론트엔드 호환용 필드명
           userName: CryptoUtil.decrypt(er.order.recipientName),
-          userMobile: CryptoUtil.decryptDeterministic(er.order.recipientMobile),
+          userMobile: CryptoUtil.decrypt(er.order.recipientMobile),
           productName,
           amount: Number(er.order.totalAmount),
           status: er.status,
@@ -595,7 +595,7 @@ export class OrdersService {
       shipping: order.shipping
         ? {
             recipientName: CryptoUtil.decrypt(order.shipping.recipientName || order.recipientName),
-            recipientMobile: CryptoUtil.decryptDeterministic(order.shipping.recipientMobile || order.recipientMobile),
+            recipientMobile: CryptoUtil.decrypt(order.shipping.recipientMobile || order.recipientMobile),
             address: CryptoUtil.decrypt(order.shipping.address || order.address),
             status: order.shipping.status,
             courierName: order.shipping.courierName,
@@ -603,7 +603,7 @@ export class OrdersService {
           }
         : {
             recipientName: CryptoUtil.decrypt(order.recipientName),
-            recipientMobile: CryptoUtil.decryptDeterministic(order.recipientMobile),
+            recipientMobile: CryptoUtil.decrypt(order.recipientMobile),
             address: CryptoUtil.decrypt(order.address),
           },
       payment: order.payment
