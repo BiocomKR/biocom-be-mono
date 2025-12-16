@@ -5,16 +5,10 @@ import {
   Logger,
   HttpCode,
   HttpStatus,
-  Headers,
-  Req,
-  UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { WebhooksService } from '../services/webhooks.service';
-import { RawBodyRequest } from '@nestjs/common';
-import { Request } from 'express';
-import * as crypto from 'crypto';
 
 /**
  * 토스페이먼츠 웹훅 컨트롤러
@@ -26,65 +20,17 @@ import * as crypto from 'crypto';
  * 주의사항:
  * - 반드시 200 OK 응답 (토스가 재시도하지 않도록)
  * - 멱등성 보장 (같은 웹훅이 여러 번 올 수 있음)
- * - 30초 이내 응답 필수
+ * - 10초 이내 응답 필수
+ *
+ * 참고: 토스페이먼츠는 웹훅 서명 검증을 제공하지 않음
+ * https://docs.tosspayments.com/guides/webhook
  */
 @ApiTags('Webhooks')
 @Controller('webhooks/toss')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
-  private readonly webhookSecretKey = process.env.TOSS_WEBHOOK_SECRET_KEY;
 
   constructor(private readonly webhooksService: WebhooksService) {}
-
-  /**
-   * 토스 웹훅 서명 검증
-   *
-   * 토스페이먼츠 공식 문서 기준:
-   * - 서명 생성: HMAC_SHA256(secretKey, ${payload}:${transmissionTime})
-   * - 헤더: tosspayments-webhook-signature, tosspayments-webhook-transmission-time
-   *
-   * @param rawBody - Raw request body (문자열)
-   * @param signature - tosspayments-webhook-signature 헤더 값
-   * @param transmissionTime - tosspayments-webhook-transmission-time 헤더 값
-   * @returns 검증 성공 여부
-   */
-  private verifyWebhookSignature(
-    rawBody: string,
-    signature: string,
-    transmissionTime: string,
-  ): boolean {
-    if (!this.webhookSecretKey) {
-      // 운영 환경에서는 키 미설정 시 무조건 실패 (보안 취약점 방지)
-      if (process.env.NODE_ENV === 'production') {
-        this.logger.error('❌ TOSS_WEBHOOK_SECRET_KEY 미설정 - 운영 환경에서 필수');
-        return false;
-      }
-      this.logger.warn('⚠️ TOSS_WEBHOOK_SECRET_KEY 미설정 - 개발 환경이므로 검증 건너뜀');
-      return true;
-    }
-
-    try {
-      // 토스 공식 문서: HMAC_SHA256(secretKey, ${payload}:${transmissionTime})
-      const message = `${rawBody}:${transmissionTime}`;
-      const expectedSignature = crypto
-        .createHmac('sha256', this.webhookSecretKey)
-        .update(message)
-        .digest('base64');
-
-      const isValid = signature === expectedSignature;
-
-      if (!isValid) {
-        this.logger.error(
-          `❌ 웹훅 서명 불일치: expected=${expectedSignature}, received=${signature}`,
-        );
-      }
-
-      return isValid;
-    } catch (error: any) {
-      this.logger.error(`❌ 웹훅 서명 검증 오류: ${error.message}`);
-      return false;
-    }
-  }
 
   /**
    * 토스페이먼츠 결제 웹훅 수신
@@ -93,12 +39,11 @@ export class WebhooksController {
    * 토스페이먼츠 서버가 결제 상태 변경 시 자동으로 호출하는 엔드포인트
    *
    * 처리 이벤트:
-   * 1. Payment.Approved - 결제 승인 완료 (가상계좌 입금, 계좌이체 완료)
-   * 2. Payment.Canceled - 결제 취소 완료
-   * 3. Payment.Failed - 결제 실패
+   * - PAYMENT_STATUS_CHANGED: 결제 상태 변경
+   * - DEPOSIT_CALLBACK: 가상계좌 입금 완료
+   * - CANCEL_STATUS_CHANGED: 결제 취소 상태 변경
    *
    * @param webhookData - 토스가 보내는 웹훅 데이터
-   * @param signature - 토스 서명 (보안 검증용, 선택적)
    * @returns 200 OK (항상)
    */
   @Post('payment')
@@ -114,43 +59,13 @@ export class WebhooksController {
       example: { success: true },
     },
   })
-  async handleTossPaymentWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Body() webhookData: any,
-    @Headers('tosspayments-webhook-signature') signature?: string,
-    @Headers('tosspayments-webhook-transmission-time') transmissionTime?: string,
-  ) {
+  async handleTossPaymentWebhook(@Body() webhookData: any) {
     this.logger.log(
       `🔔 토스 웹훅 수신: ${JSON.stringify(webhookData, null, 2)}`,
     );
 
     try {
-      // 1. 서명 검증
-      // 운영 환경에서는 서명 헤더 필수 (보안 강화)
-      if (!signature || !transmissionTime) {
-        if (process.env.NODE_ENV === 'production') {
-          this.logger.error('❌ 웹훅 서명 헤더 누락 - 운영 환경에서 요청 거부');
-          throw new UnauthorizedException('Missing webhook signature headers');
-        }
-        this.logger.warn('⚠️ 웹훅 서명 헤더 없음 - 개발 환경이므로 검증 건너뜀');
-      } else {
-        // NestJS rawBody 옵션으로 설정된 rawBody (Buffer)
-        const rawBody = req.rawBody?.toString() || JSON.stringify(webhookData);
-        const isValid = this.verifyWebhookSignature(
-          rawBody,
-          signature,
-          transmissionTime,
-        );
-
-        if (!isValid) {
-          this.logger.error('❌ 웹훅 서명 검증 실패 - 요청 거부');
-          throw new UnauthorizedException('Invalid webhook signature');
-        }
-
-        this.logger.log('✅ 웹훅 서명 검증 성공');
-      }
-
-      // 2. 웹훅 데이터 처리
+      // 웹훅 데이터 처리
       await this.webhooksService.handleTossWebhook(webhookData);
 
       this.logger.log(`✅ 토스 웹훅 처리 완료`);
@@ -161,13 +76,8 @@ export class WebhooksController {
       this.logger.error(`❌ 토스 웹훅 처리 실패: ${error.message}`);
       this.logger.error(error.stack);
 
-      // 서명 검증 실패는 401 반환
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-
       // 내부 에러는 500 반환하여 토스가 재시도하도록 함
-      // 토스는 5xx 에러를 받으면 최대 10번 재시도 (일시적 장애 시 재처리 가능)
+      // 토스는 5xx 에러를 받으면 최대 7회 재시도
       throw new InternalServerErrorException('웹훅 처리 중 오류 발생');
     }
   }
