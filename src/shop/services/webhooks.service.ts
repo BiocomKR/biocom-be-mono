@@ -127,9 +127,14 @@ export class WebhooksService {
         break;
 
       case 'ABORTED':
-      case 'EXPIRED':
-        // 결제 실패/만료
+        // 결제 실패 (사용자 취소 등)
         await this.handlePaymentFailed({ ...data, failReason: `결제 ${status}` });
+        break;
+
+      case 'EXPIRED':
+        // 결제 만료 (정상적인 타임아웃, 로그만 기록)
+        this.logger.log(`⏰ 결제 만료: 주문번호=${orderId} (결제창 유효시간 초과)`);
+        await this.handlePaymentExpired(data);
         break;
 
       case 'WAITING_FOR_DEPOSIT':
@@ -665,6 +670,62 @@ export class WebhooksService {
       }
 
       this.logger.log(`✅ 결제 실패 처리 완료: ${orderId}`);
+    });
+  }
+
+  /**
+   * 결제 만료 처리 (EXPIRED)
+   *
+   * 사용자가 결제창에서 시간 초과로 결제를 완료하지 않은 경우
+   * 정상적인 케이스이므로 Slack 알림 없이 로그만 기록
+   */
+  private async handlePaymentExpired(data: any) {
+    const { orderId } = data;
+
+    await this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { orderNumber: orderId },
+      });
+
+      if (!order) {
+        this.logger.warn(`⚠️ 만료 처리할 주문을 찾을 수 없음: ${orderId}`);
+        return;
+      }
+
+      // 이미 처리된 주문은 스킵
+      if (order.status !== OrderStatus.PENDING_PAYMENT) {
+        this.logger.log(`ℹ️ 이미 처리된 주문, 만료 처리 스킵: ${orderId} (현재 상태: ${order.status})`);
+        return;
+      }
+
+      // 주문 상태 업데이트
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: OrderStatus.PAYMENT_FAILED,
+        },
+      });
+
+      // 결제 정보 업데이트
+      const payment = await tx.payment.findFirst({
+        where: {
+          orderId: order.id,
+          status: PaymentStatus.PENDING,
+        },
+      });
+
+      if (payment) {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.FAILED,
+            failedAt: getNowKST(),
+            failReason: '결제 시간 초과 (EXPIRED)',
+          },
+        });
+      }
+
+      this.logger.log(`✅ 결제 만료 처리 완료: ${orderId}`);
     });
   }
 
