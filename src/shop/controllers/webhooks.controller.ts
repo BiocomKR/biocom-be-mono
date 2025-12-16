@@ -8,6 +8,7 @@ import {
   Headers,
   Req,
   UnauthorizedException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { WebhooksService } from '../services/webhooks.service';
@@ -165,9 +166,9 @@ export class WebhooksController {
         throw error;
       }
 
-      // 그 외 에러는 200 OK 반환 (토스 재시도 방지)
-      // 토스는 5xx 에러를 받으면 최대 10번 재시도함
-      return { success: false, error: error.message };
+      // 내부 에러는 500 반환하여 토스가 재시도하도록 함
+      // 토스는 5xx 에러를 받으면 최대 10번 재시도 (일시적 장애 시 재처리 가능)
+      throw new InternalServerErrorException('웹훅 처리 중 오류 발생');
     }
   }
 }

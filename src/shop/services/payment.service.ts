@@ -349,6 +349,7 @@ export class PaymentService {
             refundAmount: new Prisma.Decimal(dto.cancelAmount || convertDecimalToNumber(payment.amount) || 0),
             reason: dto.cancelReason,
             status: PaymentStatus.COMPLETED,
+            pgProvider: PgProvider.TOSS,
             pgCancelId: tossResult.cancels[0].transactionKey,
             pgResponse: tossResult as any,
             requestedAt: getNowKST(),

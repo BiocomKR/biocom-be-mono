@@ -66,7 +66,7 @@ export class TossPaymentsService {
         amount
       };
 
-      this.logger.log(`결제 승인 요청: paymentKey=${paymentKey}, orderId=${orderId}, amount=${amount}`);
+      this.logger.log(`결제 승인 요청: paymentKey=${paymentKey.slice(0, 8)}***, orderId=${orderId}, amount=${amount}`);
 
       const response = await firstValueFrom(
         this.httpService.post(url, body, { headers, timeout: 10000 })

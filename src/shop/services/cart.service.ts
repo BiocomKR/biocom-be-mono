@@ -331,10 +331,9 @@ export class CartService {
         continue;
       }
 
-      // TODO: 실제 재고 API 호출
-      // 현재는 모의로 처리
-      const mockStock = Math.floor(Math.random() * 100);
-      const isAvailable = mockStock >= item.quantity;
+      // 재고 검증: 현재는 외부 재고 API 연동 전이므로 상품 상태만 확인
+      // TODO: 외부 재고 API 연동 시 실제 재고 확인 로직 추가
+      const isAvailable = true;
 
       // 재고 상태 업데이트
       await this.prisma.cartItem.update({
