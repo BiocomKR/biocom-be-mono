@@ -10,7 +10,6 @@ import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { LoggerModule } from './common/modules/logger.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
-import { throttlerConfig } from './common/config/throttler.config';
 import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 import { HealthModule } from './health/health.module';
 import { validationSchema, configuration } from './common/config/env.validation';
@@ -20,9 +19,7 @@ import { ImwebModule } from './imweb/imweb.module';
 import { MissionModule } from './mission/mission.module';
 import { SurveyModule } from './survey/survey.module';
 import { ChallengeModule } from './challenge/challenge.module';
-import { ManagementModule } from './management/management.module';
 import { PointModule } from './point/point.module';
-// import { CategoriesModule } from './categories/categories.module'; // ⚠️ 제거됨: 소규모 쇼핑몰로 Products.categoryCode 사용
 import { ProductsModule } from './shop/products.module';
 import { CartModule } from './shop/cart.module';
 import { OrdersModule } from './shop/orders.module';
@@ -47,7 +44,6 @@ import { ConsentModule } from './consent/consent.module';
 import { ExamModule } from './exam/exam.module';
 import { QuizModule } from './quiz/quiz.module';
 import { QueuesModule } from './queues/queues.module';
-// import { ExchangeReturnModule } from './exchange-return/exchange-return.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -117,9 +113,7 @@ import { QueuesModule } from './queues/queues.module';
     MissionModule,    // 미션 모듈
     SurveyModule,     // 설문 모듈
     ChallengeModule,  // 챌린지 관리 모듈
-    // ManagementModule, // 백오피스 관리 모듈
     PointModule,      // 포인트 관리 모듈
-    // CategoriesModule, // ⚠️ 제거됨: Products.categoryCode 사용
     ProductsModule,   // 상품 관리 모듈
     BannersModule,    // 쇼핑몰 배너 모듈
     CartModule,       // 장바구니 모듈
@@ -143,7 +137,6 @@ import { QueuesModule } from './queues/queues.module';
     ConsentModule,    // 약관 관리 모듈
     ExamModule,       // 검사 결과 모듈
     QuizModule,       // 퀴즈 모듈
-    // ExchangeReturnModule, // 교환/반품 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [
