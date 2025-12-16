@@ -2709,7 +2709,6 @@ model UserChatHistory {
   id          Int        @id @default(autoincrement())
   userId      Int        @map("user_id")
   chartId     String?    @map("chart_id") @db.VarChar(50)
-  sessionId   String?    @map("session_id") @db.VarChar(100)
   testType    String?    @map("test_type") @db.VarChar(20)
   userMessage String     @map("user_message")
   aiMessage   String     @map("ai_message")
