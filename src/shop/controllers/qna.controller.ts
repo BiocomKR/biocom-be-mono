@@ -65,6 +65,27 @@ export class QnaController {
   }
 
   /**
+   * 내가 쓴 Q&A 목록 조회
+   */
+  @Get('my')
+  @ApiOperation({
+    summary: '내가 쓴 Q&A 목록 조회',
+    description: '로그인한 사용자가 작성한 Q&A 목록을 조회합니다.'
+  })
+  @ApiQuery({ name: 'productId', required: false, description: '상품 ID' })
+  @ApiQuery({ name: 'filter', required: false, description: '답변 여부 필터 (all, answered, unanswered)' })
+  @ApiQuery({ name: 'page', required: false, description: '페이지 번호' })
+  @ApiQuery({ name: 'limit', required: false, description: '페이지당 항목 수' })
+  @ApiResponse({ status: 200, description: '성공', type: QnaPaginatedResponseDto })
+  async findMyQuestions(
+    @Req() req: any,
+    @Query(ValidationPipe) query: QnaQueryDto
+  ): Promise<QnaPaginatedResponseDto> {
+    const userId = req.user.id;
+    return this.qnaService.findMyQuestions(userId, query);
+  }
+
+  /**
    * Q&A 목록 조회
    */
   @Get()

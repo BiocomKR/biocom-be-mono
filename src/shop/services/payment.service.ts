@@ -264,6 +264,31 @@ export class PaymentService {
         }
       }
 
+      // 구매 포인트 적립 (상품 금액의 10%)
+      const totalProductPrice = convertDecimalToNumber(order.totalProductPrice) || 0;
+      const earnedPoints = Math.floor(totalProductPrice * 0.1);
+      if (earnedPoints > 0) {
+        const updatedUser = await tx.user.update({
+          where: { id: order.userId },
+          data: { points: { increment: earnedPoints } },
+        });
+
+        await tx.pointHistory.create({
+          data: {
+            userId: order.userId,
+            type: 'PURCHASE_REWARD',
+            amount: earnedPoints,
+            balance: updatedUser.points,
+            description: `구매 적립 10% (${order.orderNumber})`,
+            relatedType: 'ORDER',
+            relatedId: order.id,
+            createdAt: getNowKST(),
+          },
+        });
+
+        this.logger.log(`구매 포인트 적립: ${earnedPoints}P (주문: ${order.orderNumber})`);
+      }
+
       this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
 
       return {
@@ -420,7 +445,7 @@ export class PaymentService {
           //   });
           // }
 
-          // 포인트 복구
+          // 사용 포인트 복구
           if ((convertDecimalToNumber(order.pointUsed) || 0) > 0) {
             const updatedUser = await tx.user.update({
               where: { id: userId },
@@ -441,6 +466,47 @@ export class PaymentService {
                 createdAt: getNowKST(),
               }
             });
+          }
+
+          // 적립 포인트 회수 (PURCHASE_REWARD로 적립된 포인트)
+          const earnedPointHistory = await tx.pointHistory.findFirst({
+            where: {
+              relatedType: 'ORDER',
+              relatedId: order.id,
+              type: 'PURCHASE_REWARD',
+            },
+          });
+
+          if (earnedPointHistory && earnedPointHistory.amount > 0) {
+            const user = await tx.user.findUnique({
+              where: { id: userId },
+              select: { points: true },
+            });
+
+            // 회수할 포인트가 보유 포인트보다 많으면 보유 포인트만큼만 회수
+            const pointsToDeduct = Math.min(earnedPointHistory.amount, user?.points || 0);
+
+            if (pointsToDeduct > 0) {
+              const updatedUser = await tx.user.update({
+                where: { id: userId },
+                data: { points: { decrement: pointsToDeduct } },
+              });
+
+              await tx.pointHistory.create({
+                data: {
+                  userId,
+                  type: 'PURCHASE_REWARD_CANCEL',
+                  amount: -pointsToDeduct,
+                  balance: updatedUser.points,
+                  description: `구매 적립 회수 (${order.orderNumber})`,
+                  relatedType: 'ORDER',
+                  relatedId: order.id,
+                  createdAt: getNowKST(),
+                },
+              });
+
+              this.logger.log(`적립 포인트 회수: ${pointsToDeduct}P (주문: ${order.orderNumber})`);
+            }
           }
         }
 

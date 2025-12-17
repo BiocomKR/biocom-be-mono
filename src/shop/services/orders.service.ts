@@ -163,6 +163,12 @@ export class OrdersService {
         if (!user || user.points < pointUsed) {
           throw new BadRequestException('보유 포인트가 부족합니다');
         }
+
+        // 최대 포인트 사용 금액 제한 (상품 금액의 30%)
+        const maxPointUsage = Math.floor(totalProductPrice * 0.3);
+        if (pointUsed > maxPointUsage) {
+          throw new BadRequestException(`최대 ${maxPointUsage.toLocaleString()}P까지 사용 가능합니다 (상품 금액의 30%)`);
+        }
       }
 
       // 5-1. 쿠폰 검증 및 할인 금액 계산

@@ -93,6 +93,87 @@ export class QnaService {
   }
 
   /**
+   * 내가 쓴 Q&A 목록 조회
+   */
+  async findMyQuestions(userId: number, query: QnaQueryDto): Promise<QnaPaginatedResponseDto> {
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // WHERE 조건 구성 - 내가 쓴 것만
+    const where: Prisma.ProductFeedbackWhereInput = {
+      feedbackType: 'QUESTION',
+      status: QnaStatus.ACTIVE,
+      parentId: null,
+      userId, // 내가 쓴 것만
+    };
+
+    if (query.productId) {
+      where.productId = query.productId;
+    }
+
+    // 답변 여부 필터
+    if (query.filter === QnaFilterType.ANSWERED) {
+      where.hasAnswer = true;
+    } else if (query.filter === QnaFilterType.UNANSWERED) {
+      where.hasAnswer = false;
+    }
+
+    // 정렬 조건 구성
+    let orderBy: Prisma.ProductFeedbackOrderByWithRelationInput[] = [{ createdAt: 'desc' }];
+
+    // 데이터 조회
+    const [questions, total] = await Promise.all([
+      this.prisma.productFeedback.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          user: {
+            select: {
+              name: true
+            }
+          },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true
+            }
+          },
+          replies: {
+            where: {
+              status: QnaStatus.ACTIVE
+            },
+            include: {
+              user: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
+        }
+      }),
+      this.prisma.productFeedback.count({ where }),
+    ]);
+
+    const answeredCount = questions.filter(q => q.hasAnswer).length;
+    const unansweredCount = questions.filter(q => !q.hasAnswer).length;
+
+    return {
+      items: questions.map(question => this.formatQnaResponse(question)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      answeredCount,
+      unansweredCount
+    };
+  }
+
+  /**
    * Q&A 목록 조회 (페이지네이션)
    */
   async findQuestions(query: QnaQueryDto): Promise<QnaPaginatedResponseDto> {
