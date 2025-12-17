@@ -4,6 +4,7 @@ import { UserChallengeStatus } from '../common/enums';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
 import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption, User } from '@prisma/client';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { SurveyOptionType } from '../common/enums';
 
 /**
  * 설문 서비스
@@ -1025,13 +1026,19 @@ export class SurveyService {
 
   /**
    * 카테고리별 설문 질문 조회
+   * @param surveyId 설문 ID
+   * @param categoryCode 카테고리 코드
+   * @param surveyType 설문 옵션 타입 (PRE_SURVEY: 사전문진, DAILY: 데일리문진)
    */
-  async findQuestions(surveyId?: number, categoryCode?: string) {
-    this.logger.log(`설문 질문 조회 - surveyId: ${surveyId || '전체'}, 카테고리: ${categoryCode || '전체'}`);
+  async findQuestions(surveyId?: number, categoryCode?: string, surveyType: string = SurveyOptionType.PRE_SURVEY) {
+    this.logger.log(`설문 질문 조회 - surveyId: ${surveyId || '전체'}, 카테고리: ${categoryCode || '전체'}, 타입: ${surveyType}`);
 
-    // 공통 옵션 조회 (모든 질문에서 사용)
+    // 타입별 옵션 조회
     const options = await this.prisma.surveyOption.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        surveyType: surveyType,
+      },
       select: {
         id: true,
         optionText: true,

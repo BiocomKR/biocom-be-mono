@@ -268,9 +268,44 @@ export class MissionCompletionService {
         const attemptNumber = todayAttempts + 1;
         const isCompleted = attemptNumber >= dailyLimit; // dailyLimit 달성 시에만 완료
 
-        // 포인트 지급 조건: 완료 + 지정된 일차에 수행한 경우만
+        /**
+         * 포인트 지급 로직
+         *
+         * [용어 정의]
+         * - dailyLimit: 일일 참여 제한 횟수 (이 횟수만큼 참여해야 미션 "완료" 처리)
+         *   예) 식단 기록 dailyLimit=9 → 9번 기록해야 완료
+         *
+         * - maxPointsPerDay: 일일 포인트 지급 제한 횟수 (이 횟수까지만 포인트 지급)
+         *   예) 식단 기록 maxPointsPerDay=3 → 1~3회차까지만 포인트 지급, 4~9회차는 기록만
+         *
+         * [지급 조건]
+         * 1. 지정된 일차(challengeMission.day)에 수행한 경우만 포인트 지급
+         * 2. maxPointsPerDay가 설정된 경우: attemptNumber <= maxPointsPerDay 까지 매회 포인트 지급
+         * 3. maxPointsPerDay가 없는 경우: dailyLimit 달성 시 1회만 포인트 지급 (기존 로직)
+         *
+         * [예시]
+         * - 식단 기록 (dailyLimit=9, maxPointsPerDay=3, points=100)
+         *   → 1회차: 100P, 2회차: 100P, 3회차: 100P, 4~9회차: 0P (총 300P)
+         * - 공복 시간 기록 (dailyLimit=1, maxPointsPerDay=null, points=100)
+         *   → 1회차(완료): 100P (총 100P)
+         */
         const isOnScheduledDay = challengeMission.day === currentDay;
-        const pointsEarned = (isCompleted && isOnScheduledDay) ? challengeMission.points : 0;
+        const maxPointsCount = mission.maxPointsPerDay ?? null;
+
+        let pointsEarned = 0;
+        if (isOnScheduledDay) {
+          if (maxPointsCount !== null) {
+            // maxPointsPerDay 설정됨: 해당 횟수까지 매 시도마다 포인트 지급
+            if (attemptNumber <= maxPointsCount) {
+              pointsEarned = challengeMission.points;
+            }
+          } else {
+            // maxPointsPerDay 미설정: dailyLimit 달성(완료) 시에만 포인트 지급
+            if (isCompleted) {
+              pointsEarned = challengeMission.points;
+            }
+          }
+        }
 
         const now = getNowKST();
         const userMission = await tx.userMission.create({
@@ -290,11 +325,10 @@ export class MissionCompletionService {
           }
         });
 
-        // 8️⃣ 최종 완료시에만 포인트 및 진행도 업데이트
+        // 8️⃣ 포인트 지급 및 진행도 업데이트
         let updatedProgress = dailyProgress;
-        let user = await tx.user.findUnique({ where: { id: userId } });
 
-        if (isCompleted && isOnScheduledDay) {
+        if (pointsEarned > 0) {
           // DailyProgress 업데이트
           updatedProgress = await tx.dailyProgress.update({
             where: {
@@ -304,8 +338,8 @@ export class MissionCompletionService {
               }
             },
             data: {
-              missionsCompleted: { increment: 1 },
-              pointsEarned: { increment: challengeMission.points }
+              missionsCompleted: isCompleted ? { increment: 1 } : undefined,
+              pointsEarned: { increment: pointsEarned }
             }
           });
 
@@ -313,7 +347,7 @@ export class MissionCompletionService {
           await tx.userChallenge.update({
             where: { id: userChallenge.id },
             data: {
-              totalPoints: { increment: challengeMission.points }
+              totalPoints: { increment: pointsEarned }
             }
           });
 
@@ -321,17 +355,17 @@ export class MissionCompletionService {
           await this.pointService.awardPointsInTransaction(
             tx,
             userId,
-            challengeMission.points,
+            pointsEarned,
             `미션 완료: ${mission.name} (${attemptNumber}/${dailyLimit})`,
             'CHALLENGE_MISSION',
             challengeMission.id
           );
 
-          this.logger.log(`미션 최종 완료 - ${mission.name}, 획득 포인트: ${challengeMission.points}`);
-        } else if (isCompleted && !isOnScheduledDay) {
+          this.logger.log(`미션 포인트 지급 - ${mission.name}, 획득 포인트: ${pointsEarned} (${attemptNumber}/${maxPointsCount ?? dailyLimit}회)`);
+        } else if (!isOnScheduledDay) {
           this.logger.log(`미션 완료 (지정 일차 아님) - ${mission.name}, 포인트 지급 없음 (${challengeMission.day}일차 미션, 현재: ${currentDay}일차)`);
         } else {
-          this.logger.log(`미션 시도 기록 - ${mission.name} (${attemptNumber}/${dailyLimit})`);
+          this.logger.log(`미션 시도 기록 - ${mission.name} (${attemptNumber}/${dailyLimit}), 포인트 지급 한도 초과`);
         }
 
         const result = {

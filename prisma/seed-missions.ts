@@ -12,8 +12,27 @@ const prisma = new PrismaClient();
  * - daily_limit 변경: 14(3→9), 17(2→999)
  * - 추가: 뷰티 종합 점수, 활동 기록, 밸런스 게임, 심층리포트, 애프터 문진
  */
+/**
+ * 미션 노출 정책 정의서 기준:
+ *
+ * | 항목명              | 노출 시기                | 뉴커머 | 챌린저     | 구독자     |
+ * |---------------------|-------------------------|--------|------------|------------|
+ * | 뷰티 종합 점수       | 매일                    | X      | 매일 1회   | 매일 1회   |
+ * | 자기 선언문          | 챌린지 1~10일차         | X      | 최초 1회   | X          |
+ * | 나 칭찬하기          | 챌린지 11~20일차 (선행조건: 자기 선언문) | X | 최초 1회 | X |
+ * | 식단 기록하기        | 매일                    | X      | 매일 9회   | 매일 9회   |
+ * | 영양제 기록          | 매일                    | X      | 매일 10회  | 매일 10회  |
+ * | 공복 시간 기록       | 매일                    | X      | 매일 1회   | 매일 1회   |
+ * | 수면 시간 기록       | 매일                    | X      | 매일 1회   | 매일 1회   |
+ * | 영상 강의(+퀴즈)     | 챌린지 기간 (1~21일)    | X      | 매일 1회   | X          |
+ * | 활동 기록            | 매일                    | X      | 매일 10회  | 매일 10회  |
+ * | 1일 1미션            | 챌린지 기간 (1~21일)    | X      | 매일 1회   | X          |
+ * | 밸런스 게임          | 챌린지 기간 (1~21일)    | X      | 매일 1회   | X          |
+ * | 심층리포트           | 주 1회 (첫주 제외: 8~21일) | X    | 매주 1회   | 매주 1회 (종료 후 1주일) |
+ * | 애프터 문진          | 챌린지 21일차~          | X      | X          | 종료 후 1주일 |
+ */
 const missionsData = [
-  // ===== DAILY (매일) =====
+  // ===== DAILY (매일) - 챌린저 & 구독자 모두 =====
   {
     name: '뷰티 종합 점수',
     description: '오늘의 뷰티 종합 점수를 확인해주세요',
@@ -28,6 +47,13 @@ const missionsData = [
     specificDay: null,
     totalDays: 21,
     uploadType: null,
+    // 노출 정책: 매일, 챌린저/구독자
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'DAILY',
+    visibleFromDay: null, // 챌린지 기간 무관 (매일)
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   {
     name: '식단 기록하기',
@@ -43,6 +69,14 @@ const missionsData = [
     specificDay: null,
     totalDays: 21,
     uploadType: null,
+    // 노출 정책: 매일, 챌린저/구독자, 포인트는 max 3회까지만
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'DAILY',
+    maxPointsPerDay: 3, // 하루 최대 3회까지 포인트 지급
+    visibleFromDay: null,
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   {
     name: '영양제 기록',
@@ -54,10 +88,18 @@ const missionsData = [
     category: 'DAILY',
     type: 'RECORD',
     recordType: 'SUPPLEMENT',
-    dailyLimit: null, // 무제한
+    dailyLimit: 10,
     specificDay: null,
     totalDays: 21,
     uploadType: null,
+    // 노출 정책: 매일, 챌린저/구독자, 포인트는 max 1회까지만
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'DAILY',
+    maxPointsPerDay: 1, // 하루 최대 1회까지 포인트 지급
+    visibleFromDay: null,
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   {
     name: '공복 시간 기록',
@@ -73,6 +115,13 @@ const missionsData = [
     specificDay: null,
     totalDays: 21,
     uploadType: null,
+    // 노출 정책: 매일, 챌린저/구독자
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'DAILY',
+    visibleFromDay: null,
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   {
     name: '수면 시간 기록',
@@ -88,21 +137,13 @@ const missionsData = [
     specificDay: null,
     totalDays: 21,
     uploadType: null,
-  },
-  {
-    name: '영상 강의(+퀴즈)',
-    description: '오늘의 건강 영상을 시청하고 퀴즈를 풀어주세요',
-    points: 200,
-    requireUpload: false,
-    sortOrder: 6,
-    isActive: true,
-    category: 'DAILY',
-    type: 'MISSION',
-    recordType: 'QUIZ',
-    dailyLimit: null, // 무제한
-    specificDay: null,
-    totalDays: 21,
-    uploadType: null,
+    // 노출 정책: 매일, 챌린저/구독자
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'DAILY',
+    visibleFromDay: null,
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   {
     name: '활동 기록',
@@ -114,12 +155,42 @@ const missionsData = [
     category: 'DAILY',
     type: 'RECORD',
     recordType: 'ACTIVITY',
-    dailyLimit: null, // 무제한
+    dailyLimit: 10,
     specificDay: null,
     totalDays: 21,
     uploadType: null,
+    // 노출 정책: 매일, 챌린저/구독자, 포인트는 max 1회까지만
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'DAILY',
+    maxPointsPerDay: 1,
+    visibleFromDay: null,
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
-  // ===== SPECIAL =====
+  // ===== CHALLENGER ONLY (챌린지 기간에만) =====
+  {
+    name: '영상 강의(+퀴즈)',
+    description: '오늘의 건강 영상을 시청하고 퀴즈를 풀어주세요',
+    points: 200,
+    requireUpload: false,
+    sortOrder: 6,
+    isActive: true,
+    category: 'DAILY',
+    type: 'MISSION',
+    recordType: 'QUIZ',
+    dailyLimit: 1,
+    specificDay: null,
+    totalDays: 21,
+    uploadType: null,
+    // 노출 정책: 챌린지 기간(1~21일), 챌린저만
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'DAILY',
+    visibleFromDay: 1,
+    visibleToDay: 21,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
+  },
   {
     name: '1일 1미션',
     description: '오늘의 특별 미션을 수행해주세요',
@@ -134,6 +205,13 @@ const missionsData = [
     specificDay: null,
     totalDays: 21,
     uploadType: 'IMAGE',
+    // 노출 정책: 챌린지 기간(1~21일), 챌린저만
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'DAILY',
+    visibleFromDay: 1,
+    visibleToDay: 21,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   {
     name: '밸런스 게임',
@@ -145,10 +223,17 @@ const missionsData = [
     category: 'DAILY',
     type: 'MISSION',
     recordType: 'BALANCE_GAME',
-    dailyLimit: null, // 무제한
+    dailyLimit: 1,
     specificDay: null,
     totalDays: 21,
     uploadType: null,
+    // 노출 정책: 챌린지 기간(1~21일), 챌린저만
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'DAILY',
+    visibleFromDay: 1,
+    visibleToDay: 21,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   // ===== WEEKLY (주 1회) =====
   {
@@ -162,9 +247,16 @@ const missionsData = [
     type: 'MISSION',
     recordType: 'WEEKLY_REPORT',
     dailyLimit: 1,
-    specificDay: null, // 7, 14, 21일차에 노출 (ChallengeMission에서 처리)
+    specificDay: null, // 8, 15, 22일차에 노출 (첫주 제외)
     totalDays: 3,
     uploadType: null,
+    // 노출 정책: 첫주 제외 매주 1회 (8일차부터), 챌린저/구독자
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'WEEKLY',
+    visibleFromDay: 8, // 첫주(1~7일) 제외
+    visibleToDay: null, // 구독자는 챌린지 종료 후에도 1주일 더
+    prerequisiteMissionId: null,
+    visibleAfterSettings: { daysAfterChallengeEnd: 7 }, // 종료 후 7일까지
   },
   // ===== EVENT (특정 일차) =====
   {
@@ -181,6 +273,13 @@ const missionsData = [
     specificDay: 1,
     totalDays: 1,
     uploadType: null,
+    // 노출 정책: 1~10일차, 챌린저만, 최초 1회
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'ONCE',
+    visibleFromDay: 1,
+    visibleToDay: 10,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
   },
   {
     name: '나 칭찬하기',
@@ -196,6 +295,13 @@ const missionsData = [
     specificDay: 10,
     totalDays: 1,
     uploadType: null,
+    // 노출 정책: 11~20일차, 챌린저만, 자기 선언문 완료 후에만
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'ONCE',
+    visibleFromDay: 11,
+    visibleToDay: 20,
+    prerequisiteMissionId: null, // seed 실행 후 업데이트 필요 (DECLARATION mission ID)
+    visibleAfterSettings: { prerequisiteRecordType: 'DECLARATION' }, // 자기 선언문 완료 조건
   },
   {
     name: '애프터 문진',
@@ -211,6 +317,13 @@ const missionsData = [
     specificDay: 21,
     totalDays: 1,
     uploadType: null,
+    // 노출 정책: 21일차 이후, 구독자만 (챌린지 종료 후 1주일)
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'ONCE',
+    visibleFromDay: 21,
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: { daysAfterChallengeEnd: 7 }, // 종료 후 7일까지
   },
 ];
 
@@ -376,6 +489,14 @@ async function main() {
         specificDay: mission.specificDay,
         totalDays: mission.totalDays,
         uploadType: mission.uploadType,
+        // 새 필드들
+        allowedUserTypes: mission.allowedUserTypes,
+        frequency: mission.frequency,
+        maxPointsPerDay: mission.maxPointsPerDay ?? null,
+        visibleFromDay: mission.visibleFromDay,
+        visibleToDay: mission.visibleToDay,
+        prerequisiteMissionId: mission.prerequisiteMissionId,
+        visibleAfterSettings: mission.visibleAfterSettings,
         updatedAt: now,
       },
       create: {
@@ -392,6 +513,14 @@ async function main() {
         specificDay: mission.specificDay,
         totalDays: mission.totalDays,
         uploadType: mission.uploadType,
+        // 새 필드들
+        allowedUserTypes: mission.allowedUserTypes,
+        frequency: mission.frequency,
+        maxPointsPerDay: mission.maxPointsPerDay ?? null,
+        visibleFromDay: mission.visibleFromDay,
+        visibleToDay: mission.visibleToDay,
+        prerequisiteMissionId: mission.prerequisiteMissionId,
+        visibleAfterSettings: mission.visibleAfterSettings,
         createdAt: now,
       },
     });

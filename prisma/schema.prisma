@@ -1233,6 +1233,8 @@ model AiPersona {
   intimacyImageUrl String?           @map("intimacy_image_url") @db.VarChar(500)
   /// 페르소나 썸네일 이미지 URL
   thumbnailUrl     String?           @map("thumbnail_url") @db.VarChar(500)
+  /// 페르소나 상반신 이미지 URL
+  torsoUrl         String?           @map("torso_url") @db.VarChar(500)
   balanceGameSteps BalanceGameStep[]
   users            User[]
 
