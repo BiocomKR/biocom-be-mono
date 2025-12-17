@@ -1,18 +1,19 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsArray, ValidateNested, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SurveyType } from '../../common/enums';
 
 class SurveyAnswerDto {
-  @ApiProperty({ 
+  @ApiProperty({
     description: '질문 ID',
-    example: 1 
+    example: 1
   })
   @IsNumber()
   questionId: number;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: '선택한 옵션 ID (1: 그렇지 않다, 2: 약간 그렇지 않다, 3: 보통이다, 4: 약간 그렇다, 5: 그렇다)',
-    example: 3 
+    example: 3
   })
   @IsNumber()
   optionId: number;
@@ -21,11 +22,11 @@ class SurveyAnswerDto {
 export class CompleteSurveyDto {
   @ApiProperty({
     description: '설문 타입',
-    enum: ['BEFORE', 'AFTER'],
-    example: 'BEFORE'
+    enum: SurveyType,
+    example: SurveyType.BEFORE
   })
-  @IsEnum(['BEFORE', 'AFTER'])
-  type: 'BEFORE' | 'AFTER';
+  @IsEnum(SurveyType)
+  type: SurveyType;
 
   @ApiProperty({ 
     description: '설문 답변 목록 (20개 질문에 대한 답변)',

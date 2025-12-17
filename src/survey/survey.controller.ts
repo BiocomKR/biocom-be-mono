@@ -26,6 +26,7 @@ import { SurveyService } from './survey.service';
 import { PrismaService } from '../common/services/prisma.service';
 import { CompleteSurveyDto } from './dto/complete-survey.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { SurveyType } from '../common/enums';
 import {
   SurveyQuestionResponseDto,
   SurveyOptionResponseDto,
@@ -395,7 +396,7 @@ export class SurveyController {
   })
   async findMyAnswers(
     @Req() req: Request,
-    @Query('type') type?: 'BEFORE' | 'AFTER',
+    @Query('type') type?: SurveyType,
   ): Promise<ApiResponseDto<SurveyAnswerResponseDto[]>> {
     this.logger.log(`내 설문 답변 조회 요청 - 사용자: ${req.user.sub}, 타입: ${type || '전체'}`);
 
@@ -451,7 +452,7 @@ export class SurveyController {
   async findAnswersByQuestion(
     @Param('questionId', ParseIntPipe) questionId: number,
     @Req() req: Request,
-    @Query('type') type?: 'BEFORE' | 'AFTER',
+    @Query('type') type?: SurveyType,
   ): Promise<ApiResponseDto<SurveyAnswerResponseDto[]>> {
     this.logger.log(`질문별 설문 답변 조회 요청 - 사용자: ${req.user.sub}, 질문 ID: ${questionId}, 타입: ${type || '전체'}`);
 
@@ -523,7 +524,7 @@ export class SurveyController {
   })
   async findMyResults(
     @Req() req: Request,
-    @Query('type') type?: 'BEFORE' | 'AFTER',
+    @Query('type') type?: SurveyType,
   ): Promise<ApiResponseDto<SurveyResultResponseDto[]>> {
     this.logger.log(`내 설문 결과 조회 요청 - 사용자: ${req.user.sub}, 타입: ${type || '전체'}`);
 

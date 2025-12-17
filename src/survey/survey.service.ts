@@ -1,10 +1,9 @@
 import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserChallengeStatus } from '../common/enums';
+import { UserChallengeStatus, SurveyOptionType, SurveyType, HealthCategory, HEALTH_CATEGORY_PRIORITY } from '../common/enums';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
-import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption, User } from '@prisma/client';
+import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption } from '@prisma/client';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
-import { SurveyOptionType } from '../common/enums';
 
 /**
  * 설문 서비스
@@ -72,7 +71,7 @@ export class SurveyService {
    */
   async createBulkAnswers(
     userId: number,
-    type: 'BEFORE' | 'AFTER',
+    type: SurveyType,
     answers: Array<{ questionId: number; optionId: number }>
   ): Promise<SurveyAnswer[]> {
     this.logger.log(`설문 답변 대량 생성 - 사용자: ${userId}, 개수: ${answers.length}`);
@@ -135,7 +134,7 @@ export class SurveyService {
    */
   async getUserAnswers(
     userId: number,
-    type?: 'BEFORE' | 'AFTER'
+    type?: SurveyType
   ): Promise<(SurveyAnswer & { 
     surveyQuestion: SurveyQuestion; 
     surveyOption: SurveyOption; 
@@ -163,7 +162,7 @@ export class SurveyService {
   async getUserAnswersByChallenge(
     userId: number,
     productId: number,
-    type?: 'BEFORE' | 'AFTER'
+    type?: SurveyType
   ): Promise<(SurveyAnswer & {
     surveyQuestion: SurveyQuestion;
     surveyOption: SurveyOption;
@@ -226,7 +225,7 @@ export class SurveyService {
    */
   async analyzeSurveyResult(
     userId: number,
-    type: 'BEFORE' | 'AFTER',
+    type: SurveyType,
     tx?: Prisma.TransactionClient
   ): Promise<{
     categoryScores: Record<string, number>;
@@ -254,7 +253,7 @@ export class SurveyService {
     });
 
     if (answers.length === 0) {
-      throw new NotFoundException(`${type === 'BEFORE' ? '사전' : '사후'} 설문 답변이 없습니다.`);
+      throw new NotFoundException(`${type === SurveyType.BEFORE ? '사전' : '사후'} 설문 답변이 없습니다.`);
     }
 
     // 카테고리별 점수 계산
@@ -356,7 +355,7 @@ export class SurveyService {
 
     // 수면 문제 점수 (점수가 높을수록 수면 문제가 많음)
     // 5문항 × 최대 20점 = 100점 만점
-    const sleepScore = categoryScores['SLEEP'] || 0;
+    const sleepScore = categoryScores[HealthCategory.SLEEP] || 0;
 
     // 수면 문제 점수가 60점 이상이면 메타드림 추천 (수면 문제가 심함)
     const recommendMetaDream = sleepScore >= 60;
@@ -420,8 +419,8 @@ export class SurveyService {
     const totalQuestions = challengeSurveys[0].survey.surveyQuestions.length;
 
     const [beforeAnswers, afterAnswers] = await Promise.all([
-      this.getUserAnswersByChallenge(userId, productId, 'BEFORE'),
-      this.getUserAnswersByChallenge(userId, productId, 'AFTER'),
+      this.getUserAnswersByChallenge(userId, productId, SurveyType.BEFORE),
+      this.getUserAnswersByChallenge(userId, productId, SurveyType.AFTER),
     ]);
 
     const beforeCompleted = beforeAnswers.length === totalQuestions;
@@ -464,7 +463,7 @@ export class SurveyService {
   /**
    * 사용자별 답변 조회
    */
-  async findAnswersByUser(userId: number, type?: 'BEFORE' | 'AFTER') {
+  async findAnswersByUser(userId: number, type?: SurveyType) {
     const where: Prisma.SurveyAnswerWhereInput = { userId };
     if (type) where.type = type;
 
@@ -482,71 +481,13 @@ export class SurveyService {
     });
   }
 
-  // // 질문별 답변 조회는 management로 이동
-
-  // /**
-  //  * 챌린지별 설문 완료 처리 (Product 기반)
-  //  * CategoryDetail 기반 동물 배정 및 Before/After 결과 저장
-  //  */
-  // async completeChallengeSurvey(
-  //   userId: number,
-  //   productId: number,
-  //   type: 'BEFORE' | 'AFTER',
-  //   answers: Array<{ questionId: number; optionId: number }>
-  // ) {
-  //   this.logger.log(`챌린지 설문 완료 처리 - 사용자: ${userId}, 상품: ${productId}, 타입: ${type}`);
-
-  //   return await this.prisma.$transaction(async (tx) => {
-  //     // 1. 설문 답변 저장
-  //     const now = getNowKST();
-  //     for (const answer of answers) {
-  //       await tx.surveyAnswer.create({
-  //         data: {
-  //           userId,
-  //           type,
-  //           surveyQuestionId: answer.questionId,
-  //           surveyOptionId: answer.optionId,
-  //           createdAt: now,
-  //         },
-  //       });
-  //     }
-
-  //     // 2. 카테고리별 점수 계산 (old-survey.service.ts 로직 적용)
-  //     const categoryScores = await this.calculateCategoryScores(answers, tx);
-  //     this.logger.debug(`카테고리별 점수: ${JSON.stringify(categoryScores)}`);
-
-  //     // 3. 최저점수 카테고리 찾기
-  //     const lowestCategory = this.findLowestScoreCategory(categoryScores);
-  //     this.logger.log(`최저점수 카테고리: ${lowestCategory}`);
-
-  //     // 4. UserChallengeSurveyResult 저장/업데이트
-  //     await this.saveOrUpdateSurveyResult(userId, productId, type, categoryScores, lowestCategory, tx);
-
-  //     // 5. HealthTypeAnimal에서 동물 캐릭터 정보 조회
-  //     const healthTypeAnimal = await tx.healthTypeAnimal.findFirst({
-  //       where: { healthType: lowestCategory },
-  //     });
-
-  //     // 6. 챌린지 진행 상황 업데이트
-  //     await this.processChallengeIntegration(tx, userId, productId);
-
-  //     return {
-  //       scores: categoryScores,
-  //       lowestCategory,
-  //       animalCharacter: healthTypeAnimal?.animalName,
-  //       characterKeyword: healthTypeAnimal?.catchphrase,
-  //       detailedFeatures: healthTypeAnimal?.symptoms,
-  //     };
-  //   });
-  // }
-
   /**
    * 설문 ID 기반 설문 완료 처리
    */
   async completeSurveyById(
     userId: number,
     surveyId: number,
-    type: 'BEFORE' | 'AFTER',
+    type: SurveyType,
     answers: Array<{ questionId: number; optionId: number }>
   ) {
     this.logger.log(`설문 완료 처리 - 사용자: ${userId}, 설문ID: ${surveyId}, 타입: ${type}`);
@@ -600,11 +541,11 @@ export class SurveyService {
   ): Promise<Record<string, number>> {
     // 초기 점수는 각 카테고리별로 100점 (SLEEP 포함)
     const categoryScores: Record<string, number> = {
-      SKIN_HEALTH: 100,
-      METABOLISM: 100,
-      IMMUNE_BALANCE: 100,
-      GUT_HEALTH: 100,
-      SLEEP: 100,
+      [HealthCategory.SKIN_HEALTH]: 100,
+      [HealthCategory.METABOLISM]: 100,
+      [HealthCategory.IMMUNE_BALANCE]: 100,
+      [HealthCategory.GUT_HEALTH]: 100,
+      [HealthCategory.SLEEP]: 100,
     };
 
     // 각 답변에 대해 점수 차감
@@ -637,22 +578,20 @@ export class SurveyService {
   }
 
   /**
-   * 최저점수 카테고리 찾기 (old-survey.service.ts 우선순위 적용)
-   * 우선순위: GUT_HEALTH → METABOLISM → SKIN_HEALTH → IMMUNE_BALANCE
+   * 최저점수 카테고리 찾기
+   * 우선순위: GUT_HEALTH(장) → IMMUNE_BALANCE(면역) → SKIN_HEALTH(염증) → METABOLISM(대사)
    */
   private findLowestScoreCategory(categoryScores: Record<string, number>): string {
-    const priorityOrder = ['GUT_HEALTH', 'METABOLISM', 'SKIN_HEALTH', 'IMMUNE_BALANCE'];
-    
-    let lowestScore = Math.min(...Object.values(categoryScores));
-    
+    const lowestScore = Math.min(...Object.values(categoryScores));
+
     // 우선순위에 따라 최저점수 카테고리 선택
-    for (const category of priorityOrder) {
+    for (const category of HEALTH_CATEGORY_PRIORITY) {
       if (categoryScores[category] === lowestScore) {
         return category;
       }
     }
-    
-    return 'GUT_HEALTH';
+
+    return HealthCategory.GUT_HEALTH;
   }
 
   /**
@@ -661,7 +600,7 @@ export class SurveyService {
   private async saveOrUpdateSurveyResult(
     userId: number,
     productId: number,
-    surveyType: 'BEFORE' | 'AFTER',
+    surveyType: SurveyType,
     categoryScores: Record<string, number>,
     lowestCategory: string,
     tx: Prisma.TransactionClient,
@@ -677,7 +616,7 @@ export class SurveyService {
 
     const updateData: Prisma.UserChallengeSurveyResultUpdateInput = {};
 
-    if (surveyType === 'BEFORE') {
+    if (surveyType === SurveyType.BEFORE) {
       updateData.beforeHealthType = lowestCategory;
       updateData.beforeScoreSkinHealth = categoryScores.SKIN_HEALTH;
       updateData.beforeScoreMetabolism = categoryScores.METABOLISM;
@@ -800,14 +739,14 @@ export class SurveyService {
   /**
    * 설문 결과 조회
    */
-  async findResults(userId: number, type?: 'BEFORE' | 'AFTER') {
+  async findResults(userId: number, type?: SurveyType) {
     const results = [];
 
-    if (!type || type === 'BEFORE') {
+    if (!type || type === SurveyType.BEFORE) {
       try {
-        const beforeResult = await this.analyzeSurveyResult(userId, 'BEFORE');
+        const beforeResult = await this.analyzeSurveyResult(userId, SurveyType.BEFORE);
         results.push({
-          type: 'BEFORE' as const,
+          type: SurveyType.BEFORE,
           ...beforeResult,
           createdAt: getNowKST(),
         });
@@ -816,11 +755,11 @@ export class SurveyService {
       }
     }
 
-    if (!type || type === 'AFTER') {
+    if (!type || type === SurveyType.AFTER) {
       try {
-        const afterResult = await this.analyzeSurveyResult(userId, 'AFTER');
+        const afterResult = await this.analyzeSurveyResult(userId, SurveyType.AFTER);
         results.push({
-          type: 'AFTER' as const,
+          type: SurveyType.AFTER,
           ...afterResult,
           createdAt: getNowKST(),
         });
@@ -996,8 +935,8 @@ export class SurveyService {
    * 설문 전후 비교 (기존 로직 - 호환성 유지)
    */
   async compareResults(userId: number) {
-    const beforeResult = await this.analyzeSurveyResult(userId, 'BEFORE');
-    const afterResult = await this.analyzeSurveyResult(userId, 'AFTER');
+    const beforeResult = await this.analyzeSurveyResult(userId, SurveyType.BEFORE);
+    const afterResult = await this.analyzeSurveyResult(userId, SurveyType.AFTER);
 
     const categoryImprovements: Record<string, number> = {};
     
@@ -1008,26 +947,26 @@ export class SurveyService {
     }
 
     // SurveyResultResponseDto 형식으로 변환
-    const formatResult = (result: any, type: 'BEFORE' | 'AFTER') => ({
+    const formatResult = (result: any, type: SurveyType) => ({
       id: 0, // 실제 저장된 결과가 아님
       userId,
       type,
-      skinHealthScore: result.categoryScores['SKIN_HEALTH'] || 0,
-      metabolismScore: result.categoryScores['METABOLISM'] || 0,
-      immuneBalanceScore: result.categoryScores['IMMUNE_BALANCE'] || 0,
-      gutHealthScore: result.categoryScores['GUT_HEALTH'] || 0,
+      skinHealthScore: result.categoryScores[HealthCategory.SKIN_HEALTH] || 0,
+      metabolismScore: result.categoryScores[HealthCategory.METABOLISM] || 0,
+      immuneBalanceScore: result.categoryScores[HealthCategory.IMMUNE_BALANCE] || 0,
+      gutHealthScore: result.categoryScores[HealthCategory.GUT_HEALTH] || 0,
       totalScore: result.totalScore,
       dominantCategory: result.dominantCategory,
       animalCharacter: result.animalCharacter,
-      animal: result.animalCharacter, // animal 필드 추가
-      calculatedAt: getNowKST(), // calculatedAt 필드 추가
+      animal: result.animalCharacter,
+      calculatedAt: getNowKST(),
       createdAt: getNowKST(),
       updatedAt: getNowKST(),
     });
 
     return {
-      before: formatResult(beforeResult, 'BEFORE'),
-      after: formatResult(afterResult, 'AFTER'),
+      before: formatResult(beforeResult, SurveyType.BEFORE),
+      after: formatResult(afterResult, SurveyType.AFTER),
       improvement: {
         totalScore: afterResult.totalScore - beforeResult.totalScore,
         categoryScores: categoryImprovements,
@@ -1075,11 +1014,11 @@ export class SurveyService {
     });
 
     // 커스텀 카테고리 순서: 염증 → 대사밸런스 → 장건강 → 면역과민반응
-    const categoryOrder = {
-      'SKIN_HEALTH': 1,      // 염증
-      'METABOLISM': 2,        // 대사밸런스
-      'GUT_HEALTH': 3,        // 장건강
-      'IMMUNE_BALANCE': 4     // 면역과민반응
+    const categoryOrder: Record<string, number> = {
+      [HealthCategory.SKIN_HEALTH]: 1,
+      [HealthCategory.METABOLISM]: 2,
+      [HealthCategory.GUT_HEALTH]: 3,
+      [HealthCategory.IMMUNE_BALANCE]: 4,
     };
 
     // 카테고리 순서 → sortOrder 순으로 정렬
@@ -1123,7 +1062,7 @@ export class SurveyService {
   /**
    * 질문별 답변 조회
    */
-  async findAnswersByQuestion(questionId: number, type?: 'BEFORE' | 'AFTER') {
+  async findAnswersByQuestion(questionId: number, type?: SurveyType) {
     this.logger.log(`질문별 답변 조회 - 질문ID: ${questionId}, 타입: ${type || '전체'}`);
 
     const answers = await this.prisma.surveyAnswer.findMany({

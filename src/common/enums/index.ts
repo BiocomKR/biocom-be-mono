@@ -21,3 +21,5 @@ export * from './verification-status.enum';
 export * from './yes-no.enum';
 export * from './pg-provider.enum';
 export * from './survey-option-type.enum';
+export * from './survey-type.enum';
+export * from './health-category.enum';
