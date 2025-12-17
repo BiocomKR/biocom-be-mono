@@ -32,7 +32,7 @@ usage() {
 
 옵션:
   -p, --project-id PROJECT_ID    GCP 프로젝트 ID (필수)
-  -e, --env ENV                   배포 환경: development 또는 production (기본값: development)
+  -e, --env ENV                   배포 환경: development 또는 production (필수)
   -c, --cluster-name CLUSTER      GKE 클러스터 이름 (기본값: biocom-cluster-dev)
   -z, --zone ZONE                 GCP 존 (기본값: asia-northeast3-a)
   -n, --namespace NAMESPACE       K8s 네임스페이스 (기본값: biocom-api)
@@ -57,7 +57,7 @@ EOF
 
 # 기본값 설정
 PROJECT_ID=""
-DEPLOY_ENV="development"  # development 또는 production
+DEPLOY_ENV=""  # development 또는 production (필수)
 CLUSTER_NAME="biocom-cluster-dev"
 ZONE="asia-northeast3-a"
 NAMESPACE="biocom-api"
@@ -123,6 +123,11 @@ done
 # 필수 파라미터 확인
 if [[ -z "$PROJECT_ID" ]]; then
     log_error "프로젝트 ID가 필요합니다. -p 또는 --project-id 옵션을 사용하세요."
+    usage
+fi
+
+if [[ -z "$DEPLOY_ENV" ]]; then
+    log_error "배포 환경이 필요합니다. -e 또는 --env 옵션을 사용하세요. (development 또는 production)"
     usage
 fi
 
