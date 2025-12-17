@@ -241,15 +241,19 @@ model SurveyQuestion {
 
 /// 옵션 마스터 테이블
 /// 설문 응답에 사용되는 공통 옵션들
+/// surveyType: PRE_SURVEY(사전문진 4/8/12/16/20), DAILY(데일리문진 5/10/15/20/25)
 model SurveyOption {
   id            Int            @id @default(autoincrement())
   optionText    String         @map("option_text")
   score         Int
+  /// 설문 옵션 타입 (PRE_SURVEY: 사전문진, DAILY: 데일리문진)
+  surveyType    String         @default("PRE_SURVEY") @map("survey_type") @db.VarChar(20)
   createdAt     DateTime       @map("created_at")
   isActive      Boolean        @default(true) @map("is_active")
   surveyAnswers SurveyAnswer[]
 
   @@index([isActive], map: "idx_survey_options_is_active")
+  @@index([surveyType], map: "idx_survey_options_survey_type")
   @@map("survey_options")
 }
 
