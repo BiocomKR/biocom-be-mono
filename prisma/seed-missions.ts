@@ -42,7 +42,7 @@ const missionsData = [
     isActive: true,
     category: 'DAILY',
     type: 'MISSION',
-    recordType: 'BEAUTY_SCORE',
+    recordType: 'BEAUTY',
     dailyLimit: 1,
     specificDay: null,
     totalDays: 21,
@@ -364,7 +364,7 @@ const generateChallengeMissions = async () => {
 
   // 매일 수행하는 미션 recordType 목록
   const dailyMissionTypes = [
-    'BEAUTY_SCORE', // 뷰티 종합 점수
+    'BEAUTY', // 뷰티 종합 점수
     'DIET', // 식단 기록하기
     'SUPPLEMENT', // 영양제 기록
     'FASTING', // 공복 시간 기록

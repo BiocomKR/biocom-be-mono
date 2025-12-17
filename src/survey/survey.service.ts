@@ -233,6 +233,8 @@ export class SurveyService {
     totalScore: number;
     dominantCategory: string | null;
     animalCharacter?: string;
+    sleepScore?: number;
+    recommendMetaDream?: boolean;
   }> {
     const prismaClient = tx || this.prisma;
 
@@ -352,11 +354,24 @@ export class SurveyService {
       }
     }
 
+    // 수면 문제 점수 (점수가 높을수록 수면 문제가 많음)
+    // 5문항 × 최대 20점 = 100점 만점
+    const sleepScore = categoryScores['SLEEP'] || 0;
+
+    // 수면 문제 점수가 60점 이상이면 메타드림 추천 (수면 문제가 심함)
+    const recommendMetaDream = sleepScore >= 60;
+
+    if (recommendMetaDream) {
+      this.logger.log(`사용자 ${userId} 수면 문제 점수 ${sleepScore}점 - 메타드림 추천`);
+    }
+
     return {
       categoryScores,
       totalScore,
       dominantCategory,
       animalCharacter,
+      sleepScore,
+      recommendMetaDream,
     };
   }
 
@@ -583,12 +598,13 @@ export class SurveyService {
     answers: Array<{ questionId: number; optionId: number }>,
     tx: Prisma.TransactionClient,
   ): Promise<Record<string, number>> {
-    // 초기 점수는 각 카테고리별로 100점
-    const categoryScores = {
+    // 초기 점수는 각 카테고리별로 100점 (SLEEP 포함)
+    const categoryScores: Record<string, number> = {
       SKIN_HEALTH: 100,
       METABOLISM: 100,
       IMMUNE_BALANCE: 100,
       GUT_HEALTH: 100,
+      SLEEP: 100,
     };
 
     // 각 답변에 대해 점수 차감

@@ -1133,6 +1133,7 @@ export class RecordsService {
   /**
    * 뷰티 설문지 조회
    * @description 뷰티 기록 작성에 필요한 설문지 질문 목록 조회 (이너뷰티 4개 + 아우터뷰티 4개)
+   * DAILY 옵션(5/10/15/20/25 점수 체계)도 함께 반환
    */
   async getBeautyQuestions() {
     try {
@@ -1151,13 +1152,23 @@ export class RecordsService {
         },
       });
 
-      // 이너뷰티와 아우터뷰티로 분류
+      // DAILY 옵션 정의 (5점 척도, 점수: 5/10/15/20/25)
+      const dailyOptions = [
+        { id: 1, text: '매우 그렇지 않다', score: 5 },
+        { id: 2, text: '그렇지 않다', score: 10 },
+        { id: 3, text: '보통이다', score: 15 },
+        { id: 4, text: '그렇다', score: 20 },
+        { id: 5, text: '매우 그렇다', score: 25 },
+      ];
+
+      // 이너뷰티와 아우터뷰티로 분류 (옵션 포함)
       const innerBeauty = questions
         .filter(q => q.type === 'INNER')
         .map(q => ({
           id: q.id,
           category: q.category,
           question: q.question,
+          options: dailyOptions,
         }));
 
       const outerBeauty = questions
@@ -1166,6 +1177,7 @@ export class RecordsService {
           id: q.id,
           category: q.category,
           question: q.question,
+          options: dailyOptions,
         }));
 
       return {

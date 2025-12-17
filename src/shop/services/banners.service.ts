@@ -45,14 +45,14 @@ export class BannersService {
         select: {
           status: true,
           aiPersona: {
-            select: { personaUrl: true },
+            select: { torsoUrl: true },
           },
         },
       });
 
       if (user) {
         userStatus = user.status;
-        personaImageUrl = user.aiPersona?.personaUrl ?? undefined;
+        personaImageUrl = user.aiPersona?.torsoUrl ?? undefined;
       }
     }
 
