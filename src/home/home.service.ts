@@ -14,7 +14,7 @@ import {
 import { getNowKST } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
 import { BannersService } from '../shop/services/banners.service';
-import { MissionService } from '../mission/mission.service';
+import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
 
 /**
  * 홈 화면 서비스
@@ -223,18 +223,22 @@ export class HomeService {
       let challengeInfo: ChallengeInfoDto | null = null;
       let startDate: string | null = null;
       let endDate: string | null = null;
-      let missionList: MissionItemDto[] = await this.missionService.getMissionsForHome(); // DB에서 조회
+      let missionList: MissionItemDto[] = [];
 
       // ACTIVE, PENDING, COMPLETED 챌린지 분리
       const activeChallenge = user.userChallenges.find(
-        (uc) => uc.status === UserChallengeStatus.ACTIVE,
+        (uc: { status: string }) => uc.status === UserChallengeStatus.ACTIVE,
       );
       const pendingChallenge = user.userChallenges.find(
-        (uc) => uc.status === UserChallengeStatus.PENDING,
+        (uc: { status: string }) => uc.status === UserChallengeStatus.PENDING,
       );
       // 종료 이후 첫 접속인 챌린지 (COMPLETED + isFirstChallengeEnd = true)
       const firstVisitAfterChallengeEnd = user.userChallenges.find(
-        (uc) => uc.status === UserChallengeStatus.COMPLETED && uc.isFirstChallengeEnd,
+        (uc: { status: string; isFirstChallengeEnd: boolean }) => uc.status === UserChallengeStatus.COMPLETED && uc.isFirstChallengeEnd,
+      );
+      // 최근 완료된 챌린지 (종료 후 기간 계산용)
+      const completedChallenge = user.userChallenges.find(
+        (uc: { status: string }) => uc.status === UserChallengeStatus.COMPLETED,
       );
 
       // 챌린지가 있으면 startDate/endDate 설정 (ACTIVE 우선, 없으면 PENDING)
@@ -248,47 +252,58 @@ export class HomeService {
           : null;
       }
 
-      // status가 CHALLENGER이고 활성 챌린지가 있는 경우만 챌린지 정보 제공
-      if (user.status === UserSubscriptionStatus.CHALLENGER && activeChallenge) {
-        const today = getNowKST();
+      // 현재 일차 및 챌린지 종료 후 경과 일수 계산
+      const today = getNowKST();
+      let currentDay: number | undefined;
+      let daysAfterChallengeEnd: number | undefined;
+
+      if (activeChallenge) {
         const activatedAt = new Date(activeChallenge.activatedAt);
-
-        // 현재 일차 계산 (activatedAt 기준)
         const diffTime = today.getTime() - activatedAt.getTime();
-        const currentDay = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+        currentDay = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      } else if (completedChallenge?.expiresAt) {
+        // 챌린지 종료 후 경과 일수 계산
+        const expiresAt = new Date(completedChallenge.expiresAt);
+        const diffTime = today.getTime() - expiresAt.getTime();
+        daysAfterChallengeEnd = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      }
 
-        // 오늘 미션 목록 조회
+      // 정책 기반 미션 목록 조회 (MissionService의 새 로직 사용)
+      const missionContext: MissionVisibilityContext = {
+        userId,
+        userStatus: user.status as UserSubscriptionStatus,
+        currentDay,
+        daysAfterChallengeEnd,
+        userChallengeId: activeChallenge?.id || completedChallenge?.id,
+      };
+      missionList = await this.missionService.getMissionsForHome(missionContext);
+
+      // status가 CHALLENGER이고 활성 챌린지가 있는 경우 챌린지 정보 및 미션 진행도 추가
+      if (user.status === UserSubscriptionStatus.CHALLENGER && activeChallenge && currentDay) {
+        // 오늘 미션 목록에 진행도 추가
         const todayMissions = activeChallenge.product.challengeMissions.filter(
-          (cm) => cm.day === currentDay,
+          (cm: { day: number }) => cm.day === currentDay,
         );
 
-        // 미션별 완료 횟수 계산
-        const challengeMissionList: MissionItemDto[] = todayMissions.map((cm) => {
+        // 미션별 완료 횟수 계산하여 missionList 업데이트
+        const missionProgressMap = new Map<string, number>();
+        for (const cm of todayMissions) {
           const completedCount = activeChallenge.userMissions.filter(
-            (um) => um.challengeMissionId === cm.id && um.day === currentDay,
+            (um: { challengeMissionId: number; day: number }) => um.challengeMissionId === cm.id && um.day === currentDay,
           ).length;
-
-          return {
-            id: cm.id,
-            title: cm.mission.name,
-            description: cm.mission.description || '',
-            point: cm.points,
-            max: cm.mission.dailyLimit,
-            current: completedCount,
-            recordType: cm.mission.recordType,
-            sortOrder: cm.sortOrder,
-          };
-        });
-
-        // 챌린지에 미션 데이터가 있으면 사용, 없으면 목업
-        if (challengeMissionList.length > 0) {
-          missionList = challengeMissionList;
+          missionProgressMap.set(cm.mission.recordType, completedCount);
         }
+
+        // missionList에 current 값 업데이트
+        missionList = missionList.map((m) => ({
+          ...m,
+          current: missionProgressMap.get(m.recordType) || 0,
+        }));
 
         // 전체 미션 수 & 완료 미션 수 계산 (진행률)
         const totalMissions = activeChallenge.product.challengeMissions.length;
         const completedMissions = activeChallenge.userMissions.filter(
-          (um) => um.isCompleted,
+          (um: { isCompleted: boolean }) => um.isCompleted,
         ).length;
         const challengePercent = totalMissions > 0
           ? Math.round((completedMissions / totalMissions) * 100)
@@ -296,7 +311,7 @@ export class HomeService {
 
         challengeInfo = {
           challengeCode: activeChallenge.product.sku,
-          startDate: activatedAt.toISOString().split('T')[0],
+          startDate: new Date(activeChallenge.activatedAt).toISOString().split('T')[0],
           endDate: activeChallenge.expiresAt
             ? new Date(activeChallenge.expiresAt).toISOString().split('T')[0]
             : '',

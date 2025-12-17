@@ -20,3 +20,4 @@ export * from './exchange-return-status.enum';
 export * from './verification-status.enum';
 export * from './yes-no.enum';
 export * from './pg-provider.enum';
+export * from './survey-option-type.enum';
