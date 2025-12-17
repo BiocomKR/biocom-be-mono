@@ -32,6 +32,7 @@ usage() {
 
 옵션:
   -p, --project-id PROJECT_ID    GCP 프로젝트 ID (필수)
+  -e, --env ENV                   배포 환경: development 또는 production (기본값: development)
   -c, --cluster-name CLUSTER      GKE 클러스터 이름 (기본값: biocom-cluster-dev)
   -z, --zone ZONE                 GCP 존 (기본값: asia-northeast3-a)
   -n, --namespace NAMESPACE       K8s 네임스페이스 (기본값: biocom-api)
@@ -42,8 +43,9 @@ usage() {
   -h, --help                      이 도움말 출력
 
 예시:
-  $0 --project-id biocom-api-dev --yes              # 전체 배포
-  $0 --project-id biocom-api-dev --skip-build --yes # 빌드 없이 배포만
+  $0 --project-id api-dev-biocom --env development --yes    # 개발 환경 배포
+  $0 --project-id api-prod-biocom --env production --yes    # 운영 환경 배포
+  $0 --project-id api-dev-biocom --skip-build --yes         # 빌드 없이 배포만
 
 주의사항:
   - 인프라가 먼저 구축되어 있어야 합니다 (01-deploy-infrastructure.sh)
@@ -55,6 +57,7 @@ EOF
 
 # 기본값 설정
 PROJECT_ID=""
+DEPLOY_ENV="development"  # development 또는 production
 CLUSTER_NAME="biocom-cluster-dev"
 ZONE="asia-northeast3-a"
 NAMESPACE="biocom-api"
@@ -69,6 +72,14 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -p|--project-id)
             PROJECT_ID="$2"
+            shift 2
+            ;;
+        -e|--env)
+            DEPLOY_ENV="$2"
+            if [[ "$DEPLOY_ENV" != "development" && "$DEPLOY_ENV" != "production" ]]; then
+                log_error "환경은 'development' 또는 'production'만 가능합니다: $DEPLOY_ENV"
+                exit 1
+            fi
             shift 2
             ;;
         -c|--cluster-name)
@@ -117,6 +128,7 @@ fi
 
 log_info "📋 애플리케이션 배포 설정:"
 log_info "   프로젝트 ID: $PROJECT_ID"
+log_info "   배포 환경: $DEPLOY_ENV"
 log_info "   클러스터: $CLUSTER_NAME"
 log_info "   존: $ZONE"
 log_info "   네임스페이스: $NAMESPACE"
@@ -440,16 +452,27 @@ deploy_kubernetes() {
     else
         log_info "Firebase Service Account Key Secret이 없습니다. 생성합니다..."
 
-        # Firebase 서비스 계정 키 파일 확인 (패턴 매칭)
-        FIREBASE_KEY_FILE=$(find "$PROJECT_ROOT" -maxdepth 1 -name "*firebase*adminsdk*.json" -type f | head -1)
+        # 환경별 Firebase 서비스 계정 키 파일 선택
+        # development: biocomchallengedev-firebase-adminsdk-*.json
+        # production: biocomchallenge-firebase-adminsdk-*.json (dev 없는 것)
+        if [[ "$DEPLOY_ENV" == "production" ]]; then
+            # 운영: biocomchallenge-firebase-adminsdk-*.json (dev가 포함되지 않은 것)
+            FIREBASE_KEY_FILE=$(find "$PROJECT_ROOT" -maxdepth 1 -name "biocomchallenge-firebase-adminsdk*.json" -type f | head -1)
+            FIREBASE_ENV_NAME="운영(biocomchallenge)"
+        else
+            # 개발: biocomchallengedev-firebase-adminsdk-*.json
+            FIREBASE_KEY_FILE=$(find "$PROJECT_ROOT" -maxdepth 1 -name "biocomchallengedev-firebase-adminsdk*.json" -type f | head -1)
+            FIREBASE_ENV_NAME="개발(biocomchallengedev)"
+        fi
 
         if [[ -z "$FIREBASE_KEY_FILE" ]] || [[ ! -f "$FIREBASE_KEY_FILE" ]]; then
-            log_error "Firebase Service Account Key 파일을 찾을 수 없습니다: $PROJECT_ROOT/*firebase*adminsdk*.json"
-            log_error "Firebase Console에서 서비스 계정 키를 다운로드하세요."
+            log_error "Firebase Service Account Key 파일을 찾을 수 없습니다."
+            log_error "환경: $DEPLOY_ENV ($FIREBASE_ENV_NAME)"
+            log_error "Firebase Console에서 해당 환경의 서비스 계정 키를 다운로드하세요."
             exit 1
         fi
 
-        log_info "Firebase 키 파일 발견: $FIREBASE_KEY_FILE"
+        log_info "Firebase 키 파일 발견 [$FIREBASE_ENV_NAME]: $FIREBASE_KEY_FILE"
 
         kubectl create secret generic firebase-service-account-key \
             --namespace="$NAMESPACE" \
