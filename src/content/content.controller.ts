@@ -19,7 +19,7 @@ import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { ContentCompletionResponseDto } from './dto/content-completion.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
+import { UserSubscriptionStatus, UserChallengeStatus } from '../common/enums';
 
 /**
  * 사용자용 컨텐츠 컨트롤러
@@ -258,7 +258,7 @@ export class ContentController {
         select: {
           status: true,
           userChallenges: {
-            where: { status: 'ACTIVE' },
+            where: { status: UserChallengeStatus.ACTIVE },
             select: { id: true, activatedAt: true }
           }
         }
@@ -269,7 +269,7 @@ export class ContentController {
       }
 
       // 구독자(NEWCOMER 아닌 경우) OR 활성 챌린지 참여자 체크
-      const isSubscriber = user.status === 'SUBSCRIBER';
+      const isSubscriber = user.status === UserSubscriptionStatus.SUBSCRIBER;
       const hasActiveChallenge = user.userChallenges.length > 0;
 
       if (!isSubscriber && !hasActiveChallenge) {
@@ -417,7 +417,7 @@ export class ContentController {
           select: {
             status: true,
             userChallenges: {
-              where: { status: 'ACTIVE' },
+              where: { status: UserChallengeStatus.ACTIVE },
               select: { id: true }
             }
           }

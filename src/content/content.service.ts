@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserChallengeStatus } from '../common/enums';
+import { UserChallengeStatus, UserSubscriptionStatus } from '../common/enums';
 import { PointService } from '../point/point.service';
 import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.util';
 import { CreateContentDto, UpdateContentDto, ContentFileDto } from './content.types';
@@ -731,7 +731,7 @@ export class ContentService {
         select: { status: true }
       });
 
-      const isSubscriber = user?.status === 'SUBSCRIBER';
+      const isSubscriber = user?.status === UserSubscriptionStatus.SUBSCRIBER;
 
       // 2️⃣ 챌린저인 경우 주차 접근 권한 검증
       if (!isSubscriber && week) {

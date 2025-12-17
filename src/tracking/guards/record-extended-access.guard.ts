@@ -1,6 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { UserSubscriptionStatus } from '../../common/enums/user-subscription-status.enum';
+import { UserSubscriptionStatus, UserChallengeStatus } from '../../common/enums';
 
 /**
  * 기록 확장 접근 권한 가드
@@ -46,7 +46,7 @@ export class RecordExtendedAccessGuard implements CanActivate {
       const isSubscriber = user.status !== UserSubscriptionStatus.NEWCOMER;
 
       // 2️⃣ 활성 챌린지 참여자 체크
-      const hasActiveChallenge = user.userChallenges.some(uc => uc.status === 'ACTIVE');
+      const hasActiveChallenge = user.userChallenges.some(uc => uc.status === UserChallengeStatus.ACTIVE);
 
       // 3️⃣ 과거 챌린지 구매자 체크 (하나라도 챌린지 이력이 있으면)
       const hasPastChallenge = user.userChallenges.length > 0;
