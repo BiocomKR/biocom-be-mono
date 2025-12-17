@@ -4,17 +4,102 @@ import { UserSubscriptionStatus } from '../common/enums/user-subscription-status
 import { UserChallengeStatus, YesNo } from '../common/enums';
 import {
   HomeResponseDto,
-  ReportInfoDto,
   AnimalTypeDto,
   PersonaInfoDto,
   ChallengeInfoDto,
   MissionItemDto,
   BannerInfoDto,
 } from './dto/home.dto';
-import { getNowKST, getKoreanToday, stringToKSTDate } from '../common/utils/kst-date.util';
+import { getNowKST } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
 import { BannersService } from '../shop/services/banners.service';
 import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
+
+/** 캐시 TTL (1분) */
+const CACHE_TTL_MS = 60 * 1000;
+
+/** 차트 캐시 정보 */
+interface ReportInfo {
+  chartId: string | null;
+  resultYN: YesNo;
+  sibError?: boolean;
+}
+
+/** 챌린지 상태별 분류 결과 */
+interface ChallengesByStatus {
+  active?: UserChallengeData;
+  pending?: UserChallengeData;
+  completed?: UserChallengeData;
+  firstVisitAfterEnd?: UserChallengeData;
+}
+
+/** 챌린지 날짜 계산 결과 */
+interface ChallengeDays {
+  currentDay?: number;
+  daysAfterChallengeEnd?: number;
+}
+
+/** UserChallenge 데이터 타입 */
+interface UserChallengeData {
+  id: number;
+  productId: number;
+  status: string;
+  expiresAt: Date | null;
+  activatedAt: Date | null;
+  createdAt: Date;
+  totalPoints: number;
+  isFirstEntry: boolean;
+  isFirstChallengeEnd: boolean;
+  product: {
+    id: number;
+    sku: string;
+    name: string;
+    challengeMissions: ChallengeMissionData[];
+  };
+  userMissions: UserMissionData[];
+}
+
+interface ChallengeMissionData {
+  id: number;
+  day: number;
+  points: number;
+  sortOrder: number;
+  mission: {
+    id: number;
+    name: string;
+    description: string;
+    dailyLimit: number | null;
+    recordType: string;
+  };
+}
+
+interface UserMissionData {
+  id: number;
+  challengeMissionId: number;
+  day: number;
+  isCompleted: boolean;
+  attemptNumber: number;
+}
+
+/** 사용자 조회 결과 타입 */
+interface UserData {
+  id: number;
+  mobile: string;
+  points: number;
+  status: string;
+  aiPersonaId: number | null;
+  health_type_animal_id: number | null;
+  isFirstAppEntry: boolean;
+  aiPersona: { id: number; name: string; personaUrl: string | null } | null;
+  healthTypeAnimal: {
+    id: number;
+    animalName: string;
+    catchphrase: string;
+    images: { file: { filePath: string } | null }[];
+  } | null;
+  userChallenges: UserChallengeData[];
+  userCharts: { chartId: string; resultYn: string; updatedAt: Date | null }[];
+}
 
 /**
  * 홈 화면 서비스
@@ -37,9 +122,6 @@ export class HomeService {
    */
   async getHealthExamStatus(userId: number): Promise<{ isCompleted: boolean; examDate?: string; message: string }> {
     this.logger.log(`종합건강대사 검사 상태 확인 - 사용자 ID: ${userId}`);
-
-    // TODO: 외부 API 호출로 실제 검사 완료 여부 확인
-    // 현재는 임시로 모든 사용자가 검사 완료된 것으로 처리
     return {
       isCompleted: true,
       examDate: '2025-09-15',
@@ -49,318 +131,41 @@ export class HomeService {
 
   /**
    * 홈 화면 데이터 조회
-   * - status별 분기: NEWCOMER/SUBSCRIBER는 challengeInfo null
-   * - CHALLENGER만 challengeInfo 제공
-   * @param userId 사용자 ID
    */
   async getHomeData(userId: number): Promise<HomeResponseDto> {
     this.logger.log(`홈 화면 데이터 조회 시작 - 사용자 ID: ${userId}`);
 
     try {
-      // 1. 사용자 정보 조회 (페르소나, 동물유형, 포인트, 활성 챌린지, 차트정보 포함)
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          mobile: true,
-          points: true,
-          status: true,
-          aiPersonaId: true,
-          health_type_animal_id: true,
-          isFirstAppEntry: true,
-          aiPersona: {
-            select: {
-              id: true,
-              name: true,
-              personaUrl: true,
-            },
-          },
-          healthTypeAnimal: {
-            select: {
-              id: true,
-              animalName: true,
-              catchphrase: true,
-              images: {
-                where: { imageType: 'THUMBNAIL' },
-                take: 1,
-                select: {
-                  file: {
-                    select: {
-                      filePath: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          userChallenges: {
-            where: { status: { in: [UserChallengeStatus.ACTIVE, UserChallengeStatus.PENDING, UserChallengeStatus.COMPLETED] } },
-            orderBy: { createdAt: 'desc' },
-            take: 3, // ACTIVE, PENDING, COMPLETED 모두 가져올 수 있도록
-            select: {
-              id: true,
-              productId: true,
-              status: true,
-              expiresAt: true,
-              activatedAt: true,
-              createdAt: true,
-              totalPoints: true,
-              isFirstEntry: true,
-              isFirstChallengeEnd: true,
-              product: {
-                select: {
-                  id: true,
-                  sku: true,
-                  name: true,
-                  challengeMissions: {
-                    where: { isActive: true },
-                    select: {
-                      id: true,
-                      day: true,
-                      points: true,
-                      sortOrder: true,
-                      mission: {
-                        select: {
-                          id: true,
-                          name: true,
-                          description: true,
-                          dailyLimit: true,
-                          recordType: true,
-                        },
-                      },
-                    },
-                    orderBy: { sortOrder: 'asc' },
-                  },
-                },
-              },
-              userMissions: {
-                select: {
-                  id: true,
-                  challengeMissionId: true,
-                  day: true,
-                  isCompleted: true,
-                  attemptNumber: true,
-                },
-              },
-            },
-          },
-          // 차트 정보 (D0004, D0060만 필터링하여 최신순 1개)
-          userCharts: {
-            where: {
-              orderCode: { in: ['D0004', 'D0060'] },
-            },
-            orderBy: { receiptDate: 'desc' },
-            take: 1,
-            select: {
-              chartId: true,
-              resultYn: true,
-              updatedAt: true,
-            },
-          },
-        },
-      });
-
+      // 1. 사용자 정보 조회
+      const user = await this.fetchUserData(userId);
       if (!user) {
         throw new Error('사용자를 찾을 수 없습니다');
       }
 
-      // 2. DB 캐시에서 검사 정보 조회 (TTL 1분, 만료 시 백그라운드 갱신)
-      const CACHE_TTL_MS = 60 * 1000; // 1분
-      let reportInfo: { chartId: string | null; resultYN: YesNo; sibError?: boolean };
+      // 2. 각 데이터 구성 (병렬 처리 가능한 것은 병렬로)
+      const [reportInfo, banner] = await Promise.all([
+        this.getReportInfo(userId, user),
+        this.getHomeBanner(user.id),
+      ]);
 
-      if (user.userCharts.length > 0) {
-        const cachedChart = user.userCharts[0];
-        const now = getNowKST();
-        const cacheAge = cachedChart.updatedAt
-          ? now.getTime() - new Date(cachedChart.updatedAt).getTime()
-          : Infinity;
+      // 3. 챌린지 관련 데이터 처리
+      const challenges = this.getChallengesByStatus(user.userChallenges);
+      const challengeDays = this.calculateChallengeDays(challenges);
 
-        // 캐시 히트 - 현재 값 반환
-        reportInfo = {
-          chartId: cachedChart.chartId,
-          resultYN: cachedChart.resultYn as YesNo,
-        };
-
-        // TTL 만료 시 백그라운드로 갱신
-        if (cacheAge > CACHE_TTL_MS) {
-          this.logger.log(`캐시 TTL 만료 (${Math.round(cacheAge / 1000)}초) - 백그라운드 갱신`);
-          this.refreshChartData(userId, user.mobile).catch((err) => {
-            this.logger.warn(`차트 데이터 백그라운드 갱신 실패 - 사용자 ID: ${userId}`, err);
-          });
-        }
-      } else {
-        // 캐시 미스 - 백그라운드로 SIB API 호출 후 기본값 반환
-        this.fetchAndSaveChartData(userId, user.mobile).catch((err) => {
-          this.logger.warn(`차트 데이터 백그라운드 저장 실패 - 사용자 ID: ${userId}`, err);
-        });
-        reportInfo = { chartId: null, resultYN: YesNo.N };
+      // 4. 미션 목록 조회 및 진행도 업데이트
+      let missionList = await this.getMissionList(userId, user.status, challenges, challengeDays);
+      if (user.status === UserSubscriptionStatus.CHALLENGER && challenges.active && challengeDays.currentDay) {
+        missionList = this.updateMissionProgress(missionList, challenges.active, challengeDays.currentDay);
       }
 
-      // 3. 배너 조회
-      const banner = await this.getHomeBanner(user.id);
+      // 5. 챌린지 정보 구성 (CHALLENGER만)
+      const challengeInfo = this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
 
-      // 4. 동물 유형 (resultYN이 Y일 때만 제공)
-      let animalType: AnimalTypeDto | null = null;
-      if (reportInfo.resultYN === YesNo.Y && user.healthTypeAnimal) {
-        const thumbnailImage = user.healthTypeAnimal.images?.[0]?.file?.filePath || '';
-        animalType = {
-          name: user.healthTypeAnimal.animalName,
-          description: user.healthTypeAnimal.catchphrase,
-          imageUrl: thumbnailImage,
-        };
-      }
+      // 6. 첫 방문 플래그 처리
+      const firstVisitFlags = this.handleFirstVisitFlags(userId, user, reportInfo, challenges, challengeDays.currentDay);
 
-      // 5. 페르소나 정보
-      let persona: PersonaInfoDto | null = null;
-      if (user.aiPersona) {
-        persona = {
-          name: user.aiPersona.name,
-          imageUrl: user.aiPersona.personaUrl || '',
-        };
-      }
-
-      // 6. 챌린지 정보 (CHALLENGER만) & 미션 목록 (최상위)
-      let challengeInfo: ChallengeInfoDto | null = null;
-      let startDate: string | null = null;
-      let endDate: string | null = null;
-      let missionList: MissionItemDto[] = [];
-
-      // ACTIVE, PENDING, COMPLETED 챌린지 분리
-      const activeChallenge = user.userChallenges.find(
-        (uc: { status: string }) => uc.status === UserChallengeStatus.ACTIVE,
-      );
-      const pendingChallenge = user.userChallenges.find(
-        (uc: { status: string }) => uc.status === UserChallengeStatus.PENDING,
-      );
-      // 종료 이후 첫 접속인 챌린지 (COMPLETED + isFirstChallengeEnd = true)
-      const firstVisitAfterChallengeEnd = user.userChallenges.find(
-        (uc: { status: string; isFirstChallengeEnd: boolean }) => uc.status === UserChallengeStatus.COMPLETED && uc.isFirstChallengeEnd,
-      );
-      // 최근 완료된 챌린지 (종료 후 기간 계산용)
-      const completedChallenge = user.userChallenges.find(
-        (uc: { status: string }) => uc.status === UserChallengeStatus.COMPLETED,
-      );
-
-      // 챌린지가 있으면 startDate/endDate 설정 (ACTIVE 우선, 없으면 PENDING)
-      const targetChallenge = activeChallenge || pendingChallenge;
-      if (targetChallenge) {
-        startDate = targetChallenge.activatedAt
-          ? new Date(targetChallenge.activatedAt).toISOString().split('T')[0]
-          : null;
-        endDate = targetChallenge.expiresAt
-          ? new Date(targetChallenge.expiresAt).toISOString().split('T')[0]
-          : null;
-      }
-
-      // 현재 일차 및 챌린지 종료 후 경과 일수 계산
-      const today = getNowKST();
-      let currentDay: number | undefined;
-      let daysAfterChallengeEnd: number | undefined;
-
-      if (activeChallenge) {
-        const activatedAt = new Date(activeChallenge.activatedAt);
-        const diffTime = today.getTime() - activatedAt.getTime();
-        currentDay = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-      } else if (completedChallenge?.expiresAt) {
-        // 챌린지 종료 후 경과 일수 계산
-        const expiresAt = new Date(completedChallenge.expiresAt);
-        const diffTime = today.getTime() - expiresAt.getTime();
-        daysAfterChallengeEnd = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-      }
-
-      // 정책 기반 미션 목록 조회 (MissionService의 새 로직 사용)
-      const missionContext: MissionVisibilityContext = {
-        userId,
-        userStatus: user.status as UserSubscriptionStatus,
-        currentDay,
-        daysAfterChallengeEnd,
-        userChallengeId: activeChallenge?.id || completedChallenge?.id,
-      };
-      missionList = await this.missionService.getMissionsForHome(missionContext);
-
-      // status가 CHALLENGER이고 활성 챌린지가 있는 경우 챌린지 정보 및 미션 진행도 추가
-      if (user.status === UserSubscriptionStatus.CHALLENGER && activeChallenge && currentDay) {
-        // 오늘 미션 목록에 진행도 추가
-        const todayMissions = activeChallenge.product.challengeMissions.filter(
-          (cm: { day: number }) => cm.day === currentDay,
-        );
-
-        // 미션별 완료 횟수 계산하여 missionList 업데이트
-        const missionProgressMap = new Map<string, number>();
-        for (const cm of todayMissions) {
-          const completedCount = activeChallenge.userMissions.filter(
-            (um: { challengeMissionId: number; day: number }) => um.challengeMissionId === cm.id && um.day === currentDay,
-          ).length;
-          missionProgressMap.set(cm.mission.recordType, completedCount);
-        }
-
-        // missionList에 current 값 업데이트
-        missionList = missionList.map((m) => ({
-          ...m,
-          current: missionProgressMap.get(m.recordType) || 0,
-        }));
-
-        // 전체 미션 수 & 완료 미션 수 계산 (진행률)
-        const totalMissions = activeChallenge.product.challengeMissions.length;
-        const completedMissions = activeChallenge.userMissions.filter(
-          (um: { isCompleted: boolean }) => um.isCompleted,
-        ).length;
-        const challengePercent = totalMissions > 0
-          ? Math.round((completedMissions / totalMissions) * 100)
-          : 0;
-
-        challengeInfo = {
-          challengeCode: activeChallenge.product.sku,
-          startDate: new Date(activeChallenge.activatedAt).toISOString().split('T')[0],
-          endDate: activeChallenge.expiresAt
-            ? new Date(activeChallenge.expiresAt).toISOString().split('T')[0]
-            : '',
-          currentDay,
-          challengePercent,
-        };
-
-        // 최초 진입인 경우 false로 업데이트 (백그라운드)
-        if (activeChallenge.isFirstEntry) {
-          this.prisma.userChallenge.update({
-            where: { id: activeChallenge.id },
-            data: { isFirstEntry: false },
-          }).catch((err: Error) => {
-            this.logger.warn(`isFirstEntry 업데이트 실패 - UserChallenge ID: ${activeChallenge.id}`, err);
-          });
-        }
-      }
-
-      // 뉴커머 첫 방문 조건:
-      // NEWCOMER 상태 + 결과지 없음 + isFirstAppEntry가 true
-      const isFirstVisitAsNewcomer =
-        user.status === UserSubscriptionStatus.NEWCOMER &&
-        reportInfo.resultYN === YesNo.N &&
-        user.isFirstAppEntry === true;
-
-      // 뉴커머 첫 방문인 경우 false로 업데이트 (백그라운드)
-      if (isFirstVisitAsNewcomer) {
-        this.prisma.user.update({
-          where: { id: userId },
-          data: { isFirstAppEntry: false },
-        }).catch((err: Error) => {
-          this.logger.warn(`isFirstAppEntry 업데이트 실패 - User ID: ${userId}`, err);
-        });
-      }
-
-      // 챌린지 시작 후 첫 방문 여부 (ACTIVE + isFirstEntry = true)
-      const isFirstVisitAfterChallengeStart = !!(activeChallenge?.isFirstEntry);
-
-      // 챌린지 종료 후 첫 방문 여부 (COMPLETED + isFirstChallengeEnd = true)
-      const isFirstVisitAfterChallengeEnd = !!firstVisitAfterChallengeEnd;
-      if (isFirstVisitAfterChallengeEnd) {
-        // 첫 방문 후 false로 업데이트 (백그라운드)
-        this.prisma.userChallenge.update({
-          where: { id: firstVisitAfterChallengeEnd.id },
-          data: { isFirstChallengeEnd: false },
-        }).catch((err: Error) => {
-          this.logger.warn(`isFirstChallengeEnd 업데이트 실패 - UserChallenge ID: ${firstVisitAfterChallengeEnd.id}`, err);
-        });
-      }
+      // 7. 날짜 정보
+      const { startDate, endDate } = this.getChallengeDates(challenges);
 
       return {
         reportInfo: {
@@ -368,34 +173,357 @@ export class HomeService {
           resultYN: reportInfo.resultYN,
           sibError: reportInfo.sibError,
         },
-        animalType,
-        persona,
+        animalType: this.buildAnimalType(reportInfo.resultYN, user.healthTypeAnimal),
+        persona: this.buildPersona(user.aiPersona),
         userPoint: user.points ?? 0,
         banner,
         challengeInfo,
         startDate,
         endDate,
         missionList,
-        isFirstVisitAsNewcomer,
-        isFirstVisitAfterChallengeStart,
-        isFirstVisitAfterChallengeEnd,
+        ...firstVisitFlags,
       };
     } catch (error) {
-      this.logger.error(`새 홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);
+      this.logger.error(`홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);
       throw error;
     }
   }
 
+  // ==================== Private Methods ====================
+
+  /**
+   * 사용자 정보 조회 (관계 데이터 포함)
+   */
+  private async fetchUserData(userId: number): Promise<UserData | null> {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        mobile: true,
+        points: true,
+        status: true,
+        aiPersonaId: true,
+        health_type_animal_id: true,
+        isFirstAppEntry: true,
+        aiPersona: {
+          select: { id: true, name: true, personaUrl: true },
+        },
+        healthTypeAnimal: {
+          select: {
+            id: true,
+            animalName: true,
+            catchphrase: true,
+            images: {
+              where: { imageType: 'THUMBNAIL' },
+              take: 1,
+              select: { file: { select: { filePath: true } } },
+            },
+          },
+        },
+        userChallenges: {
+          where: { status: { in: [UserChallengeStatus.ACTIVE, UserChallengeStatus.PENDING, UserChallengeStatus.COMPLETED] } },
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+          select: {
+            id: true,
+            productId: true,
+            status: true,
+            expiresAt: true,
+            activatedAt: true,
+            createdAt: true,
+            totalPoints: true,
+            isFirstEntry: true,
+            isFirstChallengeEnd: true,
+            product: {
+              select: {
+                id: true,
+                sku: true,
+                name: true,
+                challengeMissions: {
+                  where: { isActive: true },
+                  select: {
+                    id: true,
+                    day: true,
+                    points: true,
+                    sortOrder: true,
+                    mission: {
+                      select: { id: true, name: true, description: true, dailyLimit: true, recordType: true },
+                    },
+                  },
+                  orderBy: { sortOrder: 'asc' },
+                },
+              },
+            },
+            userMissions: {
+              select: { id: true, challengeMissionId: true, day: true, isCompleted: true, attemptNumber: true },
+            },
+          },
+        },
+        userCharts: {
+          where: { orderCode: { in: ['D0004', 'D0060'] } },
+          orderBy: { receiptDate: 'desc' },
+          take: 1,
+          select: { chartId: true, resultYn: true, updatedAt: true },
+        },
+      },
+    }) as Promise<UserData | null>;
+  }
+
+  /**
+   * 검사 결과 정보 조회 (캐시 처리 포함)
+   */
+  private async getReportInfo(userId: number, user: UserData): Promise<ReportInfo> {
+    if (user.userCharts.length > 0) {
+      const cachedChart = user.userCharts[0];
+      const now = getNowKST();
+      const cacheAge = cachedChart.updatedAt
+        ? now.getTime() - new Date(cachedChart.updatedAt).getTime()
+        : Infinity;
+
+      // TTL 만료 시 백그라운드 갱신
+      if (cacheAge > CACHE_TTL_MS) {
+        this.logger.log(`캐시 TTL 만료 (${Math.round(cacheAge / 1000)}초) - 백그라운드 갱신`);
+        this.refreshChartData(userId, user.mobile).catch((err) => {
+          this.logger.warn(`차트 데이터 백그라운드 갱신 실패 - 사용자 ID: ${userId}`, err);
+        });
+      }
+
+      return {
+        chartId: cachedChart.chartId,
+        resultYN: cachedChart.resultYn as YesNo,
+      };
+    }
+
+    // 캐시 미스 - 백그라운드로 SIB API 호출
+    this.fetchAndSaveChartData(userId, user.mobile).catch((err) => {
+      this.logger.warn(`차트 데이터 백그라운드 저장 실패 - 사용자 ID: ${userId}`, err);
+    });
+
+    return { chartId: null, resultYN: YesNo.N };
+  }
+
+  /**
+   * 동물 유형 DTO 생성
+   */
+  private buildAnimalType(resultYN: YesNo, healthTypeAnimal: UserData['healthTypeAnimal']): AnimalTypeDto | null {
+    if (resultYN !== YesNo.Y || !healthTypeAnimal) {
+      return null;
+    }
+
+    return {
+      name: healthTypeAnimal.animalName,
+      description: healthTypeAnimal.catchphrase,
+      imageUrl: healthTypeAnimal.images?.[0]?.file?.filePath || '',
+    };
+  }
+
+  /**
+   * 페르소나 DTO 생성
+   */
+  private buildPersona(aiPersona: UserData['aiPersona']): PersonaInfoDto | null {
+    if (!aiPersona) {
+      return null;
+    }
+
+    return {
+      name: aiPersona.name,
+      imageUrl: aiPersona.personaUrl || '',
+    };
+  }
+
+  /**
+   * 챌린지 상태별 분류
+   */
+  private getChallengesByStatus(userChallenges: UserChallengeData[]): ChallengesByStatus {
+    return {
+      active: userChallenges.find((uc) => uc.status === UserChallengeStatus.ACTIVE),
+      pending: userChallenges.find((uc) => uc.status === UserChallengeStatus.PENDING),
+      completed: userChallenges.find((uc) => uc.status === UserChallengeStatus.COMPLETED),
+      firstVisitAfterEnd: userChallenges.find(
+        (uc) => uc.status === UserChallengeStatus.COMPLETED && uc.isFirstChallengeEnd,
+      ),
+    };
+  }
+
+  /**
+   * 챌린지 일차 계산
+   */
+  private calculateChallengeDays(challenges: ChallengesByStatus): ChallengeDays {
+    const today = getNowKST();
+
+    if (challenges.active?.activatedAt) {
+      const activatedAt = new Date(challenges.active.activatedAt);
+      const diffTime = today.getTime() - activatedAt.getTime();
+      return { currentDay: Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) };
+    }
+
+    if (challenges.completed?.expiresAt) {
+      const expiresAt = new Date(challenges.completed.expiresAt);
+      const diffTime = today.getTime() - expiresAt.getTime();
+      return { daysAfterChallengeEnd: Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) };
+    }
+
+    return {};
+  }
+
+  /**
+   * 챌린지 시작/종료 날짜 조회
+   */
+  private getChallengeDates(challenges: ChallengesByStatus): { startDate: string | null; endDate: string | null } {
+    const target = challenges.active || challenges.pending;
+    if (!target) {
+      return { startDate: null, endDate: null };
+    }
+
+    return {
+      startDate: target.activatedAt ? new Date(target.activatedAt).toISOString().split('T')[0] : null,
+      endDate: target.expiresAt ? new Date(target.expiresAt).toISOString().split('T')[0] : null,
+    };
+  }
+
+  /**
+   * 미션 목록 조회
+   */
+  private async getMissionList(
+    userId: number,
+    userStatus: string,
+    challenges: ChallengesByStatus,
+    challengeDays: ChallengeDays,
+  ): Promise<MissionItemDto[]> {
+    const context: MissionVisibilityContext = {
+      userId,
+      userStatus: userStatus as UserSubscriptionStatus,
+      currentDay: challengeDays.currentDay,
+      daysAfterChallengeEnd: challengeDays.daysAfterChallengeEnd,
+      userChallengeId: challenges.active?.id || challenges.completed?.id,
+    };
+
+    return this.missionService.getMissionsForHome(context);
+  }
+
+  /**
+   * 미션 진행도 업데이트 (CHALLENGER만)
+   */
+  private updateMissionProgress(
+    missionList: MissionItemDto[],
+    activeChallenge: UserChallengeData,
+    currentDay: number,
+  ): MissionItemDto[] {
+    const todayMissions = activeChallenge.product.challengeMissions.filter((cm) => cm.day === currentDay);
+
+    // 미션별 완료 횟수 계산
+    const progressMap = new Map<string, number>();
+    for (const cm of todayMissions) {
+      const completedCount = activeChallenge.userMissions.filter(
+        (um) => um.challengeMissionId === cm.id && um.day === currentDay,
+      ).length;
+      progressMap.set(cm.mission.recordType, completedCount);
+    }
+
+    return missionList.map((m) => ({
+      ...m,
+      current: progressMap.get(m.recordType) || 0,
+    }));
+  }
+
+  /**
+   * 챌린지 정보 DTO 생성 (CHALLENGER만)
+   */
+  private buildChallengeInfo(
+    userStatus: string,
+    activeChallenge?: UserChallengeData,
+    currentDay?: number,
+  ): ChallengeInfoDto | null {
+    if (userStatus !== UserSubscriptionStatus.CHALLENGER || !activeChallenge || !currentDay) {
+      return null;
+    }
+
+    const totalMissions = activeChallenge.product.challengeMissions.length;
+    const completedMissions = activeChallenge.userMissions.filter((um) => um.isCompleted).length;
+    const challengePercent = totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0;
+
+    return {
+      challengeCode: activeChallenge.product.sku,
+      startDate: new Date(activeChallenge.activatedAt!).toISOString().split('T')[0],
+      endDate: activeChallenge.expiresAt ? new Date(activeChallenge.expiresAt).toISOString().split('T')[0] : '',
+      currentDay,
+      challengePercent,
+    };
+  }
+
+  /**
+   * 첫 방문 플래그 처리 및 백그라운드 업데이트
+   * @param currentDay - CHALLENGER 상태에서 isFirstEntry 업데이트 조건에 필요
+   */
+  private handleFirstVisitFlags(
+    userId: number,
+    user: UserData,
+    reportInfo: ReportInfo,
+    challenges: ChallengesByStatus,
+    currentDay?: number,
+  ): {
+    isFirstVisitAsNewcomer: boolean;
+    isFirstVisitAfterChallengeStart: boolean;
+    isFirstVisitAfterChallengeEnd: boolean;
+  } {
+    // 뉴커머 첫 방문
+    const isFirstVisitAsNewcomer =
+      user.status === UserSubscriptionStatus.NEWCOMER &&
+      reportInfo.resultYN === YesNo.N &&
+      user.isFirstAppEntry === true;
+
+    if (isFirstVisitAsNewcomer) {
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { isFirstAppEntry: false },
+      }).catch((err: Error) => {
+        this.logger.warn(`isFirstAppEntry 업데이트 실패 - User ID: ${userId}`, err);
+      });
+    }
+
+    // 챌린지 시작 후 첫 방문 (CHALLENGER + ACTIVE + currentDay 조건 필요)
+    const isFirstVisitAfterChallengeStart = !!(challenges.active?.isFirstEntry);
+    const shouldUpdateFirstEntry =
+      user.status === UserSubscriptionStatus.CHALLENGER &&
+      challenges.active &&
+      currentDay &&
+      isFirstVisitAfterChallengeStart;
+
+    if (shouldUpdateFirstEntry) {
+      this.prisma.userChallenge.update({
+        where: { id: challenges.active!.id },
+        data: { isFirstEntry: false },
+      }).catch((err: Error) => {
+        this.logger.warn(`isFirstEntry 업데이트 실패 - UserChallenge ID: ${challenges.active!.id}`, err);
+      });
+    }
+
+    // 챌린지 종료 후 첫 방문
+    const isFirstVisitAfterChallengeEnd = !!challenges.firstVisitAfterEnd;
+    if (isFirstVisitAfterChallengeEnd) {
+      this.prisma.userChallenge.update({
+        where: { id: challenges.firstVisitAfterEnd!.id },
+        data: { isFirstChallengeEnd: false },
+      }).catch((err: Error) => {
+        this.logger.warn(`isFirstChallengeEnd 업데이트 실패 - UserChallenge ID: ${challenges.firstVisitAfterEnd!.id}`, err);
+      });
+    }
+
+    return {
+      isFirstVisitAsNewcomer,
+      isFirstVisitAfterChallengeStart,
+      isFirstVisitAfterChallengeEnd,
+    };
+  }
+
   /**
    * 홈 배너 정보 조회
-   * @param userId 사용자 ID
    */
   private async getHomeBanner(userId?: number): Promise<BannerInfoDto> {
-    // BannersService를 통해 HOME 타입 배너 조회 (사용자 상태 기반 필터링)
     const banners = await this.bannersService.getActiveBanners('HOME', userId);
 
     if (banners.length > 0) {
-      const banner = banners[0]; // 첫 번째 배너 (sortOrder 기준 정렬됨)
+      const banner = banners[0];
       return {
         title: banner.title,
         description: banner.description || undefined,
@@ -405,7 +533,6 @@ export class HomeService {
       };
     }
 
-    // 기본 배너
     return {
       title: '오늘의 건강 콘텐츠',
       description: '건강한 하루를 시작해보세요',
@@ -417,17 +544,13 @@ export class HomeService {
 
   /**
    * 외부 API에서 차트 데이터 조회 및 DB 저장
-   * @param userId 사용자 ID
-   * @param mobile 휴대폰 번호
    */
   private async fetchAndSaveChartData(userId: number, mobile: string): Promise<void> {
     try {
-      this.logger.log(`외부 API 차트 데이터 조회 시작 - 사용자 ID: ${userId}, 휴대폰: ${mobile}`);
+      this.logger.log(`외부 API 차트 데이터 조회 시작 - 사용자 ID: ${userId}`);
 
-      // SibApiService를 통해 외부 API 호출
       const chartData = await this.sibApiService.getChartIdByMobile(mobile);
 
-      // 데이터가 없으면 종료
       if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
         this.logger.log(`차트 데이터 없음 - 사용자 ID: ${userId}`);
         return;
@@ -435,7 +558,6 @@ export class HomeService {
 
       this.logger.log(`차트 데이터 ${chartData.length}건 조회 - 사용자 ID: ${userId}`);
 
-      // createMany + skipDuplicates로 한 번에 저장 (중복 자동 스킵)
       const result = await this.prisma.userChart.createMany({
         data: chartData.map((chart) => ({
           userId,
@@ -449,15 +571,12 @@ export class HomeService {
 
       this.logger.log(`차트 데이터 ${result.count}건 저장 완료 - 사용자 ID: ${userId}`);
     } catch (error: any) {
-      // 외부 API 호출 실패는 치명적이지 않으므로 로그만 남기고 계속 진행
       this.logger.warn(`차트 데이터 조회 실패 - 사용자 ID: ${userId}`, error.message);
     }
   }
 
   /**
    * 캐시된 차트 데이터 갱신 (TTL 만료 시 호출)
-   * - SIB API에서 최신 데이터 조회
-   * - 기존 데이터 upsert (새 데이터 추가 + 기존 데이터 updatedAt 갱신)
    */
   private async refreshChartData(userId: number, mobile: string): Promise<void> {
     try {
@@ -472,7 +591,6 @@ export class HomeService {
 
       const now = getNowKST();
 
-      // upsert로 새 데이터 추가 + 기존 데이터 updatedAt 갱신
       for (const chart of chartData) {
         await this.prisma.userChart.upsert({
           where: { chartId: chart.chartID },
