@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString, IsNumber, IsArray, IsDateString, ValidateNested, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiResponseDto } from '../../../common/dto/api-response.dto';
@@ -305,6 +305,14 @@ export class CreateActivityRecordDto {
   @IsNotEmpty()
   imageUrl: string;
 
+  // TODO: 앱에서 보내지만 서버에서는 무시됨 (서버 기준 오늘 날짜 사용). 추후 앱과 함께 제거 검토
+  @ApiPropertyOptional({
+    description: '기록 날짜 (YYYY-MM-DD 형식) - 서버에서 무시됨',
+    example: '2025-12-18'
+  })
+  @IsOptional()
+  @IsString()
+  date?: string;
 }
 
 /**

@@ -2,15 +2,13 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { join } from 'path';
 import { ConfigService } from './common/services/config.service';
 import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { LoggerModule } from './common/modules/logger.module';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
-import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
 import { HealthModule } from './health/health.module';
 import { validationSchema, configuration } from './common/config/env.validation';
 import { UsersModule } from './users/users.module';
@@ -87,21 +85,6 @@ import { QueuesModule } from './queues/queues.module';
       inject: [ConfigService],
     }),
     
-    // Rate Limiting
-    ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        throttlers: [
-          {
-            name: 'short',
-            ttl: configService.rateLimit.ttl * 1000,
-            limit: configService.rateLimit.limit,
-          },
-        ],
-      }),
-      inject: [ConfigService],
-    }),
-    
     QueuesModule,     // BullMQ 큐 모듈 (Redis 연결 먼저)
     CommonModule,     // 공통 모듈 (글로벌)
     LoggerModule,     // 로깅 모듈 (글로벌)
@@ -143,10 +126,6 @@ import { QueuesModule } from './queues/queues.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: CustomThrottlerGuard,
     },
   ],
 })

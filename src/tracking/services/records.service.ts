@@ -597,6 +597,7 @@ export class RecordsService {
    * @param dto 활동 기록 데이터 (activityType, activityTime, imageUrl)
    */
   async createActivityRecord(userId: number, dto: CreateActivityRecordDto) {
+    // 서버 기준 오늘 날짜 사용 (클라이언트 날짜 무시)
     const targetDate = getKoreanToday();
 
     this.logger.log(`활동 기록 저장 시작 - 사용자: ${userId}, 날짜: ${targetDate}`);
@@ -621,6 +622,14 @@ export class RecordsService {
 
     const durationInMinutes = timeToMinutes(dto.activityTime);
 
+    // missions 테이블에서 ACTIVITY의 daily_limit, daily_time_limit_minutes 조회
+    const activityMission = await this.prisma.mission.findUnique({
+      where: { recordType: 'ACTIVITY' },
+      select: { dailyLimit: true, dailyTimeLimitMinutes: true },
+    });
+    const dailyLimit = activityMission?.dailyLimit || 5;
+    const dailyTimeLimitMinutes = activityMission?.dailyTimeLimitMinutes || null;
+
     // 해당 날짜의 기존 활동 기록 조회
     const existingRecords = await this.prisma.userRecord.findMany({
       where: {
@@ -630,24 +639,27 @@ export class RecordsService {
       },
     });
 
-    // 1. 1일 최대 입력 횟수 체크 (5회)
-    if (existingRecords.length >= 5) {
-      throw new BadRequestException('하루 최대 5회까지만 활동을 기록할 수 있습니다.');
+    // 1. 1일 최대 입력 횟수 체크 (missions 테이블 daily_limit 기준)
+    if (existingRecords.length >= dailyLimit) {
+      throw new BadRequestException(`하루 최대 ${dailyLimit}회까지만 활동을 기록할 수 있습니다.`);
     }
 
-    // 2. 1일 최대 입력 시간 체크 (10시간 = 600분)
-    const totalMinutes = existingRecords.reduce((sum, record) => {
-      const metadata = record.metadata as any;
-      return sum + (metadata.durationInMinutes || 0);
-    }, 0);
+    // 2. 1일 최대 입력 시간 체크 (missions 테이블 daily_time_limit_minutes 기준)
+    if (dailyTimeLimitMinutes) {
+      const totalMinutes = existingRecords.reduce((sum, record) => {
+        const metadata = record.metadata as any;
+        return sum + (metadata.durationInMinutes || 0);
+      }, 0);
 
-    if (totalMinutes + durationInMinutes > 600) {
-      const remainingMinutes = 600 - totalMinutes;
-      const remainingHours = Math.floor(remainingMinutes / 60);
-      const remainingMins = remainingMinutes % 60;
-      throw new BadRequestException(
-        `하루 최대 10시간까지만 활동을 기록할 수 있습니다. (남은 시간: ${remainingHours}시간 ${remainingMins}분)`
-      );
+      if (totalMinutes + durationInMinutes > dailyTimeLimitMinutes) {
+        const remainingMinutes = dailyTimeLimitMinutes - totalMinutes;
+        const remainingHours = Math.floor(remainingMinutes / 60);
+        const remainingMins = remainingMinutes % 60;
+        const limitHours = Math.floor(dailyTimeLimitMinutes / 60);
+        throw new BadRequestException(
+          `하루 최대 ${limitHours}시간까지만 활동을 기록할 수 있습니다. (남은 시간: ${remainingHours}시간 ${remainingMins}분)`
+        );
+      }
     }
 
     // 칼로리 계산 (DB의 calorie_rate는 10분당 소모 칼로리)
@@ -1946,7 +1958,13 @@ export class RecordsService {
         let deleteCount = 0;
 
         // 6. 날짜별로 동기화 처리
-        const dateKeys = Array.from(recordsByDateAndProduct.keys()).sort();
+        // 오늘 날짜가 dateKeys에 없으면 추가 (기존 기록이 없어도 오늘 날짜는 처리해야 함)
+        const dateKeys = Array.from(recordsByDateAndProduct.keys());
+        if (!dateKeys.includes(today)) {
+          dateKeys.push(today);
+          recordsByDateAndProduct.set(today, new Map());
+        }
+        dateKeys.sort();
 
         for (const dateStr of dateKeys) {
           const isToday = dateStr === today;

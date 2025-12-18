@@ -18,7 +18,7 @@ data:
   DATABASE_URL: "postgresql://biocom:bico0825%21%40%23@34.47.124.132:5432/biocom?connection_limit=5&pool_timeout=30&connect_timeout=10"
   
   # 애플리케이션 설정
-  NODE_ENV: "production"
+  NODE_ENV: "development"
   PORT: "10804"
   
   # API 설정

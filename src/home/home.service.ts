@@ -10,7 +10,7 @@ import {
   MissionItemDto,
   BannerInfoDto,
 } from './dto/home.dto';
-import { getNowKST } from '../common/utils/kst-date.util';
+import { getNowKST, getKoreanToday } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
 import { BannersService } from '../shop/services/banners.service';
 import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
@@ -154,8 +154,9 @@ export class HomeService {
 
       // 4. 미션 목록 조회 및 진행도 업데이트
       let missionList = await this.getMissionList(userId, user.status, challenges, challengeDays);
-      if (user.status === UserSubscriptionStatus.CHALLENGER && challenges.active && challengeDays.currentDay) {
-        missionList = this.updateMissionProgress(missionList, challenges.active, challengeDays.currentDay);
+      // NEWCOMER가 아닌 경우 진행도 업데이트 (CHALLENGER, SUBSCRIBER 모두)
+      if (user.status !== UserSubscriptionStatus.NEWCOMER) {
+        missionList = await this.updateMissionProgress(userId, missionList);
       }
 
       // 5. 챌린지 정보 구성 (CHALLENGER만)
@@ -403,21 +404,64 @@ export class HomeService {
 
   /**
    * 미션 진행도 업데이트 (CHALLENGER만)
+   * user_records 테이블에서 당일 기록을 조회하여 진행도 계산
    */
-  private updateMissionProgress(
+  private async updateMissionProgress(
+    userId: number,
     missionList: MissionItemDto[],
-    activeChallenge: UserChallengeData,
-    currentDay: number,
-  ): MissionItemDto[] {
-    const todayMissions = activeChallenge.product.challengeMissions.filter((cm) => cm.day === currentDay);
+  ): Promise<MissionItemDto[]> {
+    // 오늘 날짜 (KST 기준)
+    const today = getKoreanToday();
+    const todayDate = new Date(today);
 
-    // 미션별 완료 횟수 계산
+    // user_records에서 당일 기록 조회
+    const todayRecords = await this.prisma.userRecord.findMany({
+      where: {
+        userId,
+        date: todayDate,
+      },
+      select: {
+        recordType: true,
+        metadata: true,
+      },
+    });
+
+    // recordType별 기록 횟수 계산
     const progressMap = new Map<string, number>();
-    for (const cm of todayMissions) {
-      const completedCount = activeChallenge.userMissions.filter(
-        (um) => um.challengeMissionId === cm.id && um.day === currentDay,
-      ).length;
-      progressMap.set(cm.mission.recordType, completedCount);
+
+    // 기록 타입별 집계
+    for (const record of todayRecords) {
+      const recordType = record.recordType;
+      const currentCount = progressMap.get(recordType) || 0;
+
+      // DIET는 식사 유형별로 개별 카운트 (아침, 점심, 저녁, 간식, 야식)
+      if (recordType === 'DIET') {
+        progressMap.set(recordType, currentCount + 1);
+      } else {
+        // 나머지는 1회만 완료로 처리 (BEAUTY, FASTING, SLEEP 등)
+        progressMap.set(recordType, 1);
+      }
+    }
+
+    // SUPPLEMENT는 실제 섭취 여부(morning/afternoon/evening) 체크
+    const supplementRecords = todayRecords.filter((r: { recordType: string }) => r.recordType === 'SUPPLEMENT');
+    if (supplementRecords.length > 0) {
+      let supplementIntakeCount = 0;
+      for (const record of supplementRecords) {
+        const metadata = record.metadata as any;
+        if (metadata?.morning || metadata?.afternoon || metadata?.evening) {
+          supplementIntakeCount++;
+        }
+      }
+      if (supplementIntakeCount > 0) {
+        progressMap.set('SUPPLEMENT', supplementIntakeCount);
+      }
+    }
+
+    // ACTIVITY는 기록 횟수 그대로 사용
+    const activityCount = todayRecords.filter((r: { recordType: string }) => r.recordType === 'ACTIVITY').length;
+    if (activityCount > 0) {
+      progressMap.set('ACTIVITY', activityCount);
     }
 
     return missionList.map((m) => ({

@@ -38,6 +38,7 @@ src/shop/
 │   ├── qna.service.ts
 │   ├── banners.service.ts
 │   ├── subscription.service.ts
+│   ├── subscription-scheduler.service.ts  # 구독 갱신 스케줄러
 │   ├── toss-payments.service.ts
 │   ├── webhooks.service.ts
 │   └── order-sync.service.ts
@@ -74,16 +75,27 @@ class PurchaseItemDto {
 
 ### 주문 생성 플로우
 1. 상품 정보 조회 및 검증
-2. 챌린지/구독 상품 중복 구매 체크
+2. 챌린지/구독 상품 중복 구매 체크 (PURCHASED/ACTIVATED 티켓 보유 시 구매 불가)
 3. 상품 상태 검증 (ACTIVE만 구매 가능)
-4. 금액 계산 (상품가 + 배송비 - 쿠폰할인 - 포인트)
-5. 주문 생성 (PENDING_PAYMENT)
-6. 주문 아이템 생성
-7. Payment 레코드 생성 (PENDING)
-8. 배송 정보 생성
-9. 쿠폰 사용 처리
-10. 포인트 차감
-11. 장바구니 아이템 삭제 (해당 시)
+4. 최대 주문 수량 검증 (`maxOrderQty`)
+5. 금액 계산 (상품가 + 배송비 - 쿠폰할인 - 포인트)
+6. **포인트 사용 제한**: 상품 금액의 30%까지만 사용 가능
+7. 주문 생성 (PENDING_PAYMENT)
+8. 주문 아이템 생성
+9. Payment 레코드 생성 (PENDING)
+10. 배송 정보 생성 (Shipping)
+11. 주문 상태 로그 생성 (OrderStateLog)
+12. 쿠폰 사용 처리 (UserCoupon → USED)
+13. 포인트 차감 + PointHistory 생성
+14. 장바구니 아이템 삭제 (해당 시)
+
+### 개인정보 암호화
+주문 시 아래 필드들은 `CryptoUtil.encrypt()`로 암호화되어 저장됨:
+- recipientName (수령인명)
+- recipientMobile (연락처)
+- address (주소)
+- addressDetail (상세주소)
+- deliveryMessage (배송메시지)
 
 ---
 
@@ -101,27 +113,33 @@ class PurchaseItemDto {
     ↓
 [앱] POST /api/payment/confirm (paymentKey, orderId, amount)
     ↓
-[API] 주문/결제 정보 검증
+[API] 주문/결제 정보 검증 + 금액 일치 확인
     ↓
-[API] 토스 결제 승인 API 호출
+[API] 토스 결제 승인 API 호출 (트랜잭션 밖)
     ↓
-[API] Payment 상태 → COMPLETED
-[API] Order 상태 → PAID
+[API] 결제 성공 시 DB 업데이트 (트랜잭션 안)
+    - Payment 상태 → COMPLETED
+    - Order 상태 → PAID
+    - 챌린지/구독 티켓 발급
+    - 구매 포인트 적립 (상품금액의 10%)
     ↓
-[API] 챌린지/구독 티켓 발급 (해당 시)
-    ↓
-[API] 플레이오토 주문 생성 (비동기)
+[API] 플레이오토 주문 생성 (비동기, 트랜잭션 커밋 후)
 ```
 
 ### 결제 취소 플로우
 ```
 [앱] POST /api/orders/:orderNumber/cancel
     ↓
-[API] 송장 등록 여부 확인
+[API] 송장 등록 여부 확인 (플레이오토 실시간 조회)
     ↓
 [송장 미등록] → PG 결제 취소 → CANCELLED
 [송장 등록됨] → CANCEL_REQUESTED (실무자 확인)
+               → Refund 레코드 생성 (status: REQUESTED)
 ```
+
+### 멱등성 보장
+- 이미 PAID 상태인 주문에 대해 결제 승인 요청 시, 에러 대신 기존 결제 정보 반환
+- 중복 결제 방지
 
 ---
 
@@ -179,8 +197,9 @@ enum PaymentStatus {
 - PG 취소 불필요
 
 #### 송장 미등록 (PAID, PREPARING)
+- 플레이오토 실시간 조회로 송장 여부 재확인 (`orderSyncService.syncFromPlayauto`)
 - PG 결제 취소 자동 호출
-- 포인트/쿠폰 복구
+- 포인트/쿠폰 복구 (PaymentService.cancelPayment에서 처리)
 - 즉시 CANCELLED 처리
 
 #### 송장 등록됨 (SHIPPED 등)
@@ -224,6 +243,11 @@ Order {
 - 송장 미등록: 플레이오토 주문 삭제 (`DELETE /order/delete`)
 - 송장 등록됨: 관리자가 수동 처리 후 삭제
 
+### 주문 상태 실시간 동기화
+- 취소 요청 시 `orderSyncService.syncFromPlayauto()` 호출
+- 플레이오토에서 최신 배송 상태/송장번호 가져와서 DB 동기화
+- 동기화 결과로 송장 여부 판단 후 취소 분기
+
 ---
 
 ## 7. 배송비 정책
@@ -251,16 +275,20 @@ return baseFee + (isJeju ? jejuExtraFee : 0);
 
 ### 포인트 사용
 - 주문 생성 시 차감
+- **사용 제한**: 상품 금액의 30%까지만 사용 가능
 - 취소 시 복구 (type: REFUND)
+
+### 포인트 적립
+| 시점 | 적립률 | 기준 |
+|------|-------|------|
+| 결제 완료 시 | 10% | 상품 금액 (totalProductPrice) |
+| 구매 확정 시 | 1% | 결제 금액 (totalAmount) |
 
 ### 쿠폰 사용
 - 상품별 쿠폰 (특정 상품에만 적용 가능)
 - 할인 타입: PERCENTAGE, AMOUNT
-- 최대 할인액 제한 가능
-
-### 구매 확정 포인트
-- 배송 완료 → 구매 확정 시 지급
-- 결제 금액의 1%
+- 최대 할인액 제한 가능 (maxDiscountAmount)
+- 사용 시 UserCoupon 상태 → USED, usedAt/usedOrderId 기록
 
 ---
 
@@ -272,13 +300,13 @@ return baseFee + (isJeju ? jejuExtraFee : 0);
 
 ### 상태 관리
 ```typescript
+// 실제 구현된 enum (REQUESTED만 존재)
 enum ExchangeReturnStatus {
   REQUESTED   // 신청됨
-  APPROVED    // 승인됨
-  COMPLETED   // 처리 완료
-  REJECTED    // 거부됨
 }
 ```
+
+> **주의**: 문서상 APPROVED, COMPLETED, REJECTED 상태가 있지만, 실제 enum에는 REQUESTED만 구현됨. 관리자 페이지에서 처리 로직 추가 필요.
 
 ### 테이블: ExchangeReturn
 ```typescript
@@ -299,25 +327,55 @@ enum ExchangeReturnStatus {
 ## 10. 챌린지/구독 티켓
 
 ### 발급 시점
-- 결제 승인 완료 시 (`PaymentService.confirmPayment`)
+- **결제 승인 완료 시** (`PaymentService.confirmPayment`)
 - 주문 생성 시에는 발급하지 않음 (미결제 티켓 방지)
 
 ### 중복 구매 방지
 - 동일 상품에 대해 PURCHASED 또는 ACTIVATED 상태 티켓이 있으면 구매 불가
+- 주문 생성 시점에 검증 (`orders.service.ts`)
 
 ### 동시성 방어
-- `orderItemId + seq` 유니크 제약
+- `orderItemId + seq` 유니크 제약 (DB level)
 - seq 기반 deterministic 생성 (1부터 quantity까지)
+- 중복 생성 시도 시 P2002 에러 → catch 후 skip (멱등성 보장)
+
+### 티켓 타입 분류
+```typescript
+// categoryCode에 따라 결정
+'SUBSCRIPTION' → ticketType: 'SUBSCRIPTION'
+'CHALLENGE'    → ticketType: 'CHALLENGE'
+```
 
 ---
 
-## 11. 관련 파일
+## 11. 주요 주의사항
+
+### 개인정보 처리
+- 조회 시 반드시 `CryptoUtil.decrypt()` 적용
+- recipientName, recipientMobile, address, addressDetail
+
+### 날짜/시간 처리
+- 모든 날짜는 `getNowKST()` 사용 (new Date() 금지)
+- 토스 응답의 approvedAt은 `parseISO8601ToKST()`로 변환
+
+### 트랜잭션 분리
+- 외부 API 호출 (토스, 플레이오토)은 트랜잭션 밖에서 실행
+- DB 업데이트만 트랜잭션 안에서 처리
+
+### 미구현/TODO 항목
+- 재고 차감: `InventorySyncQueue` 테이블 없어서 주석 처리 상태
+- 반품/교환 후속 처리: 관리자 페이지 구현 필요
+
+---
+
+## 12. 관련 파일
 
 ### biocom-api (유저 앱 API)
 - 주문: `src/shop/services/orders.service.ts`
 - 결제: `src/shop/services/payment.service.ts`
 - 웹훅: `src/shop/services/webhooks.service.ts`
 - 물류 연동: `src/playauto/providers/playauto.provider.ts`
+- 주문 동기화: `src/shop/services/order-sync.service.ts`
 
 ### biocom-bo-api (관리자 API)
 - 주문 관리: `src/orders/orders.service.ts`
@@ -326,8 +384,9 @@ enum ExchangeReturnStatus {
 ### Enum 파일
 - `src/common/enums/order-status.enum.ts`
 - `src/common/enums/payment-status.enum.ts`
+- `src/common/enums/exchange-return-status.enum.ts`
 
 ---
 * 작성자: 엄신우
 * 작성일: 25/12/17
-* 수정일: 25/12/17(초안)
+* 수정일: 25/12/18

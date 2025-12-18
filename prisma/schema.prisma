@@ -356,6 +356,7 @@ model Mission {
   type                  String             @default("MISSION") @db.VarChar(20)
   recordType            String             @unique @map("record_type") @db.VarChar(50)
   dailyLimit            Int?               @map("daily_limit")
+  dailyTimeLimitMinutes Int?               @map("daily_time_limit_minutes")
   specificDay           Int?               @map("specific_day")
   totalDays             Int                @default(21) @map("total_days")
   uploadType            String?            @map("upload_type")
