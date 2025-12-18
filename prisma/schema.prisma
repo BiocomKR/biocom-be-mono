@@ -55,8 +55,8 @@ model User {
   challengeSurveyResults       UserChallengeSurveyResult[]
   userChallenges               UserChallenge[]
   userCharts                   UserChart[]
-  userChatHistories            UserChatHistory[]
   userChatDailySummaries       UserChatDailySummary[]
+  userChatHistories            UserChatHistory[]
   userConsents                 UserConsent[]
   userCoupons                  UserCoupon[]
   userDeepReports              UserDeepReport[]
@@ -246,10 +246,10 @@ model SurveyOption {
   id            Int            @id @default(autoincrement())
   optionText    String         @map("option_text")
   score         Int
-  /// 설문 옵션 타입 (PRE_SURVEY: 사전문진, DAILY: 데일리문진)
-  surveyType    String         @default("PRE_SURVEY") @map("survey_type") @db.VarChar(20)
   createdAt     DateTime       @map("created_at")
   isActive      Boolean        @default(true) @map("is_active")
+  /// 설문 옵션 타입 (PRE_SURVEY: 사전문진, DAILY: 데일리문진)
+  surveyType    String         @default("PRE_SURVEY") @map("survey_type") @db.VarChar(20)
   surveyAnswers SurveyAnswer[]
 
   @@index([isActive], map: "idx_survey_options_is_active")
@@ -294,8 +294,8 @@ model HealthTypeAnimal {
   updatedAt           DateTime?                 @updatedAt @map("updated_at")
   images              HealthTypeAnimalFile[]
   recommendedProducts HealthTypeAnimalProduct[]
-  users               User[]
   solutionScreens     SolutionScreen[]
+  users               User[]
 
   @@map("health_type_animals")
 }
@@ -356,7 +356,6 @@ model Mission {
   type                  String             @default("MISSION") @db.VarChar(20)
   recordType            String             @unique @map("record_type") @db.VarChar(50)
   dailyLimit            Int?               @map("daily_limit")
-  dailyTimeLimitMinutes Int?               @map("daily_time_limit_minutes")
   specificDay           Int?               @map("specific_day")
   totalDays             Int                @default(21) @map("total_days")
   uploadType            String?            @map("upload_type")
@@ -370,6 +369,7 @@ model Mission {
   visibleFromDay        Int?               @map("visible_from_day")
   visibleToDay          Int?               @map("visible_to_day")
   visibleAfterSettings  Json?              @map("visible_after_settings")
+  dailyTimeLimitMinutes Int?               @map("daily_time_limit_minutes")
   challengeMissions     ChallengeMission[]
   dailyMissions         DailyMission[]
   missionQuizzes        MissionQuiz[]
@@ -518,7 +518,6 @@ model ChallengeTicket {
   userId         Int             @map("user_id")
   productId      Int?            @map("product_id")
   orderItemId    Int?            @map("order_item_id")
-  seq            Int             @default(1) @map("seq") // 동일 orderItem 내 티켓 순번 (1부터 시작)
   purchaseDate   DateTime        @map("purchase_date")
   status         String          @default("PURCHASED") @db.VarChar(20)
   createdAt      DateTime        @map("created_at")
@@ -526,13 +525,14 @@ model ChallengeTicket {
   ticketType     String          @default("CHALLENGE") @map("ticket_type") @db.VarChar(20)
   startDate      DateTime?       @map("start_date")
   endDate        DateTime?       @map("end_date")
+  seq            Int             @default(1) @map("seq")
   orderItem      OrderItem?      @relation(fields: [orderItemId], references: [id])
   product        Product?        @relation(fields: [productId], references: [id])
   user           User            @relation(fields: [userId], references: [id])
   iapReceipt     IAPReceipt?
   userChallenges UserChallenge[]
 
-  @@unique([orderItemId, seq]) // 동일 orderItem에서 seq 중복 방지 (레이스 컨디션 방어)
+  @@unique([orderItemId, seq])
   @@index([userId, status, ticketType])
   @@map("challenge_tickets")
 }
@@ -948,40 +948,40 @@ model OrderStateLog {
 /// 결제 정보 테이블
 /// 주문 결제 정보 관리
 model Payment {
-  id              Int       @id @default(autoincrement())
+  id              Int          @id @default(autoincrement())
   /// 주문 ID
-  orderId         Int       @unique @map("order_id")
+  orderId         Int          @unique @map("order_id")
   /// PG사 (TOSS: 토스페이먼츠)
-  pgProvider      String    @default("TOSS") @map("pg_provider") @db.VarChar(20)
+  pgProvider      String       @default("TOSS") @map("pg_provider") @db.VarChar(20)
   /// PG사 거래번호
-  pgTransactionId String?   @unique @map("pg_transaction_id") @db.VarChar(100)
+  pgTransactionId String?      @unique @map("pg_transaction_id") @db.VarChar(100)
   /// 결제수단
-  paymentMethod   String    @map("payment_method") @db.VarChar(30)
+  paymentMethod   String       @map("payment_method") @db.VarChar(30)
   /// 결제 상태
-  status          String    @default("READY") @db.VarChar(30)
+  status          String       @default("READY") @db.VarChar(30)
   /// PG사 결제 금액
-  amount          Decimal   @db.Decimal(10, 0)
+  amount          Decimal      @db.Decimal(10, 0)
   /// 포인트 결제 금액
-  pointAmount     Decimal   @default(0) @map("point_amount") @db.Decimal(10, 0)
+  pointAmount     Decimal      @default(0) @map("point_amount") @db.Decimal(10, 0)
   /// 결제 상세 정보 (암호화 필요)
-  paymentDetails  Json?     @map("payment_details")
+  paymentDetails  Json?        @map("payment_details")
   /// 요청일시
-  requestedAt     DateTime  @map("requested_at")
+  requestedAt     DateTime     @map("requested_at")
   /// 결제일시
-  paidAt          DateTime? @map("paid_at")
+  paidAt          DateTime?    @map("paid_at")
   /// 취소일시
-  cancelledAt     DateTime? @map("cancelled_at")
+  cancelledAt     DateTime?    @map("cancelled_at")
   /// 실패일시
-  failedAt        DateTime? @map("failed_at")
+  failedAt        DateTime?    @map("failed_at")
   /// 실패 사유
-  failReason      String?   @map("fail_reason") @db.VarChar(500)
+  failReason      String?      @map("fail_reason") @db.VarChar(500)
   /// 생성일시
-  createdAt       DateTime  @map("created_at")
+  createdAt       DateTime     @map("created_at")
   /// 수정일시
-  updatedAt       DateTime? @updatedAt @map("updated_at")
-  order           Order     @relation(fields: [orderId], references: [id])
-  refunds         Refund[]
+  updatedAt       DateTime?    @updatedAt @map("updated_at")
   paymentLogs     PaymentLog[]
+  order           Order        @relation(fields: [orderId], references: [id])
+  refunds         Refund[]
 
   @@index([status])
   @@index([pgTransactionId])
@@ -1006,7 +1006,6 @@ model PaymentLog {
   rawData        Json?    @map("raw_data")
   /// 생성일시
   createdAt      DateTime @default(now()) @map("created_at")
-
   payment        Payment  @relation(fields: [paymentId], references: [id])
 
   @@index([paymentId])
@@ -1030,12 +1029,6 @@ model Refund {
   refundAmount         Decimal   @map("refund_amount") @db.Decimal(10, 0)
   /// 포인트 환불액
   pointRefund          Decimal   @default(0) @map("point_refund") @db.Decimal(10, 0)
-  /// PG사 (결제 취소 처리한 PG)
-  pgProvider           String?   @map("pg_provider") @db.VarChar(20)
-  /// PG사 취소 거래 ID
-  pgCancelId           String?   @map("pg_cancel_id") @db.VarChar(100)
-  /// PG사 취소 응답 (JSON)
-  pgResponse           Json?     @map("pg_response")
   /// 환불 사유
   reason               String    @db.VarChar(200)
   /// 상세 사유
@@ -1056,6 +1049,12 @@ model Refund {
   rejectedAt           DateTime? @map("rejected_at")
   /// 생성일시
   createdAt            DateTime  @map("created_at")
+  /// PG사 취소 거래 ID
+  pgCancelId           String?   @map("pg_cancel_id") @db.VarChar(100)
+  /// PG사 취소 응답 (JSON)
+  pgResponse           Json?     @map("pg_response")
+  /// PG사 (결제 취소 처리한 PG)
+  pgProvider           String?   @map("pg_provider") @db.VarChar(20)
   order                Order     @relation(fields: [orderId], references: [id])
   payment              Payment   @relation(fields: [paymentId], references: [id])
 
@@ -1222,8 +1221,6 @@ model AiPersona {
   featureContent   String?           @map("feature_content")
   /// 말투 제목
   speechTitle      String?           @map("speech_title") @db.VarChar(200)
-  /// 말투 내용
-  speechContent    String?           @map("speech_content")
   /// 말투 이미지 URL
   speechImageUrl   String?           @map("speech_image_url") @db.VarChar(500)
   /// 친밀도 제목
@@ -1234,10 +1231,14 @@ model AiPersona {
   intimacyImageUrl String?           @map("intimacy_image_url") @db.VarChar(500)
   /// 페르소나 썸네일 이미지 URL
   thumbnailUrl     String?           @map("thumbnail_url") @db.VarChar(500)
+  /// 말투 내용
+  speechContent    String?           @map("speech_content")
   /// 페르소나 상반신 이미지 URL
   torsoUrl         String?           @map("torso_url") @db.VarChar(500)
   /// 시스템 프롬프트
-  systemPrompt     String?           @map("system_prompt") @db.Text
+  systemPrompt     String?           @map("system_prompt")
+  /// 인사말 (성별 통합)
+  greeting         String?
   balanceGameSteps BalanceGameStep[]
   users            User[]
 
@@ -1729,35 +1730,35 @@ model RefundWarranty {
 
 /// 공통 배너 테이블
 model Banner {
-  id             Int       @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   /// 배너 제목
-  title          String    @db.VarChar(100)
+  title           String    @db.VarChar(100)
   /// 배너 이미지 URL
-  imageUrl       String    @map("image_url") @db.VarChar(500)
+  imageUrl        String    @map("image_url") @db.VarChar(500)
   /// 클릭시 이동할 라우팅 URL
-  linkUrl        String?   @map("link_url") @db.VarChar(500)
+  linkUrl         String?   @map("link_url") @db.VarChar(500)
   /// 링크 타입 (INTERNAL: 앱 내부 라우팅, EXTERNAL: 외부 URL, PRODUCT: 상품 상세)
-  linkType       String    @default("INTERNAL") @map("link_type") @db.VarChar(20)
+  linkType        String    @default("INTERNAL") @map("link_type") @db.VarChar(20)
   /// 배너 설명 (선택)
-  description    String?
+  description     String?
   /// 정렬 순서 (낮을수록 우선)
-  sortOrder      Int       @default(0) @map("sort_order")
+  sortOrder       Int       @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive       Boolean   @default(true) @map("is_active")
+  isActive        Boolean   @default(true) @map("is_active")
   /// 노출 시작일
-  startDate      DateTime? @map("start_date")
+  startDate       DateTime? @map("start_date")
   /// 노출 종료일
-  endDate        DateTime? @map("end_date")
+  endDate         DateTime? @map("end_date")
   /// 생성일시
-  createdAt      DateTime  @map("created_at")
+  createdAt       DateTime  @map("created_at")
   /// 수정일시
-  updatedAt      DateTime? @updatedAt @map("updated_at")
+  updatedAt       DateTime? @updatedAt @map("updated_at")
   /// 배너 타입 (SHOP: 쇼핑몰, HOME: 메인홈, EVENT: 이벤트)
-  bannerType     String    @default("SHOP") @map("banner_type") @db.VarChar(20)
+  bannerType      String    @default("SHOP") @map("banner_type") @db.VarChar(20)
   /// 노출 대상 유저 상태 (빈 배열 = 전체 공개, ["NEWCOMER", "CHALLENGER", "SUBSCRIBER"])
-  targetStatuses String[]  @default([]) @map("target_statuses")
+  targetStatuses  String[]  @default([]) @map("target_statuses")
   /// 페르소나별 이미지 적용 여부 (true: 유저의 페르소나 이미지 사용, false: 배너 imageUrl 사용)
-  usePersonaImage Boolean  @default(false) @map("use_persona_image")
+  usePersonaImage Boolean   @default(false) @map("use_persona_image")
 
   @@index([bannerType, isActive, sortOrder])
   @@index([startDate, endDate])
@@ -2156,18 +2157,18 @@ model SupplementNutrient {
 }
 
 model UserChart {
-  id                     Int                     @id @default(autoincrement())
-  userId                 Int                     @map("user_id")
-  chartId                String                  @unique @map("chart_id") @db.VarChar(50)
-  receiptDate            DateTime                @map("receipt_date")
-  resultYn               String                  @map("result_yn") @db.VarChar(1)
-  orderCode              String                  @map("order_code") @db.VarChar(20)
-  createdAt              DateTime                @default(now()) @map("created_at")
-  updatedAt              DateTime?               @map("updated_at")
+  id                     Int                    @id @default(autoincrement())
+  userId                 Int                    @map("user_id")
+  chartId                String                 @unique @map("chart_id") @db.VarChar(50)
+  receiptDate            DateTime               @map("receipt_date")
+  resultYn               String                 @map("result_yn") @db.VarChar(1)
+  orderCode              String                 @map("order_code") @db.VarChar(20)
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime?              @map("updated_at")
   userAllergyReports     UserAllergyReport[]
-  user                   User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userChatHistories      UserChatHistory[]
+  user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userChatDailySummaries UserChatDailySummary[]
+  userChatHistories      UserChatHistory[]
   userDeepReports        UserDeepReport[]
   userMetabolicReports   UserMetabolicReport[]
 
@@ -2682,12 +2683,12 @@ model UserAllergyReport {
   userId     Int       @map("user_id")
   chartId    String    @map("chart_id") @db.VarChar(50)
   userName   String    @map("user_name")
-  level1     String?   @db.Text
-  level2     String?   @db.Text
-  level3     String?   @db.Text
-  level4     String?   @db.Text
-  level5     String?   @db.Text
-  animalType String?   @map("animal_type") @db.Text
+  level1     String?
+  level2     String?
+  level3     String?
+  level4     String?
+  level5     String?
+  animalType String?   @map("animal_type")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime? @updatedAt @map("updated_at")
   userChart  UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_chart_id")
@@ -2743,7 +2744,7 @@ model UserChatDailySummary {
   userId        Int        @map("user_id")
   chartId       String?    @map("chart_id") @db.VarChar(50)
   date          DateTime   @map("date")
-  summary       String     @db.Text
+  summary       String
   totalMessages Int        @map("total_messages")
   createdAt     DateTime   @default(now()) @map("created_at")
   userChart     UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_chat_daily_summaries_chart_id")
@@ -2778,14 +2779,14 @@ model UserDeepReport {
   chartId               String?    @map("chart_id") @db.VarChar(50)
   reportId              String     @unique @map("report_id") @db.VarChar(100)
   provider              String     @db.VarChar(20)
-  startDate             DateTime   @map("start_date")
-  endDate               DateTime   @map("end_date")
-  weekNumber            Int?       @map("week_number")
   content               Json
   processingTimeSeconds Float?     @map("processing_time_seconds")
   totalTokens           Int?       @map("total_tokens")
   estimatedCostUsd      Float?     @map("estimated_cost_usd")
   createdAt             DateTime   @default(now()) @map("created_at")
+  startDate             DateTime   @map("start_date")
+  endDate               DateTime   @map("end_date")
+  weekNumber            Int?       @map("week_number")
   userChart             UserChart? @relation(fields: [chartId], references: [chartId], onUpdate: NoAction, map: "fk_user_deep_reports_chart_id")
   user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_deep_reports_user_id")
 
@@ -2799,21 +2800,113 @@ model UserDeepReport {
 }
 
 model UserAddress {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @map("user_id")
-  alias         String?  @db.VarChar(50)
-  recipientName String   @map("recipient_name") @db.VarChar(50)
-  recipientPhone String  @map("recipient_phone") @db.VarChar(20)
-  postalCode    String   @map("postal_code") @db.VarChar(10)
-  address       String   @db.VarChar(200)
-  addressDetail String?  @map("address_detail") @db.VarChar(100)
-  isDefault     Boolean  @default(false) @map("is_default")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @map("updated_at")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  alias          String?  @db.VarChar(50)
+  recipientName  String   @map("recipient_name") @db.VarChar(50)
+  recipientPhone String   @map("recipient_phone") @db.VarChar(20)
+  postalCode     String   @map("postal_code") @db.VarChar(10)
+  address        String   @db.VarChar(200)
+  addressDetail  String?  @map("address_detail") @db.VarChar(100)
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "idx_user_addresses_user_id")
   @@map("user_addresses")
+}
+
+/// 솔루션 화면 테이블
+/// screenKey 기반 화면 관리 및 배포 정보 포함
+model SolutionScreen {
+  id                 Int                     @id @default(autoincrement())
+  /// 화면 고유 키 (예: healthType:penguin:diet:original)
+  screenKey          String                  @unique @map("screen_key")
+  /// 건강 타입 동물 ID (RECOMMENDATION은 nullable)
+  healthTypeAnimalId Int?                    @map("health_type_animal_id")
+  /// 화면 타입
+  screenType         SolutionScreenType      @map("screen_type")
+  /// 현재 배포된 버전 ID
+  publishedVersionId Int?                    @unique @map("published_version_id")
+  /// 배포 일시
+  publishedAt        DateTime?               @map("published_at")
+  /// 배포자 ID (Operator)
+  publishedBy        Int?                    @map("published_by")
+  /// 활성화 여부
+  isActive           Boolean                 @default(true) @map("is_active")
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime?               @updatedAt @map("updated_at")
+  versions           SolutionScreenVersion[] @relation("ScreenVersions")
+  healthTypeAnimal   HealthTypeAnimal?       @relation(fields: [healthTypeAnimalId], references: [id])
+  publishedVersion   SolutionScreenVersion?  @relation("PublishedVersion", fields: [publishedVersionId], references: [id])
+
+  @@index([healthTypeAnimalId])
+  @@index([screenType])
+  @@map("solution_screens")
+}
+
+/// 솔루션 화면 버전 테이블
+/// screenKey당 DRAFT는 1개만 유지 (partial unique index 필요)
+model SolutionScreenVersion {
+  id            Int                         @id @default(autoincrement())
+  /// 화면 ID
+  screenId      Int                         @map("screen_id")
+  /// 버전 상태
+  status        SolutionScreenVersionStatus @default(DRAFT)
+  /// JSON payload (화면 콘텐츠)
+  payload       Json
+  /// 스키마 버전 (하위 호환성 관리용)
+  schemaVersion Int                         @default(1) @map("schema_version")
+  /// 작성자 ID (Operator)
+  createdBy     Int                         @map("created_by")
+  createdAt     DateTime                    @default(now()) @map("created_at")
+  screen        SolutionScreen              @relation("ScreenVersions", fields: [screenId], references: [id], onDelete: Cascade)
+  publishedFor  SolutionScreen?             @relation("PublishedVersion")
+
+  @@index([screenId, status])
+  @@map("solution_screen_versions")
+}
+
+/// 성분 마스터 테이블
+/// 영양제 성분 정보 관리
+model Ingredient {
+  id        Int      @id @default(autoincrement())
+  /// 소문자 식별자 (payload, 템플릿에서 사용)
+  key       String   @unique @db.VarChar(50)
+  /// 대문자 코드 (레거시/표시용)
+  code      String   @unique @db.VarChar(50)
+  /// 성분 한글명
+  name      String   @db.VarChar(100)
+  /// 성분 영문명
+  nameEn    String?  @map("name_en") @db.VarChar(100)
+  /// 카테고리 (미네랄, 비타민, 추출물 등)
+  category  String?  @db.VarChar(50)
+  /// 정렬 순서
+  sortOrder Int      @default(0) @map("sort_order")
+  /// 활성화 여부
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([category])
+  @@map("ingredients")
+}
+
+/// 성분 순서 템플릿 테이블
+/// 화면별 성분 표시 순서 관리
+model IngredientOrderTemplate {
+  id              Int      @id @default(autoincrement())
+  /// 템플릿 고유 키
+  templateKey     String   @unique @map("template_key") @db.VarChar(50)
+  /// 템플릿 이름
+  name            String   @db.VarChar(100)
+  /// 성분 키 배열 (Ingredient.key 기준)
+  ingredientOrder String[] @map("ingredient_order")
+  /// 활성화 여부
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("ingredient_order_templates")
 }
 
 /// AI 페르소나 성별 Enum
@@ -2878,10 +2971,6 @@ enum IAPProductType {
   NON_RENEWING
 }
 
-// =====================================================
-// 맞춤 솔루션 관련 Enum 및 모델
-// =====================================================
-
 /// 솔루션 화면 타입
 enum SolutionScreenType {
   /// 식단 > 오리지널
@@ -2908,100 +2997,4 @@ enum SolutionScreenVersionStatus {
   PUBLISHED
   /// 보관됨
   ARCHIVED
-}
-
-/// 솔루션 화면 테이블
-/// screenKey 기반 화면 관리 및 배포 정보 포함
-model SolutionScreen {
-  id                 Int                      @id @default(autoincrement())
-  /// 화면 고유 키 (예: healthType:penguin:diet:original)
-  screenKey          String                   @unique @map("screen_key")
-  /// 건강 타입 동물 ID (RECOMMENDATION은 nullable)
-  healthTypeAnimalId Int?                     @map("health_type_animal_id")
-  /// 화면 타입
-  screenType         SolutionScreenType       @map("screen_type")
-  /// 현재 배포된 버전 ID
-  publishedVersionId Int?                     @unique @map("published_version_id")
-  /// 배포 일시
-  publishedAt        DateTime?                @map("published_at")
-  /// 배포자 ID (Operator)
-  publishedBy        Int?                     @map("published_by")
-  /// 활성화 여부
-  isActive           Boolean                  @default(true) @map("is_active")
-  createdAt          DateTime                 @default(now()) @map("created_at")
-  updatedAt          DateTime?                @updatedAt @map("updated_at")
-
-  healthTypeAnimal   HealthTypeAnimal?        @relation(fields: [healthTypeAnimalId], references: [id])
-  versions           SolutionScreenVersion[]  @relation("ScreenVersions")
-  publishedVersion   SolutionScreenVersion?   @relation("PublishedVersion", fields: [publishedVersionId], references: [id])
-
-  @@index([healthTypeAnimalId])
-  @@index([screenType])
-  @@map("solution_screens")
-}
-
-/// 솔루션 화면 버전 테이블
-/// screenKey당 DRAFT는 1개만 유지 (partial unique index 필요)
-model SolutionScreenVersion {
-  id            Int                         @id @default(autoincrement())
-  /// 화면 ID
-  screenId      Int                         @map("screen_id")
-  /// 버전 상태
-  status        SolutionScreenVersionStatus @default(DRAFT)
-  /// JSON payload (화면 콘텐츠)
-  payload       Json
-  /// 스키마 버전 (하위 호환성 관리용)
-  schemaVersion Int                         @default(1) @map("schema_version")
-  /// 작성자 ID (Operator)
-  createdBy     Int                         @map("created_by")
-  createdAt     DateTime                    @default(now()) @map("created_at")
-
-  screen        SolutionScreen              @relation("ScreenVersions", fields: [screenId], references: [id], onDelete: Cascade)
-  publishedFor  SolutionScreen?             @relation("PublishedVersion")
-
-  // NOTE: DRAFT 1개 제약은 마이그레이션에서 partial unique index로 직접 추가
-  // CREATE UNIQUE INDEX uq_screen_draft ON solution_screen_versions (screen_id) WHERE status = 'DRAFT';
-  @@index([screenId, status])
-  @@map("solution_screen_versions")
-}
-
-/// 성분 마스터 테이블
-/// 영양제 성분 정보 관리
-model Ingredient {
-  id        Int      @id @default(autoincrement())
-  /// 소문자 식별자 (payload, 템플릿에서 사용)
-  key       String   @unique @db.VarChar(50)
-  /// 대문자 코드 (레거시/표시용)
-  code      String   @unique @db.VarChar(50)
-  /// 성분 한글명
-  name      String   @db.VarChar(100)
-  /// 성분 영문명
-  nameEn    String?  @map("name_en") @db.VarChar(100)
-  /// 카테고리 (미네랄, 비타민, 추출물 등)
-  category  String?  @db.VarChar(50)
-  /// 정렬 순서
-  sortOrder Int      @default(0) @map("sort_order")
-  /// 활성화 여부
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([category])
-  @@map("ingredients")
-}
-
-/// 성분 순서 템플릿 테이블
-/// 화면별 성분 표시 순서 관리
-model IngredientOrderTemplate {
-  id              Int      @id @default(autoincrement())
-  /// 템플릿 고유 키
-  templateKey     String   @unique @map("template_key") @db.VarChar(50)
-  /// 템플릿 이름
-  name            String   @db.VarChar(100)
-  /// 성분 키 배열 (Ingredient.key 기준)
-  ingredientOrder String[] @map("ingredient_order")
-  /// 활성화 여부
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  @@map("ingredient_order_templates")
 }
