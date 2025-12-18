@@ -36,8 +36,11 @@ export class TodayBalanceGameResponseDto {
   // @ApiPropertyOptional({ description: '배경 이미지 URL' })
   // backgroundUrl?: string;
 
-  @ApiPropertyOptional({ description: '페르소나 이미지 URL' })
+  @ApiPropertyOptional({ description: '페르소나 이미지 URL (놀이터 1번 이미지)' })
   personaUrl?: string;
+
+  @ApiPropertyOptional({ description: '페르소나 상반신 배경 이미지 URL (놀이터 2번 이미지)' })
+  torsoBgUrl?: string;
 
   @ApiPropertyOptional({ description: '페르소나 이름', example: '뽀로로' })
   personaName?: string;

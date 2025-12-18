@@ -38,11 +38,12 @@ export class BalanceGameService {
       throw new NotFoundException('사용자에게 지정된 AI 페르소나가 없습니다');
     }
 
-    // 페르소나의 torsoBgUrl, name 조회
+    // 페르소나의 torsoBgUrl, personaUrl, name 조회
     const aiPersona = await this.prisma.aiPersona.findUnique({
       where: { id: user.aiPersonaId },
       select: {
         torsoBgUrl: true,
+        personaUrl: true,
         name: true
       }
     }); 
@@ -77,7 +78,8 @@ export class BalanceGameService {
       id: game.id,
       title: game.title,
       description: game.description,
-      personaUrl: aiPersona?.torsoBgUrl,
+      personaUrl: aiPersona?.personaUrl,
+      torsoBgUrl: aiPersona?.torsoBgUrl,
       personaName: aiPersona?.name,
       // thumbnailUrl: game.thumbnailUrl,
       // backgroundUrl: game.backgroundUrl,
