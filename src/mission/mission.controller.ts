@@ -133,6 +133,7 @@ export class MissionController {
       type?: string;
       recordType: string;
       dailyLimit?: number;
+      dailyTimeLimitMinutes?: number;
       specificDay?: number;
       totalDays?: number;
       uploadType?: string;
@@ -166,6 +167,7 @@ export class MissionController {
       type?: string;
       recordType?: string;
       dailyLimit?: number;
+      dailyTimeLimitMinutes?: number | null;
       specificDay?: number;
       totalDays?: number;
       uploadType?: string;

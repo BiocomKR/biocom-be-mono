@@ -141,6 +141,7 @@ export class MissionService {
     type?: string;
     recordType: string;
     dailyLimit?: number;
+    dailyTimeLimitMinutes?: number;
     specificDay?: number;
     totalDays?: number;
     uploadType?: string;
@@ -183,6 +184,7 @@ export class MissionService {
           type: data.type ?? 'MISSION',
           recordType: data.recordType,
           dailyLimit: data.dailyLimit ?? 1,
+          dailyTimeLimitMinutes: data.dailyTimeLimitMinutes,
           specificDay: data.specificDay,
           totalDays: data.totalDays ?? 21,
           uploadType: data.uploadType,
@@ -231,6 +233,7 @@ export class MissionService {
     type?: string;
     recordType?: string;
     dailyLimit?: number;
+    dailyTimeLimitMinutes?: number | null;
     specificDay?: number;
     totalDays?: number;
     uploadType?: string;

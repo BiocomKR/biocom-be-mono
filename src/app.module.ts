@@ -58,6 +58,8 @@ import { LogisticsLogController } from './logistics/logistics-log.controller';
 import { LogisticsLogService } from './logistics/logistics-log.service';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
+import { SolutionController } from './solution/solution.controller';
+import { SolutionService } from './solution/solution.service';
 
 /**
  * 애플리케이션 루트 모듈
@@ -122,6 +124,7 @@ import { OrdersService } from './orders/orders.service';
     BannerController,
     LogisticsLogController,
     OrdersController,
+    SolutionController,
   ],
   providers: [
     UsersService,
@@ -140,6 +143,7 @@ import { OrdersService } from './orders/orders.service';
     BannerService,
     LogisticsLogService,
     OrdersService,
+    SolutionService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
