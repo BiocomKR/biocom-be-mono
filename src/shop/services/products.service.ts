@@ -63,8 +63,8 @@ export class ProductsService {
   /**
    * 상품 상세 조회 (간소화 버전: 기본정보 + 리뷰요약 + Q&A요약)
    */
-  async findProductDetail(id: number): Promise<ProductDetailDto> {
-    this.logger.log(`상품 상세 조회 시작: ${id}`);
+  async findProductDetail(id: number, userId: number): Promise<ProductDetailDto> {
+    this.logger.log(`상품 상세 조회 시작: ${id}, userId: ${userId}`);
 
     // 상품 기본 정보 조회
     const product = await this.prisma.product.findFirst({
@@ -84,11 +84,12 @@ export class ProductsService {
       throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
-    // 리뷰 통계 조회
-    const reviewStats = await this.getReviewSummary(id);
-
-    // Q&A 통계 조회
-    const qnaStats = await this.getQnaSummary(id);
+    // 리뷰 통계 조회, Q&A 통계 조회, 구매 여부 확인을 병렬로 처리
+    const [reviewStats, qnaStats, hasPurchased] = await Promise.all([
+      this.getReviewSummary(id),
+      this.getQnaSummary(id),
+      this.checkUserPurchased(id, userId),
+    ]);
 
     // 이미지 URL 배열 생성
     const imageUrls = product.productFiles.map(pf => pf.file.filePath);
@@ -108,7 +109,27 @@ export class ProductsService {
       price: convertDecimalToNumber(product.price),
       reviewSummary: reviewStats,
       qnaSummary: qnaStats,
+      hasPurchased,
     };
+  }
+
+  /**
+   * 사용자의 상품 구매 여부 확인 (배송완료/구매확정된 주문 기준)
+   */
+  private async checkUserPurchased(productId: number, userId: number): Promise<boolean> {
+    const purchaseHistory = await this.prisma.orderItem.findFirst({
+      where: {
+        productId,
+        order: {
+          userId,
+          status: {
+            in: ['DELIVERED', 'COMPLETED']  // 배송완료 또는 구매확정
+          }
+        }
+      }
+    });
+
+    return !!purchaseHistory;
   }
 
   /**

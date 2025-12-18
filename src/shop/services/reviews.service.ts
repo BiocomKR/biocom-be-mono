@@ -46,6 +46,23 @@ export class ReviewsService {
       throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
+    // 구매 이력 확인 (배송완료/구매확정된 주문만)
+    const purchaseHistory = await this.prisma.orderItem.findFirst({
+      where: {
+        productId: dto.productId,
+        order: {
+          userId,
+          status: {
+            in: ['DELIVERED', 'COMPLETED']
+          }
+        }
+      }
+    });
+
+    if (!purchaseHistory) {
+      throw new BadRequestException('해당 상품을 구매한 이력이 없어 리뷰를 작성할 수 없습니다');
+    }
+
     // 해당 상품에 대한 사용자의 기존 리뷰 확인 (최초 리뷰인지 체크)
     const existingReviews = await this.prisma.productFeedback.findMany({
       where: {

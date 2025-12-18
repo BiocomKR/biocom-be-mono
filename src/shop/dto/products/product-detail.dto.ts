@@ -89,4 +89,7 @@ export class ProductDetailDto {
 
   @ApiProperty({ description: 'Q&A 요약 정보', type: QnaSummaryDto })
   qnaSummary: QnaSummaryDto;
+
+  @ApiProperty({ description: '현재 사용자의 구매 여부 (배송완료/구매확정된 주문 기준)', example: true })
+  hasPurchased: boolean;
 }

@@ -74,8 +74,12 @@ export class ProductsController {
   @ApiParam({ name: 'id', description: '상품 ID' })
   @ApiResponse({ status: 200, description: '성공', type: ProductDetailDto })
   @ApiResponse({ status: 404, description: '상품을 찾을 수 없습니다' })
-  async findOne(@Param('id', ParseIntPipe) id: number): Promise<ProductDetailDto> {
-    return this.productsService.findProductDetail(id);
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: any
+  ): Promise<ProductDetailDto> {
+    const userId = req.user.id;
+    return this.productsService.findProductDetail(id, userId);
   }
 
   /**
