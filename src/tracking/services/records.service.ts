@@ -112,7 +112,7 @@ export class RecordsService {
             const transformedMetadata = await this.transformRecordMetadata(type, typeRecords, userId, typeRecords[0].date);
 
             // 현재 기록 횟수 / 최대 기록 횟수 추가
-            const recordLimit = this.getRecordLimit(type, typeRecords);
+            const recordLimit = await this.getRecordLimit(type, typeRecords);
 
             result.push({
               id: typeRecords[0].id, // 대표 ID
@@ -129,7 +129,7 @@ export class RecordsService {
               typeRecords,
             );
 
-            const recordLimit = this.getRecordLimit(type, typeRecords);
+            const recordLimit = await this.getRecordLimit(type, typeRecords);
 
             result.push({
               id: typeRecords[0].id, // 대표 ID
@@ -145,7 +145,7 @@ export class RecordsService {
             const transformedMetadata = await this.transformRecordMetadata(type, record.metadata, userId, record.date);
 
             // 현재 기록 횟수 / 최대 기록 횟수 추가
-            const recordLimit = this.getRecordLimit(type, typeRecords);
+            const recordLimit = await this.getRecordLimit(type, typeRecords);
 
             result.push({
               id: record.id,
@@ -951,36 +951,15 @@ export class RecordsService {
    * @param recordType 기록 타입
    * @param records 해당 날짜의 해당 타입 기록 배열
    */
-  private getRecordLimit(recordType: string, records: any[]): { currentCount: number; maxCount: number } {
-    switch (recordType) {
-      case 'BEAUTY':
-        // 1일 1회
-        return { currentCount: records.length, maxCount: 1 };
+  private async getRecordLimit(recordType: string, records: any[]): Promise<{ currentCount: number; maxCount: number }> {
+    // missions 테이블에서 dailyLimit 조회
+    const mission = await this.prisma.mission.findUnique({
+      where: { recordType },
+      select: { dailyLimit: true },
+    });
 
-      case 'DIET':
-        // DIET는 식사별로 다름: 아침/점심/저녁 각 1회, 간식/야식 각 3회
-        // 여기서는 전체 기록 개수만 표시 (식사별 상세는 클라이언트에서 처리)
-        return { currentCount: records.length, maxCount: 9 }; // 아침1+점심1+저녁1+간식3+야식3 = 9
-
-      case 'SUPPLEMENT':
-        // 1일 10회
-        return { currentCount: records.length, maxCount: 10 };
-
-      case 'FASTING':
-        // 1일 1회
-        return { currentCount: records.length, maxCount: 1 };
-
-      case 'SLEEP':
-        // 1일 1회
-        return { currentCount: records.length, maxCount: 1 };
-
-      case 'ACTIVITY':
-        // 1일 5회
-        return { currentCount: records.length, maxCount: 5 };
-
-      default:
-        return { currentCount: records.length, maxCount: -1 };
-    }
+    const maxCount = mission?.dailyLimit ?? -1;
+    return { currentCount: records.length, maxCount };
   }
 
   /**
