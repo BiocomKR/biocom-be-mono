@@ -163,8 +163,24 @@ export class UsersService {
               points: true,
               aiPersonaId: true,
               mbti: true,
+              refundBankName: true,
+              refundAccountNo: true,
               createdAt: true,
               updatedAt: true,
+              addresses: {
+                where: { isDefault: true },
+                select: {
+                  id: true,
+                  alias: true,
+                  recipientName: true,
+                  recipientPhone: true,
+                  postalCode: true,
+                  address: true,
+                  addressDetail: true,
+                  isDefault: true,
+                },
+                take: 1,
+              },
             },
           });
 
