@@ -1236,6 +1236,8 @@ model AiPersona {
   thumbnailUrl     String?           @map("thumbnail_url") @db.VarChar(500)
   /// 페르소나 상반신 이미지 URL
   torsoUrl         String?           @map("torso_url") @db.VarChar(500)
+  /// 페르소나 상반신 배경 이미지 URL
+  torsoBgUrl       String?           @map("torso_bg_url") @db.VarChar(500)
   /// 시스템 프롬프트
   systemPrompt     String?           @map("system_prompt") @db.Text
   balanceGameSteps BalanceGameStep[]
