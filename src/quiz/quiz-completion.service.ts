@@ -44,18 +44,27 @@ export class QuizCompletionService {
           throw new NotFoundException('챌린지 미션을 찾을 수 없습니다');
         }
 
-        // 2️⃣ 퀴즈 조회 (quizId와 missionId 모두 검증)
-        const quiz = await tx.quiz.findFirst({
+        // 2️⃣ MissionQuiz를 통해 퀴즈 조회 (missionId, quizId, day 모두 검증)
+        const missionQuiz = await tx.missionQuiz.findFirst({
           where: {
-            id: dto.quizId,
             missionId: challengeMission.missionId,
+            quizId: dto.quizId,
             day: challengeMission.day,
             isActive: true
+          },
+          include: {
+            quiz: true
           }
         });
 
-        if (!quiz) {
+        if (!missionQuiz || !missionQuiz.quiz) {
           throw new NotFoundException('퀴즈를 찾을 수 없거나 챌린지 미션과 일치하지 않습니다');
+        }
+
+        const quiz = missionQuiz.quiz;
+
+        if (!quiz.isActive) {
+          throw new NotFoundException('비활성화된 퀴즈입니다');
         }
 
         // 3️⃣ 답변 번호 유효성 검증
@@ -309,18 +318,42 @@ export class QuizCompletionService {
       // activatedAt 기준으로 현재 챌린지 일차 계산
       const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
 
-      // 2️⃣ quizzes 테이블에서 오늘의 퀴즈 조회
-      const dailyQuiz = await this.prisma.quiz.findFirst({
+      // 2️⃣ ChallengeMission → Mission → MissionQuiz → Quiz 순으로 오늘의 퀴즈 조회
+      const challengeMission = await this.prisma.challengeMission.findFirst({
         where: {
+          productId: activeChallenge.productId,
           day: currentDay,
-          isActive: true
+          isActive: true,
+          mission: {
+            type: 'QUIZ'  // 퀴즈 타입 미션만
+          }
         },
         include: {
-          mission: true
+          mission: {
+            include: {
+              missionQuizzes: {
+                where: {
+                  day: currentDay,
+                  isActive: true
+                },
+                include: {
+                  quiz: true
+                },
+                orderBy: {
+                  sortOrder: 'asc'
+                },
+                take: 1  // 첫 번째 퀴즈만
+              }
+            }
+          }
         }
       });
 
-      if (!dailyQuiz) {
+      // 퀴즈가 없는 경우
+      const missionQuiz = challengeMission?.mission?.missionQuizzes?.[0];
+      const quiz = missionQuiz?.quiz;
+
+      if (!challengeMission || !missionQuiz || !quiz) {
         return {
           success: true,
           data: {
@@ -331,33 +364,19 @@ export class QuizCompletionService {
         };
       }
 
-      // 3️⃣ challengeMission 조회
-      const challengeMission = await this.prisma.challengeMission.findFirst({
-        where: {
-          productId: activeChallenge.productId,
-          missionId: dailyQuiz.missionId,
-          day: currentDay,
-          isActive: true
-        }
-      });
-
-      if (!challengeMission) {
-        this.logger.warn(`challenge_missions에 해당 퀴즈가 없음 - day: ${currentDay}, missionId: ${dailyQuiz.missionId}`);
-      }
-
-      this.logger.log(`오늘의 퀴즈 조회 완료 - ${dailyQuiz.question}`);
+      this.logger.log(`오늘의 퀴즈 조회 완료 - ${quiz.question}`);
 
       return {
         success: true,
         data: {
           currentDay,
           quiz: {
-            challengeMissionId: challengeMission?.id,
-            quizId: dailyQuiz.id,
-            question: dailyQuiz.question,
-            options: dailyQuiz.options,
-            explanation: dailyQuiz.explanation,
-            points: dailyQuiz.points
+            challengeMissionId: challengeMission.id,
+            quizId: quiz.id,
+            question: quiz.question,
+            options: quiz.options,
+            explanation: quiz.explanation,
+            points: quiz.points
           }
         }
       };
