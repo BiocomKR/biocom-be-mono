@@ -224,6 +224,7 @@ export class AiPersonaService {
       description: persona.description,
       personality: persona.personality,
       personaUrl: persona.personaUrl,
+      personaAnimationUrl: persona.personaAnimationUrl,
       thumbnailUrl: persona.thumbnailUrl,
       gender: persona.gender,
       introTitle: persona.introTitle,

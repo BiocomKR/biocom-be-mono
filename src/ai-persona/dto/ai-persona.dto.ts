@@ -103,8 +103,11 @@ export class AiPersonaResponseDto {
   @ApiPropertyOptional({ description: '페르소나 성격/대화 스타일' })
   personality?: string;
 
-  @ApiPropertyOptional({ description: '페르소나 이미지 URL' })
+  @ApiPropertyOptional({ description: '페르소나 이미지 URL (놀이터 1번 이미지)' })
   personaUrl?: string;
+
+  @ApiPropertyOptional({ description: '페르소나 애니메이션 URL (비디오)' })
+  personaAnimationUrl?: string;
 
   @ApiPropertyOptional({ description: '페르소나 썸네일 이미지 URL', example: 'https://example.com/thumbnail.png' })
   thumbnailUrl?: string;

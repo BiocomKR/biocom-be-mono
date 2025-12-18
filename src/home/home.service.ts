@@ -90,7 +90,7 @@ interface UserData {
   aiPersonaId: number | null;
   health_type_animal_id: number | null;
   isFirstAppEntry: boolean;
-  aiPersona: { id: number; name: string; personaUrl: string | null } | null;
+  aiPersona: { id: number; name: string; personaAnimationUrl: string | null } | null;
   healthTypeAnimal: {
     id: number;
     animalName: string;
@@ -207,7 +207,7 @@ export class HomeService {
         health_type_animal_id: true,
         isFirstAppEntry: true,
         aiPersona: {
-          select: { id: true, name: true, personaUrl: true },
+          select: { id: true, name: true, personaAnimationUrl: true },
         },
         healthTypeAnimal: {
           select: {
@@ -328,7 +328,7 @@ export class HomeService {
 
     return {
       name: aiPersona.name,
-      imageUrl: aiPersona.personaUrl || '',
+      imageUrl: aiPersona.personaAnimationUrl || '',
     };
   }
 

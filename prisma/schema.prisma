@@ -1197,8 +1197,10 @@ model AiPersona {
   description      String?
   /// 페르소나 성격/대화 스타일
   personality      String?
-  /// 페르소나 이미지 URL
+  /// 페르소나 이미지 URL (놀이터 1번 이미지)
   personaUrl       String?           @map("persona_url") @db.VarChar(500)
+  /// 페르소나 애니메이션 URL (기존 비디오)
+  personaAnimationUrl String?        @map("persona_animation_url") @db.VarChar(500)
   /// 활성화 여부
   isActive         Boolean           @default(true) @map("is_active")
   /// 정렬 순서
@@ -1241,6 +1243,8 @@ model AiPersona {
   systemPrompt     String?           @map("system_prompt")
   /// 인사말 (성별 통합)
   greeting         String?
+  /// 챌린지 시작 멘트 (페르소나별)
+  challengeDescription String?       @map("challenge_description")
   balanceGameSteps BalanceGameStep[]
   users            User[]
 
