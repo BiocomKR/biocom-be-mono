@@ -42,6 +42,7 @@ import { ConsentModule } from './consent/consent.module';
 import { ExamModule } from './exam/exam.module';
 import { QuizModule } from './quiz/quiz.module';
 import { QueuesModule } from './queues/queues.module';
+import { IssueModule } from './issue/issue.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -120,6 +121,7 @@ import { QueuesModule } from './queues/queues.module';
     ConsentModule,    // 약관 관리 모듈
     ExamModule,       // 검사 결과 모듈
     QuizModule,       // 퀴즈 모듈
+    IssueModule,      // 문제 신고 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [

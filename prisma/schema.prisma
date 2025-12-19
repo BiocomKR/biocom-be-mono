@@ -70,6 +70,7 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
+  issueReports                 IssueReport[]
 
   @@map("users")
 }
@@ -3003,4 +3004,29 @@ enum SolutionScreenVersionStatus {
   PUBLISHED
   /// 보관됨
   ARCHIVED
+}
+
+/// 문제 신고 테이블
+model IssueReport {
+  /// 신고 ID
+  id          Int       @id @default(autoincrement())
+  /// 사용자 ID
+  userId      Int       @map("user_id")
+  /// 신고 내용
+  content     String    @db.Text
+  /// 관리자 답변
+  answer      String?   @db.Text
+  /// 답변 일시
+  answeredAt  DateTime? @map("answered_at")
+  /// 앱 버전
+  appVersion  String?   @map("app_version") @db.VarChar(20)
+  /// 디바이스 정보
+  deviceInfo  String?   @map("device_info") @db.VarChar(200)
+  /// 생성일시
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([userId], map: "idx_issue_reports_user_id")
+  @@map("issue_reports")
 }
