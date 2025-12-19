@@ -60,6 +60,9 @@ import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { SolutionController } from './solution/solution.controller';
 import { SolutionService } from './solution/solution.service';
+import { UtilsModule } from './utils/utils.module';
+import { IssueController } from './issue/issue.controller';
+import { IssueService } from './issue/issue.service';
 
 /**
  * 애플리케이션 루트 모듈
@@ -106,6 +109,7 @@ import { SolutionService } from './solution/solution.service';
     AppVersionModule, // 앱 버전 관리 모듈
     HealthTypeAnimalsModule, // 건강 타입 동물 관리 모듈
     QueuesModule,     // BullMQ 메시지 큐 모듈
+    UtilsModule,      // 유틸리티 모듈 (이미지 변환 등)
   ],
   controllers: [
     UsersController,
@@ -125,6 +129,7 @@ import { SolutionService } from './solution/solution.service';
     LogisticsLogController,
     OrdersController,
     SolutionController,
+    IssueController,
   ],
   providers: [
     UsersService,
@@ -144,6 +149,7 @@ import { SolutionService } from './solution/solution.service';
     LogisticsLogService,
     OrdersService,
     SolutionService,
+    IssueService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
