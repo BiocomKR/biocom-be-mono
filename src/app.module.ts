@@ -43,7 +43,6 @@ import { ExamModule } from './exam/exam.module';
 import { QuizModule } from './quiz/quiz.module';
 import { QueuesModule } from './queues/queues.module';
 import { IssueModule } from './issue/issue.module';
-import { EasUpdatesModule } from './eas-updates/eas-updates.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -123,7 +122,6 @@ import { EasUpdatesModule } from './eas-updates/eas-updates.module';
     ExamModule,       // 검사 결과 모듈
     QuizModule,       // 퀴즈 모듈
     IssueModule,      // 문제 신고 모듈
-    EasUpdatesModule, // OTA 업데이트 모듈 (자체 호스팅)
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [
