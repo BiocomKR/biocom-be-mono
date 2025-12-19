@@ -301,18 +301,35 @@ export class PointService {
 
   /**
    * 포인트 내역 조회
-   * 
+   *
    * @param userId 사용자 ID
    * @param limit 조회 개수
    * @param offset 시작 위치
+   * @param startDate 시작 날짜 (YYYY-MM-DD)
+   * @param endDate 종료 날짜 (YYYY-MM-DD)
    */
   async getHistory(
     userId: number,
     limit: number = 20,
     offset: number = 0,
+    startDate?: string,
+    endDate?: string,
   ): Promise<any[]> {
+    const where: any = { userId };
+
+    // 날짜 필터 적용
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
+      }
+    }
+
     return await this.prisma.pointHistory.findMany({
-      where: { userId },
+      where,
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
@@ -321,14 +338,27 @@ export class PointService {
 
   /**
    * 포인트 내역 전체 개수 조회
-   * 
+   *
    * @param userId 사용자 ID
+   * @param startDate 시작 날짜 (YYYY-MM-DD)
+   * @param endDate 종료 날짜 (YYYY-MM-DD)
    * @returns 전체 거래 내역 개수
    */
-  async getHistoryCount(userId: number): Promise<number> {
-    return await this.prisma.pointHistory.count({
-      where: { userId }
-    });
+  async getHistoryCount(userId: number, startDate?: string, endDate?: string): Promise<number> {
+    const where: any = { userId };
+
+    // 날짜 필터 적용
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
+      }
+    }
+
+    return await this.prisma.pointHistory.count({ where });
   }
 
   /**

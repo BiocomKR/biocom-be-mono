@@ -61,14 +61,16 @@ export class PointController {
    * @returns 포인트 거래 내역
    */
   @Get('history')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: '포인트 거래 내역 조회',
-    description: '현재 로그인한 사용자의 포인트 거래 내역을 조회합니다.'
+    description: '현재 로그인한 사용자의 포인트 거래 내역을 조회합니다. 날짜 필터를 사용하여 특정 기간의 내역만 조회할 수 있습니다.'
   })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '조회할 개수 (기본: 20)' })
   @ApiQuery({ name: 'offset', required: false, type: Number, description: '시작 위치 (기본: 0)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiQuery({ name: 'startDate', required: false, type: String, description: '시작 날짜 (YYYY-MM-DD 형식)', example: '2024-01-01' })
+  @ApiQuery({ name: 'endDate', required: false, type: String, description: '종료 날짜 (YYYY-MM-DD 형식)', example: '2024-12-31' })
+  @ApiResponse({
+    status: 200,
     description: '포인트 거래 내역 목록',
     schema: {
       example: {
@@ -94,15 +96,17 @@ export class PointController {
     @Req() req: any,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset: number,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     const userId = req.user.id;
-    this.logger.log(`포인트 내역 조회 - 사용자: ${userId}, limit: ${limit}, offset: ${offset}`);
-    
-    const items = await this.pointService.getHistory(userId, limit, offset);
-    
+    this.logger.log(`포인트 내역 조회 - 사용자: ${userId}, limit: ${limit}, offset: ${offset}, startDate: ${startDate}, endDate: ${endDate}`);
+
+    const items = await this.pointService.getHistory(userId, limit, offset, startDate, endDate);
+
     // 전체 개수 조회 (페이지네이션용)
-    const total = await this.pointService.getHistoryCount(userId);
-    
+    const total = await this.pointService.getHistoryCount(userId, startDate, endDate);
+
     return {
       items,
       total,
