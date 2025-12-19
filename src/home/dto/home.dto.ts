@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { YesNo } from '../../common/enums';
+import { UserSubscriptionStatus } from '../../common/enums/user-subscription-status.enum';
 
 /**
  * 검사 결과 정보 DTO (SIB API 연동)
@@ -116,6 +117,13 @@ export class ChallengeInfoDto {
  * 홈 화면 응답 DTO
  */
 export class HomeResponseDto {
+  @ApiProperty({
+    description: '사용자 타입',
+    enum: UserSubscriptionStatus,
+    example: UserSubscriptionStatus.NEWCOMER,
+  })
+  userType: UserSubscriptionStatus;
+
   @ApiProperty({ description: '검사 결과 정보 (지연성 알러지)' })
   reportInfo: ReportInfoDto;
 

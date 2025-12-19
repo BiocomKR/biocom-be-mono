@@ -169,6 +169,7 @@ export class HomeService {
       const { startDate, endDate } = this.getChallengeDates(challenges);
 
       return {
+        userType: user.status as UserSubscriptionStatus,
         reportInfo: {
           chartId: reportInfo.chartId,
           resultYN: reportInfo.resultYN,
