@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, MaxLength, IsArray, IsInt } from 'class-validator';
 
 export class CreateIssueReportDto {
   @ApiProperty({ description: '신고 내용', example: '홈 화면에서 앱이 종료됩니다.' })
@@ -7,6 +7,12 @@ export class CreateIssueReportDto {
   @IsNotEmpty()
   @MaxLength(1000)
   content: string;
+
+  @ApiPropertyOptional({ description: '첨부파일 ID 배열', example: [1, 2], type: [Number] })
+  @IsArray()
+  @IsInt({ each: true })
+  @IsOptional()
+  fileIds?: number[];
 
   @ApiPropertyOptional({ description: '앱 버전', example: '1.0.0' })
   @IsString()

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { CreateIssueReportDto } from './dto/create-issue-report.dto';
-import { IssueReportResponseDto, IssueReportListResponseDto } from './dto/issue-report-response.dto';
+import { IssueReportResponseDto, IssueReportListResponseDto, FileInfoDto } from './dto/issue-report-response.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 
 @Injectable()
@@ -20,6 +20,7 @@ export class IssueService {
       data: {
         userId,
         content: dto.content,
+        fileIds: dto.fileIds || [],
         appVersion: dto.appVersion,
         deviceInfo: dto.deviceInfo,
         createdAt: getNowKST(),
@@ -49,8 +50,22 @@ export class IssueService {
       }),
     ]);
 
+    // 모든 fileIds 수집
+    const allFileIds = items.flatMap((item: any) => item.fileIds || []);
+
+    // 파일 정보 일괄 조회
+    const files = allFileIds.length > 0
+      ? await this.prisma.file.findMany({
+          where: { id: { in: allFileIds } },
+          select: { id: true, filePath: true, originalName: true },
+        })
+      : [];
+
+    // fileId -> File 매핑
+    const fileMap = new Map<number, any>(files.map((f: any) => [f.id, f]));
+
     return {
-      items: items.map(this.toResponseDto),
+      items: items.map((report: any) => this.toResponseDto(report, fileMap)),
       total,
     };
   }
@@ -58,10 +73,18 @@ export class IssueService {
   /**
    * 엔티티를 응답 DTO로 변환
    */
-  private toResponseDto(report: any): IssueReportResponseDto {
+  private toResponseDto(report: any, fileMap: Map<number, any>): IssueReportResponseDto {
+    const fileInfos: FileInfoDto[] = (report.fileIds || [])
+      .map((fileId: number) => {
+        const file = fileMap.get(fileId);
+        return file ? { id: file.id, url: file.filePath, originalName: file.originalName } : null;
+      })
+      .filter((f: FileInfoDto | null): f is FileInfoDto => f !== null);
+
     return {
       id: report.id,
       content: report.content,
+      files: fileInfos,
       answer: report.answer,
       answeredAt: report.answeredAt,
       appVersion: report.appVersion,

@@ -1,11 +1,25 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export class FileInfoDto {
+  @ApiProperty({ description: '파일 ID' })
+  id: number;
+
+  @ApiProperty({ description: '파일 URL' })
+  url: string;
+
+  @ApiProperty({ description: '원본 파일명' })
+  originalName: string;
+}
+
 export class IssueReportResponseDto {
   @ApiProperty({ description: '신고 ID' })
   id: number;
 
   @ApiProperty({ description: '신고 내용' })
   content: string;
+
+  @ApiPropertyOptional({ description: '첨부파일 목록', type: [FileInfoDto] })
+  files: FileInfoDto[];
 
   @ApiPropertyOptional({ description: '관리자 답변' })
   answer: string | null;

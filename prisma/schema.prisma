@@ -3014,6 +3014,8 @@ model IssueReport {
   userId      Int       @map("user_id")
   /// 신고 내용
   content     String    @db.Text
+  /// 첨부파일 ID 배열
+  fileIds     Int[]     @default([]) @map("file_ids")
   /// 관리자 답변
   answer      String?   @db.Text
   /// 답변 일시
