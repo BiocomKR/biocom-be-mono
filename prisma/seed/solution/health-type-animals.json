@@ -1,6 +1,6 @@
 [
   {
-    "healthType": "penguin",
+    "healthType": "GUT_HEALTH",
     "typeName": "장 건강 저하",
     "animalName": "배 빵빵 펭귄",
     "description": "장내 미생물 불균형으로 장-피부 축(Gut-Skin Axis)에 문제가 생긴 장 건강 저하형입니다.",
@@ -68,7 +68,7 @@
     }
   },
   {
-    "healthType": "hedgehog",
+    "healthType": "IMMUNE_BALANCE",
     "typeName": "면역 과민 반응",
     "animalName": "예민한 고슴도치",
     "description": "우리 몸을 지키는 면역계가 너무 예민해져, 사소한 자극에도 피부에 가려움과 붉은 반응을 일으키는 면역 과민 반응형입니다.",
@@ -136,7 +136,7 @@
     }
   },
   {
-    "healthType": "fox",
+    "healthType": "SKIN_HEALTH",
     "typeName": "염증 과다",
     "animalName": "화끈한 불여우",
     "description": "염증 스위치가 남들보다 쉽게 켜지고(ON) 잘 꺼지지 않는(OFF) 유형입니다.",
@@ -204,7 +204,7 @@
     }
   },
   {
-    "healthType": "polarbear",
+    "healthType": "METABOLISM",
     "typeName": "대사 저하 / 인슐린 저항성",
     "animalName": "동면 중인 북극곰",
     "description": "인슐린 저항성으로 피부 노화와 탄력 저하뿐 아니라 만성 피로를 겪는 유형입니다.",

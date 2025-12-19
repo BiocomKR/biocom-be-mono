@@ -148,6 +148,9 @@ export class AiPersonaResponseDto {
   @ApiPropertyOptional({ description: '친밀도 이미지 URL', example: 'https://example.com/intimacy.png' })
   intimacyImageUrl?: string;
 
+  @ApiPropertyOptional({ description: '챌린지 시작 멘트', example: '오늘부터 21일 챌린지를 함께 시작해볼까요?' })
+  challengeDescription?: string;
+
   @ApiProperty({ description: '활성화 여부', example: true })
   isActive: boolean;
 

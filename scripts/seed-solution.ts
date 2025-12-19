@@ -122,6 +122,96 @@ async function seedHealthTypeAnimalMetadata() {
   }
 }
 
+async function seedHealthTypeAnimalProducts() {
+  console.log('💊 HealthTypeAnimalProduct (영양제 추천) 시드 시작...');
+
+  const data = loadJson<
+    Array<{
+      healthType: string;
+      products: Array<{
+        productId: number;
+        type: string;
+        priority: number;
+        keyword: string;
+        recommendReason: string;
+        dosage: string;
+        mechanisms: object[];
+      }>;
+    }>
+  >('health-type-animal-products.json');
+
+  for (const healthTypeData of data) {
+    // healthTypeAnimalId 조회
+    const [animal] = await prisma.$queryRaw<[{ id: number }]>`
+      SELECT "id" FROM "health_type_animals" WHERE "health_type" = ${healthTypeData.healthType}
+    `;
+
+    if (!animal) {
+      console.log(`  ⚠️ ${healthTypeData.healthType} 건강유형을 찾을 수 없습니다.`);
+      continue;
+    }
+
+    // displayOrder 카운터 (type별로 구분)
+    let supplementOrder = 0;
+    let dietOrder = 100;
+
+    for (const product of healthTypeData.products) {
+      const mechanismsJson = JSON.stringify(product.mechanisms);
+
+      // SUPPLEMENT는 1~99, DIET는 100~199
+      const displayOrder = product.type === 'DIET'
+        ? ++dietOrder
+        : ++supplementOrder;
+
+      await prisma.$executeRaw`
+        INSERT INTO "health_type_animal_products" (
+          "health_type_animal_id", "product_id", "type", "priority",
+          "keyword", "recommend_reason", "dosage", "mechanisms", "display_order", "is_active"
+        )
+        VALUES (
+          ${animal.id}, ${product.productId}, ${product.type}, ${product.priority},
+          ${product.keyword}, ${product.recommendReason}, ${product.dosage}, ${mechanismsJson}::jsonb, ${displayOrder}, true
+        )
+        ON CONFLICT ("health_type_animal_id", "product_id") DO UPDATE SET
+          "type" = EXCLUDED."type",
+          "priority" = EXCLUDED."priority",
+          "keyword" = EXCLUDED."keyword",
+          "recommend_reason" = EXCLUDED."recommend_reason",
+          "dosage" = EXCLUDED."dosage",
+          "mechanisms" = EXCLUDED."mechanisms",
+          "display_order" = EXCLUDED."display_order",
+          "is_active" = EXCLUDED."is_active"
+      `;
+
+      console.log(`  ✅ ${healthTypeData.healthType} - Product ID ${product.productId} (${product.keyword})`);
+    }
+  }
+}
+
+async function seedLunchboxIngredients() {
+  console.log('🍱 도시락 식재료 시드 시작...');
+
+  const lunchboxes = loadJson<
+    Array<{
+      productId: number;
+      name: string;
+      ingredients: string[];
+    }>
+  >('lunchbox-ingredients.json');
+
+  for (const lunchbox of lunchboxes) {
+    const metadata = JSON.stringify({ ingredients: lunchbox.ingredients });
+
+    await prisma.$executeRaw`
+      UPDATE "products"
+      SET "metadata" = ${metadata}::jsonb
+      WHERE "id" = ${lunchbox.productId}
+    `;
+
+    console.log(`  ✅ ${lunchbox.name} (${lunchbox.ingredients.length}개 식재료)`);
+  }
+}
+
 async function main() {
   console.log('🌱 맞춤 솔루션 시드 시작...\n');
 
@@ -133,6 +223,12 @@ async function main() {
     console.log('');
 
     await seedHealthTypeAnimalMetadata();
+    console.log('');
+
+    await seedHealthTypeAnimalProducts();
+    console.log('');
+
+    await seedLunchboxIngredients();
     console.log('');
 
     console.log('🎉 맞춤 솔루션 시드 완료!');

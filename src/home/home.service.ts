@@ -404,8 +404,9 @@ export class HomeService {
   }
 
   /**
-   * 미션 진행도 업데이트 (CHALLENGER만)
-   * user_records 테이블에서 당일 기록을 조회하여 진행도 계산
+   * 미션 진행도 업데이트 (CHALLENGER, SUBSCRIBER)
+   * - current: 포인트 지급 횟수 (user_missions.pointsEarned > 0)
+   * - executed: 실행 횟수 (user_records 카운트)
    */
   private async updateMissionProgress(
     userId: number,
@@ -415,59 +416,61 @@ export class HomeService {
     const today = getKoreanToday();
     const todayDate = new Date(today);
 
-    // user_records에서 당일 기록 조회
-    const todayRecords = await this.prisma.userRecord.findMany({
-      where: {
-        userId,
-        date: todayDate,
-      },
-      select: {
-        recordType: true,
-        metadata: true,
-      },
-    });
+    // 병렬로 조회: user_records (실행 횟수), user_missions (포인트 지급 횟수)
+    const [todayRecords, todayMissions] = await Promise.all([
+      // 실행 횟수 조회
+      this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          date: todayDate,
+        },
+        select: {
+          recordType: true,
+          metadata: true,
+        },
+      }),
+      // 포인트 지급 횟수 조회
+      this.prisma.userMission.findMany({
+        where: {
+          userId,
+          createdAt: {
+            gte: todayDate,
+            lt: new Date(todayDate.getTime() + 24 * 60 * 60 * 1000),
+          },
+          pointsEarned: { gt: 0 },
+        },
+        select: {
+          challengeMission: {
+            select: {
+              mission: {
+                select: { recordType: true },
+              },
+            },
+          },
+        },
+      }),
+    ]);
 
-    // recordType별 기록 횟수 계산
-    const progressMap = new Map<string, number>();
-
-    // 기록 타입별 집계
+    // recordType별 실행 횟수 계산
+    const executedMap = new Map<string, number>();
     for (const record of todayRecords) {
       const recordType = record.recordType;
-      const currentCount = progressMap.get(recordType) || 0;
-
-      // DIET는 식사 유형별로 개별 카운트 (아침, 점심, 저녁, 간식, 야식)
-      if (recordType === 'DIET') {
-        progressMap.set(recordType, currentCount + 1);
-      } else {
-        // 나머지는 1회만 완료로 처리 (BEAUTY, FASTING, SLEEP 등)
-        progressMap.set(recordType, 1);
-      }
+      const currentCount = executedMap.get(recordType) || 0;
+      executedMap.set(recordType, currentCount + 1);
     }
 
-    // SUPPLEMENT는 실제 섭취 여부(morning/afternoon/evening) 체크
-    const supplementRecords = todayRecords.filter((r: { recordType: string }) => r.recordType === 'SUPPLEMENT');
-    if (supplementRecords.length > 0) {
-      let supplementIntakeCount = 0;
-      for (const record of supplementRecords) {
-        const metadata = record.metadata as any;
-        if (metadata?.morning || metadata?.afternoon || metadata?.evening) {
-          supplementIntakeCount++;
-        }
-      }
-      if (supplementIntakeCount > 0) {
-        progressMap.set('SUPPLEMENT', supplementIntakeCount);
-      }
-    }
-
-    // ACTIVITY는 기록 횟수 그대로 사용
-    const activityCount = todayRecords.filter((r: { recordType: string }) => r.recordType === 'ACTIVITY').length;
-    if (activityCount > 0) {
-      progressMap.set('ACTIVITY', activityCount);
+    // recordType별 포인트 지급 횟수 계산
+    const currentMap = new Map<string, number>();
+    for (const mission of todayMissions) {
+      const recordType = mission.challengeMission.mission.recordType;
+      const currentCount = currentMap.get(recordType) || 0;
+      currentMap.set(recordType, currentCount + 1);
     }
 
     return missionList.map((m) => ({
       ...m,
-      current: progressMap.get(m.recordType) || 0,
+      current: currentMap.get(m.recordType) || 0,
+      executed: executedMap.get(m.recordType) || 0,
     }));
   }
 

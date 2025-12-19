@@ -77,11 +77,14 @@ export class MissionItemDto {
   @ApiProperty({ description: '포인트', example: 100 })
   point: number;
 
-  @ApiPropertyOptional({ description: '일일 최대 수행 횟수 (null이면 무제한)', example: 1 })
+  @ApiPropertyOptional({ description: '일일 최대 포인트 지급 횟수 (null이면 무제한)', example: 3 })
   max: number | null;
 
-  @ApiProperty({ description: '오늘 수행한 횟수', example: 0 })
+  @ApiProperty({ description: '오늘 포인트 지급 횟수', example: 0 })
   current: number;
+
+  @ApiProperty({ description: '오늘 실행 횟수', example: 0 })
+  executed: number;
 
   @ApiProperty({ description: '기록유형', example: 'DIET' })
   recordType: string;

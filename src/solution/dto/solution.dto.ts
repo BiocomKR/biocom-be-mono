@@ -21,26 +21,14 @@ export class LineupDto {
 }
 
 /**
- * 알레르겐 응답 DTO
+ * 식재료 레벨 정보 DTO (음식물 과민증 검사 결과 기반)
  */
-export class IngredientDto {
-  @ApiProperty({ description: '알레르겐 ID' })
-  id: number;
+export class IngredientLevelDto {
+  @ApiProperty({ description: '1-3단계 식재료 (안전)', type: [String] })
+  safe: string[];
 
-  @ApiProperty({ description: '알레르겐 키 (milk, soybean 등)' })
-  key: string;
-
-  @ApiProperty({ description: '알레르겐 코드' })
-  code: string;
-
-  @ApiProperty({ description: '알레르겐명' })
-  name: string;
-
-  @ApiPropertyOptional({ description: '영문명' })
-  nameEn?: string;
-
-  @ApiPropertyOptional({ description: '카테고리' })
-  category?: string;
+  @ApiProperty({ description: '4-5단계 식재료 (주의)', type: [String] })
+  caution: string[];
 }
 
 /**
@@ -64,9 +52,9 @@ export class NutritionDto {
 }
 
 /**
- * 추천 상품 DTO (영양제/식단 공통)
+ * 영양제 추천 상품 DTO
  */
-export class RecommendProductDto {
+export class SupplementProductDto {
   @ApiProperty({ description: '상품 ID' })
   id: number;
 
@@ -76,29 +64,58 @@ export class RecommendProductDto {
   @ApiPropertyOptional({ description: '상품 이미지' })
   thumbnail?: string;
 
-  @ApiPropertyOptional({ description: '추천 키워드' })
+  @ApiPropertyOptional({ description: '추천 키워드 (맞춤 포뮬러, 장건강 등)' })
   keyword?: string;
 
   @ApiPropertyOptional({ description: '추천 이유' })
   recommendReason?: string;
 
-  @ApiPropertyOptional({ description: '복용량/섭취량' })
+  @ApiPropertyOptional({ description: '복용량' })
   dosage?: string;
 
-  @ApiPropertyOptional({ description: '작용기전 목록' })
-  mechanisms?: string[];
+  @ApiPropertyOptional({ description: '작용기전 목록 (시너지 효과)' })
+  mechanisms?: any[];
 
-  @ApiPropertyOptional({ description: '우선순위' })
-  priority?: number;
+  @ApiProperty({ description: '정렬 순서' })
+  displayOrder: number;
+}
 
-  @ApiPropertyOptional({ description: '라인업 정보 (식단용)', type: LineupDto })
-  lineup?: LineupDto;
+/**
+ * 식단 추천 상품 DTO
+ */
+export class DietProductDto {
+  @ApiProperty({ description: '상품 ID' })
+  id: number;
 
-  @ApiPropertyOptional({ description: '영양 정보 (식단용)', type: NutritionDto })
+  @ApiProperty({ description: '상품명' })
+  name: string;
+
+  @ApiPropertyOptional({ description: '상품 이미지' })
+  thumbnail?: string;
+
+  @ApiPropertyOptional({ description: '추천 이유' })
+  recommendReason?: string;
+
+  @ApiPropertyOptional({ description: '섭취량' })
+  dosage?: string;
+
+  @ApiProperty({ description: '라인업 정보', type: LineupDto })
+  lineup: LineupDto;
+
+  @ApiPropertyOptional({ description: '영양 정보', type: NutritionDto })
   nutrition?: NutritionDto;
 
-  @ApiPropertyOptional({ description: '포함된 알레르겐 (식단용)', type: [IngredientDto] })
-  allergens?: IngredientDto[];
+  @ApiPropertyOptional({ description: '전체 식재료 목록', type: [String] })
+  ingredients?: string[];
+
+  @ApiPropertyOptional({ description: '식재료 레벨 정보 (음식물 과민증 결과 기반)', type: IngredientLevelDto })
+  ingredientLevels?: IngredientLevelDto;
+
+  @ApiProperty({ description: '섭취 가능 여부 (4,5단계 식재료 미포함 시 true)' })
+  isEdible: boolean;
+
+  @ApiProperty({ description: '정렬 순서' })
+  displayOrder: number;
 }
 
 /**
@@ -132,51 +149,18 @@ export class HealthTypeAnimalDto {
 }
 
 /**
- * 탭별 추천 목록 DTO
- */
-export class TabRecommendationsDto {
-  @ApiProperty({ description: 'CORE 추천 상품', type: [RecommendProductDto] })
-  core: RecommendProductDto[];
-
-  @ApiProperty({ description: 'PLUS 추천 상품', type: [RecommendProductDto] })
-  plus: RecommendProductDto[];
-
-  @ApiProperty({ description: 'CONDITION 추천 상품', type: [RecommendProductDto] })
-  condition: RecommendProductDto[];
-}
-
-/**
  * 맞춤 솔루션 전체 응답 DTO
  */
 export class SolutionResponseDto {
   @ApiProperty({ description: '건강유형 동물 정보', type: HealthTypeAnimalDto })
   animal: HealthTypeAnimalDto;
 
-  @ApiProperty({ description: '영양제 추천 목록', type: TabRecommendationsDto })
-  supplements: TabRecommendationsDto;
+  @ApiProperty({ description: '영양제 추천 목록', type: [SupplementProductDto] })
+  supplements: SupplementProductDto[];
 
-  @ApiProperty({ description: '식단 추천 목록', type: TabRecommendationsDto })
-  diets: TabRecommendationsDto;
+  @ApiProperty({ description: '식단 추천 목록', type: [DietProductDto] })
+  diets: DietProductDto[];
 
   @ApiProperty({ description: '라인업 목록 (식단 필터용)', type: [LineupDto] })
   lineups: LineupDto[];
-
-  @ApiProperty({ description: '알레르겐 목록 (식단 필터용)', type: [IngredientDto] })
-  allergens: IngredientDto[];
-
-  @ApiPropertyOptional({ description: '조건부 추천 (메타드림/리셋데이)' })
-  conditionalProducts?: {
-    metadream?: {
-      productId: number;
-      name: string;
-      description: string;
-      thumbnail?: string;
-    };
-    resetDay?: {
-      productId: number;
-      name: string;
-      description: string;
-      thumbnail?: string;
-    };
-  };
 }
