@@ -151,5 +151,8 @@ export class HomeResponseDto {
 
   @ApiProperty({ description: '챌린지 종료 후 첫 방문 여부 (COMPLETED 후 최초 1회)', example: false })
   isFirstVisitAfterChallengeEnd: boolean;
+
+  @ApiProperty({ description: '챌린지 이력이 있는 뉴커머 여부 (과거 챌린지 완료했으나 현재 진행 중인 챌린지 없음)', example: false })
+  hasCompletedChallengeHistory: boolean;
 }
 

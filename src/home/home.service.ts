@@ -509,6 +509,7 @@ export class HomeService {
     isFirstVisitAsNewcomer: boolean;
     isFirstVisitAfterChallengeStart: boolean;
     isFirstVisitAfterChallengeEnd: boolean;
+    hasCompletedChallengeHistory: boolean;
   } {
     // 뉴커머 첫 방문
     const isFirstVisitAsNewcomer =
@@ -553,10 +554,18 @@ export class HomeService {
       });
     }
 
+    // 챌린지 이력이 있는 뉴커머 (과거 챌린지 완료했으나 현재 진행 중인 챌린지 없음)
+    const hasCompletedChallengeHistory =
+      user.status === UserSubscriptionStatus.NEWCOMER &&
+      !!challenges.completed &&
+      !challenges.active &&
+      !challenges.pending;
+
     return {
       isFirstVisitAsNewcomer,
       isFirstVisitAfterChallengeStart,
       isFirstVisitAfterChallengeEnd,
+      hasCompletedChallengeHistory,
     };
   }
 
