@@ -1,0 +1,225 @@
+[
+  {
+    "key": "milk",
+    "code": "MILK",
+    "name": "우유",
+    "nameEn": "Milk",
+    "category": "유제품",
+    "sortOrder": 1,
+    "aliases": ["원유", "우유단백"]
+  },
+  {
+    "key": "cheese",
+    "code": "CHEESE",
+    "name": "치즈",
+    "nameEn": "Cheese",
+    "category": "유제품",
+    "sortOrder": 2
+  },
+  {
+    "key": "yogurt",
+    "code": "YOGURT",
+    "name": "요거트",
+    "nameEn": "Yogurt",
+    "category": "유제품",
+    "sortOrder": 3
+  },
+  {
+    "key": "soybean",
+    "code": "SOYBEAN",
+    "name": "대두",
+    "nameEn": "Soybean",
+    "category": "콩류",
+    "sortOrder": 10,
+    "aliases": ["대두콩", "대두(간장,두부)"]
+  },
+  {
+    "key": "peanut",
+    "code": "PEANUT",
+    "name": "땅콩",
+    "nameEn": "Peanut",
+    "category": "견과류",
+    "sortOrder": 20,
+    "aliases": ["낙화생"]
+  },
+  {
+    "key": "almond",
+    "code": "ALMOND",
+    "name": "아몬드",
+    "nameEn": "Almond",
+    "category": "견과류",
+    "sortOrder": 21
+  },
+  {
+    "key": "walnut",
+    "code": "WALNUT",
+    "name": "호두",
+    "nameEn": "Walnut",
+    "category": "견과류",
+    "sortOrder": 22
+  },
+  {
+    "key": "cashew",
+    "code": "CASHEW",
+    "name": "캐슈넛",
+    "nameEn": "Cashew",
+    "category": "견과류",
+    "sortOrder": 23
+  },
+  {
+    "key": "wheat",
+    "code": "WHEAT",
+    "name": "밀",
+    "nameEn": "Wheat",
+    "category": "곡류",
+    "sortOrder": 30,
+    "aliases": ["소맥", "밀가루"]
+  },
+  {
+    "key": "gluten",
+    "code": "GLUTEN",
+    "name": "글루텐",
+    "nameEn": "Gluten",
+    "category": "곡류",
+    "sortOrder": 31
+  },
+  {
+    "key": "oat",
+    "code": "OAT",
+    "name": "귀리",
+    "nameEn": "Oat",
+    "category": "곡류",
+    "sortOrder": 32
+  },
+  {
+    "key": "shrimp",
+    "code": "SHRIMP",
+    "name": "새우",
+    "nameEn": "Shrimp",
+    "category": "갑각류",
+    "sortOrder": 40,
+    "aliases": ["새우류"]
+  },
+  {
+    "key": "crab",
+    "code": "CRAB",
+    "name": "게",
+    "nameEn": "Crab",
+    "category": "갑각류",
+    "sortOrder": 41,
+    "aliases": ["게류"]
+  },
+  {
+    "key": "squid",
+    "code": "SQUID",
+    "name": "오징어",
+    "nameEn": "Squid",
+    "category": "연체류",
+    "sortOrder": 42
+  },
+  {
+    "key": "mackerel",
+    "code": "MACKEREL",
+    "name": "고등어",
+    "nameEn": "Mackerel",
+    "category": "생선",
+    "sortOrder": 43
+  },
+  {
+    "key": "salmon",
+    "code": "SALMON",
+    "name": "연어",
+    "nameEn": "Salmon",
+    "category": "생선",
+    "sortOrder": 44
+  },
+  {
+    "key": "beef",
+    "code": "BEEF",
+    "name": "소고기",
+    "nameEn": "Beef",
+    "category": "육류",
+    "sortOrder": 50
+  },
+  {
+    "key": "pork",
+    "code": "PORK",
+    "name": "돼지고기",
+    "nameEn": "Pork",
+    "category": "육류",
+    "sortOrder": 51
+  },
+  {
+    "key": "chicken",
+    "code": "CHICKEN",
+    "name": "닭고기",
+    "nameEn": "Chicken",
+    "category": "육류",
+    "sortOrder": 52
+  },
+  {
+    "key": "egg",
+    "code": "EGG",
+    "name": "계란",
+    "nameEn": "Egg",
+    "category": "계란",
+    "sortOrder": 60,
+    "aliases": ["달걀", "계란(전란)"]
+  },
+  {
+    "key": "egg_white",
+    "code": "EGG_WHITE",
+    "name": "계란 흰자",
+    "nameEn": "Egg White",
+    "category": "계란",
+    "sortOrder": 61
+  },
+  {
+    "key": "egg_yolk",
+    "code": "EGG_YOLK",
+    "name": "계란 노른자",
+    "nameEn": "Egg Yolk",
+    "category": "계란",
+    "sortOrder": 62
+  },
+  {
+    "key": "tomato",
+    "code": "TOMATO",
+    "name": "토마토",
+    "nameEn": "Tomato",
+    "category": "채소",
+    "sortOrder": 70
+  },
+  {
+    "key": "onion",
+    "code": "ONION",
+    "name": "양파",
+    "nameEn": "Onion",
+    "category": "채소",
+    "sortOrder": 71
+  },
+  {
+    "key": "garlic",
+    "code": "GARLIC",
+    "name": "마늘",
+    "nameEn": "Garlic",
+    "category": "채소",
+    "sortOrder": 72
+  },
+  {
+    "key": "apple",
+    "code": "APPLE",
+    "name": "사과",
+    "nameEn": "Apple",
+    "category": "과일",
+    "sortOrder": 73
+  },
+  {
+    "key": "banana",
+    "code": "BANANA",
+    "name": "바나나",
+    "nameEn": "Banana",
+    "category": "과일",
+    "sortOrder": 74
+  }
+]

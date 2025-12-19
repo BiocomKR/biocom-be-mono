@@ -43,6 +43,7 @@ import { ExamModule } from './exam/exam.module';
 import { QuizModule } from './quiz/quiz.module';
 import { QueuesModule } from './queues/queues.module';
 import { IssueModule } from './issue/issue.module';
+import { SolutionModule } from './solution/solution.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -122,6 +123,7 @@ import { IssueModule } from './issue/issue.module';
     ExamModule,       // 검사 결과 모듈
     QuizModule,       // 퀴즈 모듈
     IssueModule,      // 문제 신고 모듈
+    SolutionModule,   // 맞춤 솔루션 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [
