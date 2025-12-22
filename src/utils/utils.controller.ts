@@ -136,8 +136,9 @@ export class UtilsController {
     const archive = archiver('zip', { zlib: { level: 9 } });
     archive.pipe(res);
 
+    const now = getNowKST();
     for (let i = 0; i < buffers.length; i++) {
-      archive.append(buffers[i], { name: results[i].convertedName });
+      archive.append(buffers[i], { name: results[i].convertedName, date: now });
     }
 
     await archive.finalize();

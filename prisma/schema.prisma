@@ -2952,6 +2952,8 @@ model ProductLineup {
   name        String    @db.VarChar(100)
   /// 설명
   description String?
+  /// 대표 이미지 URL
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
   /// 정렬 순서
   sortOrder   Int       @default(0) @map("sort_order")
   /// 활성화 여부

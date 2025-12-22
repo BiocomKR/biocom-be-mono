@@ -459,12 +459,6 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 사용자 주소 테이블
   get userAddress() { return this.prisma.userAddress; }
 
-  // 맞춤 솔루션 테이블
-  get solutionScreen() { return this.prisma.solutionScreen; }
-  get solutionScreenVersion() { return this.prisma.solutionScreenVersion; }
-  get ingredient() { return this.prisma.ingredient; }
-  get ingredientOrderTemplate() { return this.prisma.ingredientOrderTemplate; }
-
   // 문제 신고 테이블
   get issueReport() { return this.prisma.issueReport; }
 
