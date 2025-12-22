@@ -9,10 +9,12 @@ import {
   ChallengeInfoDto,
   MissionItemDto,
   BannerInfoDto,
+  HomeBannerLinkType,
 } from './dto/home.dto';
+import { AppConfigService } from '../app-config/app-config.service';
+import { SurveyType } from '../common/enums';
 import { getNowKST, getKoreanToday } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
-import { BannersService } from '../shop/services/banners.service';
 import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
 
 /** 캐시 TTL (1분) */
@@ -112,8 +114,8 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sibApiService: SibApiService,
-    private readonly bannersService: BannersService,
     private readonly missionService: MissionService,
+    private readonly appConfigService: AppConfigService,
   ) {}
 
   /**
@@ -142,15 +144,27 @@ export class HomeService {
         throw new Error('사용자를 찾을 수 없습니다');
       }
 
-      // 2. 각 데이터 구성 (병렬 처리 가능한 것은 병렬로)
-      const [reportInfo, banner] = await Promise.all([
-        this.getReportInfo(userId, user),
-        this.getHomeBanner(user.id),
-      ]);
+      // 2. 검사 결과 정보 조회
+      const reportInfo = await this.getReportInfo(userId, user);
 
       // 3. 챌린지 관련 데이터 처리
       const challenges = this.getChallengesByStatus(user.userChallenges);
       const challengeDays = this.calculateChallengeDays(challenges);
+
+      // 4. 사전문진 완료 여부 확인
+      const hasPreSurvey = await this.checkPreSurveyCompleted(userId);
+
+      // 5. 조건별 홈 배너 조회
+      const banner = await this.getChallengeBanner({
+        userId,
+        userStatus: user.status as UserSubscriptionStatus,
+        hasPurchase: user.userChallenges.length > 0,
+        hasResult: reportInfo.resultYN === YesNo.Y,
+        hasPreSurvey,
+        hasChallengeStart: !!challenges.active,
+        personaImageUrl: user.aiPersona?.personaAnimationUrl || null,
+        healthTypeAnimalId: user.health_type_animal_id,
+      });
 
       // 4. 미션 목록 조회 및 진행도 업데이트
       let missionList = await this.getMissionList(userId, user.status, challenges, challengeDays);
@@ -574,29 +588,146 @@ export class HomeService {
   }
 
   /**
-   * 홈 배너 정보 조회
+   * 사전문진 완료 여부 확인
    */
-  private async getHomeBanner(userId?: number): Promise<BannerInfoDto> {
-    const banners = await this.bannersService.getActiveBanners('HOME', userId);
+  private async checkPreSurveyCompleted(userId: number): Promise<boolean> {
+    const count = await this.prisma.surveyAnswer.count({
+      where: {
+        userId,
+        type: SurveyType.BEFORE,
+      },
+    });
+    return count > 0;
+  }
 
-    if (banners.length > 0) {
-      const banner = banners[0];
+  /**
+   * 조건별 홈 배너 정보 조회
+   *
+   * 조건 우선순위:
+   * 1. 구매 이력 없음 → 챌린지 소개
+   * 2. 결과지 없음 → 챌린지 소개
+   * 3. 사전문진 미완료 → 사전문진 유도
+   * 4. 챌린지 시작일 미설정 → 시작일 설정 유도
+   * 5. 챌린지 진행 중 (CHALLENGER) → 강의 이동
+   * 6. 구독자 (SUBSCRIBER) → 추천 영양제
+   * 7. 챌린지 종료 후 (NEWCOMER) → 설정된 콘텐츠
+   */
+  private async getChallengeBanner(context: {
+    userId: number;
+    userStatus: UserSubscriptionStatus;
+    hasPurchase: boolean;
+    hasResult: boolean;
+    hasPreSurvey: boolean;
+    hasChallengeStart: boolean;
+    personaImageUrl: string | null;
+    healthTypeAnimalId: number | null;
+  }): Promise<BannerInfoDto> {
+    const {
+      userId,
+      userStatus,
+      hasPurchase,
+      hasResult,
+      hasPreSurvey,
+      hasChallengeStart,
+      personaImageUrl,
+      healthTypeAnimalId,
+    } = context;
+
+    // 기본 이미지 (페르소나 설정 전)
+    const defaultImageUrl = '';
+    // 페르소나 설정 후에는 페르소나 이미지 사용
+    const bannerImageUrl = personaImageUrl || defaultImageUrl;
+
+    // 1. 구매 이력 없음 OR 결과지 없음 → 챌린지 소개
+    if (!hasPurchase || !hasResult) {
       return {
-        title: banner.title,
-        description: banner.description || undefined,
-        imageUrl: banner.imageUrl,
-        linkUrl: banner.linkUrl,
-        linkType: banner.linkType,
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 >',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.CHALLENGE_INTRO,
+        targetId: null,
+        externalUrl: null,
       };
     }
 
+    // 2. 사전문진 미완료 → 사전문진 유도
+    if (!hasPreSurvey) {
+      return {
+        title: '1분 유형분류 문진하고',
+        description: '맞춤 솔루션 보러가기 >',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.PRE_SURVEY,
+        targetId: null,
+        externalUrl: null,
+      };
+    }
+
+    // 3. 챌린지 시작일 미설정 → 시작일 설정 유도
+    if (!hasChallengeStart) {
+      return {
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 >',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.CHALLENGE_START,
+        targetId: null,
+        externalUrl: null,
+      };
+    }
+
+    // 4. 챌린지 진행 중 (CHALLENGER) → 강의 이동
+    if (userStatus === UserSubscriptionStatus.CHALLENGER) {
+      const contentId = await this.appConfigService.getNumberValue('CHALLENGER_BANNER_CONTENT_ID');
+      return {
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 >',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.CONTENT,
+        targetId: contentId,
+        externalUrl: null,
+      };
+    }
+
+    // 5. 구독자 (SUBSCRIBER) → 추천 영양제 (1순위)
+    if (userStatus === UserSubscriptionStatus.SUBSCRIBER) {
+      const topProductId = await this.getTopRecommendedProductId(healthTypeAnimalId);
+      return {
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 >',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.PRODUCT,
+        targetId: topProductId,
+        externalUrl: null,
+      };
+    }
+
+    // 6. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 설정된 콘텐츠
+    const newcomerContentId = await this.appConfigService.getNumberValue('NEWCOMER_BANNER_CONTENT_ID');
     return {
-      title: '오늘의 건강 콘텐츠',
-      description: '건강한 하루를 시작해보세요',
-      imageUrl: '',
-      linkUrl: null,
-      linkType: 'INTERNAL',
+      title: '미션 수행하고 30,000P 받으세요',
+      description: '이너뷰티 챌린지 >',
+      imageUrl: bannerImageUrl,
+      linkType: HomeBannerLinkType.CONTENT,
+      targetId: newcomerContentId,
+      externalUrl: null,
     };
+  }
+
+  /**
+   * 동물 유형별 1순위 추천 제품 ID 조회
+   */
+  private async getTopRecommendedProductId(healthTypeAnimalId: number | null): Promise<number | null> {
+    if (!healthTypeAnimalId) return null;
+
+    const topProduct = await this.prisma.healthTypeAnimalProduct.findFirst({
+      where: {
+        healthTypeAnimalId,
+        isActive: true,
+      },
+      orderBy: { displayOrder: 'asc' },
+      select: { productId: true },
+    });
+
+    return topProduct?.productId || null;
   }
 
   /**

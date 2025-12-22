@@ -42,23 +42,48 @@ export class PersonaInfoDto {
 }
 
 /**
+ * 홈 배너 링크 타입
+ */
+export enum HomeBannerLinkType {
+  /** 챌린지 소개 페이지 */
+  CHALLENGE_INTRO = 'CHALLENGE_INTRO',
+  /** 사전 문진 */
+  PRE_SURVEY = 'PRE_SURVEY',
+  /** 챌린지 시작일 설정 */
+  CHALLENGE_START = 'CHALLENGE_START',
+  /** 콘텐츠(강의) 상세 */
+  CONTENT = 'CONTENT',
+  /** 상품 상세 */
+  PRODUCT = 'PRODUCT',
+  /** 외부 URL */
+  EXTERNAL = 'EXTERNAL',
+}
+
+/**
  * 배너 정보 DTO
  */
 export class BannerInfoDto {
-  @ApiProperty({ description: '배너 제목', example: '오늘의 건강 팁' })
+  @ApiProperty({ description: '배너 제목', example: '미션 수행하고 30,000P 받으세요' })
   title: string;
 
-  @ApiPropertyOptional({ description: '배너 설명', example: '10살 어려지는 식단 비법' })
+  @ApiPropertyOptional({ description: '배너 설명 (서브타이틀)', example: '이너뷰티 챌린지 >' })
   description?: string;
 
   @ApiProperty({ description: '배너 이미지 URL', example: 'https://...' })
   imageUrl: string;
 
-  @ApiPropertyOptional({ description: '클릭 시 이동 URL', example: '/content/1' })
-  linkUrl: string | null;
+  @ApiProperty({
+    description: '링크 타입',
+    example: 'CHALLENGE_INTRO',
+    enum: HomeBannerLinkType,
+  })
+  linkType: HomeBannerLinkType;
 
-  @ApiProperty({ description: '링크 타입', example: 'INTERNAL', enum: ['INTERNAL', 'EXTERNAL', 'PRODUCT'] })
-  linkType: string;
+  @ApiPropertyOptional({ description: '이동 대상 ID (콘텐츠ID, 상품ID 등)', example: 123 })
+  targetId?: number | null;
+
+  @ApiPropertyOptional({ description: '외부 URL (linkType이 EXTERNAL일 때)', example: 'https://example.com' })
+  externalUrl?: string | null;
 }
 
 /**

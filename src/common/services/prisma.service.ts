@@ -450,6 +450,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get ingredientAlias() { return this.prisma.ingredientAlias; }
   get productIngredient() { return this.prisma.productIngredient; }
 
+  // 앱 설정 테이블
+  get appConfig() { return this.prisma.appConfig; }
+
   // 메서드 바인딩
   $transaction(arg: any) {
     return (this.prisma as any).$transaction(arg);
