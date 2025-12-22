@@ -89,11 +89,25 @@ export class SolutionService {
       foodLevelResult = await this.getFoodLevelResult(user.mobile);
     }
 
-    // 5. 영양제 추천 목록 (type = 'SUPPLEMENT')
+    // metadata에서 intakeGuide 추출
+    const metadata = healthTypeAnimal.metadata as {
+      intakeGuide?: {
+        diet?: { routine?: string; synergy?: string };
+        supplement?: { formula?: string };
+      };
+      dietRecommendation?: {
+        lunch?: { lineupKey?: string };
+        dinner?: { lineupKey?: string };
+      };
+    } | null;
+
+    // 5. 영양제 추천 목록 (type = 'SUPPLEMENT') - formula 포함
+    const supplementFormula = metadata?.intakeGuide?.supplement?.formula;
     const supplements = this.mapSupplements(
       healthTypeAnimal.recommendedProducts.filter(
         (rp) => rp.type === 'SUPPLEMENT',
       ),
+      supplementFormula,
     );
 
     // 6. 식단 추천 목록 (type = 'DIET') - SIB 결과 포함
@@ -105,11 +119,15 @@ export class SolutionService {
     // 7. 라인업 목록 조회
     const lineups = await this.getLineups();
 
+    // 8. 식단 섭취 가이드 (별도 필드)
+    const dietGuide = metadata?.intakeGuide?.diet;
+
     return {
       animal,
       supplements,
       diets,
       lineups,
+      dietGuide: dietGuide?.routine || dietGuide?.synergy ? dietGuide : undefined,
     };
   }
 
@@ -120,6 +138,18 @@ export class SolutionService {
     // 썸네일 이미지는 images 관계에서 가져옴
     const thumbnailImage = healthTypeAnimal.images?.[0]?.file?.filePath;
 
+    // intakeGuide, dietRecommendation은 lineups와 supplements로 이동했으므로 제외
+    const rawMetadata = healthTypeAnimal.metadata as {
+      synergyEffects?: any[];
+      intakeGuide?: any;
+      dietRecommendation?: any;
+    } | null;
+
+    // synergyEffects만 포함
+    const metadata = rawMetadata?.synergyEffects
+      ? { synergyEffects: rawMetadata.synergyEffects }
+      : undefined;
+
     return {
       healthType: healthTypeAnimal.healthType,
       typeName: healthTypeAnimal.typeName,
@@ -127,7 +157,7 @@ export class SolutionService {
       description: healthTypeAnimal.description || undefined,
       solution: healthTypeAnimal.solution || undefined,
       imageUrl: thumbnailImage || healthTypeAnimal.imageUrl || undefined,
-      metadata: healthTypeAnimal.metadata as any,
+      metadata,
     };
   }
 
@@ -135,11 +165,18 @@ export class SolutionService {
    * 영양제 추천 목록 매핑
    * - displayOrder 순 정렬
    * - keyword로 슬라이드바 구분 (맞춤 포뮬러, 장건강 등)
+   * - 맞춤포뮬러인 경우 formula 설명 추가
    */
-  private mapSupplements(recommendedProducts: any[]): SupplementProductDto[] {
+  private mapSupplements(
+    recommendedProducts: any[],
+    supplementFormula?: string,
+  ): SupplementProductDto[] {
     return recommendedProducts.map((rp) => {
       const product = rp.product;
       const thumbnail = product.images?.[0]?.imageUrl || undefined;
+
+      // 맞춤포뮬러 키워드인 경우에만 formula 추가
+      const isCustomFormula = rp.keyword === '맞춤포뮬러';
 
       return {
         id: product.id,
@@ -153,6 +190,7 @@ export class SolutionService {
         recommendReason: rp.recommendReason || undefined,
         dosage: rp.dosage || undefined,
         mechanisms: Array.isArray(rp.mechanisms) ? rp.mechanisms : undefined,
+        formula: isCustomFormula ? supplementFormula : undefined,
         displayOrder: rp.displayOrder,
       };
     });
@@ -189,7 +227,7 @@ export class SolutionService {
         isEdible = ingredientLevels.caution.length === 0;
       }
 
-      // 라인업 정보
+      // 라인업 정보 (가격 포함)
       const lineup = product.lineup
         ? {
             id: product.lineup.id,
@@ -197,6 +235,12 @@ export class SolutionService {
             name: product.lineup.name,
             description: product.lineup.description || undefined,
             sortOrder: product.lineup.sortOrder,
+            originalPrice: product.lineup.originalPrice
+              ? Number(product.lineup.originalPrice)
+              : undefined,
+            price: product.lineup.price
+              ? Number(product.lineup.price)
+              : undefined,
           }
         : {
             id: 0,
@@ -256,6 +300,8 @@ export class SolutionService {
       name: l.name,
       description: l.description || undefined,
       sortOrder: l.sortOrder,
+      originalPrice: l.originalPrice ? Number(l.originalPrice) : undefined,
+      price: l.price ? Number(l.price) : undefined,
     }));
   }
 

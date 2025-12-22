@@ -18,6 +18,13 @@ export class LineupDto {
 
   @ApiProperty({ description: '정렬 순서' })
   sortOrder: number;
+
+  @ApiPropertyOptional({ description: '정가' })
+  originalPrice?: number;
+
+  @ApiPropertyOptional({ description: '할인가' })
+  price?: number;
+
 }
 
 /**
@@ -81,6 +88,9 @@ export class SupplementProductDto {
 
   @ApiPropertyOptional({ description: '작용기전 목록 (시너지 효과)' })
   mechanisms?: any[];
+
+  @ApiPropertyOptional({ description: '맞춤 포뮬러 설명 (건강유형별, keyword가 맞춤포뮬러인 경우)' })
+  formula?: string;
 
   @ApiProperty({ description: '정렬 순서' })
   displayOrder: number;
@@ -161,6 +171,17 @@ export class HealthTypeAnimalDto {
 }
 
 /**
+ * 식단 섭취 가이드 DTO
+ */
+export class DietGuideDto {
+  @ApiPropertyOptional({ description: '섭취 루틴 (예: 최소 2주간 점심은 저포드맵, 저녁은 오리지널로...)' })
+  routine?: string;
+
+  @ApiPropertyOptional({ description: '시너지 효과 설명' })
+  synergy?: string;
+}
+
+/**
  * 맞춤 솔루션 전체 응답 DTO
  */
 export class SolutionResponseDto {
@@ -175,4 +196,7 @@ export class SolutionResponseDto {
 
   @ApiProperty({ description: '라인업 목록 (식단 필터용)', type: [LineupDto] })
   lineups: LineupDto[];
+
+  @ApiPropertyOptional({ description: '식단 섭취 가이드 (건강유형별)', type: DietGuideDto })
+  dietGuide?: DietGuideDto;
 }
