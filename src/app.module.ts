@@ -44,6 +44,7 @@ import { QuizModule } from './quiz/quiz.module';
 import { QueuesModule } from './queues/queues.module';
 import { IssueModule } from './issue/issue.module';
 import { SolutionModule } from './solution/solution.module';
+import { AppConfigModule } from './app-config/app-config.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -124,6 +125,7 @@ import { SolutionModule } from './solution/solution.module';
     QuizModule,       // 퀴즈 모듈
     IssueModule,      // 문제 신고 모듈
     SolutionModule,   // 맞춤 솔루션 모듈
+    AppConfigModule,  // 앱 설정 관리 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [

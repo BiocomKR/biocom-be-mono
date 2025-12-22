@@ -3036,6 +3036,32 @@ model ingredient_order_templates {
   created_at       DateTime @default(now())
 }
 
+/// 앱 설정 테이블
+/// 시스템 전역 설정값 관리 (배너 설정, API 키 등)
+/// 민감정보는 isEncrypted=true로 암호화 저장
+model AppConfig {
+  id          Int       @id @default(autoincrement())
+  /// 설정 키 (고유)
+  configKey   String    @unique @map("config_key") @db.VarChar(100)
+  /// 설정 값 (암호화된 경우 암호문 저장)
+  configValue String?   @map("config_value") @db.Text
+  /// 값 타입 (STRING, NUMBER, JSON, BOOLEAN)
+  valueType   String    @default("STRING") @map("value_type") @db.VarChar(20)
+  /// 암호화 여부 (민감정보는 true)
+  isEncrypted Boolean   @default(false) @map("is_encrypted")
+  /// 설명
+  description String?   @db.VarChar(255)
+  /// 활성화 여부
+  isActive    Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt   DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("app_configs")
+}
+
 /// AI 페르소나 성별 Enum
 enum Gender {
   M
