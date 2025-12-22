@@ -63,6 +63,7 @@ import { SolutionService } from './solution/solution.service';
 import { UtilsModule } from './utils/utils.module';
 import { IssueController } from './issue/issue.controller';
 import { IssueService } from './issue/issue.service';
+import { AppConfigModule } from './app-config/app-config.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -110,6 +111,7 @@ import { IssueService } from './issue/issue.service';
     HealthTypeAnimalsModule, // 건강 타입 동물 관리 모듈
     QueuesModule,     // BullMQ 메시지 큐 모듈
     UtilsModule,      // 유틸리티 모듈 (이미지 변환 등)
+    AppConfigModule,  // 앱 설정 관리 모듈
   ],
   controllers: [
     UsersController,
