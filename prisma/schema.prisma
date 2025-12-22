@@ -568,6 +568,8 @@ model UserChallenge {
   isFirstEntry        Boolean         @default(true) @map("is_first_entry")
   /// 챌린지 종료 후 첫 접속 여부 (true: 첫 접속, false: 재접속)
   isFirstChallengeEnd Boolean         @default(true) @map("is_first_challenge_end")
+  /// 시작일 설정 시점 (null = 미설정)
+  startDateSetAt      DateTime?       @map("start_date_set_at")
   dailyProgress       DailyProgress[]
   surveyAnswers       SurveyAnswer[]
   product             Product         @relation(fields: [productId], references: [id])
