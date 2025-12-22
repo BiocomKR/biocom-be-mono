@@ -9,6 +9,7 @@ import {
   ProcessRefundDto,
   ProcessExchangeReturnDto,
 } from './dto/order-action.dto';
+import { RefundService } from '../refund/refund.service';
 
 /**
  * 주문 관리 서비스
@@ -17,7 +18,10 @@ import {
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly refundService: RefundService,
+  ) {}
 
   /**
    * 주문 목록 조회
@@ -159,6 +163,9 @@ export class OrdersService {
 
   /**
    * 주문 상태 변경
+   *
+   * CANCEL_REQUESTED → CANCELLED: RefundService.approveRefund() 호출
+   * (PG 환불, 포인트 복구, 쿠폰 복구, 티켓 취소 자동 처리)
    */
   async updateStatus(id: number, dto: UpdateOrderStatusDto, operatorId?: number) {
     const order = await this.prisma.order.findUnique({
@@ -169,13 +176,29 @@ export class OrdersService {
       throw new NotFoundException('주문을 찾을 수 없습니다.');
     }
 
+    // CANCEL_REQUESTED → CANCELLED: RefundService로 처리
+    if (order.status === 'CANCEL_REQUESTED' && dto.status === 'CANCELLED') {
+      const pendingRefund = await this.prisma.refund.findFirst({
+        where: { orderId: id, status: 'REQUESTED' },
+      });
+
+      if (pendingRefund) {
+        const result = await this.refundService.approveRefund(
+          pendingRefund.id,
+          dto.reason || '관리자 취소 승인',
+        );
+        this.logger.log(`취소 승인 완료: orderId=${id}, refundId=${pendingRefund.id}`);
+        return { success: true, ...result };
+      }
+      this.logger.warn(`CANCEL_REQUESTED 주문에 Refund 없음: orderId=${id}`);
+    }
+
     const now = getNowKST();
     const updates: any = {
       status: dto.status,
       updatedAt: now,
     };
 
-    // 상태별 타임스탬프 업데이트
     if (dto.status === 'SHIPPING' && !order.shippedAt) {
       updates.shippedAt = now;
     }

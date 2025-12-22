@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsIn, IsInt, Min, Max, IsOptional } from 'class-validator';
 
 export const SUPPORTED_INPUT_FORMATS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tiff', 'avif'] as const;
@@ -26,6 +27,7 @@ export class ImageConvertDto {
     maximum: 100,
   })
   @IsOptional()
+  @Transform(({ value }) => (value ? parseInt(value, 10) : undefined))
   @IsInt()
   @Min(1)
   @Max(100)
