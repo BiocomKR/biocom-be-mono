@@ -9,10 +9,12 @@ import {
   ChallengeInfoDto,
   MissionItemDto,
   BannerInfoDto,
+  HomeBannerLinkType,
 } from './dto/home.dto';
+import { AppConfigService } from '../app-config/app-config.service';
+import { SurveyType } from '../common/enums';
 import { getNowKST, getKoreanToday } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
-import { BannersService } from '../shop/services/banners.service';
 import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
 
 /** 캐시 TTL (1분) */
@@ -112,8 +114,8 @@ export class HomeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sibApiService: SibApiService,
-    private readonly bannersService: BannersService,
     private readonly missionService: MissionService,
+    private readonly appConfigService: AppConfigService,
   ) {}
 
   /**
@@ -142,15 +144,28 @@ export class HomeService {
         throw new Error('사용자를 찾을 수 없습니다');
       }
 
-      // 2. 각 데이터 구성 (병렬 처리 가능한 것은 병렬로)
-      const [reportInfo, banner] = await Promise.all([
-        this.getReportInfo(userId, user),
-        this.getHomeBanner(user.id),
-      ]);
+      // 2. 검사 결과 정보 조회
+      const reportInfo = await this.getReportInfo(userId, user);
 
       // 3. 챌린지 관련 데이터 처리
       const challenges = this.getChallengesByStatus(user.userChallenges);
       const challengeDays = this.calculateChallengeDays(challenges);
+
+      // 4. 사전문진 완료 여부 확인
+      const hasPreSurvey = await this.checkPreSurveyCompleted(userId);
+
+      // 5. 조건별 홈 배너 조회
+      const banner = await this.getChallengeBanner({
+        userId,
+        userStatus: user.status as UserSubscriptionStatus,
+        hasPurchase: user.userChallenges.length > 0,
+        hasResult: reportInfo.resultYN === YesNo.Y,
+        hasPreSurvey,
+        hasChallengeStart: !!challenges.active,
+        personaImageUrl: user.aiPersona?.personaAnimationUrl || null,
+        healthTypeAnimalId: user.health_type_animal_id,
+        animalName: user.healthTypeAnimal?.animalName || null,
+      });
 
       // 4. 미션 목록 조회 및 진행도 업데이트
       let missionList = await this.getMissionList(userId, user.status, challenges, challengeDays);
@@ -404,8 +419,9 @@ export class HomeService {
   }
 
   /**
-   * 미션 진행도 업데이트 (CHALLENGER만)
-   * user_records 테이블에서 당일 기록을 조회하여 진행도 계산
+   * 미션 진행도 업데이트 (CHALLENGER, SUBSCRIBER)
+   * - current: 포인트 지급 횟수 (user_missions.pointsEarned > 0)
+   * - executed: 실행 횟수 (user_records 카운트)
    */
   private async updateMissionProgress(
     userId: number,
@@ -415,59 +431,61 @@ export class HomeService {
     const today = getKoreanToday();
     const todayDate = new Date(today);
 
-    // user_records에서 당일 기록 조회
-    const todayRecords = await this.prisma.userRecord.findMany({
-      where: {
-        userId,
-        date: todayDate,
-      },
-      select: {
-        recordType: true,
-        metadata: true,
-      },
-    });
+    // 병렬로 조회: user_records (실행 횟수), user_missions (포인트 지급 횟수)
+    const [todayRecords, todayMissions] = await Promise.all([
+      // 실행 횟수 조회
+      this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          date: todayDate,
+        },
+        select: {
+          recordType: true,
+          metadata: true,
+        },
+      }),
+      // 포인트 지급 횟수 조회
+      this.prisma.userMission.findMany({
+        where: {
+          userId,
+          createdAt: {
+            gte: todayDate,
+            lt: new Date(todayDate.getTime() + 24 * 60 * 60 * 1000),
+          },
+          pointsEarned: { gt: 0 },
+        },
+        select: {
+          challengeMission: {
+            select: {
+              mission: {
+                select: { recordType: true },
+              },
+            },
+          },
+        },
+      }),
+    ]);
 
-    // recordType별 기록 횟수 계산
-    const progressMap = new Map<string, number>();
-
-    // 기록 타입별 집계
+    // recordType별 실행 횟수 계산
+    const executedMap = new Map<string, number>();
     for (const record of todayRecords) {
       const recordType = record.recordType;
-      const currentCount = progressMap.get(recordType) || 0;
-
-      // DIET는 식사 유형별로 개별 카운트 (아침, 점심, 저녁, 간식, 야식)
-      if (recordType === 'DIET') {
-        progressMap.set(recordType, currentCount + 1);
-      } else {
-        // 나머지는 1회만 완료로 처리 (BEAUTY, FASTING, SLEEP 등)
-        progressMap.set(recordType, 1);
-      }
+      const currentCount = executedMap.get(recordType) || 0;
+      executedMap.set(recordType, currentCount + 1);
     }
 
-    // SUPPLEMENT는 실제 섭취 여부(morning/afternoon/evening) 체크
-    const supplementRecords = todayRecords.filter((r: { recordType: string }) => r.recordType === 'SUPPLEMENT');
-    if (supplementRecords.length > 0) {
-      let supplementIntakeCount = 0;
-      for (const record of supplementRecords) {
-        const metadata = record.metadata as any;
-        if (metadata?.morning || metadata?.afternoon || metadata?.evening) {
-          supplementIntakeCount++;
-        }
-      }
-      if (supplementIntakeCount > 0) {
-        progressMap.set('SUPPLEMENT', supplementIntakeCount);
-      }
-    }
-
-    // ACTIVITY는 기록 횟수 그대로 사용
-    const activityCount = todayRecords.filter((r: { recordType: string }) => r.recordType === 'ACTIVITY').length;
-    if (activityCount > 0) {
-      progressMap.set('ACTIVITY', activityCount);
+    // recordType별 포인트 지급 횟수 계산
+    const currentMap = new Map<string, number>();
+    for (const mission of todayMissions) {
+      const recordType = mission.challengeMission.mission.recordType;
+      const currentCount = currentMap.get(recordType) || 0;
+      currentMap.set(recordType, currentCount + 1);
     }
 
     return missionList.map((m) => ({
       ...m,
-      current: progressMap.get(m.recordType) || 0,
+      current: currentMap.get(m.recordType) || 0,
+      executed: executedMap.get(m.recordType) || 0,
     }));
   }
 
@@ -571,29 +589,177 @@ export class HomeService {
   }
 
   /**
-   * 홈 배너 정보 조회
+   * 사전문진 완료 여부 확인
    */
-  private async getHomeBanner(userId?: number): Promise<BannerInfoDto> {
-    const banners = await this.bannersService.getActiveBanners('HOME', userId);
+  private async checkPreSurveyCompleted(userId: number): Promise<boolean> {
+    const count = await this.prisma.surveyAnswer.count({
+      where: {
+        userId,
+        type: SurveyType.BEFORE,
+      },
+    });
+    return count > 0;
+  }
 
-    if (banners.length > 0) {
-      const banner = banners[0];
+  /**
+   * 조건별 홈 배너 정보 조회
+   *
+   * 조건 우선순위 (4가지 조건 중 하나라도 N이면 챌린지 소개):
+   * 1. 구매이력/결과지/사전문진/시작일설정 중 하나라도 N → 챌린지 소개
+   * 2. 모두 Y + CHALLENGER → 콘텐츠 페이지 이동
+   * 3. 모두 Y + SUBSCRIBER → 유형별 1순위 추천 제품 상세
+   * 4. 모두 Y + NEWCOMER (챌린지 종료 후) → 지정된 칼럼
+   */
+  private async getChallengeBanner(context: {
+    userId: number;
+    userStatus: UserSubscriptionStatus;
+    hasPurchase: boolean;
+    hasResult: boolean;
+    hasPreSurvey: boolean;
+    hasChallengeStart: boolean;
+    personaImageUrl: string | null;
+    healthTypeAnimalId: number | null;
+    animalName: string | null;
+  }): Promise<BannerInfoDto> {
+    const {
+      userStatus,
+      hasPurchase,
+      hasResult,
+      hasPreSurvey,
+      hasChallengeStart,
+      personaImageUrl,
+      healthTypeAnimalId,
+      animalName,
+    } = context;
+
+    // 기본 이미지 (페르소나 설정 전)
+    const defaultImageUrl = '';
+    // 페르소나 설정 후에는 페르소나 이미지 사용
+    const bannerImageUrl = personaImageUrl || defaultImageUrl;
+
+    // 1. 구매 이력 없음 OR 결과지 없음 → 챌린지 소개
+    if (!hasPurchase || !hasResult) {
       return {
-        title: banner.title,
-        description: banner.description || undefined,
-        imageUrl: banner.imageUrl,
-        linkUrl: banner.linkUrl,
-        linkType: banner.linkType,
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 ›',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.CHALLENGE_INTRO,
+        targetId: null,
+        contentType: null,
+        productType: null,
+        externalUrl: null,
       };
     }
 
+    // 2. 사전문진 미완료 → 사전문진 유도
+    if (!hasPreSurvey) {
+      return {
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 ›',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.PRE_SURVEY,
+        targetId: null,
+        contentType: null,
+        productType: null,
+        externalUrl: null,
+      };
+    }
+
+    // 3. 챌린지 시작일 미설정 → 시작일 설정 유도
+    if (!hasChallengeStart) {
+      return {
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 ›',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.CHALLENGE_START,
+        targetId: null,
+        contentType: null,
+        productType: null,
+        externalUrl: null,
+      };
+    }
+
+    // 4. 챌린지 진행 중 (CHALLENGER) → 콘텐츠 페이지 이동
+    if (userStatus === UserSubscriptionStatus.CHALLENGER) {
+      const contentInfo = await this.getFallbackContent('LECTURE');
+      return {
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 ›',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.CONTENT,
+        targetId: contentInfo?.id || null,
+        contentType: contentInfo?.type || 'LECTURE',
+        productType: null,
+        externalUrl: null,
+      };
+    }
+
+    // 5. 구독자 (SUBSCRIBER) → 추천 영양제 (1순위)
+    if (userStatus === UserSubscriptionStatus.SUBSCRIBER) {
+      const productInfo = await this.getTopRecommendedProduct(healthTypeAnimalId);
+      const displayAnimalName = animalName || '회원';
+      return {
+        title: `${displayAnimalName}에게 꼭 필요한`,
+        description: productInfo?.name || '',
+        imageUrl: bannerImageUrl,
+        linkType: HomeBannerLinkType.PRODUCT,
+        targetId: productInfo?.id || null,
+        contentType: null,
+        productType: productInfo?.productType || null,
+        externalUrl: null,
+      };
+    }
+
+    // 6. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 오늘의 칼럼 콘텐츠
+    const contentInfo = await this.getFallbackContent('COLUMN');
     return {
-      title: '오늘의 건강 콘텐츠',
-      description: '건강한 하루를 시작해보세요',
-      imageUrl: '',
-      linkUrl: null,
-      linkType: 'INTERNAL',
+      title: '오늘의 칼럼 콘텐츠',
+      description: contentInfo?.title || '',
+      imageUrl: bannerImageUrl,
+      linkType: HomeBannerLinkType.CONTENT,
+      targetId: contentInfo?.id || null,
+      contentType: contentInfo?.type || 'COLUMN',
+      productType: null,
+      externalUrl: null,
     };
+  }
+
+  /**
+   * Fallback 콘텐츠 조회 (ID, 제목, 타입 포함)
+   * @param type 콘텐츠 타입 (LECTURE, COLUMN)
+   */
+  private async getFallbackContent(type: string): Promise<{ id: number; title: string; type: string } | null> {
+    const content = await this.prisma.content.findFirst({
+      where: {
+        type,
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, title: true, type: true },
+    });
+    return content;
+  }
+
+  /**
+   * 동물 유형별 1순위 추천 제품 조회 (ID, 이름, 타입 포함)
+   */
+  private async getTopRecommendedProduct(healthTypeAnimalId: number | null): Promise<{ id: number; name: string; productType: string } | null> {
+    if (!healthTypeAnimalId) return null;
+
+    const topProduct = await this.prisma.healthTypeAnimalProduct.findFirst({
+      where: {
+        healthTypeAnimalId,
+        isActive: true,
+      },
+      orderBy: { displayOrder: 'asc' },
+      select: {
+        product: {
+          select: { id: true, name: true, productType: true },
+        },
+      },
+    });
+
+    return topProduct?.product || null;
   }
 
   /**

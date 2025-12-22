@@ -42,23 +42,54 @@ export class PersonaInfoDto {
 }
 
 /**
+ * 홈 배너 링크 타입
+ */
+export enum HomeBannerLinkType {
+  /** 챌린지 소개 페이지 */
+  CHALLENGE_INTRO = 'CHALLENGE_INTRO',
+  /** 사전 문진 */
+  PRE_SURVEY = 'PRE_SURVEY',
+  /** 챌린지 시작일 설정 */
+  CHALLENGE_START = 'CHALLENGE_START',
+  /** 콘텐츠(강의) 상세 */
+  CONTENT = 'CONTENT',
+  /** 상품 상세 */
+  PRODUCT = 'PRODUCT',
+  /** 외부 URL */
+  EXTERNAL = 'EXTERNAL',
+}
+
+/**
  * 배너 정보 DTO
  */
 export class BannerInfoDto {
-  @ApiProperty({ description: '배너 제목', example: '오늘의 건강 팁' })
+  @ApiProperty({ description: '배너 제목', example: '배빵펭귄에게 꼭 필요한' })
   title: string;
 
-  @ApiPropertyOptional({ description: '배너 설명', example: '10살 어려지는 식단 비법' })
+  @ApiPropertyOptional({ description: '배너 설명 (상품명 또는 콘텐츠 제목)', example: '세포 보호 바이오 밸런스' })
   description?: string;
 
   @ApiProperty({ description: '배너 이미지 URL', example: 'https://...' })
   imageUrl: string;
 
-  @ApiPropertyOptional({ description: '클릭 시 이동 URL', example: '/content/1' })
-  linkUrl: string | null;
+  @ApiProperty({
+    description: '링크 타입',
+    example: 'CHALLENGE_INTRO',
+    enum: HomeBannerLinkType,
+  })
+  linkType: HomeBannerLinkType;
 
-  @ApiProperty({ description: '링크 타입', example: 'INTERNAL', enum: ['INTERNAL', 'EXTERNAL', 'PRODUCT'] })
-  linkType: string;
+  @ApiPropertyOptional({ description: '이동 대상 ID (콘텐츠ID, 상품ID 등)', example: 123 })
+  targetId?: number | null;
+
+  @ApiPropertyOptional({ description: '콘텐츠 타입 (linkType이 CONTENT일 때)', example: 'COLUMN' })
+  contentType?: string | null;
+
+  @ApiPropertyOptional({ description: '상품 타입 (linkType이 PRODUCT일 때)', example: 'SUPPLEMENT' })
+  productType?: string | null;
+
+  @ApiPropertyOptional({ description: '외부 URL (linkType이 EXTERNAL일 때)', example: 'https://example.com' })
+  externalUrl?: string | null;
 }
 
 /**
@@ -77,11 +108,14 @@ export class MissionItemDto {
   @ApiProperty({ description: '포인트', example: 100 })
   point: number;
 
-  @ApiPropertyOptional({ description: '일일 최대 수행 횟수 (null이면 무제한)', example: 1 })
+  @ApiPropertyOptional({ description: '일일 최대 포인트 지급 횟수 (null이면 무제한)', example: 3 })
   max: number | null;
 
-  @ApiProperty({ description: '오늘 수행한 횟수', example: 0 })
+  @ApiProperty({ description: '오늘 포인트 지급 횟수', example: 0 })
   current: number;
+
+  @ApiProperty({ description: '오늘 실행 횟수', example: 0 })
+  executed: number;
 
   @ApiProperty({ description: '기록유형', example: 'DIET' })
   recordType: string;
