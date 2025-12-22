@@ -604,14 +604,11 @@ export class HomeService {
   /**
    * 조건별 홈 배너 정보 조회
    *
-   * 조건 우선순위:
-   * 1. 구매 이력 없음 → 챌린지 소개
-   * 2. 결과지 없음 → 챌린지 소개
-   * 3. 사전문진 미완료 → 사전문진 유도
-   * 4. 챌린지 시작일 미설정 → 시작일 설정 유도
-   * 5. 챌린지 진행 중 (CHALLENGER) → 추천 상품
-   * 6. 구독자 (SUBSCRIBER) → 추천 영양제
-   * 7. 챌린지 종료 후 (NEWCOMER) → 오늘의 칼럼 콘텐츠
+   * 조건 우선순위 (4가지 조건 중 하나라도 N이면 챌린지 소개):
+   * 1. 구매이력/결과지/사전문진/시작일설정 중 하나라도 N → 챌린지 소개
+   * 2. 모두 Y + CHALLENGER → 콘텐츠 페이지 이동
+   * 3. 모두 Y + SUBSCRIBER → 유형별 1순위 추천 제품 상세
+   * 4. 모두 Y + NEWCOMER (챌린지 종료 후) → 지정된 칼럼
    */
   private async getChallengeBanner(context: {
     userId: number;
@@ -657,8 +654,8 @@ export class HomeService {
     // 2. 사전문진 미완료 → 사전문진 유도
     if (!hasPreSurvey) {
       return {
-        title: '1분 유형분류 문진하고',
-        description: '맞춤 솔루션 보러가기 ›',
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 ›',
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.PRE_SURVEY,
         targetId: null,
@@ -682,18 +679,17 @@ export class HomeService {
       };
     }
 
-    // 4. 챌린지 진행 중 (CHALLENGER) → 추천 상품
+    // 4. 챌린지 진행 중 (CHALLENGER) → 콘텐츠 페이지 이동
     if (userStatus === UserSubscriptionStatus.CHALLENGER) {
-      const productInfo = await this.getTopRecommendedProduct(healthTypeAnimalId);
-      const displayAnimalName = animalName || '회원';
+      const contentInfo = await this.getFallbackContent('LECTURE');
       return {
-        title: `${displayAnimalName}에게 꼭 필요한`,
-        description: productInfo?.name || '',
+        title: '미션 수행하고 30,000P 받으세요',
+        description: '이너뷰티 챌린지 ›',
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.PRODUCT,
-        targetId: productInfo?.id || null,
-        contentType: null,
-        productType: productInfo?.productType || null,
+        linkType: HomeBannerLinkType.CONTENT,
+        targetId: contentInfo?.id || null,
+        contentType: contentInfo?.type || 'LECTURE',
+        productType: null,
         externalUrl: null,
       };
     }
