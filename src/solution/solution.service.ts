@@ -64,8 +64,9 @@ export class SolutionService {
             product: {
               include: {
                 lineup: true,
-                images: {
+                productFiles: {
                   where: { imageType: 'MAIN' },
+                  include: { file: true },
                   take: 1,
                 },
               },
@@ -101,12 +102,16 @@ export class SolutionService {
       };
     } | null;
 
-    // 5. 영양제 추천 목록 (type = 'SUPPLEMENT') - formula 포함
+    // 5. 영양제 추천 목록 - FORMULA를 맨 앞에, SUPPLEMENT는 뒤에
     const supplementFormula = metadata?.intakeGuide?.supplement?.formula;
+    const formulaProducts = healthTypeAnimal.recommendedProducts.filter(
+      (rp) => rp.type === 'FORMULA',
+    );
+    const supplementProducts = healthTypeAnimal.recommendedProducts.filter(
+      (rp) => rp.type === 'SUPPLEMENT',
+    );
     const supplements = this.mapSupplements(
-      healthTypeAnimal.recommendedProducts.filter(
-        (rp) => rp.type === 'SUPPLEMENT',
-      ),
+      [...formulaProducts, ...supplementProducts],
       supplementFormula,
     );
 
@@ -163,9 +168,8 @@ export class SolutionService {
 
   /**
    * 영양제 추천 목록 매핑
-   * - displayOrder 순 정렬
-   * - keyword로 슬라이드바 구분 (맞춤 포뮬러, 장건강 등)
-   * - 맞춤포뮬러인 경우 formula 설명 추가
+   * - FORMULA 타입: 맞춤솔루션 (synergyEffects 포함)
+   * - SUPPLEMENT 타입: 단품 영양제 (mechanisms 포함)
    */
   private mapSupplements(
     recommendedProducts: any[],
@@ -173,15 +177,32 @@ export class SolutionService {
   ): SupplementProductDto[] {
     return recommendedProducts.map((rp) => {
       const product = rp.product;
-      const thumbnail = product.images?.[0]?.imageUrl || undefined;
+      const thumbnail = product.productFiles?.[0]?.file?.filePath || undefined;
 
-      // 맞춤포뮬러 키워드인 경우에만 formula 추가
-      const isCustomFormula = rp.keyword === '맞춤포뮬러';
+      const isFormula = rp.type === 'FORMULA';
+
+      // FORMULA 타입: mechanisms에 시너지 효과 데이터가 들어있음
+      // SUPPLEMENT 타입: mechanisms에 작용기전 데이터가 들어있음
+      let mechanisms: any[] | undefined;
+      let synergyEffects: any | undefined;
+
+      if (isFormula && rp.mechanisms) {
+        // FORMULA: mechanisms 객체를 synergyEffects로 매핑
+        synergyEffects = {
+          formulaName: rp.mechanisms.formulaName,
+          formulaDescription: rp.mechanisms.formulaDescription,
+          synergyEffects: rp.mechanisms.synergyEffects,
+        };
+      } else if (Array.isArray(rp.mechanisms)) {
+        // SUPPLEMENT: 배열 형태의 작용기전
+        mechanisms = rp.mechanisms;
+      }
 
       return {
         id: product.id,
         name: product.name,
         thumbnail,
+        type: rp.type,
         keyword: rp.keyword || undefined,
         originalPrice: product.originalPrice
           ? Number(product.originalPrice)
@@ -189,8 +210,9 @@ export class SolutionService {
         price: product.price ? Number(product.price) : undefined,
         recommendReason: rp.recommendReason || undefined,
         dosage: rp.dosage || undefined,
-        mechanisms: Array.isArray(rp.mechanisms) ? rp.mechanisms : undefined,
-        formula: isCustomFormula ? supplementFormula : undefined,
+        mechanisms,
+        synergyEffects,
+        formula: isFormula ? supplementFormula : undefined,
         displayOrder: rp.displayOrder,
       };
     });

@@ -71,7 +71,10 @@ export class SupplementProductDto {
   @ApiPropertyOptional({ description: '상품 이미지' })
   thumbnail?: string;
 
-  @ApiPropertyOptional({ description: '추천 키워드 (맞춤 포뮬러, 장건강 등)' })
+  @ApiProperty({ description: '상품 타입 (FORMULA: 맞춤솔루션, SUPPLEMENT: 단품 영양제)' })
+  type: string;
+
+  @ApiPropertyOptional({ description: '추천 키워드 (맞춤솔루션, 장건강 등)' })
   keyword?: string;
 
   @ApiPropertyOptional({ description: '정가' })
@@ -86,8 +89,15 @@ export class SupplementProductDto {
   @ApiPropertyOptional({ description: '복용량' })
   dosage?: string;
 
-  @ApiPropertyOptional({ description: '작용기전 목록 (시너지 효과)' })
+  @ApiPropertyOptional({ description: '작용기전 목록 (SUPPLEMENT용)' })
   mechanisms?: any[];
+
+  @ApiPropertyOptional({ description: '시너지 효과 (FORMULA용 - formulaName, formulaDescription, synergyEffects 포함)' })
+  synergyEffects?: {
+    formulaName?: string;
+    formulaDescription?: string;
+    synergyEffects?: any[];
+  };
 
   @ApiPropertyOptional({ description: '맞춤 포뮬러 설명 (건강유형별, keyword가 맞춤포뮬러인 경우)' })
   formula?: string;
