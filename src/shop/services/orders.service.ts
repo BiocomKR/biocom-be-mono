@@ -418,10 +418,18 @@ export class OrdersService {
 
   /**
    * 주문 목록 조회
+   * @param userId 사용자 ID
+   * @param status 주문 상태 필터
+   * @param startDate 시작일 (YYYY-MM-DD)
+   * @param endDate 종료일 (YYYY-MM-DD)
+   * @param page 페이지 번호
+   * @param limit 페이지당 항목 수
    */
   async findAll(
     userId: number,
     status?: string,
+    startDate?: string,
+    endDate?: string,
     page = 1,
     limit = 10
   ): Promise<{ items: OrderResponseDto[]; total: number }> {
@@ -435,6 +443,19 @@ export class OrdersService {
       where.status = status;
     }
 
+    // 날짜 필터 적용
+    if (startDate || endDate) {
+      where.orderedAt = {};
+      if (startDate) {
+        // 시작일 00:00:00
+        where.orderedAt.gte = new Date(`${startDate}T00:00:00+09:00`);
+      }
+      if (endDate) {
+        // 종료일 23:59:59
+        where.orderedAt.lte = new Date(`${endDate}T23:59:59+09:00`);
+      }
+    }
+
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
@@ -442,7 +463,19 @@ export class OrdersService {
         take: limit,
         orderBy: { orderedAt: 'desc' },
         include: {
-          items: true,
+          items: {
+            include: {
+              product: {
+                include: {
+                  productFiles: {
+                    where: { imageType: 'MAIN' },
+                    include: { file: true },
+                    take: 1,
+                  },
+                },
+              },
+            },
+          },
           payment: true,
           shipping: true,
         },
@@ -466,10 +499,12 @@ export class OrdersService {
         shippingFee: Number(order.shippingFee),
         pointUsed: Number(order.pointUsed),
         totalAmount: Number(order.totalAmount),
-        items: order.items?.map(item => ({
+        items: order.items?.map((item: any) => ({
           ...item,
           productPrice: Number(item.productPrice),
           subtotal: Number(item.subtotal),
+          // 상품 이미지 URL 추가
+          productImageUrl: item.product?.productFiles?.[0]?.file?.filePath || null,
         })),
       })),
       total,

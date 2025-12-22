@@ -53,20 +53,26 @@ export class OrdersController {
    * 주문 목록 조회
    */
   @Get()
-  @ApiOperation({ summary: '주문 목록 조회', description: '사용자의 주문 목록을 조회합니다' })
+  @ApiOperation({ summary: '주문 목록 조회', description: '사용자의 주문 목록을 조회합니다. startDate/endDate로 기간 필터링 가능' })
   @ApiQuery({ name: 'status', required: false, description: '주문 상태' })
+  @ApiQuery({ name: 'startDate', required: false, description: '시작일 (YYYY-MM-DD)', example: '2024-01-01' })
+  @ApiQuery({ name: 'endDate', required: false, description: '종료일 (YYYY-MM-DD)', example: '2024-12-31' })
   @ApiQuery({ name: 'page', required: false, description: '페이지 번호', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: '페이지당 항목 수', example: 10 })
   @ApiResponse({ status: 200, description: '성공' })
   async findAll(
     @Request() req,
     @Query('status') status?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string
   ): Promise<{ items: OrderResponseDto[]; total: number }> {
     return this.ordersService.findAll(
       req.user.id,
       status,
+      startDate,
+      endDate,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 10
     );
