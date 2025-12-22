@@ -108,9 +108,11 @@ export class UtilsController {
     if (files.length === 1) {
       const contentType = this.getContentType(dto.outputFormat);
       res.setHeader('Content-Type', contentType);
+      // RFC 5987 형식으로 한글 파일명 지원
+      const encodedFilename = encodeURIComponent(results[0].convertedName);
       res.setHeader(
         'Content-Disposition',
-        `attachment; filename="${encodeURIComponent(results[0].convertedName)}"`,
+        `attachment; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`,
       );
       res.setHeader('X-Original-Size', results[0].originalSize.toString());
       res.setHeader('X-Converted-Size', results[0].convertedSize.toString());
@@ -128,7 +130,8 @@ export class UtilsController {
       'Content-Disposition',
       `attachment; filename="converted_images_${Date.now()}.zip"`,
     );
-    res.setHeader('X-Conversion-Results', JSON.stringify(results));
+    // 한글 파일명 포함 시 헤더 에러 방지를 위해 Base64 인코딩
+    res.setHeader('X-Conversion-Results', Buffer.from(JSON.stringify(results)).toString('base64'));
 
     const archive = archiver('zip', { zlib: { level: 9 } });
     archive.pipe(res);

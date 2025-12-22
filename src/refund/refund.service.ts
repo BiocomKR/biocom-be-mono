@@ -325,7 +325,41 @@ export class RefundService {
         this.logger.log(`쿠폰 복구: couponId=${usedCoupon.id}, status=${newStatus}`);
       }
 
-      // 8. 챌린지/구독 티켓 취소
+      // 8. 적립 포인트 회수 (구매 적립금 취소)
+      const purchaseReward = await tx.pointHistory.findFirst({
+        where: {
+          relatedType: 'ORDER',
+          relatedId: order.id,
+          type: 'PURCHASE_REWARD',
+        },
+      });
+
+      if (purchaseReward) {
+        const rewardAmount = purchaseReward.amount;
+        const updatedUserForReward = await tx.user.update({
+          where: { id: order.userId },
+          data: {
+            points: { decrement: rewardAmount },
+          },
+        });
+
+        await tx.pointHistory.create({
+          data: {
+            userId: order.userId,
+            type: 'PURCHASE_REWARD_CANCEL',
+            amount: -rewardAmount,
+            balance: updatedUserForReward.points,
+            description: `주문 취소로 인한 적립금 회수 (${order.orderNumber})`,
+            relatedType: 'ORDER',
+            relatedId: order.id,
+            createdAt: now,
+          },
+        });
+
+        this.logger.log(`적립 포인트 회수: userId=${order.userId}, amount=${rewardAmount}`);
+      }
+
+      // 9. 챌린지/구독 티켓 취소
       const cancelledTickets = await tx.challengeTicket.updateMany({
         where: {
           orderItemId: { in: order.items.map(item => item.id) },
@@ -349,6 +383,7 @@ export class RefundService {
         orderNumber: order.orderNumber,
         refundAmount: Number(refund.refundAmount),
         pointRefunded: Number(order.pointUsed),
+        rewardPointCancelled: purchaseReward ? purchaseReward.amount : 0,
         couponRestored: usedCoupon ? true : false,
         ticketsCancelled: cancelledTickets.count,
       };

@@ -59,15 +59,23 @@ export class UtilsService {
           quality,
         );
 
-        const originalExt = file.originalname.split('.').pop() || '';
-        const baseName = file.originalname.replace(`.${originalExt}`, '');
+        // 한글 파일명 디코딩 처리
+        let originalName = file.originalname;
+        try {
+          originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        } catch {
+          // 디코딩 실패 시 원본 사용
+        }
+
+        const originalExt = originalName.split('.').pop() || '';
+        const baseName = originalName.replace(`.${originalExt}`, '');
         const convertedName = `${baseName}.${outputFormat}`;
 
         const compressionRatio =
           ((file.size - convertedBuffer.length) / file.size) * 100;
 
         results.push({
-          originalName: file.originalname,
+          originalName,
           convertedName,
           originalSize: file.size,
           convertedSize: convertedBuffer.length,

@@ -40,7 +40,7 @@ spec:
       containers:
         - name: biocom-bo-api
           # TODO: 실제 이미지 태그로 변경
-          image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-bo-api:20251216142142
+          image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-bo-api:20251219121321
           imagePullPolicy: Always
 
           ports:
