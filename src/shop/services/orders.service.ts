@@ -574,60 +574,13 @@ export class OrdersService {
       };
     }
 
-    // 5. 송장 등록됨 → CANCEL_REQUESTED (실무자 확인 필요)
-    this.logger.log(`송장 등록된 주문 취소 요청: ${orderNumber} (실무자 확인 필요)`);
+    // 5. 송장 등록됨 → 취소 불가, 반품 안내 (이커머스 표준 정책)
+    // 쿠팡/네이버 등 대형몰과 동일한 정책: 출고 후에는 취소 불가, 반품으로 전환
+    this.logger.log(`송장 등록된 주문 취소 거부: ${orderNumber} (반품으로 전환 필요)`);
 
-    return await this.prisma.$transaction(async (tx) => {
-      const updatedOrder = await tx.order.update({
-        where: { id: order.id },
-        data: {
-          status: OrderStatus.CANCEL_REQUESTED,
-        },
-      });
-
-      await tx.orderStateLog.create({
-        data: {
-          orderId: order.id,
-          fromStatus: order.status,
-          toStatus: OrderStatus.CANCEL_REQUESTED,
-          changeReason: `취소 요청 - ${reason} (송장 등록됨, 실무자 확인 필요)`,
-          createdAt: now,
-        },
-      });
-
-      // 환불 요청 레코드 생성 (관리자 페이지에서 조회용)
-      await tx.refund.create({
-        data: {
-          orderId: order.id,
-          paymentId: order.payment?.id || 0,
-          refundType: 'CANCEL',
-          status: 'REQUESTED',
-          refundAmount: order.totalAmount,
-          pointRefund: order.pointUsed,
-          reason: reason,
-          reasonDetail: `송장번호: ${order.shipping?.trackingNumber || '확인필요'}`,
-          requestedAt: now,
-          createdAt: now,
-        },
-      });
-
-      this.logger.log(`주문 취소 요청 완료: ${orderNumber} (실무자 확인 대기)`);
-
-      return {
-        ...updatedOrder,
-        orderId: updatedOrder.orderNumber,
-        totalProductPrice: Number(updatedOrder.totalProductPrice),
-        totalDiscount: Number(updatedOrder.totalDiscount),
-        shippingFee: Number(updatedOrder.shippingFee),
-        pointUsed: Number(updatedOrder.pointUsed),
-        totalAmount: Number(updatedOrder.totalAmount),
-        items: order.items.map((item) => ({
-          ...item,
-          productPrice: Number(item.productPrice),
-          subtotal: Number(item.subtotal),
-        })),
-      };
-    });
+    throw new BadRequestException(
+      '이미 배송이 시작되어 취소가 불가합니다. 상품 수령 후 반품을 신청해주세요.'
+    );
   }
 
   /**
@@ -658,6 +611,53 @@ export class OrdersService {
           createdAt: now,
         },
       });
+
+      // 사용 포인트 복구
+      const pointUsed = Number(order.pointUsed) || 0;
+      if (pointUsed > 0) {
+        const updatedUser = await tx.user.update({
+          where: { id: order.userId },
+          data: {
+            points: { increment: pointUsed },
+          },
+        });
+
+        await tx.pointHistory.create({
+          data: {
+            userId: order.userId,
+            type: 'REFUND',
+            amount: pointUsed,
+            balance: updatedUser.points,
+            description: `주문 취소 환불 (${order.orderNumber})`,
+            relatedType: 'ORDER',
+            relatedId: order.id,
+            createdAt: now,
+          },
+        });
+
+        this.logger.log(`포인트 복구: ${pointUsed}P (주문: ${order.orderNumber})`);
+      }
+
+      // 쿠폰 복구
+      const usedCoupon = await tx.userCoupon.findFirst({
+        where: {
+          usedOrderId: order.id,
+          status: 'USED',
+        },
+      });
+
+      if (usedCoupon) {
+        const newStatus = usedCoupon.expiresAt > now ? 'ACTIVE' : 'EXPIRED';
+        await tx.userCoupon.update({
+          where: { id: usedCoupon.id },
+          data: {
+            status: newStatus,
+            usedAt: null,
+            usedOrderId: null,
+          },
+        });
+        this.logger.log(`쿠폰 복구: couponId=${usedCoupon.id}, status=${newStatus}`);
+      }
 
       this.logger.log(`${logMessage} 완료: ${order.orderNumber}`);
 

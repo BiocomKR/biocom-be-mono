@@ -508,6 +508,28 @@ export class PaymentService {
               this.logger.log(`적립 포인트 회수: ${pointsToDeduct}P (주문: ${order.orderNumber})`);
             }
           }
+
+          // 쿠폰 복구
+          const usedCoupon = await tx.userCoupon.findFirst({
+            where: {
+              usedOrderId: order.id,
+              status: 'USED',
+            },
+          });
+
+          if (usedCoupon) {
+            const now = getNowKST();
+            const newStatus = usedCoupon.expiresAt > now ? 'ACTIVE' : 'EXPIRED';
+            await tx.userCoupon.update({
+              where: { id: usedCoupon.id },
+              data: {
+                status: newStatus,
+                usedAt: null,
+                usedOrderId: null,
+              },
+            });
+            this.logger.log(`쿠폰 복구: couponId=${usedCoupon.id}, status=${newStatus}`);
+          }
         }
 
         this.logger.log(`결제 취소 완료: ${dto.orderNumber} / ${payment.pgTransactionId}`);

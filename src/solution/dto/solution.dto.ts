@@ -67,6 +67,12 @@ export class SupplementProductDto {
   @ApiPropertyOptional({ description: '추천 키워드 (맞춤 포뮬러, 장건강 등)' })
   keyword?: string;
 
+  @ApiPropertyOptional({ description: '정가' })
+  originalPrice?: number;
+
+  @ApiPropertyOptional({ description: '할인가' })
+  price?: number;
+
   @ApiPropertyOptional({ description: '추천 이유' })
   recommendReason?: string;
 
@@ -92,6 +98,12 @@ export class DietProductDto {
 
   @ApiPropertyOptional({ description: '상품 이미지' })
   thumbnail?: string;
+
+  @ApiPropertyOptional({ description: '정가' })
+  originalPrice?: number;
+
+  @ApiPropertyOptional({ description: '할인가' })
+  price?: number;
 
   @ApiPropertyOptional({ description: '추천 이유' })
   recommendReason?: string;

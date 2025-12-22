@@ -146,6 +146,10 @@ export class SolutionService {
         name: product.name,
         thumbnail,
         keyword: rp.keyword || undefined,
+        originalPrice: product.originalPrice
+          ? Number(product.originalPrice)
+          : undefined,
+        price: product.price ? Number(product.price) : undefined,
         recommendReason: rp.recommendReason || undefined,
         dosage: rp.dosage || undefined,
         mechanisms: Array.isArray(rp.mechanisms) ? rp.mechanisms : undefined,
@@ -205,6 +209,10 @@ export class SolutionService {
         id: product.id,
         name: product.name,
         thumbnail,
+        originalPrice: product.originalPrice
+          ? Number(product.originalPrice)
+          : undefined,
+        price: product.price ? Number(product.price) : undefined,
         recommendReason: rp.recommendReason || undefined,
         dosage: rp.dosage || undefined,
         lineup,

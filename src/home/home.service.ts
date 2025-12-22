@@ -10,6 +10,7 @@ import {
   MissionItemDto,
   BannerInfoDto,
   HomeBannerLinkType,
+  HomeBannerContentType,
 } from './dto/home.dto';
 import { AppConfigService } from '../app-config/app-config.service';
 import { SurveyType } from '../common/enums';
@@ -184,6 +185,12 @@ export class HomeService {
       // 7. 날짜 정보
       const { startDate, endDate } = this.getChallengeDates(challenges);
 
+      // 8. 사후문진 완료 여부 및 종료 후 일주일 이내 여부
+      const { hasAfterSurvey, isWithinOneWeekAfterEnd } = await this.getAfterChallengeStatus(
+        challenges.completed,
+        challengeDays.daysAfterChallengeEnd,
+      );
+
       return {
         userType: user.status as UserSubscriptionStatus,
         reportInfo: {
@@ -200,6 +207,8 @@ export class HomeService {
         endDate,
         missionList,
         ...firstVisitFlags,
+        hasAfterSurvey,
+        isWithinOneWeekAfterEnd,
       };
     } catch (error) {
       this.logger.error(`홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);
@@ -606,11 +615,11 @@ export class HomeService {
   /**
    * 조건별 홈 배너 정보 조회
    *
-   * 조건 우선순위 (4가지 조건 중 하나라도 N이면 챌린지 소개):
+   * 조건 우선순위:
    * 1. 구매이력/결과지/사전문진/시작일설정 중 하나라도 N → 챌린지 소개
-   * 2. 모두 Y + CHALLENGER → 콘텐츠 페이지 이동
-   * 3. 모두 Y + SUBSCRIBER → 유형별 1순위 추천 제품 상세
-   * 4. 모두 Y + NEWCOMER (챌린지 종료 후) → 지정된 칼럼
+   * 2. 모두 Y + CHALLENGER → 강의(LECTURE)
+   * 3. 모두 Y + SUBSCRIBER → 추천 제품(PRODUCT)
+   * 4. 모두 Y + NEWCOMER (챌린지 종료 후) → 칼럼(COLUMN)
    */
   private async getChallengeBanner(context: {
     userId: number;
@@ -639,64 +648,34 @@ export class HomeService {
     // 페르소나 설정 후에는 페르소나 이미지 사용
     const bannerImageUrl = personaImageUrl || defaultImageUrl;
 
-    // 1. 구매 이력 없음 OR 결과지 없음 → 챌린지 소개
-    if (!hasPurchase || !hasResult) {
+    // 1. 4가지 조건 중 하나라도 N → 챌린지 소개
+    if (!hasPurchase || !hasResult || !hasPreSurvey || !hasChallengeStart) {
       return {
         title: '미션 수행하고 30,000P 받으세요',
         description: '이너뷰티 챌린지 ›',
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.CHALLENGE_INTRO,
+        linkType: HomeBannerLinkType.INTERNAL,
+        contentType: HomeBannerContentType.CHALLENGE_INTRO,
         targetId: null,
-        contentType: null,
-        productType: null,
         externalUrl: null,
       };
     }
 
-    // 2. 사전문진 미완료 → 사전문진 유도
-    if (!hasPreSurvey) {
-      return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
-        imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.PRE_SURVEY,
-        targetId: null,
-        contentType: null,
-        productType: null,
-        externalUrl: null,
-      };
-    }
-
-    // 3. 챌린지 시작일 미설정 → 시작일 설정 유도
-    if (!hasChallengeStart) {
-      return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
-        imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.CHALLENGE_START,
-        targetId: null,
-        contentType: null,
-        productType: null,
-        externalUrl: null,
-      };
-    }
-
-    // 4. 챌린지 진행 중 (CHALLENGER) → 콘텐츠 페이지 이동
+    // 2. 챌린지 진행 중 (CHALLENGER) → 강의
     if (userStatus === UserSubscriptionStatus.CHALLENGER) {
       const contentInfo = await this.getFallbackContent('LECTURE');
       return {
         title: '미션 수행하고 30,000P 받으세요',
         description: '이너뷰티 챌린지 ›',
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.CONTENT,
+        linkType: HomeBannerLinkType.INTERNAL,
+        contentType: HomeBannerContentType.LECTURE,
         targetId: contentInfo?.id || null,
-        contentType: contentInfo?.type || 'LECTURE',
-        productType: null,
         externalUrl: null,
       };
     }
 
-    // 5. 구독자 (SUBSCRIBER) → 추천 영양제 (1순위)
+    // 3. 구독자 (SUBSCRIBER) → 추천 제품
     if (userStatus === UserSubscriptionStatus.SUBSCRIBER) {
       const productInfo = await this.getTopRecommendedProduct(healthTypeAnimalId);
       const displayAnimalName = animalName || '회원';
@@ -704,25 +683,53 @@ export class HomeService {
         title: `${displayAnimalName}에게 꼭 필요한`,
         description: productInfo?.name || '',
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.PRODUCT,
+        linkType: HomeBannerLinkType.INTERNAL,
+        contentType: HomeBannerContentType.PRODUCT,
         targetId: productInfo?.id || null,
-        contentType: null,
-        productType: productInfo?.productType || null,
         externalUrl: null,
       };
     }
 
-    // 6. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 오늘의 칼럼 콘텐츠
+    // 4. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 칼럼
     const contentInfo = await this.getFallbackContent('COLUMN');
     return {
       title: '오늘의 칼럼 콘텐츠',
       description: contentInfo?.title || '',
       imageUrl: bannerImageUrl,
-      linkType: HomeBannerLinkType.CONTENT,
+      linkType: HomeBannerLinkType.INTERNAL,
+      contentType: HomeBannerContentType.COLUMN,
       targetId: contentInfo?.id || null,
-      contentType: contentInfo?.type || 'COLUMN',
-      productType: null,
       externalUrl: null,
+    };
+  }
+
+  /**
+   * 사후문진 완료 여부 및 종료 후 일주일 이내 여부 조회
+   */
+  private async getAfterChallengeStatus(
+    completedChallenge: UserChallengeData | undefined,
+    daysAfterChallengeEnd: number | undefined,
+  ): Promise<{ hasAfterSurvey: boolean; isWithinOneWeekAfterEnd: boolean }> {
+    // 완료된 챌린지가 없으면 둘 다 false
+    if (!completedChallenge) {
+      return { hasAfterSurvey: false, isWithinOneWeekAfterEnd: false };
+    }
+
+    // 사후문진 완료 여부 확인
+    const afterSurveyAnswer = await this.prisma.surveyAnswer.findFirst({
+      where: {
+        userChallengeId: completedChallenge.id,
+        type: SurveyType.AFTER,
+      },
+      select: { id: true },
+    });
+
+    // 종료 후 일주일 이내 여부
+    const isWithinOneWeekAfterEnd = daysAfterChallengeEnd !== undefined && daysAfterChallengeEnd <= 7;
+
+    return {
+      hasAfterSurvey: !!afterSurveyAnswer,
+      isWithinOneWeekAfterEnd,
     };
   }
 
@@ -743,9 +750,9 @@ export class HomeService {
   }
 
   /**
-   * 동물 유형별 1순위 추천 제품 조회 (ID, 이름, 타입 포함)
+   * 동물 유형별 1순위 추천 제품 조회 (ID, 이름)
    */
-  private async getTopRecommendedProduct(healthTypeAnimalId: number | null): Promise<{ id: number; name: string; productType: string } | null> {
+  private async getTopRecommendedProduct(healthTypeAnimalId: number | null): Promise<{ id: number; name: string } | null> {
     if (!healthTypeAnimalId) return null;
 
     const topProduct = await this.prisma.healthTypeAnimalProduct.findFirst({
@@ -756,7 +763,7 @@ export class HomeService {
       orderBy: { displayOrder: 'asc' },
       select: {
         product: {
-          select: { id: true, name: true, productType: true },
+          select: { id: true, name: true },
         },
       },
     });
