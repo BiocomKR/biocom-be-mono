@@ -652,7 +652,7 @@ export class HomeService {
     if (!hasPurchase || !hasResult || !hasPreSurvey || !hasChallengeStart) {
       return {
         title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
+        description: '이너뷰티 챌린지',
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.INTERNAL,
         contentType: HomeBannerContentType.CHALLENGE_INTRO,
@@ -666,7 +666,7 @@ export class HomeService {
       const contentInfo = await this.getFallbackContent('LECTURE');
       return {
         title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
+        description: '이너뷰티 챌린지',
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.INTERNAL,
         contentType: HomeBannerContentType.LECTURE,
