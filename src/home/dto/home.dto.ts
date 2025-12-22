@@ -63,10 +63,10 @@ export enum HomeBannerLinkType {
  * 배너 정보 DTO
  */
 export class BannerInfoDto {
-  @ApiProperty({ description: '배너 제목', example: '미션 수행하고 30,000P 받으세요' })
+  @ApiProperty({ description: '배너 제목', example: '배빵펭귄에게 꼭 필요한' })
   title: string;
 
-  @ApiPropertyOptional({ description: '배너 설명 (서브타이틀)', example: '이너뷰티 챌린지 >' })
+  @ApiPropertyOptional({ description: '배너 설명 (상품명 또는 콘텐츠 제목)', example: '세포 보호 바이오 밸런스' })
   description?: string;
 
   @ApiProperty({ description: '배너 이미지 URL', example: 'https://...' })
@@ -81,6 +81,12 @@ export class BannerInfoDto {
 
   @ApiPropertyOptional({ description: '이동 대상 ID (콘텐츠ID, 상품ID 등)', example: 123 })
   targetId?: number | null;
+
+  @ApiPropertyOptional({ description: '콘텐츠 타입 (linkType이 CONTENT일 때)', example: 'COLUMN' })
+  contentType?: string | null;
+
+  @ApiPropertyOptional({ description: '상품 타입 (linkType이 PRODUCT일 때)', example: 'SUPPLEMENT' })
+  productType?: string | null;
 
   @ApiPropertyOptional({ description: '외부 URL (linkType이 EXTERNAL일 때)', example: 'https://example.com' })
   externalUrl?: string | null;

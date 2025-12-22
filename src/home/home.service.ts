@@ -164,6 +164,7 @@ export class HomeService {
         hasChallengeStart: !!challenges.active,
         personaImageUrl: user.aiPersona?.personaAnimationUrl || null,
         healthTypeAnimalId: user.health_type_animal_id,
+        animalName: user.healthTypeAnimal?.animalName || null,
       });
 
       // 4. 미션 목록 조회 및 진행도 업데이트
@@ -608,9 +609,9 @@ export class HomeService {
    * 2. 결과지 없음 → 챌린지 소개
    * 3. 사전문진 미완료 → 사전문진 유도
    * 4. 챌린지 시작일 미설정 → 시작일 설정 유도
-   * 5. 챌린지 진행 중 (CHALLENGER) → 강의 이동
+   * 5. 챌린지 진행 중 (CHALLENGER) → 추천 상품
    * 6. 구독자 (SUBSCRIBER) → 추천 영양제
-   * 7. 챌린지 종료 후 (NEWCOMER) → 설정된 콘텐츠
+   * 7. 챌린지 종료 후 (NEWCOMER) → 오늘의 칼럼 콘텐츠
    */
   private async getChallengeBanner(context: {
     userId: number;
@@ -621,9 +622,9 @@ export class HomeService {
     hasChallengeStart: boolean;
     personaImageUrl: string | null;
     healthTypeAnimalId: number | null;
+    animalName: string | null;
   }): Promise<BannerInfoDto> {
     const {
-      userId,
       userStatus,
       hasPurchase,
       hasResult,
@@ -631,6 +632,7 @@ export class HomeService {
       hasChallengeStart,
       personaImageUrl,
       healthTypeAnimalId,
+      animalName,
     } = context;
 
     // 기본 이미지 (페르소나 설정 전)
@@ -642,10 +644,12 @@ export class HomeService {
     if (!hasPurchase || !hasResult) {
       return {
         title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 >',
+        description: '이너뷰티 챌린지 ›',
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.CHALLENGE_INTRO,
         targetId: null,
+        contentType: null,
+        productType: null,
         externalUrl: null,
       };
     }
@@ -654,10 +658,12 @@ export class HomeService {
     if (!hasPreSurvey) {
       return {
         title: '1분 유형분류 문진하고',
-        description: '맞춤 솔루션 보러가기 >',
+        description: '맞춤 솔루션 보러가기 ›',
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.PRE_SURVEY,
         targetId: null,
+        contentType: null,
+        productType: null,
         externalUrl: null,
       };
     }
@@ -666,75 +672,82 @@ export class HomeService {
     if (!hasChallengeStart) {
       return {
         title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 >',
+        description: '이너뷰티 챌린지 ›',
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.CHALLENGE_START,
         targetId: null,
+        contentType: null,
+        productType: null,
         externalUrl: null,
       };
     }
 
-    // 4. 챌린지 진행 중 (CHALLENGER) → 강의 이동
+    // 4. 챌린지 진행 중 (CHALLENGER) → 추천 상품
     if (userStatus === UserSubscriptionStatus.CHALLENGER) {
-      const contentId = await this.appConfigService.getNumberValue('CHALLENGER_BANNER_CONTENT_ID')
-        ?? await this.getFallbackContentId('LECTURE');
+      const productInfo = await this.getTopRecommendedProduct(healthTypeAnimalId);
+      const displayAnimalName = animalName || '회원';
       return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 >',
+        title: `${displayAnimalName}에게 꼭 필요한`,
+        description: productInfo?.name || '',
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.CONTENT,
-        targetId: contentId,
+        linkType: HomeBannerLinkType.PRODUCT,
+        targetId: productInfo?.id || null,
+        contentType: null,
+        productType: productInfo?.productType || null,
         externalUrl: null,
       };
     }
 
     // 5. 구독자 (SUBSCRIBER) → 추천 영양제 (1순위)
     if (userStatus === UserSubscriptionStatus.SUBSCRIBER) {
-      const topProductId = await this.getTopRecommendedProductId(healthTypeAnimalId);
+      const productInfo = await this.getTopRecommendedProduct(healthTypeAnimalId);
+      const displayAnimalName = animalName || '회원';
       return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 >',
+        title: `${displayAnimalName}에게 꼭 필요한`,
+        description: productInfo?.name || '',
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.PRODUCT,
-        targetId: topProductId,
+        targetId: productInfo?.id || null,
+        contentType: null,
+        productType: productInfo?.productType || null,
         externalUrl: null,
       };
     }
 
-    // 6. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 설정된 콘텐츠
-    const newcomerContentId = await this.appConfigService.getNumberValue('NEWCOMER_BANNER_CONTENT_ID')
-      ?? await this.getFallbackContentId('COLUMN');
+    // 6. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 오늘의 칼럼 콘텐츠
+    const contentInfo = await this.getFallbackContent('COLUMN');
     return {
-      title: '미션 수행하고 30,000P 받으세요',
-      description: '이너뷰티 챌린지 >',
+      title: '오늘의 칼럼 콘텐츠',
+      description: contentInfo?.title || '',
       imageUrl: bannerImageUrl,
       linkType: HomeBannerLinkType.CONTENT,
-      targetId: newcomerContentId,
+      targetId: contentInfo?.id || null,
+      contentType: contentInfo?.type || 'COLUMN',
+      productType: null,
       externalUrl: null,
     };
   }
 
   /**
-   * Fallback 콘텐츠 ID 조회
-   * app_config에 설정된 값이 없을 때 사용
+   * Fallback 콘텐츠 조회 (ID, 제목, 타입 포함)
    * @param type 콘텐츠 타입 (LECTURE, COLUMN)
    */
-  private async getFallbackContentId(type: string): Promise<number | null> {
+  private async getFallbackContent(type: string): Promise<{ id: number; title: string; type: string } | null> {
     const content = await this.prisma.content.findFirst({
       where: {
         type,
         isActive: true,
       },
       orderBy: { sortOrder: 'asc' },
-      select: { id: true },
+      select: { id: true, title: true, type: true },
     });
-    return content?.id ?? null;
+    return content;
   }
 
   /**
-   * 동물 유형별 1순위 추천 제품 ID 조회
+   * 동물 유형별 1순위 추천 제품 조회 (ID, 이름, 타입 포함)
    */
-  private async getTopRecommendedProductId(healthTypeAnimalId: number | null): Promise<number | null> {
+  private async getTopRecommendedProduct(healthTypeAnimalId: number | null): Promise<{ id: number; name: string; productType: string } | null> {
     if (!healthTypeAnimalId) return null;
 
     const topProduct = await this.prisma.healthTypeAnimalProduct.findFirst({
@@ -743,10 +756,14 @@ export class HomeService {
         isActive: true,
       },
       orderBy: { displayOrder: 'asc' },
-      select: { productId: true },
+      select: {
+        product: {
+          select: { id: true, name: true, productType: true },
+        },
+      },
     });
 
-    return topProduct?.productId || null;
+    return topProduct?.product || null;
   }
 
   /**
