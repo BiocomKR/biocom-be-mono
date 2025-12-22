@@ -167,6 +167,7 @@ export class HomeService {
         personaImageUrl: user.aiPersona?.personaAnimationUrl || null,
         healthTypeAnimalId: user.health_type_animal_id,
         animalName: user.healthTypeAnimal?.animalName || null,
+        currentDay: challengeDays.currentDay,
       });
 
       // 4. 미션 목록 조회 및 진행도 업데이트
@@ -631,6 +632,7 @@ export class HomeService {
     personaImageUrl: string | null;
     healthTypeAnimalId: number | null;
     animalName: string | null;
+    currentDay?: number;
   }): Promise<BannerInfoDto> {
     const {
       userStatus,
@@ -641,6 +643,7 @@ export class HomeService {
       personaImageUrl,
       healthTypeAnimalId,
       animalName,
+      currentDay,
     } = context;
 
     // 기본 이미지 (페르소나 설정 전)
@@ -661,12 +664,12 @@ export class HomeService {
       };
     }
 
-    // 2. 챌린지 진행 중 (CHALLENGER) → 강의
+    // 2. 챌린지 진행 중 (CHALLENGER) → 오늘 일차에 해당하는 강의
     if (userStatus === UserSubscriptionStatus.CHALLENGER) {
-      const contentInfo = await this.getFallbackContent('LECTURE');
+      const contentInfo = await this.getLectureByDay(currentDay);
       return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지',
+        title: contentInfo?.title || '오늘의 강의',
+        description: `Day ${currentDay || 1}`,
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.INTERNAL,
         contentType: HomeBannerContentType.LECTURE,
@@ -731,6 +734,55 @@ export class HomeService {
       hasAfterSurvey: !!afterSurveyAnswer,
       isWithinOneWeekAfterEnd,
     };
+  }
+
+  /**
+   * 챌린지 일차에 해당하는 강의 콘텐츠 조회
+   * @param currentDay 챌린지 현재 일차
+   * @returns 해당 일차 강의 또는 fallback 강의
+   */
+  private async getLectureByDay(currentDay?: number): Promise<{ id: number; title: string; type: string } | null> {
+    // 1. currentDay가 있으면 해당 일차 강의 조회
+    if (currentDay) {
+      const lecture = await this.prisma.content.findFirst({
+        where: {
+          type: 'LECTURE',
+          dayNumber: currentDay,
+          isActive: true,
+        },
+        select: { id: true, title: true, type: true },
+      });
+
+      if (lecture) {
+        return lecture;
+      }
+
+      // 2. 해당 일차 강의가 없으면 21일 넘은 경우 마지막 강의 반환
+      if (currentDay > 21) {
+        const lastLecture = await this.prisma.content.findFirst({
+          where: {
+            type: 'LECTURE',
+            isActive: true,
+          },
+          orderBy: { dayNumber: 'desc' },
+          select: { id: true, title: true, type: true },
+        });
+
+        if (lastLecture) {
+          return lastLecture;
+        }
+      }
+    }
+
+    // 3. Fallback: 첫 번째 강의 반환
+    return this.prisma.content.findFirst({
+      where: {
+        type: 'LECTURE',
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, title: true, type: true },
+    });
   }
 
   /**
