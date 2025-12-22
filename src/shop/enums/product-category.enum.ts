@@ -14,6 +14,7 @@ export enum ProductCategory {
   OVERSEASUPPLEMENT = 'OVERSEASUPPLEMENT',  // 해외직구영양제
   HEALTH_CHECK = 'HEALTH_CHECK',            // 건강검진
   CHALLENGE = 'CHALLENGE',                  // 챌린지
+  SOLUTION = 'SOLUTION',                    // 맞춤솔루션 (쇼핑 노출 제외)
 }
 
 /**
@@ -28,6 +29,7 @@ export const CategoryNameMap: Record<ProductCategory, string> = {
   [ProductCategory.OVERSEASUPPLEMENT]: '해외직구영양제',
   [ProductCategory.HEALTH_CHECK]: '건강검진',
   [ProductCategory.CHALLENGE]: '챌린지',
+  [ProductCategory.SOLUTION]: '맞춤솔루션',
 };
 
 /**
