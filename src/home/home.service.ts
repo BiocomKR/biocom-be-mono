@@ -48,6 +48,7 @@ interface UserChallengeData {
   status: string;
   expiresAt: Date | null;
   activatedAt: Date | null;
+  startDateSetAt: Date | null;
   createdAt: Date;
   totalPoints: number;
   isFirstEntry: boolean;
@@ -161,7 +162,7 @@ export class HomeService {
         hasPurchase: user.userChallenges.length > 0,
         hasResult: reportInfo.resultYN === YesNo.Y,
         hasPreSurvey,
-        hasChallengeStart: !!challenges.active,
+        hasChallengeStart: !!challenges.active || !!challenges.pending?.startDateSetAt,
         personaImageUrl: user.aiPersona?.personaAnimationUrl || null,
         healthTypeAnimalId: user.health_type_animal_id,
         animalName: user.healthTypeAnimal?.animalName || null,
@@ -247,6 +248,7 @@ export class HomeService {
             status: true,
             expiresAt: true,
             activatedAt: true,
+            startDateSetAt: true,
             createdAt: true,
             totalPoints: true,
             isFirstEntry: true,

@@ -1236,12 +1236,16 @@ export class ChallengeService {
           23, 59, 59
         );
 
+        // 현재 시간 (시작일 설정 시점)
+        const now = getNowKST();
+
         // UserChallenge 업데이트
         const userChallenge = await tx.userChallenge.update({
           where: { id: userChallengeId },
           data: {
             activatedAt: startDateKST,
-            expiresAt: endDateKST
+            expiresAt: endDateKST,
+            startDateSetAt: now, // 시작일 설정 시점 기록
           }
         });
 
@@ -1447,6 +1451,7 @@ export class ChallengeService {
           data: {
             activatedAt: startDateKST,
             expiresAt: endDateKST,
+            startDateSetAt: nowKST, // 시작일 설정 시점 기록
             // status는 PENDING 유지 (크론잡에서 ACTIVE로 변경)
           }
         });
