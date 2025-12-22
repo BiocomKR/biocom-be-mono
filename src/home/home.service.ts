@@ -676,7 +676,8 @@ export class HomeService {
 
     // 4. 챌린지 진행 중 (CHALLENGER) → 강의 이동
     if (userStatus === UserSubscriptionStatus.CHALLENGER) {
-      const contentId = await this.appConfigService.getNumberValue('CHALLENGER_BANNER_CONTENT_ID');
+      const contentId = await this.appConfigService.getNumberValue('CHALLENGER_BANNER_CONTENT_ID')
+        ?? await this.getFallbackContentId('LECTURE');
       return {
         title: '미션 수행하고 30,000P 받으세요',
         description: '이너뷰티 챌린지 >',
@@ -701,7 +702,8 @@ export class HomeService {
     }
 
     // 6. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 설정된 콘텐츠
-    const newcomerContentId = await this.appConfigService.getNumberValue('NEWCOMER_BANNER_CONTENT_ID');
+    const newcomerContentId = await this.appConfigService.getNumberValue('NEWCOMER_BANNER_CONTENT_ID')
+      ?? await this.getFallbackContentId('COLUMN');
     return {
       title: '미션 수행하고 30,000P 받으세요',
       description: '이너뷰티 챌린지 >',
@@ -710,6 +712,23 @@ export class HomeService {
       targetId: newcomerContentId,
       externalUrl: null,
     };
+  }
+
+  /**
+   * Fallback 콘텐츠 ID 조회
+   * app_config에 설정된 값이 없을 때 사용
+   * @param type 콘텐츠 타입 (LECTURE, COLUMN)
+   */
+  private async getFallbackContentId(type: string): Promise<number | null> {
+    const content = await this.prisma.content.findFirst({
+      where: {
+        type,
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true },
+    });
+    return content?.id ?? null;
   }
 
   /**

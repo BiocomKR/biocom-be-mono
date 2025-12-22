@@ -30,6 +30,7 @@ import { HomeModule } from './home/home.module';
 import { BalanceGameModule } from './balance-game/balance-game.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { AiPersonaModule } from './ai-persona/ai-persona.module';
+import { HealthTypeAnimalModule } from './health-type-animal/health-type-animal.module';
 import { BannersModule } from './shop/banners.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
 import { PushModule } from './push/push.module';
@@ -113,6 +114,7 @@ import { AppConfigModule } from './app-config/app-config.module';
     BalanceGameModule, // 밸런스게임 모듈
     CouponsModule,    // 쿠폰 관리 모듈
     AiPersonaModule, // AI 페르소나 관리 모듈
+    HealthTypeAnimalModule, // 건강타입 동물 관리 모듈
     PhoneVerificationModule, // 휴대폰 본인인증 모듈 (NHN KCP SMS 인증)
     PushModule,      // 푸시 알림 모듈 (FCM)
     AppEventsModule, // 앱 이벤트 수집 모듈 (GA4 대체/보조)
