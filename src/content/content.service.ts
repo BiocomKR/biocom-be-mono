@@ -123,11 +123,11 @@ export class ContentService {
       include: {
         contentFiles: {
           include: {
-            file: true
+            file: true,
           },
           orderBy: { sortOrder: 'asc' },
         },
-        products: {
+        challenge: {
           select: {
             id: true,
             name: true,
@@ -141,11 +141,7 @@ export class ContentService {
       throw new NotFoundException(`컨텐츠를 찾을 수 없습니다: ${id}`);
     }
 
-    // 프론트엔드 호환성을 위해 challenge 필드 추가
-    return {
-      ...content,
-      challenge: content.products,
-    };
+    return content;
   }
 
   /**
