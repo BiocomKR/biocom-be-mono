@@ -21,6 +21,12 @@ export enum CouponStatus {
   EXPIRED = 'EXPIRED'
 }
 
+export enum CouponScopeType {
+  ALL = 'ALL',           // 전체 상품 적용
+  CATEGORY = 'CATEGORY', // 특정 카테고리 상품 적용
+  PRODUCT = 'PRODUCT'    // 특정 상품만 적용
+}
+
 /**
  * 사용자 보유 쿠폰 목록 응답 DTO
  */

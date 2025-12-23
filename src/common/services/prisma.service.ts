@@ -388,6 +388,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 쿠폰 관련 테이블
   get coupon() { return this.prisma.coupon; }
+  get couponProduct() { return this.prisma.couponProduct; }
   get userCoupon() { return this.prisma.userCoupon; }
 
   // 휴대폰 본인인증 테이블
