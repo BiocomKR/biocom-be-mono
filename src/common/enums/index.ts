@@ -19,6 +19,7 @@ export * from './pg-provider.enum';
 
 // 상품 관련
 export * from './product-status.enum';
+export * from './category-code.enum';
 export * from './coupon-status.enum';
 export * from './warranty-status.enum';
 

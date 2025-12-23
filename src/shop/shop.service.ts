@@ -9,7 +9,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { UploadService } from '../upload/upload.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
-import { OrderStatus, ProductStatus } from '../common/enums';
+import { OrderStatus, ProductStatus, CategoryCode } from '../common/enums';
 
 /**
  * 주문 상태 전이 규칙
@@ -52,7 +52,10 @@ export class ShopService {
     const { status, categoryCode, search, isFeatured, sortBy, sortOrder, page, limit } = params;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.ProductWhereInput = {};
+    const where: Prisma.ProductWhereInput = {
+      // 챌린지 상품은 상품 관리에서 제외 (챌린지 관리 메뉴에서 별도 관리)
+      categoryCode: { not: CategoryCode.CHALLENGE }
+    };
     if (status) where.status = status;
     if (categoryCode) where.categoryCode = categoryCode;
     if (isFeatured !== undefined) where.isFeatured = isFeatured;

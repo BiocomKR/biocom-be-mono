@@ -19,45 +19,7 @@ async function main() {
   }
   console.log(`펭귄 찾음: ID=${penguin.id}, healthType=${penguin.healthType}`);
 
-  // 2. 성분(Ingredient) 시드 데이터
-  const ingredientData = [
-    { key: 'zinc', code: 'ZINC', name: '아연', category: '미네랄' },
-    { key: 'magnesium', code: 'MAGNESIUM', name: '마그네슘', category: '미네랄' },
-    { key: 'selenium', code: 'SELENIUM', name: '셀레늄', category: '미네랄' },
-    { key: 'chromium', code: 'CHROMIUM', name: '크롬', category: '미네랄' },
-    { key: 'manganese', code: 'MANGANESE', name: '망간', category: '미네랄' },
-    { key: 'molybdenum', code: 'MOLYBDENUM', name: '몰리브덴', category: '미네랄' },
-    { key: 'vitamin_a', code: 'VITAMIN_A', name: '비타민A', category: '비타민' },
-    { key: 'vitamin_b1', code: 'VITAMIN_B1', name: '비타민 B1', category: '비타민' },
-    { key: 'vitamin_b2', code: 'VITAMIN_B2', name: '비타민 B2', category: '비타민' },
-    { key: 'vitamin_b3', code: 'VITAMIN_B3', name: '비타민 B3', category: '비타민' },
-    { key: 'vitamin_b5', code: 'VITAMIN_B5', name: '비타민 B5', category: '비타민' },
-    { key: 'vitamin_b6', code: 'VITAMIN_B6', name: '비타민 B6', category: '비타민' },
-    { key: 'vitamin_b7', code: 'VITAMIN_B7', name: '비타민 B7', category: '비타민' },
-    { key: 'vitamin_b9', code: 'VITAMIN_B9', name: '비타민 B9', category: '비타민' },
-    { key: 'vitamin_b12', code: 'VITAMIN_B12', name: '비타민 B12', category: '비타민' },
-    { key: 'vitamin_c', code: 'VITAMIN_C', name: '비타민 C', category: '비타민' },
-    { key: 'vitamin_d', code: 'VITAMIN_D', name: '비타민D', category: '비타민' },
-    { key: 'vitamin_e', code: 'VITAMIN_E', name: '비타민E', category: '비타민' },
-    { key: 'chlorella', code: 'CHLORELLA', name: '클로렐라', category: '추출물' },
-    { key: 'corosolic_acid', code: 'COROSOLIC_ACID', name: '코로솔산', category: '추출물' },
-    { key: 'hca', code: 'HCA', name: 'HCA', category: '추출물' },
-    { key: 'forskolin', code: 'FORSKOLIN', name: '포스콜린', category: '추출물' },
-  ];
-
-  for (const ing of ingredientData) {
-    await prisma.ingredient.upsert({
-      where: { key: ing.key },
-      update: {},
-      create: {
-        ...ing,
-        sortOrder: ingredientData.indexOf(ing),
-      },
-    });
-  }
-  console.log(`성분 ${ingredientData.length}개 생성/업데이트 완료`);
-
-  // 3. 솔루션 화면 생성 - 펭귄(GUT_HEALTH) 식단/영양제
+  // 2. 솔루션 화면 생성 - 펭귄(GUT_HEALTH) 식단/영양제
   const healthTypeKey = penguin.healthType.toLowerCase(); // gut_health
   const screenData = [
     {

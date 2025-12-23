@@ -270,6 +270,8 @@ export class ChallengeService {
 
   /**
    * 챌린지 활성/비활성 전환
+   * 주의: Active 챌린지는 단 하나만 존재할 수 있음
+   * 다른 챌린지를 활성화하면 기존 Active 챌린지는 자동으로 비활성화됨
    */
   async toggleChallengeStatus(productId: number) {
     const product = await this.prisma.product.findUnique({
@@ -281,6 +283,19 @@ export class ChallengeService {
     }
 
     const newStatus = product.status === ProductStatus.ACTIVE ? ProductStatus.INACTIVE : ProductStatus.ACTIVE;
+
+    // Active로 전환하는 경우: 기존 Active 챌린지를 먼저 비활성화
+    if (newStatus === ProductStatus.ACTIVE) {
+      await this.prisma.product.updateMany({
+        where: {
+          categoryCode: 'CHALLENGE',
+          status: ProductStatus.ACTIVE,
+          id: { not: productId }
+        },
+        data: { status: ProductStatus.INACTIVE }
+      });
+      this.logger.log(`기존 Active 챌린지 비활성화 완료 (새로운 Active: ${productId})`);
+    }
 
     return await this.prisma.product.update({
       where: { id: productId },
