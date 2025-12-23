@@ -16,7 +16,7 @@ export class GoogleStorageService {
   private readonly projectId: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.bucketName = this.configService.get<string>('GOOGLE_CLOUD_STORAGE_BUCKET') || 'biocom-file-storage';
+    this.bucketName = this.configService.get<string>('GOOGLE_CLOUD_STORAGE_BUCKET') || 'api-dev-biocom-uploads';
     this.projectId = this.configService.get<string>('GOOGLE_CLOUD_PROJECT_ID');
 
     if (!this.projectId) {
