@@ -19,7 +19,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { getNowKST, parseISO8601ToKST } from '../../common/utils/kst-date.util';
-import { ChallengeTicketStatus, OrderStatus, PaymentStatus, PgProvider } from '../../common/enums';
+import { OrderStatus, PaymentStatus, PgProvider } from '../../common/enums';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 
 @Injectable()
@@ -231,38 +231,10 @@ export class PaymentService {
         }
       });
 
-      // 챌린지/구독 상품 티켓 발급 (동시성 방어: seq 기반 deterministic 생성 + DB unique 제약)
-      // DB unique 제약: @@unique([orderItemId, seq])로 레이스 컨디션 완전 방어
-      for (const item of order.items) {
-        if (['CHALLENGE', 'SUBSCRIPTION'].includes(item.product.categoryCode || '')) {
-          const ticketType = item.product.categoryCode === 'SUBSCRIPTION' ? 'SUBSCRIPTION' : 'CHALLENGE';
-          // seq 기반으로 deterministic하게 티켓 생성 (1부터 quantity까지)
-          for (let seq = 1; seq <= item.quantity; seq++) {
-            try {
-              await tx.challengeTicket.create({
-                data: {
-                  userId: order.userId,
-                  productId: item.productId,
-                  orderItemId: item.id,
-                  seq, // 동일 orderItem 내 순번 (unique 제약으로 중복 방지)
-                  purchaseDate: getNowKST(),
-                  status: ChallengeTicketStatus.PURCHASED,
-                  ticketType,
-                  createdAt: getNowKST(),
-                },
-              });
-            } catch (error: any) {
-              // P2002: Unique constraint violation → 이미 존재하는 티켓 (정상 케이스)
-              if (error.code === 'P2002') {
-                this.logger.log(`${ticketType} 티켓 이미 존재: orderItemId=${item.id}, seq=${seq}`);
-                continue;
-              }
-              throw error; // 그 외 에러는 재throw
-            }
-          }
-          this.logger.log(`${ticketType} 티켓 발급 완료: orderItemId=${item.id}, quantity=${item.quantity}`);
-        }
-      }
+      // [제거됨] 챌린지/구독 상품 티켓 발급 로직
+      // - 챌린지: quick-start API로만 시작 (challenge.service.ts)
+      // - 구독: IAP 인앱결제로만 구매 (iap.service.ts)
+      // - 주문 플로우에서 CHALLENGE/SUBSCRIPTION 상품은 orders.service.ts에서 차단됨
 
       // 구매 포인트 적립 (상품 금액의 10%)
       const totalProductPrice = convertDecimalToNumber(order.totalProductPrice) || 0;

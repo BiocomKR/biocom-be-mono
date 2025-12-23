@@ -119,20 +119,10 @@ export class OrdersService {
         })
       );
 
-      // 2. 챌린지/구독 상품 중복 구매 체크
+      // 2. 챌린지/구독 상품 주문 차단 (IAP/quick-start로만 구매 가능)
       for (const item of orderItemsData) {
         if (['CHALLENGE', 'SUBSCRIPTION'].includes(item.product.categoryCode || '')) {
-          const existingTicket = await tx.challengeTicket.findFirst({
-            where: {
-              userId,
-              productId: item.productId,
-              status: { in: ['PURCHASED', 'ACTIVATED'] }
-            }
-          });
-
-          if (existingTicket) {
-            throw new BadRequestException(`${item.product.name}은(는) 이미 사용 가능한 이용권이 있어 추가 구매할 수 없습니다`);
-          }
+          throw new BadRequestException(`${item.product.name}은(는) 주문할 수 없는 상품입니다`);
         }
       }
 

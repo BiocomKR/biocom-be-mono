@@ -446,9 +446,6 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 맞춤 솔루션 테이블
   get productLineup() { return this.prisma.productLineup; }
-  get ingredient() { return this.prisma.ingredient; }
-  get ingredientAlias() { return this.prisma.ingredientAlias; }
-  get productIngredient() { return this.prisma.productIngredient; }
 
   // 앱 설정 테이블
   get appConfig() { return this.prisma.appConfig; }

@@ -129,6 +129,11 @@ export class CartService {
       throw new BadRequestException('판매 중인 상품이 아닙니다');
     }
 
+    // 챌린지/구독 상품은 장바구니 담기 불가 (IAP/quick-start로만 구매)
+    if (['CHALLENGE', 'SUBSCRIPTION'].includes(product.categoryCode || '')) {
+      throw new BadRequestException('해당 상품은 장바구니에 담을 수 없습니다');
+    }
+
     // 최대 주문 수량 체크
     if (dto.quantity > product.maxOrderQty) {
       throw new BadRequestException(`최대 주문 수량은 ${product.maxOrderQty}개입니다`);

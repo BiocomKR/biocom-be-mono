@@ -1,7 +1,6 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import {
   // ⚠️ 배송 관련 함수 import 제거됨 (도시락 배송 정책 폐지)
   // calculateDeliveryArrivalDate,
@@ -21,7 +20,6 @@ import { UserSubscriptionStatus } from '../common/enums/user-subscription-status
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
 import { ChallengeTicketStatus, UserChallengeStatus } from '../common/enums/challenge-ticket-status.enum';
 import { ProductStatus } from '../common/enums';
-import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
  * 챌린지 서비스
@@ -1119,59 +1117,26 @@ export class ChallengeService {
           }
         });
 
-        // 4. 티켓이 없으면 0원 구매 처리
+        // 4. 티켓이 없으면 무료 티켓 발급
+        // [제거됨] Order/OrderItem 생성 로직
+        // - 챌린지는 주문 플로우와 분리됨
+        // - ChallengeTicket만 생성 (orderItemId = null)
         if (!ticket) {
-          // 주문번호 생성
-          const orderNumber = `Q${Date.now()}${Math.floor(Math.random() * 1000)}`;
           const now = getNowKST();
 
-          // Order 생성 (0원 주문)
-          const order = await tx.order.create({
-            data: {
-              userId,
-              orderNumber,
-              totalProductPrice: new Prisma.Decimal(0),
-              totalDiscount: new Prisma.Decimal(0),
-              shippingFee: new Prisma.Decimal(0),
-              pointUsed: new Prisma.Decimal(0),
-              totalAmount: new Prisma.Decimal(0),
-              recipientName: CryptoUtil.encrypt('QUICK_START'),
-              recipientMobile: CryptoUtil.encrypt('QUICK_START'),
-              postalCode: '00000',
-              address: CryptoUtil.encrypt('QUICK_START'),
-              status: UserChallengeStatus.COMPLETED,
-              orderedAt: now,
-              createdAt: now
-            }
-          });
-
-          // OrderItem 생성
-          const orderItem = await tx.orderItem.create({
-            data: {
-              orderId: order.id,
-              productId,
-              productName: product.name,
-              productPrice: new Prisma.Decimal(0),
-              quantity: 1,
-              subtotal: new Prisma.Decimal(0),
-              createdAt: now
-            }
-          });
-
-          // ChallengeTicket 생성
           ticket = await tx.challengeTicket.create({
             data: {
               userId,
               productId,
-              orderItemId: orderItem.id,
-              ticketType: 'CHALLENGE',
+              // orderItemId: null (주문과 무관한 무료 티켓)
+              ticketType: 'QUICK_START',
               status: ChallengeTicketStatus.PURCHASED,
               purchaseDate: now,
               createdAt: now
             }
           });
 
-          this.logger.log(`챌린지 티켓 자동 구매 완료 - 티켓 ID: ${ticket.id}`);
+          this.logger.log(`챌린지 티켓 무료 발급 완료 - 티켓 ID: ${ticket.id}`);
         }
 
         // 5. 티켓으로 UserChallenge 생성 (PENDING 상태)
