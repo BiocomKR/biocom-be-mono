@@ -88,12 +88,16 @@ export class MissionCompletionService {
           throw new BadRequestException(`아직 수행할 수 없는 미션입니다 (${challengeMission.day}일차 미션, 현재: ${currentDay}일차)`);
         }
 
-        // 3️⃣ 오늘의 미션 시도 횟수 확인
-        const todayAttempts = await tx.userMission.count({
+        // 3️⃣ 오늘의 미션 시도 횟수 확인 (user_records 기반)
+        const todayAttempts = await tx.userRecord.count({
           where: {
             userId,
-            challengeMissionId: challengeMission.id,
-            day: currentDay
+            userChallengeId: userChallenge.id,
+            date: new Date(todayStr),
+            metadata: {
+              path: ['challengeMissionId'],
+              equals: challengeMission.id
+            }
           }
         });
 
@@ -127,11 +131,9 @@ export class MissionCompletionService {
         // 6️⃣ metadata에서 필요한 데이터 안전하게 추출 (undefined 방지)
         const metadata = dto.metadata ?? {};
         const fileUploadIdFromMetadata = metadata?.fileUploadId ?? null;
-        const textFromMetadata = metadata?.text ?? null;
         const valueFromMetadata = metadata?.value ?? null;
         const unitFromMetadata = metadata?.unit ?? null;
 
-        let trackingRecordId: number | null = null;
         let fileUploadId: number | null = null;
 
         if (mission.type === 'RECORD') {
@@ -144,15 +146,13 @@ export class MissionCompletionService {
             throw new BadRequestException('기록형 미션의 recordType이 설정되지 않았습니다');
           }
 
-          // 오늘 해당 기록 타입으로 이미 시도했는지 확인
-          const todayRecordAttempts = await tx.userMission.count({
+          // 오늘 해당 기록 타입으로 이미 시도했는지 확인 (user_records 기반)
+          const todayRecordAttempts = await tx.userRecord.count({
             where: {
               userId,
-              challengeMissionId: challengeMission.id,
-              day: currentDay,
-              trackingRecord: {
-                recordType: mission.recordType
-              }
+              userChallengeId: userChallenge.id,
+              recordType: mission.recordType,
+              date: new Date(todayStr)
             }
           });
 
@@ -160,31 +160,8 @@ export class MissionCompletionService {
             throw new ConflictException(`오늘 이미 해당 기록을 ${dailyLimit}번 완료했습니다`);
           }
 
-          // 기록 데이터 저장 (완전한 역추적 정보 포함)
-          const now = getNowKST();
-          const userRecord = await tx.userRecord.create({
-            data: {
-              userId,
-              userChallengeId: userChallenge.id,
-              recordType: mission.recordType,
-              date: new Date(todayStr),
-              metadata: {
-                // 챌린지 컨텍스트
-                challengeMissionId: challengeMission.id,
-                missionId: challengeMission.missionId,
-                day: currentDay,
-                productId: challengeMission.productId,
-
-                // 기록 데이터 (metadata 통째로 저장)
-                ...metadata
-              },
-              createdAt: now,
-              updatedAt: now
-            }
-          });
-
-          trackingRecordId = userRecord.id;
-          this.logger.log(`기록 저장 완료 - ${mission.recordType}: ${valueFromMetadata} ${unitFromMetadata || ''}`);
+          // 기록 데이터 저장은 아래 공통 로직에서 처리
+          this.logger.log(`기록형 미션 검증 완료 - ${mission.recordType}: ${valueFromMetadata} ${unitFromMetadata || ''}`);
 
         } else {
           // 일반 미션 처리 (1일1미션 등)
@@ -208,60 +185,7 @@ export class MissionCompletionService {
             fileUploadId = fileUploadIdFromMetadata;
           }
 
-          // 일반 미션도 recordType이 있으면 user_records에 저장
-          if (mission.recordType) {
-            const now = getNowKST();
-
-            // DAILY_MISSION이면 daily_missions 테이블에서 상세 정보 조회
-            // (이미 위에서 dailyMission을 조회했으면 재사용, 아니면 새로 조회)
-            let dailyMissionData = dailyMission;
-            if (mission.recordType === 'DAILY_MISSION' && !dailyMissionData) {
-              dailyMissionData = await tx.dailyMission.findFirst({
-                where: {
-                  missionId: mission.id,
-                  day: currentDay,
-                  isActive: true
-                }
-              });
-            }
-
-            const userRecord = await tx.userRecord.create({
-              data: {
-                userId,
-                userChallengeId: userChallenge.id,
-                recordType: mission.recordType,
-                date: new Date(todayStr),
-                metadata: {
-                  // 챌린지 컨텍스트
-                  challengeMissionId: challengeMission.id,
-                  missionId: challengeMission.missionId,
-                  day: currentDay,
-                  productId: challengeMission.productId,
-
-                  // DAILY_MISSION 상세 정보
-                  ...(dailyMissionData && {
-                    dailyMissionId: dailyMissionData.id,
-                    title: dailyMissionData.title,
-                    description: dailyMissionData.description,
-                    verifyType: dailyMissionData.verifyType,
-                    imageUrl: dailyMissionData.imageUrl,
-                    reason: dailyMissionData.reason,
-                    method: dailyMissionData.method
-                  }),
-
-                  // 실제 수행 데이터 (metadata 통째로 저장)
-                  ...metadata
-                },
-                createdAt: now,
-                updatedAt: now
-              }
-            });
-
-            trackingRecordId = userRecord.id;
-            this.logger.log(`미션 데이터 저장 완료 - ${mission.recordType}: ${textFromMetadata || valueFromMetadata || 'file upload'}`);
-          }
-
-          this.logger.log(`일반 미션 시도 - ${mission.name}`);
+          this.logger.log(`일반 미션 검증 완료 - ${mission.name}`);
         }
 
         // 7️⃣ 미션 시도 기록 생성
@@ -308,22 +232,61 @@ export class MissionCompletionService {
         }
 
         const now = getNowKST();
-        const userMission = await tx.userMission.create({
+
+        // DAILY_MISSION이면 daily_missions 테이블에서 상세 정보 조회
+        let dailyMissionData = dailyMission;
+        if (mission.recordType === 'DAILY_MISSION' && !dailyMissionData) {
+          dailyMissionData = await tx.dailyMission.findFirst({
+            where: {
+              missionId: mission.id,
+              day: currentDay,
+              isActive: true
+            }
+          });
+        }
+
+        // 7️⃣ user_records에 미션 기록 저장 (user_missions 대체)
+        const userRecord = await tx.userRecord.create({
           data: {
             userId,
-            challengeMissionId: challengeMission.id,
             userChallengeId: userChallenge.id,
-            day: currentDay,
-            attemptNumber,
-            isCompleted,
-            pointsEarned,
-            fileUploadId,
-            trackingRecordId,
-            metadata: dto.metadata,
+            recordType: mission.recordType || 'MISSION',
+            date: new Date(todayStr),
+            metadata: {
+              // 챌린지 컨텍스트
+              challengeMissionId: challengeMission.id,
+              missionId: challengeMission.missionId,
+              missionName: mission.name,
+              missionType: mission.type,
+              day: currentDay,
+              productId: challengeMission.productId,
+
+              // 미션 진행 정보 (기존 user_missions 필드)
+              attemptNumber,
+              isCompleted,
+              pointsEarned,
+              fileUploadId,
+
+              // DAILY_MISSION 상세 정보
+              ...(dailyMissionData && {
+                dailyMissionId: dailyMissionData.id,
+                title: dailyMissionData.title,
+                description: dailyMissionData.description,
+                verifyType: dailyMissionData.verifyType,
+                imageUrl: dailyMissionData.imageUrl,
+                reason: dailyMissionData.reason,
+                method: dailyMissionData.method
+              }),
+
+              // 실제 수행 데이터 (metadata 통째로 저장)
+              ...metadata
+            },
             createdAt: now,
             updatedAt: now
           }
         });
+
+        const trackingRecordId = userRecord.id;
 
         // 8️⃣ 포인트 지급 및 진행도 업데이트
         let updatedProgress = dailyProgress;
@@ -437,14 +400,22 @@ export class MissionCompletionService {
         }
       });
 
-      // 3️⃣ 각 미션별 오늘의 시도 횟수 조회
+      // 오늘 날짜
+      const today = getNowKST();
+      const todayStr = today.toISOString().split('T')[0];
+
+      // 3️⃣ 각 미션별 오늘의 시도 횟수 조회 (user_records 기반)
       const missionsWithProgress = await Promise.all(
         todayMissions.map(async (cm) => {
-          const todayAttempts = await this.prisma.userMission.count({
+          const todayAttempts = await this.prisma.userRecord.count({
             where: {
               userId,
-              challengeMissionId: cm.id,
-              day: currentDay
+              userChallengeId: activeChallenge.id,
+              date: new Date(todayStr),
+              metadata: {
+                path: ['challengeMissionId'],
+                equals: cm.id
+              }
             }
           });
 
@@ -470,11 +441,15 @@ export class MissionCompletionService {
         }
       });
 
-      // 완료된 미션 개수 (isCompleted = true인 UserMission)
-      const completedMissions = await this.prisma.userMission.count({
+      // 완료된 미션 개수 (user_records에서 isCompleted = true인 기록)
+      const completedMissions = await this.prisma.userRecord.count({
         where: {
+          userId,
           userChallengeId: activeChallenge.id,
-          isCompleted: true
+          metadata: {
+            path: ['isCompleted'],
+            equals: true
+          }
         }
       });
 
@@ -564,12 +539,20 @@ export class MissionCompletionService {
         this.logger.warn(`challenge_missions에 해당 미션이 없음 - day: ${currentDay}, missionId: ${dailyMission.missionId}`);
       }
 
-      // 4️⃣ 미션 완료 여부 조회
-      const todayAttempts = challengeMission ? await this.prisma.userMission.count({
+      // 오늘 날짜
+      const today = getNowKST();
+      const todayStr = today.toISOString().split('T')[0];
+
+      // 4️⃣ 미션 완료 여부 조회 (user_records 기반)
+      const todayAttempts = challengeMission ? await this.prisma.userRecord.count({
         where: {
           userId,
-          challengeMissionId: challengeMission.id,
-          day: currentDay
+          userChallengeId: activeChallenge.id,
+          date: new Date(todayStr),
+          metadata: {
+            path: ['challengeMissionId'],
+            equals: challengeMission.id
+          }
         }
       }) : 0;
 
@@ -638,49 +621,49 @@ export class MissionCompletionService {
 
       this.logger.log(`날짜 범위 → 챌린지 일차: ${startDay}일차 ~ ${endDay}일차`);
 
-      // 3️⃣ 완료한 미션 조회 (isCompleted = true)
-      const completedMissions = await this.prisma.userMission.findMany({
+      // 3️⃣ 완료한 미션 조회 (user_records 기반, isCompleted = true)
+      const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
           userChallengeId: activeChallenge.id,
-          isCompleted: true,
-          day: {
-            gte: startDay,
-            lte: endDay
-          }
-        },
-        include: {
-          challengeMission: {
-            include: {
-              mission: true
-            }
+          date: {
+            gte: start,
+            lte: end
+          },
+          metadata: {
+            path: ['isCompleted'],
+            equals: true
           }
         },
         orderBy: [
-          { day: 'asc' },
+          { date: 'asc' },
           { createdAt: 'asc' }
         ]
       });
 
       // 4️⃣ 일자별로 그룹핑
-      const missionsByDay = completedMissions.reduce((acc, um) => {
-        if (!acc[um.day]) {
-          acc[um.day] = [];
+      const missionsByDay = completedRecords.reduce((acc, record) => {
+        const metadata = record.metadata as any;
+        const day = metadata?.day;
+        if (!day) return acc;
+
+        if (!acc[day]) {
+          acc[day] = [];
         }
 
-        acc[um.day].push({
-          id: um.id,
-          missionId: um.challengeMission.mission.id,
-          missionName: um.challengeMission.mission.name,
-          missionType: um.challengeMission.mission.type,
-          pointsEarned: um.pointsEarned,
-          completedAt: um.createdAt
+        acc[day].push({
+          id: record.id,
+          missionId: metadata.missionId,
+          missionName: metadata.missionName,
+          missionType: metadata.missionType,
+          pointsEarned: metadata.pointsEarned || 0,
+          completedAt: record.createdAt
         });
 
         return acc;
       }, {} as Record<number, any[]>);
 
-      this.logger.log(`완료한 미션 조회 완료 - 총 ${completedMissions.length}개`);
+      this.logger.log(`완료한 미션 조회 완료 - 총 ${completedRecords.length}개`);
 
       return {
         success: true,
@@ -688,7 +671,7 @@ export class MissionCompletionService {
           dateRange: { startDate, endDate },
           dayRange: { startDay, endDay },
           missions: missionsByDay,
-          totalCount: completedMissions.length
+          totalCount: completedRecords.length
         }
       };
 
@@ -771,23 +754,26 @@ export class MissionCompletionService {
         ]
       });
 
-      // 4️⃣ 완료한 미션 ID 목록 조회
-      const completedMissionIds = await this.prisma.userMission.findMany({
+      // 4️⃣ 완료한 미션 ID 목록 조회 (user_records 기반)
+      const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
           userChallengeId: activeChallenge.id,
-          isCompleted: true,
-          day: {
-            gte: startDay,
-            lte: adjustedEndDay
+          metadata: {
+            path: ['isCompleted'],
+            equals: true
           }
         },
         select: {
-          challengeMissionId: true
+          metadata: true
         }
       });
 
-      const completedIds = new Set(completedMissionIds.map(cm => cm.challengeMissionId));
+      const completedIds = new Set(
+        completedRecords
+          .map(r => (r.metadata as any)?.challengeMissionId)
+          .filter(id => id !== undefined)
+      );
 
       // 5️⃣ 놓친 미션 필터링 (완료하지 않은 미션)
       const missedMissions = allMissions.filter(cm => !completedIds.has(cm.id));
@@ -873,50 +859,39 @@ export class MissionCompletionService {
         };
       }
 
-      // 3️⃣ 각 미션에 대한 challenge_missions 조회 및 user_missions 조회
+      // 3️⃣ 각 미션에 대한 user_records 조회
       const results = await Promise.all(
         recordMissions.map(async (mission) => {
-          // challenge_missions에서 해당 미션의 챌린지미션 조회
-          const challengeMission = await this.prisma.challengeMission.findFirst({
-            where: {
-              challengeId: activeChallenge.challengeId,
-              missionId: mission.id,
-              day: mission.specificDay,
-              isActive: true
-            }
-          });
-
-          if (!challengeMission) {
-            return null;
-          }
-
-          // user_missions에서 실제 기록 조회
-          const userMission = await this.prisma.userMission.findFirst({
+          // user_records에서 해당 recordType 기록 조회
+          const userRecord = await this.prisma.userRecord.findFirst({
             where: {
               userId,
               userChallengeId: activeChallenge.id,
-              challengeMissionId: challengeMission.id,
-              isCompleted: true
+              recordType: mission.recordType,
+              metadata: {
+                path: ['isCompleted'],
+                equals: true
+              }
             },
             orderBy: {
               createdAt: 'desc'
             }
           });
 
-          if (!userMission) {
+          if (!userRecord) {
             return null;
           }
 
           // metadata에서 contents 추출
-          const metadata = userMission.metadata as any;
-          const contents = metadata?.contents || null;
+          const metadata = userRecord.metadata as any;
+          const contents = metadata?.contents || metadata?.text || null;
 
           return {
             type: mission.recordType,
             day: mission.specificDay,
             contents,
-            completedAt: userMission.createdAt,
-            pointsEarned: userMission.pointsEarned
+            completedAt: userRecord.createdAt,
+            pointsEarned: metadata?.pointsEarned || 0
           };
         })
       );
@@ -935,6 +910,133 @@ export class MissionCompletionService {
 
     } catch (error) {
       this.logger.error('자기선언문/칭찬내역 조회 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * recordType으로 미션 정보 조회
+   * @param userId 사용자 ID
+   * @param recordType 미션 기록 타입 (DECLARATION, SELF_PRAISE 등)
+   * @description ID 없이 recordType만으로 미션 정보와 완료 여부 조회
+   */
+  async getMissionByRecordType(userId: number, recordType: string) {
+    try {
+      this.logger.log(`recordType으로 미션 조회 - 사용자: ${userId}, recordType: ${recordType}`);
+
+      // 1️⃣ 활성화된 사용자 챌린지 조회
+      const activeChallenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: UserChallengeStatus.ACTIVE
+        },
+        include: {
+          product: true
+        }
+      });
+
+      if (!activeChallenge) {
+        throw new NotFoundException('활성화된 챌린지가 없습니다');
+      }
+
+      // 2️⃣ recordType으로 미션 마스터 조회
+      const mission = await this.prisma.mission.findFirst({
+        where: {
+          recordType,
+          isActive: true
+        }
+      });
+
+      if (!mission) {
+        throw new NotFoundException(`${recordType} 타입의 미션을 찾을 수 없습니다`);
+      }
+
+      // 3️⃣ 해당 챌린지의 challengeMission 조회
+      const challengeMission = await this.prisma.challengeMission.findFirst({
+        where: {
+          productId: activeChallenge.productId,
+          missionId: mission.id,
+          isActive: true
+        }
+      });
+
+      if (!challengeMission) {
+        throw new NotFoundException(`현재 챌린지에 ${recordType} 미션이 설정되어 있지 않습니다`);
+      }
+
+      // 4️⃣ 현재 챌린지 일차 계산
+      const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+
+      // 5️⃣ 이미 완료했는지 확인
+      const existingRecord = await this.prisma.userRecord.findFirst({
+        where: {
+          userId,
+          userChallengeId: activeChallenge.id,
+          recordType
+        }
+      });
+
+      const isCompleted = !!existingRecord;
+      const isAvailable = challengeMission.day <= currentDay;
+
+      return {
+        success: true,
+        data: {
+          challengeMissionId: challengeMission.id,
+          missionId: mission.id,
+          name: mission.name,
+          description: mission.description,
+          points: challengeMission.points,
+          recordType: mission.recordType,
+          verifyType: mission.verifyType,
+          requireUpload: mission.requireUpload,
+          day: challengeMission.day,
+          currentDay,
+          isCompleted,
+          isAvailable,
+          completedAt: existingRecord?.createdAt || null,
+          contents: isCompleted ? (existingRecord?.metadata as any)?.text || (existingRecord?.metadata as any)?.contents : null
+        }
+      };
+
+    } catch (error) {
+      this.logger.error(`recordType 미션 조회 실패 - ${recordType}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * recordType으로 미션 제출
+   * @param userId 사용자 ID
+   * @param recordType 미션 기록 타입
+   * @param metadata 제출 데이터
+   * @description ID 없이 recordType만으로 미션 제출. 내부에서 challengeMissionId를 찾아 completeMission 호출
+   */
+  async submitMissionByRecordType(userId: number, recordType: string, metadata: { text?: string; fileUploadId?: number }) {
+    try {
+      this.logger.log(`recordType으로 미션 제출 - 사용자: ${userId}, recordType: ${recordType}`);
+
+      // 1️⃣ 먼저 미션 정보 조회
+      const missionInfo = await this.getMissionByRecordType(userId, recordType);
+
+      if (missionInfo.data.isCompleted) {
+        throw new BadRequestException('이미 완료한 미션입니다');
+      }
+
+      if (!missionInfo.data.isAvailable) {
+        throw new BadRequestException(`아직 수행할 수 없는 미션입니다 (${missionInfo.data.day}일차 미션, 현재: ${missionInfo.data.currentDay}일차)`);
+      }
+
+      // 2️⃣ 기존 completeMission 호출
+      const result = await this.completeMission(userId, {
+        challengeMissionId: missionInfo.data.challengeMissionId,
+        metadata
+      });
+
+      return result;
+
+    } catch (error) {
+      this.logger.error(`recordType 미션 제출 실패 - ${recordType}:`, error);
       throw error;
     }
   }
