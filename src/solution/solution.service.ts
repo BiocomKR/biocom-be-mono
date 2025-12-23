@@ -321,6 +321,7 @@ export class SolutionService {
       key: l.key,
       name: l.name,
       description: l.description || undefined,
+      imageUrl: l.imageUrl || undefined,
       sortOrder: l.sortOrder,
       originalPrice: l.originalPrice ? Number(l.originalPrice) : undefined,
       price: l.price ? Number(l.price) : undefined,

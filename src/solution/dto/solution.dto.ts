@@ -16,6 +16,9 @@ export class LineupDto {
   @ApiPropertyOptional({ description: '설명' })
   description?: string;
 
+  @ApiPropertyOptional({ description: '대표 이미지 URL' })
+  imageUrl?: string;
+
   @ApiProperty({ description: '정렬 순서' })
   sortOrder: number;
 
