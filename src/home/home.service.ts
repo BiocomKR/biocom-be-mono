@@ -14,7 +14,7 @@ import {
 } from './dto/home.dto';
 import { AppConfigService } from '../app-config/app-config.service';
 import { SurveyType } from '../common/enums';
-import { getNowKST, getKoreanToday } from '../common/utils/kst-date.util';
+import { getNowKST, getKoreanToday, stringToKSTDate } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
 import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
 
@@ -305,8 +305,9 @@ export class HomeService {
     if (user.userCharts.length > 0) {
       const cachedChart = user.userCharts[0];
       const now = getNowKST();
+      // DB에서 가져온 updatedAt은 이미 KST로 저장된 값이므로 그대로 사용
       const cacheAge = cachedChart.updatedAt
-        ? now.getTime() - new Date(cachedChart.updatedAt).getTime()
+        ? now.getTime() - cachedChart.updatedAt.getTime()
         : Infinity;
 
       // TTL 만료 시 백그라운드 갱신
@@ -376,18 +377,21 @@ export class HomeService {
 
   /**
    * 챌린지 일차 계산
+   * DB에서 가져온 날짜는 이미 KST로 저장된 값이므로 그대로 사용
    */
   private calculateChallengeDays(challenges: ChallengesByStatus): ChallengeDays {
     const today = getNowKST();
 
     if (challenges.active?.activatedAt) {
-      const activatedAt = new Date(challenges.active.activatedAt);
+      // DB에서 가져온 activatedAt은 이미 KST로 저장된 값
+      const activatedAt = challenges.active.activatedAt;
       const diffTime = today.getTime() - activatedAt.getTime();
       return { currentDay: Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) };
     }
 
     if (challenges.completed?.expiresAt) {
-      const expiresAt = new Date(challenges.completed.expiresAt);
+      // DB에서 가져온 expiresAt은 이미 KST로 저장된 값
+      const expiresAt = challenges.completed.expiresAt;
       const diffTime = today.getTime() - expiresAt.getTime();
       return { daysAfterChallengeEnd: Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) };
     }
@@ -432,7 +436,7 @@ export class HomeService {
 
   /**
    * 미션 진행도 업데이트 (CHALLENGER, SUBSCRIBER)
-   * - current: 포인트 지급 횟수 (user_missions.pointsEarned > 0)
+   * - current: 포인트 지급 횟수 (point_histories에서 RECORD_COMPLETION 조회)
    * - executed: 실행 횟수 (user_records 카운트)
    */
   private async updateMissionProgress(
@@ -441,39 +445,38 @@ export class HomeService {
   ): Promise<MissionItemDto[]> {
     // 오늘 날짜 (KST 기준)
     const today = getKoreanToday();
-    const todayDate = new Date(today);
+    const todayDate = stringToKSTDate(today);
+    const tomorrowDate = stringToKSTDate(today, 24, 0, 0);
 
-    // 병렬로 조회: user_records (실행 횟수), user_missions (포인트 지급 횟수)
-    const [todayRecords, todayMissions] = await Promise.all([
-      // 실행 횟수 조회
+    // 병렬로 조회: user_records (실행 횟수), point_histories (포인트 지급 횟수)
+    // 둘 다 createdAt 기준으로 조회 (기록 저장 시점 = 포인트 지급 시점)
+    const [todayRecords, todayPointHistories] = await Promise.all([
+      // 실행 횟수 조회 (createdAt 기준 - date는 사용자가 입력한 날짜라 다를 수 있음)
       this.prisma.userRecord.findMany({
         where: {
           userId,
-          date: todayDate,
+          createdAt: {
+            gte: todayDate,
+            lt: tomorrowDate,
+          },
         },
         select: {
           recordType: true,
           metadata: true,
         },
       }),
-      // 포인트 지급 횟수 조회
-      this.prisma.userMission.findMany({
+      // 포인트 지급 횟수 조회 (point_histories에서 RECORD_COMPLETION 타입)
+      this.prisma.pointHistory.findMany({
         where: {
           userId,
+          relatedType: 'RECORD_COMPLETION',
           createdAt: {
             gte: todayDate,
-            lt: new Date(todayDate.getTime() + 24 * 60 * 60 * 1000),
+            lt: tomorrowDate,
           },
-          pointsEarned: { gt: 0 },
         },
         select: {
-          challengeMission: {
-            select: {
-              mission: {
-                select: { recordType: true },
-              },
-            },
-          },
+          description: true,
         },
       }),
     ]);
@@ -486,10 +489,10 @@ export class HomeService {
       executedMap.set(recordType, currentCount + 1);
     }
 
-    // recordType별 포인트 지급 횟수 계산
+    // recordType별 포인트 지급 횟수 계산 (description에서 recordType 추출: "BEAUTY 기록 완료" → "BEAUTY")
     const currentMap = new Map<string, number>();
-    for (const mission of todayMissions) {
-      const recordType = mission.challengeMission.mission.recordType;
+    for (const history of todayPointHistories) {
+      const recordType = history.description.split(' ')[0];
       const currentCount = currentMap.get(recordType) || 0;
       currentMap.set(recordType, currentCount + 1);
     }
