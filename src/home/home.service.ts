@@ -60,7 +60,6 @@ interface UserChallengeData {
     name: string;
     challengeMissions: ChallengeMissionData[];
   };
-  userMissions: UserMissionData[];
 }
 
 interface ChallengeMissionData {
@@ -178,7 +177,7 @@ export class HomeService {
       }
 
       // 5. 챌린지 정보 구성 (CHALLENGER만)
-      const challengeInfo = this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
+      const challengeInfo = await this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
 
       // 6. 첫 방문 플래그 처리
       const firstVisitFlags = this.handleFirstVisitFlags(userId, user, reportInfo, challenges, challengeDays.currentDay);
@@ -282,9 +281,6 @@ export class HomeService {
                   orderBy: { sortOrder: 'asc' },
                 },
               },
-            },
-            userMissions: {
-              select: { id: true, challengeMissionId: true, day: true, isCompleted: true, attemptNumber: true },
             },
           },
         },
@@ -453,8 +449,8 @@ export class HomeService {
     const todayDate = stringToKSTDate(today);
     const tomorrowDate = stringToKSTDate(today, 24, 0, 0);
 
-    // 병렬로 조회: user_records, user_missions, point_histories
-    const [todayRecords, todaySupplementRecords, todayUserMissions, todayPointHistories] = await Promise.all([
+    // 병렬로 조회: user_records, point_histories (user_missions 제거)
+    const [todayRecords, todaySupplementRecords, todayPointHistories] = await Promise.all([
       // user_records: 5가지 기록 (createdAt 기준) - SUPPLEMENT 제외
       this.prisma.userRecord.findMany({
         where: {
@@ -484,26 +480,6 @@ export class HomeService {
         select: {
           recordType: true,
           metadata: true,
-        },
-      }),
-      // user_missions: 챌린지 미션 (createdAt 기준)
-      this.prisma.userMission.findMany({
-        where: {
-          userId,
-          createdAt: {
-            gte: todayDate,
-            lt: tomorrowDate,
-          },
-        },
-        select: {
-          pointsEarned: true,
-          challengeMission: {
-            select: {
-              mission: {
-                select: { recordType: true },
-              },
-            },
-          },
         },
       }),
       // point_histories: 포인트 지급 내역 (RECORD_COMPLETION, MISSION_COMPLETION)
@@ -536,15 +512,6 @@ export class HomeService {
     // SUPPLEMENT 실행 횟수 (date 기준 조회 결과)
     executedMap.set('SUPPLEMENT', todaySupplementRecords.length);
 
-    // user_missions에서 실행 횟수 (챌린지 미션)
-    for (const mission of todayUserMissions) {
-      const recordType = mission.challengeMission?.mission?.recordType;
-      if (recordType) {
-        const currentCount = executedMap.get(recordType) || 0;
-        executedMap.set(recordType, currentCount + 1);
-      }
-    }
-
     // recordType별 포인트 지급 횟수 계산
     const currentMap = new Map<string, number>();
 
@@ -566,17 +533,29 @@ export class HomeService {
   /**
    * 챌린지 정보 DTO 생성 (CHALLENGER만)
    */
-  private buildChallengeInfo(
+  private async buildChallengeInfo(
     userStatus: string,
     activeChallenge?: UserChallengeData,
     currentDay?: number,
-  ): ChallengeInfoDto | null {
+  ): Promise<ChallengeInfoDto | null> {
     if (userStatus !== UserSubscriptionStatus.CHALLENGER || !activeChallenge || !currentDay) {
       return null;
     }
 
     const totalMissions = activeChallenge.product.challengeMissions.length;
-    const completedMissions = activeChallenge.userMissions.filter((um) => um.isCompleted).length;
+
+    // user_records에서 완료된 미션 개수 조회
+    const completedMissions = await this.prisma.userRecord.count({
+      where: {
+        userId: activeChallenge.id, // userChallengeId가 아님, 아래에서 수정
+        userChallengeId: activeChallenge.id,
+        metadata: {
+          path: ['isCompleted'],
+          equals: true
+        }
+      }
+    });
+
     const challengePercent = totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0;
 
     return {
