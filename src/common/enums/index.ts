@@ -23,3 +23,4 @@ export * from './pg-provider.enum';
 export * from './survey-option-type.enum';
 export * from './survey-type.enum';
 export * from './health-category.enum';
+export * from './category-code.enum';
