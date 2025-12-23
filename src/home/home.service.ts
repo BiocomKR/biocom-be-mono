@@ -436,8 +436,13 @@ export class HomeService {
 
   /**
    * 미션 진행도 업데이트 (CHALLENGER, SUBSCRIBER)
-   * - current: 포인트 지급 횟수 (point_histories에서 RECORD_COMPLETION 조회)
-   * - executed: 실행 횟수 (user_records 카운트)
+   * - current: 포인트 지급 횟수
+   * - executed: 실행 횟수
+   *
+   * 데이터 소스:
+   * - user_records: 6가지 기록 (BEAUTY, DIET, SUPPLEMENT, FASTING, SLEEP, ACTIVITY)
+   * - user_missions: 챌린지 미션 (QUIZ, BALANCE_GAME, DAILY_MISSION, DECLARATION, SELF_PRAISE 등)
+   * - point_histories: 포인트 지급 내역 (relatedType으로 구분)
    */
   private async updateMissionProgress(
     userId: number,
@@ -448,10 +453,9 @@ export class HomeService {
     const todayDate = stringToKSTDate(today);
     const tomorrowDate = stringToKSTDate(today, 24, 0, 0);
 
-    // 병렬로 조회: user_records (실행 횟수), point_histories (포인트 지급 횟수)
-    // 둘 다 createdAt 기준으로 조회 (기록 저장 시점 = 포인트 지급 시점)
-    const [todayRecords, todayPointHistories] = await Promise.all([
-      // 실행 횟수 조회 (createdAt 기준 - date는 사용자가 입력한 날짜라 다를 수 있음)
+    // 병렬로 조회: user_records, user_missions, point_histories
+    const [todayRecords, todayUserMissions, todayPointHistories] = await Promise.all([
+      // user_records: 6가지 기록 (createdAt 기준)
       this.prisma.userRecord.findMany({
         where: {
           userId,
@@ -465,11 +469,31 @@ export class HomeService {
           metadata: true,
         },
       }),
-      // 포인트 지급 횟수 조회 (point_histories에서 RECORD_COMPLETION 타입)
+      // user_missions: 챌린지 미션 (createdAt 기준)
+      this.prisma.userMission.findMany({
+        where: {
+          userId,
+          createdAt: {
+            gte: todayDate,
+            lt: tomorrowDate,
+          },
+        },
+        select: {
+          pointsEarned: true,
+          challengeMission: {
+            select: {
+              mission: {
+                select: { recordType: true },
+              },
+            },
+          },
+        },
+      }),
+      // point_histories: 포인트 지급 내역 (RECORD_COMPLETION, MISSION_COMPLETION)
       this.prisma.pointHistory.findMany({
         where: {
           userId,
-          relatedType: 'RECORD_COMPLETION',
+          relatedType: { in: ['RECORD_COMPLETION', 'MISSION_COMPLETION'] },
           createdAt: {
             gte: todayDate,
             lt: tomorrowDate,
@@ -477,21 +501,36 @@ export class HomeService {
         },
         select: {
           description: true,
+          relatedType: true,
         },
       }),
     ]);
 
     // recordType별 실행 횟수 계산
     const executedMap = new Map<string, number>();
+
+    // user_records에서 실행 횟수 (6가지 기록)
     for (const record of todayRecords) {
       const recordType = record.recordType;
       const currentCount = executedMap.get(recordType) || 0;
       executedMap.set(recordType, currentCount + 1);
     }
 
-    // recordType별 포인트 지급 횟수 계산 (description에서 recordType 추출: "BEAUTY 기록 완료" → "BEAUTY")
+    // user_missions에서 실행 횟수 (챌린지 미션)
+    for (const mission of todayUserMissions) {
+      const recordType = mission.challengeMission?.mission?.recordType;
+      if (recordType) {
+        const currentCount = executedMap.get(recordType) || 0;
+        executedMap.set(recordType, currentCount + 1);
+      }
+    }
+
+    // recordType별 포인트 지급 횟수 계산
     const currentMap = new Map<string, number>();
+
+    // point_histories에서 포인트 지급 횟수 (description에서 recordType 추출)
     for (const history of todayPointHistories) {
+      // "BEAUTY 기록 완료", "DAILY_MISSION 미션 완료" 형식에서 첫 단어 추출
       const recordType = history.description.split(' ')[0];
       const currentCount = currentMap.get(recordType) || 0;
       currentMap.set(recordType, currentCount + 1);

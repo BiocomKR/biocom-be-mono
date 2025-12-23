@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
+import { getKoreanToday } from '../common/utils/kst-date.util';
 
 /**
  * 미션 노출 컨텍스트
@@ -153,18 +154,26 @@ export class MissionService {
       },
     });
 
-    // 전제조건 미션 완료 여부 조회 (DECLARATION 완료 여부)
+    // ONCE 타입 미션 완료 여부 및 완료 날짜 조회 (DECLARATION, SELF_PRAISE, AFTER_SURVEY)
+    const onceRecordTypes = ['DECLARATION', 'SELF_PRAISE', 'AFTER_SURVEY'];
     let completedRecordTypes: Set<string> = new Set();
+    let completedRecordDates: Map<string, string> = new Map(); // recordType → 완료 날짜 (YYYY-MM-DD)
+
     if (userChallengeId) {
       const completedMissions = await this.prisma.userRecord.findMany({
         where: {
           userId,
           userChallengeId,
-          recordType: { in: ['DECLARATION', 'SELF_PRAISE'] },
+          recordType: { in: onceRecordTypes },
         },
-        select: { recordType: true },
+        select: { recordType: true, date: true },
       });
       completedRecordTypes = new Set(completedMissions.map((m) => m.recordType));
+      // 완료 날짜 저장 (KST 날짜 문자열로 변환)
+      for (const m of completedMissions) {
+        const dateStr = m.date.toISOString().split('T')[0];
+        completedRecordDates.set(m.recordType, dateStr);
+      }
     }
 
     // 정책 기반 필터링
@@ -208,9 +217,14 @@ export class MissionService {
         }
       }
 
-      // 5. ONCE 타입 미션은 이미 완료했으면 숨김
+      // 5. ONCE 타입 미션은 완료한 익일부터 숨김
       if (mission.frequency === 'ONCE' && completedRecordTypes.has(mission.recordType)) {
-        return false;
+        const completedDate = completedRecordDates.get(mission.recordType);
+        const today = getKoreanToday();
+        // 완료 날짜와 오늘이 같으면 노출 (당일은 보임), 다르면 숨김 (익일부터 삭제)
+        if (completedDate !== today) {
+          return false;
+        }
       }
 
       return true;
