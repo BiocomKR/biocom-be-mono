@@ -43,7 +43,7 @@ spec:
 
           containers:
           - name: activate-challenges
-            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:latest
+            image: asia-northeast3-docker.pkg.dev/api-prod-biocom/biocom-api/biocom-api:prod-20251223151022
             imagePullPolicy: Always
 
             command:
