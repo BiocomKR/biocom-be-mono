@@ -746,7 +746,6 @@ model Product {
   feedback                     ProductFeedback[]
   productFiles                 ProductFile[]
   images                       ProductImage[]
-  productIngredients           ProductIngredient[]
   lineup                       ProductLineup?                 @relation(fields: [lineupId], references: [id])
   recentlyViewed               RecentlyViewed[]
   supplementNutrients          SupplementNutrient[]
@@ -2967,69 +2966,6 @@ model ProductLineup {
   @@map("product_lineups")
 }
 
-/// 알레르겐 마스터 테이블
-/// 식단 알레르겐 관리 (검사결과 매칭용)
-model Ingredient {
-  id                 Int                 @id @default(autoincrement())
-  /// 키 (soybean, milk 등)
-  key                String              @unique @db.VarChar(50)
-  /// 코드 (SOYBEAN, MILK 등)
-  code               String              @unique @db.VarChar(50)
-  /// 성분명
-  name               String              @db.VarChar(100)
-  /// 영문명
-  nameEn             String?             @map("name_en") @db.VarChar(100)
-  /// 카테고리 (콩류, 유제품 등)
-  category           String?             @db.VarChar(50)
-  /// 정렬 순서
-  sortOrder          Int                 @default(0) @map("sort_order")
-  /// 활성화 여부
-  isActive           Boolean             @default(true) @map("is_active")
-  /// 생성일시
-  createdAt          DateTime            @default(now()) @map("created_at")
-  aliases            IngredientAlias[]
-  productIngredients ProductIngredient[]
-
-  @@index([category])
-  @@map("ingredients")
-}
-
-/// 알레르겐명 표기 변형 테이블
-/// 대두 = 대두콩 = 대두(간장,두부)
-model IngredientAlias {
-  id           Int        @id @default(autoincrement())
-  /// 알레르겐 ID
-  ingredientId Int        @map("ingredient_id")
-  /// 표기 변형
-  alias        String     @unique @db.VarChar(100)
-  /// 출처 (TEST_RESULT: 검사결과, DIET_COMPONENT: 식단성분)
-  source       String?    @db.VarChar(50)
-  /// 생성일시
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-
-  @@index([ingredientId])
-  @@map("ingredient_aliases")
-}
-
-/// 상품-알레르겐 연결 테이블
-/// 식단에 포함된 알레르겐 정보
-model ProductIngredient {
-  id           Int        @id @default(autoincrement())
-  /// 상품 ID
-  productId    Int        @map("product_id")
-  /// 알레르겐 ID
-  ingredientId Int        @map("ingredient_id")
-  /// 생성일시
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, ingredientId], map: "product_ingredients_product_ingredient_key")
-  @@index([productId])
-  @@index([ingredientId])
-  @@map("product_ingredients")
-}
 
 model ingredient_order_templates {
   id               Int      @id @default(autoincrement())
