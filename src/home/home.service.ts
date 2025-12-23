@@ -94,7 +94,7 @@ interface UserData {
   aiPersonaId: number | null;
   health_type_animal_id: number | null;
   isFirstAppEntry: boolean;
-  aiPersona: { id: number; name: string; personaAnimationUrl: string | null } | null;
+  aiPersona: { id: number; name: string; torsoUrl: string | null } | null;
   healthTypeAnimal: {
     id: number;
     animalName: string;
@@ -164,7 +164,7 @@ export class HomeService {
         hasResult: reportInfo.resultYN === YesNo.Y,
         hasPreSurvey,
         hasChallengeStart: !!challenges.active || !!challenges.pending?.startDateSetAt,
-        personaImageUrl: user.aiPersona?.personaAnimationUrl || null,
+        personaImageUrl: user.aiPersona?.torsoUrl || null,
         healthTypeAnimalId: user.health_type_animal_id,
         animalName: user.healthTypeAnimal?.animalName || null,
         currentDay: challengeDays.currentDay,
@@ -234,7 +234,7 @@ export class HomeService {
         health_type_animal_id: true,
         isFirstAppEntry: true,
         aiPersona: {
-          select: { id: true, name: true, personaAnimationUrl: true },
+          select: { id: true, name: true, torsoUrl: true },
         },
         healthTypeAnimal: {
           select: {
@@ -357,7 +357,7 @@ export class HomeService {
 
     return {
       name: aiPersona.name,
-      imageUrl: aiPersona.personaAnimationUrl || '',
+      imageUrl: aiPersona.torsoUrl || '',
     };
   }
 
@@ -454,15 +454,32 @@ export class HomeService {
     const tomorrowDate = stringToKSTDate(today, 24, 0, 0);
 
     // 병렬로 조회: user_records, user_missions, point_histories
-    const [todayRecords, todayUserMissions, todayPointHistories] = await Promise.all([
-      // user_records: 6가지 기록 (createdAt 기준)
+    const [todayRecords, todaySupplementRecords, todayUserMissions, todayPointHistories] = await Promise.all([
+      // user_records: 5가지 기록 (createdAt 기준) - SUPPLEMENT 제외
       this.prisma.userRecord.findMany({
         where: {
           userId,
+          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY'] },
           createdAt: {
             gte: todayDate,
             lt: tomorrowDate,
           },
+        },
+        select: {
+          recordType: true,
+          metadata: true,
+        },
+      }),
+      // SUPPLEMENT: date 기준으로 별도 조회
+      // 이유: saveSupplementRoutine에서 루틴 저장 시 미래 날짜의 기록을 미리 생성하는데,
+      // 이때 createdAt은 생성 시점(루틴 저장 시점)으로 저장됨.
+      // 예) 12/22에 루틴 저장 → 12/23 날짜 기록의 createdAt은 12/22
+      // 따라서 createdAt 기준 조회 시 오늘 날짜 기록이 누락되는 문제 발생
+      this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'SUPPLEMENT',
+          date: todayDate,
         },
         select: {
           recordType: true,
@@ -509,12 +526,15 @@ export class HomeService {
     // recordType별 실행 횟수 계산
     const executedMap = new Map<string, number>();
 
-    // user_records에서 실행 횟수 (6가지 기록)
+    // user_records에서 실행 횟수 (5가지 기록 - SUPPLEMENT 제외)
     for (const record of todayRecords) {
       const recordType = record.recordType;
       const currentCount = executedMap.get(recordType) || 0;
       executedMap.set(recordType, currentCount + 1);
     }
+
+    // SUPPLEMENT 실행 횟수 (date 기준 조회 결과)
+    executedMap.set('SUPPLEMENT', todaySupplementRecords.length);
 
     // user_missions에서 실행 횟수 (챌린지 미션)
     for (const mission of todayUserMissions) {
