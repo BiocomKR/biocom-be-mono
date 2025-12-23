@@ -739,6 +739,7 @@ model Product {
   challengeTickets             ChallengeTicket[]
   challengeContents            Content[]                      @relation("ChallengeContents")
   coupons                      Coupon[]
+  couponProducts               CouponProduct[]
   healthTypeAnimalProducts     HealthTypeAnimalProduct[]
   iapProducts                  IAPProduct[]
   lectureProducts              LectureProduct[]
@@ -746,7 +747,6 @@ model Product {
   feedback                     ProductFeedback[]
   productFiles                 ProductFile[]
   images                       ProductImage[]
-  productIngredients           ProductIngredient[]
   lineup                       ProductLineup?                 @relation(fields: [lineupId], references: [id])
   recentlyViewed               RecentlyViewed[]
   supplementNutrients          SupplementNutrient[]
@@ -1541,8 +1541,12 @@ model Coupon {
   discountValue     Int                      @map("discount_value")
   /// 최대 할인 금액 (퍼센트 할인인 경우)
   maxDiscountAmount Int?                     @map("max_discount_amount")
-  /// 적용 상품 ID (특정 상품에만 적용)
-  productId         Int                      @map("product_id")
+  /// 적용 범위 타입 (ALL: 전체, CATEGORY: 카테고리, PRODUCT: 특정 상품)
+  scopeType         String                   @default("PRODUCT") @map("scope_type") @db.VarChar(20)
+  /// 적용 카테고리 코드 (scopeType=CATEGORY일 때)
+  categoryCode      String?                  @map("category_code") @db.VarChar(50)
+  /// 적용 상품 ID (scopeType=PRODUCT일 때, 단일 상품) - nullable로 변경
+  productId         Int?                     @map("product_id")
   /// 유효시간 (시간 단위, 48시간 = 48)
   validHours        Int                      @default(48) @map("valid_hours")
   /// 활성화 여부
@@ -1552,12 +1556,35 @@ model Coupon {
   /// 수정일시
   updatedAt         DateTime?                @updatedAt @map("updated_at")
   gameSteps         BalanceGameStep[]
-  product           Product                  @relation(fields: [productId], references: [id])
+  product           Product?                 @relation(fields: [productId], references: [id])
+  couponProducts    CouponProduct[]
   earnedInGames     UserBalanceGameHistory[]
   userCoupons       UserCoupon[]
 
+  @@index([scopeType, isActive])
+  @@index([categoryCode, isActive])
   @@index([productId, isActive])
   @@map("coupons")
+}
+
+/// 쿠폰-상품 연결 테이블 (다대다)
+/// scopeType=PRODUCT일 때 여러 상품에 적용 가능
+model CouponProduct {
+  id        Int      @id @default(autoincrement())
+  /// 쿠폰 ID
+  couponId  Int      @map("coupon_id")
+  /// 상품 ID
+  productId Int      @map("product_id")
+  /// 생성일시
+  createdAt DateTime @default(now()) @map("created_at")
+
+  coupon  Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, productId])
+  @@index([couponId])
+  @@index([productId])
+  @@map("coupon_products")
 }
 
 /// 사용자 쿠폰 테이블
@@ -2952,6 +2979,8 @@ model ProductLineup {
   name        String    @db.VarChar(100)
   /// 설명
   description String?
+  /// 대표 이미지 URL
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
   /// 정렬 순서
   sortOrder   Int       @default(0) @map("sort_order")
   /// 활성화 여부
@@ -2965,69 +2994,6 @@ model ProductLineup {
   @@map("product_lineups")
 }
 
-/// 알레르겐 마스터 테이블
-/// 식단 알레르겐 관리 (검사결과 매칭용)
-model Ingredient {
-  id                 Int                 @id @default(autoincrement())
-  /// 키 (soybean, milk 등)
-  key                String              @unique @db.VarChar(50)
-  /// 코드 (SOYBEAN, MILK 등)
-  code               String              @unique @db.VarChar(50)
-  /// 성분명
-  name               String              @db.VarChar(100)
-  /// 영문명
-  nameEn             String?             @map("name_en") @db.VarChar(100)
-  /// 카테고리 (콩류, 유제품 등)
-  category           String?             @db.VarChar(50)
-  /// 정렬 순서
-  sortOrder          Int                 @default(0) @map("sort_order")
-  /// 활성화 여부
-  isActive           Boolean             @default(true) @map("is_active")
-  /// 생성일시
-  createdAt          DateTime            @default(now()) @map("created_at")
-  aliases            IngredientAlias[]
-  productIngredients ProductIngredient[]
-
-  @@index([category])
-  @@map("ingredients")
-}
-
-/// 알레르겐명 표기 변형 테이블
-/// 대두 = 대두콩 = 대두(간장,두부)
-model IngredientAlias {
-  id           Int        @id @default(autoincrement())
-  /// 알레르겐 ID
-  ingredientId Int        @map("ingredient_id")
-  /// 표기 변형
-  alias        String     @unique @db.VarChar(100)
-  /// 출처 (TEST_RESULT: 검사결과, DIET_COMPONENT: 식단성분)
-  source       String?    @db.VarChar(50)
-  /// 생성일시
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-
-  @@index([ingredientId])
-  @@map("ingredient_aliases")
-}
-
-/// 상품-알레르겐 연결 테이블
-/// 식단에 포함된 알레르겐 정보
-model ProductIngredient {
-  id           Int        @id @default(autoincrement())
-  /// 상품 ID
-  productId    Int        @map("product_id")
-  /// 알레르겐 ID
-  ingredientId Int        @map("ingredient_id")
-  /// 생성일시
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
-  product      Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, ingredientId], map: "product_ingredients_product_ingredient_key")
-  @@index([productId])
-  @@index([ingredientId])
-  @@map("product_ingredients")
-}
 
 model ingredient_order_templates {
   id               Int      @id @default(autoincrement())
