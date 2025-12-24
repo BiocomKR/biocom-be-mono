@@ -228,7 +228,8 @@ export class BalanceGameService {
           data: {
             userId,
             couponId: resultStep.coupon.id,
-            expiresAt
+            issuedAt: getNowKST(),
+            expiresAt,
           }
         });
         earnedCoupon = resultStep.coupon;

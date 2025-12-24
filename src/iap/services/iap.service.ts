@@ -231,9 +231,8 @@ export class IapService {
         productId,
         ticketType: 'IAP',
         status: 'AVAILABLE',
-        purchasePrice: product.price,
-        purchasedAt: getNowKST(),
-        expiresAt: this.calculateExpiryDate(30), // 30일 후 만료
+        purchaseDate: getNowKST(),
+        createdAt: getNowKST(),
       },
     });
   }
