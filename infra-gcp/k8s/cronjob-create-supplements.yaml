@@ -42,7 +42,7 @@ spec:
 
           containers:
           - name: create-weekly-supplements
-            image: asia-northeast3-docker.pkg.dev/api-prod-biocom/biocom-api/biocom-api:prod-20251223151022
+            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224150140
             imagePullPolicy: Always
 
             command:

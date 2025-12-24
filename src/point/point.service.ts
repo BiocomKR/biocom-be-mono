@@ -397,7 +397,7 @@ export class PointService {
       await tx.pointHistory.create({
         data: {
           userId,
-          type: 'EARN',
+          type: 'EARNED',
           amount: amount, // 적립은 양수로 기록
           balance: updatedUser.points, // 실제 잔액
           description,

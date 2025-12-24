@@ -77,7 +77,7 @@ export class PointController {
         items: [
           {
             id: 1,
-            type: 'EARN',
+            type: 'EARNED',
             amount: 100,
             balance: 5100,
             description: '1일차 미션 완료',

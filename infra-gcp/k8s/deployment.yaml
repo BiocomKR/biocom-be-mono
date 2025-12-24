@@ -42,7 +42,7 @@ spec:
       containers:
       # 메인 애플리케이션 컨테이너
       - name: biocom-api
-        image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251223124620
+        image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224150140
         imagePullPolicy: Always
         
         ports:
@@ -132,7 +132,7 @@ spec:
       # Cloud SQL Proxy 사이드카 컨테이너 (Workload Identity 사용 시 제거)
       # GKE는 Private IP로 직접 연결 가능
       # - name: cloudsql-proxy
-      #   image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251223124620
+      #   image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224150140
       #   command:
       #     - "/cloud_sql_proxy"
       #     - "-instances=api-dev-biocom:asia-northeast3:biocom-postgres=tcp:5432"

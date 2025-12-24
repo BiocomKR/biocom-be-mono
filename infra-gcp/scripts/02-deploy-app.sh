@@ -540,8 +540,11 @@ deploy_kubernetes() {
     # 모든 CronJob YAML 자동 감지 및 배포
     for cronjob_file in cronjob-*.yaml; do
         if [[ -f "$cronjob_file" ]]; then
+            # Deployment와 동일한 이미지로 업데이트
+            sed -i.bak "s|image: .*biocom-api.*|image: $REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-api:$IMAGE_TAG|" "$cronjob_file"
             kubectl apply -f "$cronjob_file"
             log_info "  ✓ $cronjob_file 배포 완료"
+            rm -f "${cronjob_file}.bak"
         fi
     done
 
