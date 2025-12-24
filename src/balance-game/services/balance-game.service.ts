@@ -214,7 +214,8 @@ export class BalanceGameService {
           gameId,
           playDate: today,
           selectedOptions: [], // 빈 배열로 저장
-          earnedCouponId: isFirstCompletion ? resultStep?.couponId : null
+          earnedCouponId: isFirstCompletion ? resultStep?.couponId : null,
+          completedAt: getNowKST(),
         }
       });
 
