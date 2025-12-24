@@ -100,23 +100,32 @@ if [[ "$AUTO_APPROVE" != true ]]; then
     fi
 fi
 
+# 스크립트 경로
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 # GCP 인증 설정
 setup_auth() {
     log_info "🔐 인증 설정 중..."
 
-    # 현재 gcloud 로그인 계정 확인
-    local current_account
-    current_account=$(gcloud config get-value account 2>/dev/null)
-
-    if [[ -z "$current_account" ]]; then
-        log_error "gcloud에 로그인되어 있지 않습니다. 'gcloud auth login'을 먼저 실행하세요."
-        exit 1
+    # 프로젝트 ID에 따라 적절한 계정으로 자동 전환
+    if [[ "$PROJECT_ID" == "api-dev-biocom" ]]; then
+        log_info "개발 환경 계정으로 전환 중 (ai@biocom.kr)..."
+        gcloud config set account ai@biocom.kr --quiet 2>/dev/null || true
+    elif [[ "$PROJECT_ID" == "api-prod-biocom" ]]; then
+        # 운영 환경: 서비스 계정 키 파일 사용
+        if [ -f "$PROJECT_ROOT/google-service-account-key.json" ]; then
+            log_info "운영 환경 서비스 계정으로 인증 중..."
+            gcloud auth activate-service-account --key-file="$PROJECT_ROOT/google-service-account-key.json" --quiet
+        else
+            log_warning "서비스 계정 키 파일이 없습니다. 기존 인증 사용."
+        fi
     fi
 
-    log_info "현재 계정: $current_account"
-
-    # 프로젝트 및 클러스터 인증
+    # GCP 프로젝트 설정
     gcloud config set project "$PROJECT_ID" --quiet
+
+    # kubeconfig 설정
     gcloud container clusters get-credentials "$CLUSTER_NAME" \
         --zone="$ZONE" \
         --project="$PROJECT_ID"
