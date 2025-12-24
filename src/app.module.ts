@@ -46,6 +46,7 @@ import { QueuesModule } from './queues/queues.module';
 import { IssueModule } from './issue/issue.module';
 import { SolutionModule } from './solution/solution.module';
 import { AppConfigModule } from './app-config/app-config.module';
+import { AiChatModule } from './ai-chat/ai-chat.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -128,6 +129,7 @@ import { AppConfigModule } from './app-config/app-config.module';
     IssueModule,      // 문제 신고 모듈
     SolutionModule,   // 맞춤 솔루션 모듈
     AppConfigModule,  // 앱 설정 관리 모듈
+    AiChatModule,     // AI 챗봇 모듈 (AI Agent 서버 중계)
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [

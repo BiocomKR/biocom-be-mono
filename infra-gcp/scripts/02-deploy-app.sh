@@ -32,7 +32,7 @@ usage() {
 
 옵션:
   -p, --project-id PROJECT_ID    GCP 프로젝트 ID (필수)
-  -e, --env ENV                   배포 환경: development 또는 production (필수)
+  -e, --env ENV                   배포 환경: dev 또는 prod (필수)
   -c, --cluster-name CLUSTER      GKE 클러스터 이름 (기본값: biocom-cluster-dev)
   -z, --zone ZONE                 GCP 존 (기본값: asia-northeast3-a)
   -n, --namespace NAMESPACE       K8s 네임스페이스 (기본값: biocom-api)
@@ -43,9 +43,9 @@ usage() {
   -h, --help                      이 도움말 출력
 
 예시:
-  $0 --project-id api-dev-biocom --env development --yes    # 개발 환경 배포
-  $0 --project-id api-prod-biocom --env production --yes    # 운영 환경 배포
-  $0 --project-id api-dev-biocom --skip-build --yes         # 빌드 없이 배포만
+  $0 --project-id api-dev-biocom --env dev --yes    # 개발 환경 배포
+  $0 --project-id api-prod-biocom --env prod --yes  # 운영 환경 배포
+  $0 --project-id api-dev-biocom --skip-build --yes # 빌드 없이 배포만
 
 주의사항:
   - 인프라가 먼저 구축되어 있어야 합니다 (01-deploy-infrastructure.sh)
@@ -57,7 +57,7 @@ EOF
 
 # 기본값 설정
 PROJECT_ID=""
-DEPLOY_ENV=""  # development 또는 production (필수)
+DEPLOY_ENV=""  # dev 또는 prod (필수)
 CLUSTER_NAME="biocom-cluster-dev"
 ZONE="asia-northeast3-a"
 NAMESPACE="biocom-api"
@@ -76,8 +76,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--env)
             DEPLOY_ENV="$2"
-            if [[ "$DEPLOY_ENV" != "development" && "$DEPLOY_ENV" != "production" ]]; then
-                log_error "환경은 'development' 또는 'production'만 가능합니다: $DEPLOY_ENV"
+            if [[ "$DEPLOY_ENV" != "dev" && "$DEPLOY_ENV" != "prod" ]]; then
+                log_error "환경은 'dev' 또는 'prod'만 가능합니다: $DEPLOY_ENV"
                 exit 1
             fi
             shift 2
@@ -127,7 +127,7 @@ if [[ -z "$PROJECT_ID" ]]; then
 fi
 
 if [[ -z "$DEPLOY_ENV" ]]; then
-    log_error "배포 환경이 필요합니다. -e 또는 --env 옵션을 사용하세요. (development 또는 production)"
+    log_error "배포 환경이 필요합니다. -e 또는 --env 옵션을 사용하세요. (dev 또는 prod)"
     usage
 fi
 
@@ -377,9 +377,30 @@ deploy_kubernetes() {
     # 네임스페이스 생성 (이미 있으면 무시)
     kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
     
-    # ConfigMap 업데이트 (DB_HOST 설정)
-    log_info "ConfigMap 업데이트 중..."
+    # ConfigMap 업데이트 (환경별 설정)
+    log_info "ConfigMap 업데이트 중... (환경: $DEPLOY_ENV)"
+
+    # 환경별 값 설정
+    if [[ "$DEPLOY_ENV" == "prod" ]]; then
+        NODE_ENV_VALUE="production"
+        AI_AGENT_URL="https://ai-agent.biocom.ai.kr"
+        GCP_PROJECT="api-prod-biocom"
+        IMWEB_REDIRECT="https://api.biocom.ai.kr/auth/redirect"
+    else
+        NODE_ENV_VALUE="development"
+        AI_AGENT_URL="https://ai-agent-dev.biocom.ai.kr"
+        GCP_PROJECT="api-dev-biocom"
+        IMWEB_REDIRECT="https://api-dev.biocom.ai.kr/auth/redirect"
+    fi
+
+    # ConfigMap 값 치환
     sed -i.bak "s/DB_HOST: .*/DB_HOST: \"$DB_HOST\"/" configmap.yaml
+    sed -i.bak "s/NODE_ENV: .*/NODE_ENV: \"$NODE_ENV_VALUE\"/" configmap.yaml
+    sed -i.bak "s|AI_AGENT_BASE_URL: .*|AI_AGENT_BASE_URL: \"$AI_AGENT_URL\"|" configmap.yaml
+    sed -i.bak "s/GOOGLE_CLOUD_PROJECT_ID: .*/GOOGLE_CLOUD_PROJECT_ID: \"$GCP_PROJECT\"/" configmap.yaml
+    sed -i.bak "s|IMWEB_REDIRECT_URI: .*|IMWEB_REDIRECT_URI: \"$IMWEB_REDIRECT\"|" configmap.yaml
+    sed -i.bak "s/environment: .*/environment: $DEPLOY_ENV/" configmap.yaml
+
     kubectl apply -f configmap.yaml
     
     # Secret 생성 (이미 있으면 업데이트)
@@ -399,7 +420,8 @@ deploy_kubernetes() {
         --from-literal=SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL" \
         --from-literal=PLAYAUTO_API_KEY="$PLAYAUTO_API_KEY" \
         --from-literal=PLAYAUTO_EMAIL="$PLAYAUTO_EMAIL" \
-        --from-literal=PLAYAUTO_PASSWORD="$PLAYAUTO_PASSWORD"
+        --from-literal=PLAYAUTO_PASSWORD="$PLAYAUTO_PASSWORD" \
+        --from-literal=AI_AGENT_API_KEY="$AI_AGENT_API_KEY"
     
     # Google Service Account Key Secret 확인/생성
     log_info "Google Service Account Key Secret 확인 중..."
@@ -458,9 +480,9 @@ deploy_kubernetes() {
         log_info "Firebase Service Account Key Secret이 없습니다. 생성합니다..."
 
         # 환경별 Firebase 서비스 계정 키 파일 선택
-        # development: biocomchallengedev-firebase-adminsdk-*.json
-        # production: biocomchallenge-firebase-adminsdk-*.json (dev 없는 것)
-        if [[ "$DEPLOY_ENV" == "production" ]]; then
+        # dev: biocomchallengedev-firebase-adminsdk-*.json
+        # prod: biocomchallenge-firebase-adminsdk-*.json (dev 없는 것)
+        if [[ "$DEPLOY_ENV" == "prod" ]]; then
             # 운영: biocomchallenge-firebase-adminsdk-*.json (dev가 포함되지 않은 것)
             FIREBASE_KEY_FILE=$(find "$PROJECT_ROOT" -maxdepth 1 -name "biocomchallenge-firebase-adminsdk*.json" -type f | head -1)
             FIREBASE_ENV_NAME="운영(biocomchallenge)"
@@ -507,9 +529,9 @@ deploy_kubernetes() {
     log_info "Ingress 배포 중..."
     kubectl apply -f ingress.yaml
 
-    # CronJob 검증 및 배포
-    log_info "CronJob 설정 검증 중..."
-    if ! bash "$SCRIPT_DIR/validate-cronjobs.sh"; then
+    # CronJob 검증 및 배포 (환경 파라미터 전달)
+    log_info "CronJob 설정 검증 중... (환경: $DEPLOY_ENV)"
+    if ! bash "$SCRIPT_DIR/validate-cronjobs.sh" "$DEPLOY_ENV"; then
         log_error "CronJob 검증 실패! 배포를 중단합니다."
         exit 1
     fi
