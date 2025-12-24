@@ -700,8 +700,8 @@ export class HomeService {
       currentDay,
     } = context;
 
-    // 기본 이미지 (페르소나 설정 전)
-    const defaultImageUrl = '';
+    // 기본 이미지 (페르소나 설정 전) - 메이브 상반신 이미지 사용
+    const defaultImageUrl = 'https://storage.googleapis.com/api-dev-biocom-uploads/persona_torso_mave.webp';
     // 페르소나 설정 후에는 페르소나 이미지 사용
     const bannerImageUrl = personaImageUrl || defaultImageUrl;
 
