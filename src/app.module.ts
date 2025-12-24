@@ -47,6 +47,7 @@ import { IssueModule } from './issue/issue.module';
 import { SolutionModule } from './solution/solution.module';
 import { AppConfigModule } from './app-config/app-config.module';
 import { AiChatModule } from './ai-chat/ai-chat.module';
+import { DeepReportModule } from './deep-report/deep-report.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -130,6 +131,7 @@ import { AiChatModule } from './ai-chat/ai-chat.module';
     SolutionModule,   // 맞춤 솔루션 모듈
     AppConfigModule,  // 앱 설정 관리 모듈
     AiChatModule,     // AI 챗봇 모듈 (AI Agent 서버 중계)
+    DeepReportModule, // 심층리포트 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [

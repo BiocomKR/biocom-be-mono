@@ -84,6 +84,9 @@ data:
   KCP_CERT_INFO: "/config/kcp-cert/KCP_AUTH_ALDXX_CERT.pem"
   KCP_PRIVATE_KEY_PATH: "/config/kcp-cert/KCP_AUTH_ALDXX_PRIKEY.pem"
   KCP_CALLBACK_NUMBER: "0220390295"
+
+  # AI Agent 서버 설정
+  AI_AGENT_BASE_URL: "https://ai-agent-dev.biocom.ai.kr"
   
 ---
 # 📝 로깅 설정용 ConfigMap

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
 import { UserChallengeStatus, YesNo } from '../common/enums';
@@ -17,6 +18,7 @@ import { SurveyType } from '../common/enums';
 import { getNowKST, getKoreanToday, stringToKSTDate } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
 import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
+import axios from 'axios';
 
 /** 캐시 TTL (1분) */
 const CACHE_TTL_MS = 60 * 1000;
@@ -111,13 +113,20 @@ interface UserData {
 @Injectable()
 export class HomeService {
   private readonly logger = new Logger(HomeService.name);
+  private readonly aiAgentBaseUrl: string;
+  private readonly aiAgentApiKey: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly sibApiService: SibApiService,
     private readonly missionService: MissionService,
     private readonly appConfigService: AppConfigService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    // AI Agent 서버 설정 로드
+    this.aiAgentBaseUrl = this.configService.get<string>('AI_AGENT_BASE_URL') || 'http://localhost:8000';
+    this.aiAgentApiKey = this.configService.get<string>('AI_AGENT_API_KEY') || '';
+  }
 
   /**
    * 종합건강대사 검사 완료 여부 확인
@@ -190,6 +199,12 @@ export class HomeService {
         challenges.completed,
         challengeDays.daysAfterChallengeEnd,
       );
+
+      // 9. 심층리포트 및 채팅요약 생성 (비동기 - 응답 대기 없음)
+      // chartId가 있는 경우에만 AI Agent 호출
+      if (reportInfo.chartId) {
+        this.callAiAgentHomeAsync(userId, reportInfo.chartId);
+      }
 
       return {
         userType: user.status as UserSubscriptionStatus,
@@ -933,5 +948,45 @@ export class HomeService {
     } catch (error: any) {
       this.logger.warn(`차트 데이터 갱신 실패 - 사용자 ID: ${userId}`, error.message);
     }
+  }
+
+  /**
+   * AI Agent /api/home 비동기 호출 (Fire-and-Forget)
+   * 심층리포트 및 채팅요약 생성을 위해 AI Agent 서버에 요청
+   * 응답을 기다리지 않고 백그라운드에서 처리
+   *
+   * @param userId 사용자 ID
+   * @param chartId 차트 ID
+   */
+  private callAiAgentHomeAsync(userId: number, chartId: string): void {
+    const url = `${this.aiAgentBaseUrl}/api/home`;
+
+    this.logger.log(`[callAiAgentHomeAsync] AI Agent 호출 시작 - userId: ${userId}, chartId: ${chartId}`);
+
+    // 비동기 호출 (응답 대기 없음)
+    axios
+      .post(
+        url,
+        {
+          userId,
+          chartId,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.aiAgentApiKey,
+          },
+          timeout: 30000, // 30초 타임아웃
+        },
+      )
+      .then(() => {
+        this.logger.log(`[callAiAgentHomeAsync] AI Agent 호출 성공 - userId: ${userId}`);
+      })
+      .catch((error) => {
+        // 에러 발생해도 홈 API 응답에 영향 없음
+        this.logger.warn(
+          `[callAiAgentHomeAsync] AI Agent 호출 실패 - userId: ${userId}, error: ${error.message}`,
+        );
+      });
   }
 }

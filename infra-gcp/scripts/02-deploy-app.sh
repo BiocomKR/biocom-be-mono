@@ -346,6 +346,15 @@ load_secrets() {
     source "$SECRETS_FILE"
     set +a
 
+    # 필수 환경변수 검증
+    local required_vars=("DB_PASSWORD" "JWT_SECRET" "OPENAI_API_KEY" "AI_AGENT_API_KEY")
+    for var in "${required_vars[@]}"; do
+        if [[ -z "${!var}" ]]; then
+            log_error "필수 환경변수가 비어있습니다: $var"
+            exit 1
+        fi
+    done
+
     log_success "✅ 민감정보 로드 완료!"
 }
 
