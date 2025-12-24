@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { DeepReportResponseDto, DeepReportContentDto } from './dto/deep-report.dto';
 import { YesNo } from '../common/enums';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 심층리포트 서비스
@@ -36,13 +37,20 @@ export class DeepReportService {
     const { lastMonday, lastSunday } = this.getLastWeekRange();
     this.logger.log(`[getDeepReport] 지난주 범위: ${lastMonday.toISOString()} ~ ${lastSunday.toISOString()}`);
 
-    // 3. user_deep_reports 조회
+    // 3. user_deep_reports 조회 (endDate는 같은 날짜의 23:59:59까지 포함)
+    // DB의 end_date는 일요일 23:59:59로 저장되므로 범위 비교 사용
+    const lastSundayEnd = new Date(lastSunday.getTime() + 24 * 60 * 60 * 1000 - 1); // 일요일 23:59:59.999
+    this.logger.log(`[getDeepReport] endDate 범위: ${lastSunday.toISOString()} ~ ${lastSundayEnd.toISOString()}`);
+
     const deepReport = await this.prisma.userDeepReport.findFirst({
       where: {
         userId,
         chartId,
         startDate: lastMonday,
-        endDate: lastSunday,
+        endDate: {
+          gte: lastSunday,
+          lte: lastSundayEnd,
+        },
       },
       select: {
         reportId: true,
@@ -99,47 +107,37 @@ export class DeepReportService {
 
   /**
    * 지난주 월요일과 일요일 날짜 계산 (KST 기준)
-   * 예) 오늘이 2025-12-10(수)이면 지난주 월요일=2025-12-01, 일요일=2025-12-07
+   * 예) 오늘이 2025-12-24(화)이면 지난주 월요일=2025-12-15, 일요일=2025-12-21
    *
    * @returns 지난주 월요일(00:00:00), 일요일(00:00:00) Date 객체
    */
   private getLastWeekRange(): { lastMonday: Date; lastSunday: Date } {
-    // 현재 KST 시간 구하기
-    const now = new Date();
-    const kstOffset = 9 * 60 * 60 * 1000; // UTC+9
-    const kstNow = new Date(now.getTime() + kstOffset);
+    // KST 기준 현재 시간
+    const now = getNowKST();
 
-    // 오늘의 요일 (0=일, 1=월, ..., 6=토)
-    const dayOfWeek = kstNow.getUTCDay();
+    // 오늘의 요일 (0=일, 1=월, ..., 6=토) - UTC 메서드 사용 (KST를 UTC로 저장했으므로)
+    const dayOfWeek = now.getUTCDay();
 
     // 이번주 월요일까지 며칠 전인지 계산
-    // 일요일(0) -> 6일 전이 월요일
-    // 월요일(1) -> 0일 전
-    // 화요일(2) -> 1일 전
-    // ...
     const daysToThisMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-    // 이번주 월요일
-    const thisMonday = new Date(kstNow);
-    thisMonday.setUTCDate(thisMonday.getUTCDate() - daysToThisMonday);
-    thisMonday.setUTCHours(0, 0, 0, 0);
+    // 이번주 월요일 날짜 계산
+    const thisMondayDate = now.getUTCDate() - daysToThisMonday;
 
     // 지난주 월요일 = 이번주 월요일 - 7일
-    const lastMonday = new Date(thisMonday);
-    lastMonday.setUTCDate(lastMonday.getUTCDate() - 7);
+    const lastMondayDate = thisMondayDate - 7;
 
     // 지난주 일요일 = 지난주 월요일 + 6일
-    const lastSunday = new Date(lastMonday);
-    lastSunday.setUTCDate(lastSunday.getUTCDate() + 6);
+    const lastSundayDate = lastMondayDate + 6;
 
-    // UTC로 저장된 DB와 비교를 위해 KST offset 제거
-    // DB에 저장된 날짜가 KST 기준이라면 그대로 사용
-    // DB에 저장된 날짜가 UTC라면 offset 조정 필요
-    // 여기서는 DB가 KST 기준으로 저장되어 있다고 가정
+    // createKSTDate로 Date 객체 생성 (00:00:00 기준)
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth() + 1;
 
-    return {
-      lastMonday: new Date(lastMonday.getTime() - kstOffset),
-      lastSunday: new Date(lastSunday.getTime() - kstOffset),
-    };
+    // 날짜 계산 (월 경계 처리)
+    const lastMonday = new Date(Date.UTC(year, month - 1, lastMondayDate, 0, 0, 0));
+    const lastSunday = new Date(Date.UTC(year, month - 1, lastSundayDate, 0, 0, 0));
+
+    return { lastMonday, lastSunday };
   }
 }
