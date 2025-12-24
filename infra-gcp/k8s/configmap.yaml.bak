@@ -8,7 +8,7 @@ metadata:
   namespace: biocom-api
   labels:
     app: biocom-api
-    environment: dev
+    environment: prod
 data:
   # 데이터베이스 설정 (민감하지 않은 정보)
   DB_HOST: "34.47.124.132"
