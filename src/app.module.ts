@@ -28,7 +28,6 @@ import { UsersController } from './users/users.controller';
 import { ChallengeController } from './challenge/challenge.controller';
 import { MissionController } from './mission/mission.controller';
 import { SurveyController } from './survey/survey.controller';
-import { QuizMasterController } from './quiz/quiz-master.controller';
 import { ContentController } from './content/content.controller';
 import { PointController } from './point/point.controller';
 import { ShopController } from './shop/shop.controller';
@@ -44,7 +43,6 @@ import { UsersService } from './users/users.service';
 import { ChallengeService } from './challenge/challenge.service';
 import { MissionService } from './mission/mission.service';
 import { SurveyService } from './survey/survey.service';
-import { QuizService } from './quiz/quiz.service';
 import { ContentService } from './content/content.service';
 import { PointService } from './point/point.service';
 import { ShopService } from './shop/shop.service';
@@ -54,8 +52,6 @@ import { RefundService } from './refund/refund.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { CartService } from './cart/cart.service';
 import { BannerService } from './banner/banner.service';
-import { LogisticsLogController } from './logistics/logistics-log.controller';
-import { LogisticsLogService } from './logistics/logistics-log.service';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
 import { UtilsModule } from './utils/utils.module';
@@ -116,7 +112,6 @@ import { AppConfigModule } from './app-config/app-config.module';
     ChallengeController,
     MissionController,
     SurveyController,
-    QuizMasterController,
     ContentController,
     PointController,
     ShopController,
@@ -126,7 +121,6 @@ import { AppConfigModule } from './app-config/app-config.module';
     DashboardController,
     CartController,
     BannerController,
-    LogisticsLogController,
     OrdersController,
     IssueController,
   ],
@@ -135,7 +129,6 @@ import { AppConfigModule } from './app-config/app-config.module';
     ChallengeService,
     MissionService,
     SurveyService,
-    QuizService,
     ContentService,
     PointService,
     ShopService,
@@ -145,7 +138,6 @@ import { AppConfigModule } from './app-config/app-config.module';
     DashboardService,
     CartService,
     BannerService,
-    LogisticsLogService,
     OrdersService,
     IssueService,
     {

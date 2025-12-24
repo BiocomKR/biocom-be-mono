@@ -460,41 +460,55 @@ export class MissionService {
         throw new NotFoundException('미션을 찾을 수 없습니다');
       }
 
-      // 미션 시도 통계
-      const attemptStats = await this.prisma.userMission.groupBy({
-        by: ['isCompleted'],
+      // 미션 시도 통계 (user_records 기반)
+      const allRecords = await this.prisma.userRecord.findMany({
         where: {
-          challengeMission: {
-            missionId: id
+          metadata: {
+            path: ['missionId'],
+            equals: id
           }
         },
-        _count: {
-          id: true
+        select: {
+          metadata: true
         }
       });
+
+      // isCompleted 기준으로 그룹화
+      const completedCount = allRecords.filter(r => (r.metadata as any)?.isCompleted === true).length;
+      const incompleteCount = allRecords.filter(r => (r.metadata as any)?.isCompleted !== true).length;
 
       // 일별 완료 통계 (최근 30일)
       const thirtyDaysAgo = getNowKST();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const dailyStats = await this.prisma.userMission.groupBy({
-        by: ['day'],
+      const recentRecords = await this.prisma.userRecord.findMany({
         where: {
-          challengeMission: {
-            missionId: id
+          metadata: {
+            path: ['missionId'],
+            equals: id
           },
           createdAt: {
             gte: thirtyDaysAgo
-          },
-          isCompleted: true
+          }
         },
-        _count: {
-          id: true
-        },
-        orderBy: {
-          day: 'asc'
+        select: {
+          metadata: true
         }
       });
+
+      // day별로 그룹화 (완료된 것만)
+      const dailyStatsMap = new Map<number, number>();
+      recentRecords.forEach(r => {
+        const metadata = r.metadata as any;
+        if (metadata?.isCompleted === true && metadata?.day) {
+          const day = metadata.day;
+          dailyStatsMap.set(day, (dailyStatsMap.get(day) || 0) + 1);
+        }
+      });
+
+      const dailyStats = Array.from(dailyStatsMap.entries())
+        .map(([day, count]) => ({ day, _count: { id: count } }))
+        .sort((a, b) => a.day - b.day);
 
       // 챌린지별 사용 현황
       const challengeUsage = await this.prisma.challengeMission.findMany({
@@ -513,9 +527,9 @@ export class MissionService {
         }
       });
 
-      const totalAttempts = attemptStats.reduce((sum, stat) => sum + stat._count.id, 0);
-      const completedAttempts = attemptStats.find(stat => stat.isCompleted)?._count.id || 0;
-      const incompleteAttempts = attemptStats.find(stat => !stat.isCompleted)?._count.id || 0;
+      const totalAttempts = allRecords.length;
+      const completedAttempts = completedCount;
+      const incompleteAttempts = incompleteCount;
 
       return {
         mission: {

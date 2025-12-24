@@ -1,5 +1,5 @@
-# 🚀 Deployment - biocom-bo-api 배포 정의
-# 경량화된 백오피스 API 스펙
+# 🚀 Deployment - biocom-bo-api 운영 배포 정의
+# dev 스펙의 2배 적용
 
 apiVersion: apps/v1
 kind: Deployment
@@ -9,14 +9,14 @@ metadata:
   labels:
     app: biocom-bo-api
     version: v1
-    environment: dev
+    environment: prod
 spec:
-  replicas: 1  # 백오피스는 1개로 충분
+  replicas: 2  # dev: 1 → prod: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 0          # 추가 Pod 없이 배포 (메모리 절약)
-      maxUnavailable: 1    # 기존 Pod 먼저 종료 후 새 Pod 생성
+      maxSurge: 1          # 운영: 가용성 보장
+      maxUnavailable: 0    # 운영: 다운타임 없음
   selector:
     matchLabels:
       app: biocom-bo-api
@@ -25,6 +25,7 @@ spec:
       labels:
         app: biocom-bo-api
         version: v1
+        environment: prod
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "10805"
@@ -37,10 +38,23 @@ spec:
         runAsUser: 1000
         fsGroup: 2000
 
+      # 운영 환경: 서로 다른 노드에 분산 배치
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - biocom-bo-api
+                topologyKey: kubernetes.io/hostname
+
       containers:
         - name: biocom-bo-api
-          # TODO: 실제 이미지 태그로 변경
-          image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-bo-api:20251223174555
+          image: asia-northeast3-docker.pkg.dev/api-prod-biocom/biocom-bo-api/biocom-bo-api:latest
           imagePullPolicy: Always
 
           ports:
@@ -64,14 +78,14 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
 
-          # 리소스 제한 (경량화)
+          # 리소스 제한 (dev의 2배)
           resources:
             requests:
-              memory: "256Mi"  # biocom-api는 512Mi
-              cpu: "100m"      # biocom-api는 250m
+              memory: "512Mi"   # dev: 256Mi → prod: 512Mi
+              cpu: "200m"       # dev: 100m → prod: 200m
             limits:
-              memory: "512Mi"  # biocom-api는 1Gi
-              cpu: "250m"      # biocom-api는 500m
+              memory: "1Gi"     # dev: 512Mi → prod: 1Gi
+              cpu: "500m"       # dev: 250m → prod: 500m
 
           # Startup probe
           startupProbe:
@@ -133,7 +147,7 @@ spec:
       restartPolicy: Always
 
 ---
-# 🔄 HorizontalPodAutoscaler - 자동 스케일링 (경량화)
+# 🔄 HorizontalPodAutoscaler - 자동 스케일링 (운영용)
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -146,8 +160,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: biocom-bo-api
-  minReplicas: 1  # biocom-api는 2
-  maxReplicas: 3  # biocom-api는 10
+  minReplicas: 2  # dev: 1 → prod: 2
+  maxReplicas: 6  # dev: 3 → prod: 6
   metrics:
     - type: Resource
       resource:
@@ -176,7 +190,7 @@ spec:
           periodSeconds: 60
 
 ---
-# 🔧 ServiceAccount - Workload Identity용
+# 🔧 ServiceAccount - Workload Identity용 (운영)
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -185,5 +199,5 @@ metadata:
   labels:
     app: biocom-bo-api
   annotations:
-    iam.gke.io/gcp-service-account: biocom-bo-api@biocom-backoffice.iam.gserviceaccount.com
+    iam.gke.io/gcp-service-account: biocom-bo-api@api-prod-biocom.iam.gserviceaccount.com
 automountServiceAccountToken: true
