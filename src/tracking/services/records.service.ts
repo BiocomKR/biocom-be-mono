@@ -1294,11 +1294,15 @@ export class RecordsService {
       //   throw new ForbiddenException('접근 권한이 없습니다.');
       // }
 
-      this.logger.log(`D0060 검사 결과 발견 - chartID: ${latestResult.chartID}, 경과일: ${daysDiff}일`);
+      this.logger.log(`지연성 알러지 검사 결과 발견 - chartID: ${latestResult.chartID}, orderCode: ${latestResult.orderCode}, 경과일: ${daysDiff}일`);
 
-      // 2. getIggLevels API 호출
+      // 2. orderCode에 따라 신/구 API 분기 호출
+      const apiEndpoint = latestResult.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY
+        ? 'https://sib.codns.com:3001/api/report/getIggLevelOld'
+        : 'https://sib.codns.com:3001/api/report/getIggLevels';
+
       const iggResponse = await firstValueFrom(
-        this.httpService.get(`https://sib.codns.com:3001/api/report/getIggLevels`, {
+        this.httpService.get(apiEndpoint, {
           params: { chartId: latestResult.chartID },
         })
       );

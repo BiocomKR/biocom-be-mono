@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
+import { ExamCode } from '../../common/enums/exam-code.enum';
 import { getNowKST, getDayOfWeek, formatKoreanDate } from '../../common/utils/kst-date.util';
 import {
   BeautyStatisticsDto,
@@ -1822,11 +1823,15 @@ export class StatisticsService {
 
       this.logger.log(`날짜 필터 (KST): ${startDate.toISOString()} ~ ${today.toISOString()}`);
 
-      // 2. 외부 API: 음식물과민증 검사 결과 조회
+      // 2. 외부 API: 음식물과민증 검사 결과 조회 (orderCode에 따라 신/구 API 분기)
       let iggLevels = [];
       try {
+        const apiEndpoint = userChart.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY
+          ? 'https://sib.codns.com:3001/api/report/getIggLevelOld'
+          : 'https://sib.codns.com:3001/api/report/getIggLevels';
+
         const iggResponse = await firstValueFrom(
-          this.httpService.get(`https://sib.codns.com:3001/api/report/getIggLevels`, {
+          this.httpService.get(apiEndpoint, {
             params: { chartId },
             timeout: 10000 // 10초 타임아웃
           })
@@ -1836,7 +1841,7 @@ export class StatisticsService {
           iggLevels = iggResponse.data;
         }
 
-        this.logger.log(`음식물과민증 검사 결과 조회 완료: ${iggLevels.length}건`);
+        this.logger.log(`음식물과민증 검사 결과 조회 완료: ${iggLevels.length}건, orderCode: ${userChart.orderCode}`);
       } catch (error) {
         this.logger.warn(`음식물과민증 검사 결과 조회 실패: ${error.message}`);
         // 실패해도 계속 진행 (빈 배열)

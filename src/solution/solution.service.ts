@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { SibApiService } from '../sib/services/sib-api.service';
+import { ExamType, IGG_EXAM_TYPES } from '../sib/enums/exam-type.enum';
 import { FoodLevelItem } from '../sib/interfaces/sib-response.interface';
 import {
   SolutionResponseDto,
@@ -330,6 +331,8 @@ export class SolutionService {
 
   /**
    * SIB 음식물 과민증 검사 결과 조회
+   * - D0004(구), D0060(신) 중 최신 검사 결과 조회
+   * - orderCode에 따라 신/구 API 분기 호출
    * @param mobile 전화번호
    * @returns 레벨별 음식 목록 또는 null
    */
@@ -337,22 +340,44 @@ export class SolutionService {
     mobile: string,
   ): Promise<FoodLevelItem | null> {
     try {
-      // 1. 전화번호로 차트 ID 조회
-      const homeExamInfo = await this.sibApiService.getHomeExamInfo(mobile);
+      // 1. 전화번호로 차트 목록 조회
+      const chartList = await this.sibApiService.getChartIdByMobile(mobile);
 
-      if (!homeExamInfo.chartId) {
+      if (!chartList || chartList.length === 0) {
         this.logger.debug(`SIB 검사 결과 없음 (mobile: ${mobile})`);
         return null;
       }
 
-      // 2. 차트 ID로 IgG 레벨 조회
-      const iggLevels = await this.sibApiService.getIggLevels(
-        homeExamInfo.chartId,
+      // 2. D0004, D0060만 필터링 후 최신순 정렬
+      const iggExams = chartList
+        .filter((exam) => IGG_EXAM_TYPES.includes(exam.orderCode as ExamType))
+        .sort(
+          (a, b) =>
+            new Date(b.receiptDate).getTime() -
+            new Date(a.receiptDate).getTime(),
+        );
+
+      if (iggExams.length === 0) {
+        this.logger.debug(`지연성 알러지 검사 결과 없음 (mobile: ${mobile})`);
+        return null;
+      }
+
+      const targetExam = iggExams[0];
+      this.logger.debug(
+        `SIB 검사 조회 - chartId: ${targetExam.chartID}, orderCode: ${targetExam.orderCode}`,
       );
+
+      // 3. orderCode에 따라 신/구 API 분기 호출
+      let iggLevels;
+      if (targetExam.orderCode === ExamType.IGG_OLD) {
+        iggLevels = await this.sibApiService.getIggLevelsOld(targetExam.chartID);
+      } else {
+        iggLevels = await this.sibApiService.getIggLevels(targetExam.chartID);
+      }
 
       if (!iggLevels || iggLevels.length === 0) {
         this.logger.debug(
-          `IgG 레벨 조회 실패 (chartId: ${homeExamInfo.chartId})`,
+          `IgG 레벨 조회 실패 (chartId: ${targetExam.chartID})`,
         );
         return null;
       }
