@@ -45,7 +45,7 @@ spec:
 
           containers:
           - name: iap-acknowledge-retry
-            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224150140
+            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224191256
             imagePullPolicy: Always
 
             command:

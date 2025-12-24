@@ -1108,12 +1108,12 @@ export class ChallengeService {
           throw new ConflictException('이미 활성화된 챌린지가 있습니다. 한 번에 하나의 챌린지만 진행할 수 있습니다.');
         }
 
-        // 3. 이미 구매한 티켓이 있는지 확인
+        // 3. 이미 구매한 티켓이 있는지 확인 (PURCHASED 또는 ACTIVATED 상태)
         let ticket = await tx.challengeTicket.findFirst({
           where: {
             userId,
             productId,
-            status: ChallengeTicketStatus.PURCHASED
+            status: { in: [ChallengeTicketStatus.PURCHASED, ChallengeTicketStatus.ACTIVATED] }
           }
         });
 

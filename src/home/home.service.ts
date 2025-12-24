@@ -335,12 +335,20 @@ export class HomeService {
       };
     }
 
-    // 캐시 미스 - 백그라운드로 SIB API 호출
-    this.fetchAndSaveChartData(userId, user.mobile).catch((err) => {
-      this.logger.warn(`차트 데이터 백그라운드 저장 실패 - 사용자 ID: ${userId}`, err);
-    });
+    // 캐시 미스 - 동기적으로 SIB API 호출 (첫 호출 시 대기)
+    try {
+      const chartData = await this.fetchAndSaveChartDataSync(userId, user.mobile);
+      if (chartData) {
+        return {
+          chartId: chartData.chartId,
+          resultYN: chartData.resultYn as YesNo,
+        };
+      }
+    } catch (err) {
+      this.logger.warn(`차트 데이터 동기 조회 실패 - 사용자 ID: ${userId}`, err);
+    }
 
-    return { chartId: null, resultYN: YesNo.N };
+    return { chartId: null, resultYN: YesNo.N, sibError: true };
   }
 
   /**
@@ -878,22 +886,30 @@ export class HomeService {
   }
 
   /**
-   * 외부 API에서 차트 데이터 조회 및 DB 저장
+   * 외부 API에서 차트 데이터 조회 및 DB 저장 (동기 - 결과 반환)
    */
-  private async fetchAndSaveChartData(userId: number, mobile: string): Promise<void> {
+  private async fetchAndSaveChartDataSync(userId: number, mobile: string): Promise<{ chartId: string; resultYn: string } | null> {
     try {
-      this.logger.log(`외부 API 차트 데이터 조회 시작 - 사용자 ID: ${userId}`);
+      this.logger.log(`외부 API 차트 데이터 동기 조회 시작 - 사용자 ID: ${userId}`);
 
       const chartData = await this.sibApiService.getChartIdByMobile(mobile);
 
       if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
         this.logger.log(`차트 데이터 없음 - 사용자 ID: ${userId}`);
-        return;
+        return null;
+      }
+
+      // D0004 또는 D0060 차트만 필터링
+      const targetChart = chartData.find((c) => c.orderCode === 'D0004' || c.orderCode === 'D0060');
+      if (!targetChart) {
+        this.logger.log(`대상 차트 데이터 없음 (D0004/D0060) - 사용자 ID: ${userId}`);
+        return null;
       }
 
       this.logger.log(`차트 데이터 ${chartData.length}건 조회 - 사용자 ID: ${userId}`);
 
-      const result = await this.prisma.userChart.createMany({
+      // DB에 저장
+      await this.prisma.userChart.createMany({
         data: chartData.map((chart) => ({
           userId,
           chartId: chart.chartID,
@@ -904,9 +920,15 @@ export class HomeService {
         skipDuplicates: true,
       });
 
-      this.logger.log(`차트 데이터 ${result.count}건 저장 완료 - 사용자 ID: ${userId}`);
+      this.logger.log(`차트 데이터 저장 완료 - 사용자 ID: ${userId}`);
+
+      return {
+        chartId: targetChart.chartID,
+        resultYn: targetChart.resultYN,
+      };
     } catch (error: any) {
-      this.logger.warn(`차트 데이터 조회 실패 - 사용자 ID: ${userId}`, error.message);
+      this.logger.warn(`차트 데이터 동기 조회 실패 - 사용자 ID: ${userId}`, error.message);
+      throw error;
     }
   }
 
