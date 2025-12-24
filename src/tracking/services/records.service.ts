@@ -880,14 +880,19 @@ export class RecordsService {
       where: { userId, status: 'ACTIVE' },
     });
 
-    // 기록 저장
+    // 기록 저장 (pointsEarned를 metadata에 포함)
+    const metadataWithPoints = {
+      ...metadata,
+      pointsEarned: pointsToAward,
+    };
+
     const userRecord = await tx.userRecord.create({
       data: {
         userId,
         userChallengeId: activeChallenge?.id || null,
         recordType: recordCode,
         date: new Date(date),
-        metadata,
+        metadata: metadataWithPoints,
         createdAt: getNowKST(),
       },
     });
