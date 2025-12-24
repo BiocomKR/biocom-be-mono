@@ -1491,7 +1491,7 @@ export class RecordsService {
       const isFirstRecordOfDay = !existingRecordWithImage;
 
       // 3. RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
-      const updatePromises = data.map(async (item: any) => {
+      const updatePromises = data.map(async (item: any, index: number) => {
         const { productId, morning, afternoon, evening } = item;
 
         // 해당 productId의 기록 조회
@@ -1525,6 +1525,11 @@ export class RecordsService {
         // imageUrl이 있으면 metadata에 포함
         if (imageUrl) {
           updatedMetadata.imageUrl = imageUrl;
+        }
+
+        // 당일 최초 기록이고 첫 번째 아이템인 경우 pointsEarned 추가
+        if (isFirstRecordOfDay && index === 0) {
+          updatedMetadata.pointsEarned = 100;
         }
 
         // 레코드 업데이트
