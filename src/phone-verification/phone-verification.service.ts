@@ -2,7 +2,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/services/prisma.service';
@@ -73,33 +72,6 @@ export class PhoneVerificationService {
     dto: RequestVerificationDto,
   ): Promise<RequestVerificationResponseDto> {
     this.logger.log(`🚀 본인인증 요청 시작 - 이름: ${dto.userName}`);
-
-    // 기존 회원 체크 (회원가입용 본인인증에서 이미 가입된 번호 차단)
-    const existingUser = await this.prisma.user.findFirst({
-      where: { mobile: dto.mobile },
-    });
-
-    if (existingUser) {
-      this.logger.warn(`이미 가입된 휴대폰 번호: ${dto.mobile}`);
-      throw new ConflictException('이미 가입된 휴대폰 번호입니다. 로그인을 이용해주세요.');
-    }
-
-    // 3분 이내 중복 발송 체크
-    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
-    const recentVerification = await this.prisma.phoneVerificationLog.findFirst({
-      where: {
-        mobile: dto.mobile,
-        step: VerificationStep.SMS_SENT,
-        verificationStatus: VerificationStatus.PENDING,
-        createdAt: { gte: threeMinutesAgo },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (recentVerification) {
-      this.logger.warn(`3분 이내 중복 요청: ${dto.mobile}`);
-      throw new ConflictException('이미 인증번호가 발송되었습니다. 3분 후에 다시 시도해주세요.');
-    }
 
     // 주문번호 생성
     const orderId = this.generateOrderId();
