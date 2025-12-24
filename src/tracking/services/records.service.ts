@@ -900,7 +900,7 @@ export class RecordsService {
         pointsToAward,
         `${recordCode} 기록 완료`,
         'RECORD_COMPLETION',
-        userRecord.id
+        userRecord.id,
       );
     }
 

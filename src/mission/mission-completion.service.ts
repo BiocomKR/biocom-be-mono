@@ -321,7 +321,7 @@ export class MissionCompletionService {
             pointsEarned,
             `미션 완료: ${mission.name} (${attemptNumber}/${dailyLimit})`,
             'CHALLENGE_MISSION',
-            challengeMission.id
+            challengeMission.id,
           );
 
           this.logger.log(`미션 포인트 지급 - ${mission.name}, 획득 포인트: ${pointsEarned} (${attemptNumber}/${maxPointsCount ?? dailyLimit}회)`);

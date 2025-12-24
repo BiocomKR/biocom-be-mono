@@ -449,13 +449,13 @@ export class HomeService {
     const todayDate = stringToKSTDate(today);
     const tomorrowDate = stringToKSTDate(today, 24, 0, 0);
 
-    // 병렬로 조회: user_records, point_histories (user_missions 제거)
-    const [todayRecords, todaySupplementRecords, todayPointHistories] = await Promise.all([
-      // user_records: 5가지 기록 (createdAt 기준) - SUPPLEMENT 제외
+    // 병렬로 조회: user_records (SUPPLEMENT 별도)
+    const [todayRecords, todaySupplementRecords] = await Promise.all([
+      // user_records: 기록 타입 (createdAt 기준) - SUPPLEMENT 제외
       this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY'] },
+          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY', 'DECLARATION', 'SELF_PRAISE', 'QUIZ', 'BALANCE_GAME', 'DAILY_MISSION', 'WEEKLY_REPORT', 'AFTER_SURVEY'] },
           createdAt: {
             gte: todayDate,
             lt: tomorrowDate,
@@ -482,27 +482,12 @@ export class HomeService {
           metadata: true,
         },
       }),
-      // point_histories: 포인트 지급 내역 (RECORD_COMPLETION, MISSION_COMPLETION)
-      this.prisma.pointHistory.findMany({
-        where: {
-          userId,
-          relatedType: { in: ['RECORD_COMPLETION', 'MISSION_COMPLETION'] },
-          createdAt: {
-            gte: todayDate,
-            lt: tomorrowDate,
-          },
-        },
-        select: {
-          description: true,
-          relatedType: true,
-        },
-      }),
     ]);
 
     // recordType별 실행 횟수 계산
     const executedMap = new Map<string, number>();
 
-    // user_records에서 실행 횟수 (5가지 기록 - SUPPLEMENT 제외)
+    // user_records에서 실행 횟수
     for (const record of todayRecords) {
       const recordType = record.recordType;
       const currentCount = executedMap.get(recordType) || 0;
@@ -510,17 +495,30 @@ export class HomeService {
     }
 
     // SUPPLEMENT 실행 횟수 (date 기준 조회 결과)
-    executedMap.set('SUPPLEMENT', todaySupplementRecords.length);
+    for (const record of todaySupplementRecords) {
+      const currentCount = executedMap.get('SUPPLEMENT') || 0;
+      executedMap.set('SUPPLEMENT', currentCount + 1);
+    }
 
-    // recordType별 포인트 지급 횟수 계산
+    // recordType별 포인트 지급 횟수 계산 (metadata.pointsEarned > 0인 경우)
     const currentMap = new Map<string, number>();
 
-    // point_histories에서 포인트 지급 횟수 (description에서 recordType 추출)
-    for (const history of todayPointHistories) {
-      // "BEAUTY 기록 완료", "DAILY_MISSION 미션 완료" 형식에서 첫 단어 추출
-      const recordType = history.description.split(' ')[0];
-      const currentCount = currentMap.get(recordType) || 0;
-      currentMap.set(recordType, currentCount + 1);
+    // user_records에서 포인트 지급 횟수 (metadata.pointsEarned로 확인)
+    for (const record of todayRecords) {
+      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
+      if (pointsEarned > 0) {
+        const currentCount = currentMap.get(record.recordType) || 0;
+        currentMap.set(record.recordType, currentCount + 1);
+      }
+    }
+
+    // SUPPLEMENT도 동일하게 처리
+    for (const record of todaySupplementRecords) {
+      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
+      if (pointsEarned > 0) {
+        const currentCount = currentMap.get('SUPPLEMENT') || 0;
+        currentMap.set('SUPPLEMENT', currentCount + 1);
+      }
     }
 
     return missionList.map((m) => ({

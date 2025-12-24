@@ -132,7 +132,7 @@ export class PointService {
 
   /**
    * 트랜잭션 내에서 포인트 지급 (다른 서비스에서 트랜잭션과 함께 사용)
-   * 
+   *
    * @param tx 트랜잭션 객체
    * @param userId 사용자 ID
    * @param amount 지급할 포인트
