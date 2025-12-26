@@ -113,13 +113,8 @@ setup_auth() {
         log_info "개발 환경 계정으로 전환 중 (ai@biocom.kr)..."
         gcloud config set account ai@biocom.kr --quiet 2>/dev/null || true
     elif [[ "$PROJECT_ID" == "api-prod-biocom" ]]; then
-        # 운영 환경: 서비스 계정 키 파일 사용
-        if [ -f "$PROJECT_ROOT/google-service-account-key.json" ]; then
-            log_info "운영 환경 서비스 계정으로 인증 중..."
-            gcloud auth activate-service-account --key-file="$PROJECT_ROOT/google-service-account-key.json" --quiet
-        else
-            log_warning "서비스 계정 키 파일이 없습니다. 기존 인증 사용."
-        fi
+        log_info "운영 환경 계정으로 전환 중 (ai@biocom.kr)..."
+        gcloud config set account ai@biocom.kr --quiet 2>/dev/null || true
     fi
 
     # GCP 프로젝트 설정
