@@ -1,5 +1,5 @@
 # 🚀 Deployment - 애플리케이션 배포 정의
-# AWS EKS Deployment와 동일한 기능
+# Kustomize로 환경별 이미지 태그 관리
 
 apiVersion: apps/v1
 kind: Deployment
@@ -9,9 +9,8 @@ metadata:
   labels:
     app: biocom-api
     version: v1
-    environment: dev
 spec:
-  replicas: 2  # Pod 개수 (AWS EKS와 동일)
+  replicas: 2
   selector:
     matchLabels:
       app: biocom-api
@@ -21,43 +20,45 @@ spec:
         app: biocom-api
         version: v1
       annotations:
-        # Prometheus 메트릭 수집을 위한 어노테이션
         prometheus.io/scrape: "true"
         prometheus.io/port: "10804"
         prometheus.io/path: "/metrics"
     spec:
-      # 서비스 계정 (Workload Identity용)
       serviceAccountName: biocom-api-sa
-      
-      # 이미지 Pull Secret (Artifact Registry 접근용)
       imagePullSecrets:
       - name: gcr-json-key
-      
-      # Pod 보안 설정
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 2000
-      
+
       containers:
-      # 메인 애플리케이션 컨테이너
       - name: biocom-api
-        image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224225323
+        # 이미지는 Kustomize로 오버라이드됨
+        image: biocom-api
         imagePullPolicy: Always
-        
+
+        # DATABASE_URL을 환경변수에서 동적으로 조합하여 시작
+        # DB_PASSWORD의 특수문자(@, #, ! 등)를 URL 인코딩 처리 (node 사용)
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            ENCODED_PASSWORD=$(node -e "console.log(encodeURIComponent(process.env.DB_PASSWORD))")
+            export DATABASE_URL="postgresql://${DB_USERNAME}:${ENCODED_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?${DATABASE_URL_OPTIONS}"
+            echo "DATABASE_URL configured (password hidden)"
+            exec node dist/src/main.js
+
         ports:
         - containerPort: 10804
           name: http
           protocol: TCP
-        
-        # 환경 변수 (ConfigMap에서 가져오기)
+
         envFrom:
         - configMapRef:
             name: biocom-api-config
         - secretRef:
             name: biocom-api-secrets
-        
-        # 추가 환경 변수
+
         env:
         - name: POD_NAME
           valueFrom:
@@ -71,8 +72,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        
-        # 리소스 제한 (AWS EKS와 동일한 개념)
+
         resources:
           requests:
             memory: "512Mi"
@@ -80,39 +80,35 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "500m"
-        
-        # Startup probe - 애플리케이션 초기 시작 시에만 사용 (가장 중요!)
+
         startupProbe:
           httpGet:
             path: /api/health
             port: 10804
-          initialDelaySeconds: 30    # 30초 후 첫 체크
-          periodSeconds: 10          # 10초마다 체크
-          timeoutSeconds: 5          # 5초 타임아웃
-          failureThreshold: 30       # 30번 실패까지 허용 (총 5분 대기)
-          successThreshold: 1        # 1번 성공하면 완료
-        
-        # Liveness probe - startup 완료 후 컨테이너 생존 여부 체크
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+          successThreshold: 1
+
         livenessProbe:
           httpGet:
             path: /api/health
             port: 10804
-          initialDelaySeconds: 0     # startup 완료 후 바로 시작
-          periodSeconds: 30          # 30초마다 체크
-          timeoutSeconds: 10         # 10초 타임아웃
-          failureThreshold: 3        # 3번 실패하면 재시작
-        
-        # Readiness probe - traffic을 받을 준비가 되었는지 체크
+          initialDelaySeconds: 0
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
         readinessProbe:
           httpGet:
             path: /api/health
             port: 10804
-          initialDelaySeconds: 0     # startup 완료 후 바로 시작
-          periodSeconds: 10          # 10초마다 체크
-          timeoutSeconds: 5          # 5초 타임아웃
-          failureThreshold: 3        # 3번 실패하면 트래픽 차단
-        
-        # 볼륨 마운트
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
         volumeMounts:
         - name: logs
           mountPath: /app/logs
@@ -129,16 +125,6 @@ spec:
           mountPath: /app/firebase
           readOnly: true
 
-      # Cloud SQL Proxy 사이드카 컨테이너 (Workload Identity 사용 시 제거)
-      # GKE는 Private IP로 직접 연결 가능
-      # - name: cloudsql-proxy
-      #   image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224225323
-      #   command:
-      #     - "/cloud_sql_proxy"
-      #     - "-instances=api-dev-biocom:asia-northeast3:biocom-postgres=tcp:5432"
-      #     - "-credential_file=/secrets/cloudsql/credentials.json"
-      
-      # 볼륨 정의
       volumes:
       - name: logs
         emptyDir: {}
@@ -154,19 +140,9 @@ spec:
       - name: firebase-service-account-key
         secret:
           secretName: firebase-service-account-key
-      # Cloud SQL credentials (Workload Identity 사용 시 불필요)
-      # - name: cloudsql-instance-credentials
-      #   secret:
-      #     secretName: cloudsql-instance-credentials
-      
-      # Pod 재시작 정책
+
       restartPolicy: Always
-      
-      # 노드 선택 (필요한 경우)
-      # nodeSelector:
-      #   cloud.google.com/gke-nodepool: app-nodes
-      
-      # Pod 분산 정책 (고가용성)
+
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -181,7 +157,7 @@ spec:
               topologyKey: kubernetes.io/hostname
 
 ---
-# 🔄 HorizontalPodAutoscaler - 자동 스케일링
+# 🔄 HorizontalPodAutoscaler
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -211,20 +187,20 @@ spec:
         averageUtilization: 80
   behavior:
     scaleDown:
-      stabilizationWindowSeconds: 300  # 5분 안정화
+      stabilizationWindowSeconds: 300
       policies:
       - type: Percent
-        value: 50  # 한 번에 50%까지 줄이기
+        value: 50
         periodSeconds: 60
     scaleUp:
-      stabilizationWindowSeconds: 60   # 1분 안정화
+      stabilizationWindowSeconds: 60
       policies:
       - type: Percent
-        value: 100  # 한 번에 2배까지 늘리기
+        value: 100
         periodSeconds: 60
 
 ---
-# 🔧 ServiceAccount - Workload Identity용
+# 🔧 ServiceAccount
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -233,6 +209,5 @@ metadata:
   labels:
     app: biocom-api
   annotations:
-    # Workload Identity 어노테이션 (실제 GSA 이메일로 교체)
     iam.gke.io/gcp-service-account: biocom-api@biocom-api-dev.iam.gserviceaccount.com
 automountServiceAccountToken: true

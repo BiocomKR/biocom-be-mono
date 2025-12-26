@@ -1,19 +1,18 @@
-# 🕐 CronJob - 챌린지 활성화 배치
-# 매주 월요일 00:05 KST에 실행
+# 🕐 CronJob - 영양제 주간 생성 배치
+# 매주 월요일 00:10 KST에 실행
 
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: activate-challenges
+  name: create-weekly-supplements
   namespace: biocom-api
   labels:
     app: biocom-api
-    job-type: activate-challenges
+    job-type: create-weekly-supplements
 spec:
-  # Cron 표현식 (UTC 기준 - KST 00:05 = UTC 15:05, 월요일)
-  # 월요일: 1 (일요일=0, 월요일=1)
-  # KST 00:05 월요일 = UTC 15:05 일요일
-  schedule: "5 15 * * 0"
+  # Cron 표현식 (UTC 기준 - KST 00:10 = UTC 15:10, 월요일)
+  # KST 00:10 월요일 = UTC 15:10 일요일
+  schedule: "10 15 * * 0"
 
   # 성공한 Job 히스토리 보관 개수
   successfulJobsHistoryLimit: 3
@@ -32,7 +31,7 @@ spec:
         metadata:
           labels:
             app: biocom-api
-            job-type: activate-challenges
+            job-type: create-weekly-supplements
         spec:
           serviceAccountName: biocom-api-sa
 
@@ -42,15 +41,15 @@ spec:
           restartPolicy: Never
 
           containers:
-          - name: activate-challenges
-            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224225323
+          - name: create-weekly-supplements
+            image: biocom-api
             imagePullPolicy: Always
 
             command:
             - node
             - dist/src/main.js
             - --run-scheduler
-            - activate-challenges
+            - create-weekly-supplements
 
             envFrom:
             - configMapRef:
@@ -63,10 +62,8 @@ spec:
               mountPath: /app/logs
             - name: kcp-cert-files
               mountPath: /config/kcp-cert
-              readOnly: true
             - name: firebase-service-account-key
               mountPath: /app/firebase
-              readOnly: true
 
             resources:
               requests:

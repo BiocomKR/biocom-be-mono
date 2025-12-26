@@ -1,0 +1,28 @@
+# 🔧 Dev Environment Kustomization
+# 개발 환경 전용 설정
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 네임스페이스 지정
+namespace: biocom-api
+
+# Base 리소스 참조
+resources:
+  - ../../base
+  - configmap.yaml
+  - ingress.yaml
+
+# 이미지 태그 (배포 시 동적으로 변경됨)
+images:
+  - name: biocom-api
+    newName: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api
+    newTag: "20251226135033"
+
+# 환경별 레이블
+commonLabels:
+  environment: dev
+
+# 환경별 어노테이션
+commonAnnotations:
+  environment: dev

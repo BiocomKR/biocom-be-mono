@@ -1,18 +1,19 @@
-# 🕐 CronJob - 챌린지 만료 처리 배치
-# 매일 자정(00:00 KST)에 실행
+# 🕐 CronJob - 챌린지 활성화 배치
+# 매주 월요일 00:05 KST에 실행
 
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: expire-challenges
+  name: activate-challenges
   namespace: biocom-api
   labels:
     app: biocom-api
-    job-type: expire-challenges
+    job-type: activate-challenges
 spec:
-  # Cron 표현식 (UTC 기준 - KST 00:00 = UTC 15:00)
-  # KST는 UTC+9 이므로 00:00 KST = 15:00 UTC (전날)
-  schedule: "0 15 * * *"
+  # Cron 표현식 (UTC 기준 - KST 00:05 = UTC 15:05, 월요일)
+  # 월요일: 1 (일요일=0, 월요일=1)
+  # KST 00:05 월요일 = UTC 15:05 일요일
+  schedule: "5 15 * * 0"
 
   # 성공한 Job 히스토리 보관 개수
   successfulJobsHistoryLimit: 3
@@ -20,43 +21,37 @@ spec:
   # 실패한 Job 히스토리 보관 개수
   failedJobsHistoryLimit: 3
 
-  # 동시 실행 정책 (Forbid: 이전 작업이 끝나기 전까지 새 작업 시작 안 함)
+  # 동시 실행 정책
   concurrencyPolicy: Forbid
 
   jobTemplate:
     spec:
-      # Job 완료 후 Pod 삭제까지 대기 시간 (초)
       ttlSecondsAfterFinished: 3600
 
       template:
         metadata:
           labels:
             app: biocom-api
-            job-type: expire-challenges
+            job-type: activate-challenges
         spec:
-          # 서비스 계정
           serviceAccountName: biocom-api-sa
 
-          # 이미지 Pull Secret
           imagePullSecrets:
           - name: gcr-json-key
 
-          # Job 실패 시 재시작하지 않음
           restartPolicy: Never
 
           containers:
-          - name: expire-challenges
-            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224225323
+          - name: activate-challenges
+            image: biocom-api
             imagePullPolicy: Always
 
-            # 배치 실행 명령어
             command:
             - node
             - dist/src/main.js
             - --run-scheduler
-            - expire-challenges
+            - activate-challenges
 
-            # 환경변수는 ConfigMap + Secret에서 가져옴
             envFrom:
             - configMapRef:
                 name: biocom-api-config
@@ -68,12 +63,11 @@ spec:
               mountPath: /app/logs
             - name: kcp-cert-files
               mountPath: /config/kcp-cert
+              readOnly: true
             - name: firebase-service-account-key
               mountPath: /app/firebase
               readOnly: true
-              readOnly: true
 
-            # 리소스 제한
             resources:
               requests:
                 memory: "512Mi"

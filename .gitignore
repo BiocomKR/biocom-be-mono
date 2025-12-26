@@ -17,7 +17,9 @@ dist
 .env.staging
 .env.test
 .env.secrets
+.env.secrets.*
 */.env.secrets
+*/.env.secrets.*
 
 # logs
 *.log

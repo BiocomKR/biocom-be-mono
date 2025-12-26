@@ -45,7 +45,7 @@ spec:
 
           containers:
           - name: iap-acknowledge-retry
-            image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-api:20251224225323
+            image: biocom-api
             imagePullPolicy: Always
 
             command:
@@ -67,8 +67,6 @@ spec:
               mountPath: /config/kcp-cert
             - name: firebase-service-account-key
               mountPath: /app/firebase
-              readOnly: true
-              readOnly: true
 
             resources:
               requests:
