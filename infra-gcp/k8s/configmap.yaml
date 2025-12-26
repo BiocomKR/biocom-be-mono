@@ -8,7 +8,7 @@ metadata:
   namespace: biocom-api
   labels:
     app: biocom-api
-    environment: dev
+    environment: prod
 data:
   # 데이터베이스 설정 (민감하지 않은 정보)
   DB_HOST: "34.47.124.132"
@@ -18,7 +18,7 @@ data:
   DATABASE_URL: "postgresql://biocom:bico0825%21%40%23@34.47.124.132:5432/biocom?connection_limit=5&pool_timeout=30&connect_timeout=10"
   
   # 애플리케이션 설정
-  NODE_ENV: "development"
+  NODE_ENV: "production"
   PORT: "10804"
   
   # API 설정
@@ -31,7 +31,7 @@ data:
   
   # ImWeb API 설정
   IMWEB_API_BASE_URL: "https://api.imweb.me"
-  IMWEB_REDIRECT_URI: "https://api-dev.biocom.ai.kr/auth/redirect"
+  IMWEB_REDIRECT_URI: "https://api.biocom.ai.kr/auth/redirect"
   
   # CORS 설정
   # CORS 설정 - 개발 환경에서는 모든 origin 허용
@@ -46,7 +46,7 @@ data:
   TOSS_PAYMENTS_CLIENT_KEY: "test_ck_0RnYX2w532qNWYYLpqXP8NeyqApQ"
 
   # Google Cloud Storage 설정
-  GOOGLE_CLOUD_PROJECT_ID: "api-dev-biocom"
+  GOOGLE_CLOUD_PROJECT_ID: "api-prod-biocom"
   GCS_BUCKET_NAME: "api-dev-biocom-uploads"
   GOOGLE_APPLICATION_CREDENTIALS: "/app/secrets/key.json"
 
@@ -86,7 +86,7 @@ data:
   KCP_CALLBACK_NUMBER: "0220390295"
 
   # AI Agent 서버 설정
-  AI_AGENT_BASE_URL: "https://ai-agent-dev.biocom.ai.kr"
+  AI_AGENT_BASE_URL: "https://ai-agent.biocom.ai.kr"
   
 ---
 # 📝 로깅 설정용 ConfigMap
