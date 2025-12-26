@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Body, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiExcludeEndpoint } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from '../common/decorators/public.decorator';
 import { ChallengeService } from './challenge.service';
 import { ChallengeSchedulerService } from './challenge-scheduler.service';
 import { ActivateChallengeDto, ChallengeResponseDto } from './dto/challenge.dto';
@@ -222,6 +224,8 @@ export class ChallengeController {
    * @description PENDING 상태의 챌린지를 즉시 ACTIVE로 전환합니다
    */
   @Post('scheduler/run-activation')
+  @Public()
+  @SkipThrottle()
   @ApiOperation({
     summary: '챌린지 활성화 크론잡 수동 실행 (테스트용)',
     description: '오늘 시작일인 PENDING 챌린지들을 즉시 ACTIVE로 전환합니다'
@@ -238,4 +242,37 @@ export class ChallengeController {
     };
   }
 
+  /**
+   * [테스트] 모든 PENDING 챌린지 즉시 활성화
+   * 날짜 조건 무시
+   */
+  @Post('scheduler/activate-all-pending')
+  @Public()
+  @SkipThrottle()
+  @ApiExcludeEndpoint()
+  async activateAllPending() {
+    const result = await this.challengeSchedulerService.activateAllPendingTest();
+    return {
+      success: true,
+      message: `PENDING 챌린지 활성화 완료: 성공 ${result.success}건, 실패 ${result.fail}건`,
+      data: result
+    };
+  }
+
+  //--------------------- TEST ---------------------
+  /**
+   * 빠른 챌린지 시작 TEST (배열로 다수 등록)
+   */
+  @Post('quick-start-test')
+  @Public()
+  @SkipThrottle()
+  @ApiExcludeEndpoint()
+  async quickStartChallengeTest(@Body() userIds: number[]) {
+    const results = await this.challengeService.quickStartChallengeTest(userIds);
+    return {
+      success: true,
+      message: `${results.filter(r => r.success).length}명 챌린지 시작 완료`,
+      data: results,
+    };
+  }
 }

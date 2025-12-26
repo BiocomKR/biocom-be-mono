@@ -6,6 +6,7 @@ import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
 import { PhoneLoginDto } from './dto/phone-login.dto';
 import { PhoneRegisterDto } from './dto/phone-register.dto';
+import { PhoneRegisterTestDto } from './dto/phone-register.dto';
 import { PhoneRequestDto } from './dto/phone-request.dto';
 import { CheckMobileDto } from './dto/check-mobile.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -240,33 +241,33 @@ export class AuthController {
     }
   }
 
-  @Get('test-token')
-  @Public()
-  @SkipThrottle()
-  @ApiOperation({
-    summary: '토큰 발행 테스트',
-    description: '액세스 토큰 발행 및 저장 테스트'
-  })
-  async testToken() {
-    console.log('[test-token] 메서드 진입');
-    try {
-      // 현재 저장된 토큰 확인
-      const currentToken = await this.imwebAuthService.getValidAccessToken('S20190715619285c855898');
-      console.log('[test-token] 새로운 액세스 토큰:', currentToken);
+  // @Get('test-token')
+  // @Public()
+  // @SkipThrottle()
+  // @ApiOperation({
+  //   summary: '토큰 발행 테스트',
+  //   description: '액세스 토큰 발행 및 저장 테스트'
+  // })
+  // async testToken() {
+  //   console.log('[test-token] 메서드 진입');
+  //   try {
+  //     // 현재 저장된 토큰 확인
+  //     const currentToken = await this.imwebAuthService.getValidAccessToken('S20190715619285c855898');
+  //     console.log('[test-token] 새로운 액세스 토큰:', currentToken);
 
-      return {
-        message: '토큰 발행 및 저장 테스트',
-        accessToken: currentToken
-      };
-    } catch (error) {
-      console.error('[test-token] 에러 발생:', error);
-      // 에러 상세 정보 로깅
-      if (error.error && error.error.details) {
-        console.error('[test-token] 에러 상세:', JSON.stringify(error.error.details, null, 2));
-      }
-      throw error;
-    }
-  }
+  //     return {
+  //       message: '토큰 발행 및 저장 테스트',
+  //       accessToken: currentToken
+  //     };
+  //   } catch (error) {
+  //     console.error('[test-token] 에러 발생:', error);
+  //     // 에러 상세 정보 로깅
+  //     if (error.error && error.error.details) {
+  //       console.error('[test-token] 에러 상세:', JSON.stringify(error.error.details, null, 2));
+  //     }
+  //     throw error;
+  //   }
+  // }
 
   /**
    * 휴대폰 번호 중복 체크
@@ -426,4 +427,23 @@ export class AuthController {
     };
   }
 
+
+  //--------------------- TEST ---------------------
+  /**
+   * 휴대폰 회원가입 TEST (배열로 다수 등록)
+   */
+  @Post('phone-register-test')
+  @Public()
+  @SkipThrottle()
+  @ApiExcludeEndpoint()
+  async phoneRegisterTest(@Body() users: PhoneRegisterTestDto[]): Promise<ApiResponseDto> {
+    const results = await this.authService.phoneRegisterTest(users);
+
+    return {
+      success: true,
+      message: `${results.length}명 회원가입이 완료되었습니다.`,
+      data: results,
+      timestamp: getNowKST(),
+    };
+  }
 }
