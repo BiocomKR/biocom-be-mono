@@ -5,13 +5,24 @@ import { ApiResponseDto } from '../../../common/dto/api-response.dto';
 
 /**
  * 뷰티 질문 응답 DTO
+ *
+ * 점수 체계 (낮을수록 건강함):
+ * - 그렇다 (최상): 5점
+ * - 그런편이다: 10점
+ * - 보통이다: 15점
+ * - 아닌편이다: 20점
+ * - 아니다 (최하): 25점
  */
 export class BeautyQuestionDto {
   @ApiProperty({ description: '질문 번호', example: 1 })
   @IsNumber()
   no: number;
 
-  @ApiProperty({ description: '점수 (25, 20, 15, 10, 5)', example: 20, enum: [25, 20, 15, 10, 5] })
+  @ApiProperty({
+    description: '점수 (5=그렇다, 10=그런편이다, 15=보통이다, 20=아닌편이다, 25=아니다)',
+    example: 5,
+    enum: [5, 10, 15, 20, 25]
+  })
   @IsNumber()
   score: number;
 }
@@ -19,16 +30,21 @@ export class BeautyQuestionDto {
 /**
  * 뷰티 기록 DTO
  * 이너뷰티(4개 질문) + 아우터뷰티(4개 질문) = 총 8개 질문
+ *
+ * 점수 범위:
+ * - 이너뷰티: 20~100점 (낮을수록 건강)
+ * - 아우터뷰티: 20~100점 (낮을수록 건강)
+ * - 총점: 40~200점 (낮을수록 건강)
  */
 export class CreateBeautyRecordDto {
   @ApiProperty({
     description: '이너뷰티 4개 질문에 대한 응답',
     type: [BeautyQuestionDto],
     example: [
-      { no: 1, score: 25 },
-      { no: 2, score: 20 },
+      { no: 1, score: 5 },
+      { no: 2, score: 10 },
       { no: 3, score: 15 },
-      { no: 4, score: 10 }
+      { no: 4, score: 5 }
     ]
   })
   @IsArray()
@@ -40,10 +56,10 @@ export class CreateBeautyRecordDto {
     description: '아우터뷰티 4개 질문에 대한 응답',
     type: [BeautyQuestionDto],
     example: [
-      { no: 1, score: 25 },
-      { no: 2, score: 20 },
+      { no: 1, score: 5 },
+      { no: 2, score: 10 },
       { no: 3, score: 15 },
-      { no: 4, score: 10 }
+      { no: 4, score: 5 }
     ]
   })
   @IsArray()

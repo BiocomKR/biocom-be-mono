@@ -7,7 +7,7 @@ import * as crypto from 'crypto';
 import { SignUpDto } from './dto/sign-up.dto';
 import { SignInDto } from './dto/sign-in.dto';
 import { PhoneLoginDto } from './dto/phone-login.dto';
-import { PhoneRegisterDto } from './dto/phone-register.dto';
+import { PhoneRegisterDto, PhoneRegisterTestDto } from './dto/phone-register.dto';
 import { PhoneRequestDto } from './dto/phone-request.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
@@ -612,5 +612,80 @@ export class AuthService {
       certNumber: verificationResult.certNumber,
       message: verificationResult.message,
     };
+  }
+
+
+
+  //--------------------- TEST ---------------------
+  /**
+   * 테스트용 사전 회원 등록 (배열로 다수 등록)
+   * 운영 DB에 사전 회원 정보 강제 등록
+   *
+   * @param users 회원 정보 배열
+   * @returns 생성된 사용자 목록
+   */
+  async phoneRegisterTest(users: PhoneRegisterTestDto[]) {
+    this.logger.log(`[테스트] 사전 회원 등록 시작: ${users.length}명`);
+
+    const results = [];
+    const now = getNowKST();
+
+    for (const userDto of users) {
+      const { name, mobile, birthDate, sex, telecom } = userDto;
+
+      try {
+        // 사용자 생성 (트랜잭션)
+        const user = await this.prisma.$transaction(async (tx) => {
+          const newUser = await tx.user.create({
+            data: {
+              email: null,
+              password: null,
+              name,
+              mobile,
+              birthDate,
+              telecom,
+              sex,
+              localCode: '01', // 내국인 고정
+              status: UserSubscriptionStatus.NEWCOMER,
+              createdAt: now,
+            },
+            select: {
+              id: true,
+              name: true,
+              mobile: true,
+              birthDate: true,
+              telecom: true,
+              sex: true,
+              createdAt: true,
+            },
+          });
+
+          // 약관 동의 일괄 등록 (1~8번)
+          for (let i = 1; i <= 8; i++) {
+            await tx.userConsent.create({
+              data: {
+                userId: newUser.id,
+                consentId: i,
+                isAgreed: true,
+                agreedAt: now,
+                createdAt: now,
+              },
+            });
+          }
+
+          return newUser;
+        });
+
+        this.logger.log(`[테스트] 회원 등록 성공: ${user.name} (${user.mobile})`);
+        results.push({ success: true, user });
+      } catch (error) {
+        this.logger.error(`[테스트] 회원 등록 실패: ${name} (${mobile}) - ${error.message}`);
+        results.push({ success: false, name, mobile, error: error.message });
+      }
+    }
+
+    this.logger.log(`[테스트] 사전 회원 등록 완료: 성공 ${results.filter(r => r.success).length}명 / 전체 ${users.length}명`);
+
+    return results;
   }
 }

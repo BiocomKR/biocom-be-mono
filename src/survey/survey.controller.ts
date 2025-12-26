@@ -20,7 +20,10 @@ import {
   ApiQuery,
   ApiBody,
   ApiBearerAuth,
+  ApiExcludeEndpoint,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from '../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SurveyService } from './survey.service';
 import { PrismaService } from '../common/services/prisma.service';
@@ -275,6 +278,37 @@ export class SurveyController {
       };
     } catch (error) {
       this.logger.error(`챌린지 설문 완료 실패 - 사용자: ${req.user.sub}, challengeSurveyId: ${challengeSurveyId}`, error);
+      throw error;
+    }
+  }
+
+  // ==================== 테스트용 엔드포인트 ====================
+
+  /**
+   * [테스트] 사전설문 답변 배치 등록
+   * 2D 배열로 여러 사용자의 설문 답변을 한 번에 등록
+   * 각 배열: [userId, ...25개 optionId]
+   */
+  @Post('complete-test')
+  @Public()
+  @SkipThrottle()
+  @ApiExcludeEndpoint()
+  async completeSurveyTest(
+    @Body() data: number[][],
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`사전설문 배치 등록 요청 - ${data.length}명`);
+
+    try {
+      const results = await this.surveyService.createBulkAnswersTest(data);
+
+      return {
+        success: true,
+        message: `${results.filter(r => r.success).length}명 사전설문 등록 완료`,
+        data: results,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`사전설문 배치 등록 실패`, error);
       throw error;
     }
   }

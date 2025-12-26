@@ -426,4 +426,50 @@ export class ChallengeSchedulerService {
     this.logger.log('🧪 수동 실행 - 챌린지 활성화 스케줄러');
     await this.handleChallengeActivation();
   }
+
+  /**
+   * [테스트] 모든 PENDING 챌린지 즉시 활성화
+   * 날짜 조건 무시하고 모든 PENDING → ACTIVE 전환
+   */
+  async activateAllPendingTest() {
+    this.logger.log('🧪 [테스트] 모든 PENDING 챌린지 즉시 활성화 시작...');
+
+    // 모든 PENDING 챌린지 찾기 (날짜 조건 없음)
+    const pendingChallenges = await this.prisma.userChallenge.findMany({
+      where: {
+        status: UserChallengeStatus.PENDING,
+      },
+      include: {
+        user: true,
+        product: true,
+      },
+    });
+
+    this.logger.log(`📋 활성화할 PENDING 챌린지: ${pendingChallenges.length}건`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const challenge of pendingChallenges) {
+      try {
+        this.logger.log(
+          `처리 중: userChallengeId=${challenge.id}, userId=${challenge.userId}, 상품=${challenge.product.name}`,
+        );
+
+        await this.activateChallenge(challenge.id, challenge.userId);
+        successCount++;
+      } catch (error: any) {
+        this.logger.error(
+          `챌린지 활성화 실패: userChallengeId=${challenge.id}, error=${error.message}`,
+        );
+        failCount++;
+      }
+    }
+
+    this.logger.log(
+      `✅ [테스트] PENDING 챌린지 활성화 완료: 성공 ${successCount}건, 실패 ${failCount}건`,
+    );
+
+    return { success: successCount, fail: failCount, total: pendingChallenges.length };
+  }
 }

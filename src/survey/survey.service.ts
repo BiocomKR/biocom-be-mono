@@ -1059,6 +1059,89 @@ export class SurveyService {
     return question;
   }
 
+  // ==================== 테스트용 메서드 ====================
+
+  /**
+   * [테스트] 사전설문 답변 배치 등록
+   * 2D 배열로 여러 사용자의 설문 답변을 한 번에 등록
+   * 각 배열: [userId, ...25개 optionId]
+   * questionId 매핑: [1~20, 41~45] 총 25개
+   * type: BEFORE 고정
+   * surveyId: 1 고정 (현재 미사용, 향후 확장용)
+   */
+  async createBulkAnswersTest(
+    data: number[][]
+  ): Promise<{ success: boolean; userId: number; count?: number; error?: string }[]> {
+    this.logger.log(`[테스트] 사전설문 배치 등록 시작 - ${data.length}명`);
+
+    // questionId 매핑: 1~20, 41~45 총 25개
+    const questionIds = [
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+      11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+      41, 42, 43, 44, 45
+    ];
+
+    const results: { success: boolean; userId: number; count?: number; error?: string }[] = [];
+
+    for (const row of data) {
+      const userId = row[0];
+      const optionIds = row.slice(1); // 25개 optionId
+
+      if (optionIds.length !== 25) {
+        results.push({
+          success: false,
+          userId,
+          error: `optionId 개수가 25개가 아닙니다 (${optionIds.length}개)`,
+        });
+        continue;
+      }
+
+      try {
+        // 트랜잭션으로 처리
+        const createdCount = await this.prisma.$transaction(async (tx) => {
+          // 기존 BEFORE 답변 삭제 (덮어쓰기)
+          await tx.surveyAnswer.deleteMany({
+            where: {
+              userId,
+              type: SurveyType.BEFORE,
+            },
+          });
+
+          // 새 답변 저장
+          const now = getNowKST();
+          await tx.surveyAnswer.createMany({
+            data: questionIds.map((questionId, index) => ({
+              userId,
+              surveyQuestionId: questionId,
+              surveyOptionId: optionIds[index],
+              type: SurveyType.BEFORE,
+              createdAt: now,
+            })),
+          });
+
+          return 25;
+        });
+
+        results.push({
+          success: true,
+          userId,
+          count: createdCount,
+        });
+
+        this.logger.log(`[테스트] 사용자 ${userId} 사전설문 등록 완료 - ${createdCount}개`);
+      } catch (error) {
+        results.push({
+          success: false,
+          userId,
+          error: error.message,
+        });
+        this.logger.error(`[테스트] 사용자 ${userId} 사전설문 등록 실패`, error);
+      }
+    }
+
+    return results;
+  }
+
   /**
    * 질문별 답변 조회
    */

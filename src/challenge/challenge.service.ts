@@ -1240,6 +1240,34 @@ export class ChallengeService {
     }
   }
 
+  //--------------------- TEST ---------------------
+  /**
+   * 테스트용 빠른 챌린지 시작 (배열로 다수 처리)
+   * startDate는 '2025-12-29' 고정
+   * @param userIds 사용자 ID 배열
+   */
+  async quickStartChallengeTest(userIds: number[]) {
+    const FIXED_START_DATE = '2025-12-29';
+    this.logger.log(`[테스트] 사전 챌린지 시작: ${userIds.length}명, 시작일: ${FIXED_START_DATE}`);
+
+    const results = [];
+
+    for (const userId of userIds) {
+      try {
+        const result = await this.quickStartChallenge(userId, FIXED_START_DATE);
+        this.logger.log(`[테스트] 챌린지 시작 성공: userId=${userId}`);
+        results.push({ success: true, userId, data: result.data });
+      } catch (error) {
+        this.logger.error(`[테스트] 챌린지 시작 실패: userId=${userId} - ${error.message}`);
+        results.push({ success: false, userId, error: error.message });
+      }
+    }
+
+    this.logger.log(`[테스트] 사전 챌린지 시작 완료: 성공 ${results.filter(r => r.success).length}명 / 전체 ${userIds.length}명`);
+
+    return results;
+  }
+
   /**
    * 챌린지 일정 조회
    * @description 사용자의 챌린지 일정 정보를 조회합니다

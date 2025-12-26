@@ -290,9 +290,9 @@ export class RecordsService {
       metadata: {
         innerBeauty: dto.innerBeauty,
         outerBeauty: dto.outerBeauty,
-        innerBeautyScore, // 이너뷰티 총점 (4-20점)
-        outerBeautyScore, // 아우터뷰티 총점 (4-20점)
-        totalScore: innerBeautyScore + outerBeautyScore, // 전체 총점 (8-40점)
+        innerBeautyScore, // 이너뷰티 총점 (20~100점, 낮을수록 건강)
+        outerBeautyScore, // 아우터뷰티 총점 (20~100점, 낮을수록 건강)
+        totalScore: innerBeautyScore + outerBeautyScore, // 전체 총점 (40~200점, 낮을수록 건강)
       },
     });
   }
