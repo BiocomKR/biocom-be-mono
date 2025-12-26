@@ -613,4 +613,32 @@ export class AuthService {
       message: verificationResult.message,
     };
   }
+
+  /**
+   * 휴대폰 번호 중복 체크
+   * 회원가입 전 해당 번호로 가입된 사용자가 있는지 확인
+   *
+   * @param mobile 휴대폰 번호
+   * @returns 중복 여부 (exists: boolean)
+   */
+  async checkMobile(mobile: string): Promise<{ exists: boolean; message: string }> {
+    this.logger.log(`휴대폰 번호 중복 체크: ${mobile}`);
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: { mobile },
+    });
+
+    if (existingUser) {
+      this.logger.log(`이미 가입된 번호: ${mobile}`);
+      return {
+        exists: true,
+        message: '이미 가입된 휴대폰 번호입니다.',
+      };
+    }
+
+    return {
+      exists: false,
+      message: '가입 가능한 휴대폰 번호입니다.',
+    };
+  }
 }

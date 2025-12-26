@@ -7,6 +7,7 @@ import { SignInDto } from './dto/sign-in.dto';
 import { PhoneLoginDto } from './dto/phone-login.dto';
 import { PhoneRegisterDto } from './dto/phone-register.dto';
 import { PhoneRequestDto } from './dto/phone-request.dto';
+import { CheckMobileDto } from './dto/check-mobile.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { LoginRateLimit, SignupRateLimit } from '../common/decorators/throttle.decorator';
@@ -265,6 +266,44 @@ export class AuthController {
       }
       throw error;
     }
+  }
+
+  /**
+   * 휴대폰 번호 중복 체크
+   */
+  @Post('check-mobile')
+  @ApiOperation({
+    summary: '휴대폰 번호 중복 체크',
+    description: '회원가입 전 해당 휴대폰 번호로 가입된 사용자가 있는지 확인합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '중복 체크 완료',
+    schema: {
+      example: {
+        success: true,
+        message: '가입 가능한 휴대폰 번호입니다.',
+        data: {
+          exists: false,
+        },
+        timestamp: '2025-12-26T10:00:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: '입력값 검증 실패',
+    type: ValidationErrorResponseDto,
+  })
+  async checkMobile(@Body() checkMobileDto: CheckMobileDto): Promise<ApiResponseDto> {
+    const result = await this.authService.checkMobile(checkMobileDto.mobile);
+
+    return {
+      success: true,
+      message: result.message,
+      data: { exists: result.exists },
+      timestamp: getNowKST(),
+    };
   }
 
   /**
