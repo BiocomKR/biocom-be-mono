@@ -118,7 +118,7 @@ async function bootstrap() {
   // 환경별 로거 설정
   // 개발 환경: NestJS 기본 Logger (콘솔 로그 잘 보임)
   // 운영 환경: Winston Logger (파일 저장)
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === 'prod';
 
   if (isProduction) {
     // 운영 환경: Winston Logger 사용 (파일 저장)
