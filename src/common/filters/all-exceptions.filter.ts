@@ -121,7 +121,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     // 개발 환경에서는 스택 트레이스 포함
-    if (process.env.NODE_ENV === 'development' && exception instanceof Error) {
+    if (process.env.NODE_ENV === 'dev' && exception instanceof Error) {
       (responseBody as any).stack = exception.stack;
     }
 

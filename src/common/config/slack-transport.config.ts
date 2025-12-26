@@ -23,7 +23,7 @@ import axios from 'axios';
 // 환경 변수
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 const SLACK_ENABLED = process.env.SLACK_NOTIFICATION_ENABLED === 'true';
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const NODE_ENV = process.env.NODE_ENV || 'dev';
 const SERVER_PORT = process.env.PORT || '3000';
 const PROJECT_NAME = process.env.PROJECT_NAME || 'biocom-api';
 

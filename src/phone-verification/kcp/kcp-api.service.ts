@@ -29,7 +29,7 @@ export class KcpApiService {
     private readonly configService: ConfigService,
   ) {
     // 테스트/운영 환경에 따른 URL 설정
-    const isProduction = this.configService.get('NODE_ENV') === 'production';
+    const isProduction = this.configService.get('NODE_ENV') === 'prod';
 
     // TODO: 형님, KCP 담당자에게 환경 확인 필요!
     // 임시로 운영 서버로 테스트 (실제 SMS 발송됨 주의!)

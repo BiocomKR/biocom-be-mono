@@ -23,7 +23,7 @@ export default () => ({
    */
   app: {
     port: parseInt(process.env.PORT || '10804', 10),
-    nodeEnv: process.env.NODE_ENV || 'development',
+    nodeEnv: process.env.NODE_ENV || 'dev',
   },
 
   /**

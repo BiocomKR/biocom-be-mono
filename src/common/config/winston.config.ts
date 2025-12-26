@@ -55,7 +55,7 @@ const dailyRotateOptions = {
 const transports: winston.transport[] = [
   // 콘솔 출력 (개발 환경)
   new winston.transports.Console({
-    format: process.env.NODE_ENV === 'production' ? logFormat : consoleFormat,
+    format: process.env.NODE_ENV === 'prod' ? logFormat : consoleFormat,
   }),
 
   // 전체 로그 파일 (info 레벨 이상)

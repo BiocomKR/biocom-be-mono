@@ -114,7 +114,7 @@ export class AppleIapService {
   ): Promise<AppleTransactionInfo | null> {
     // 환경에 따라 API 호출 순서 결정
     // Production 환경에서는 Production URL 먼저 시도
-    const isProduction = this.configService.raw.get<string>('NODE_ENV') === 'production';
+    const isProduction = this.configService.raw.get<string>('NODE_ENV') === 'prod';
     const urls = isProduction
       ? [this.PRODUCTION_URL, this.SANDBOX_URL]
       : [this.SANDBOX_URL, this.PRODUCTION_URL];

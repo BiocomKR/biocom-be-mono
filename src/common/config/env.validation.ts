@@ -9,8 +9,8 @@ import * as Joi from 'joi';
 export const validationSchema = Joi.object({
   // 애플리케이션 설정
   NODE_ENV: Joi.string()
-    .valid('development', 'production', 'local')
-    .default('development')
+    .valid('dev', 'prod', 'local')
+    .default('dev')
     .description('애플리케이션 실행 환경'),
     
   PORT: Joi.number()
@@ -100,7 +100,7 @@ export const validationSchema = Joi.object({
     .default('*')
     .custom((value, helpers) => {
       // 프로덕션에서 와일드카드 사용 경고
-      if (process.env.NODE_ENV === 'production' && value === '*') {
+      if (process.env.NODE_ENV === 'prod' && value === '*') {
         console.warn('⚠️  경고: 프로덕션 환경에서 CORS 와일드카드(*) 사용 중입니다. 보안 위험이 있습니다!');
       }
       return value;
@@ -134,7 +134,7 @@ export const validationSchema = Joi.object({
  */
 export interface EnvironmentVariables {
   // 애플리케이션
-  NODE_ENV: 'development' | 'production' | 'local';
+  NODE_ENV: 'dev' | 'prod' | 'local';
   PORT: number;
   
   // 데이터베이스
