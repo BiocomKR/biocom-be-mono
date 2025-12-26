@@ -388,6 +388,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 쿠폰 관련 테이블
   get coupon() { return this.prisma.coupon; }
+  get couponProduct() { return this.prisma.couponProduct; }
   get userCoupon() { return this.prisma.userCoupon; }
 
   // 휴대폰 본인인증 테이블
@@ -446,12 +447,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 맞춤 솔루션 테이블
   get productLineup() { return this.prisma.productLineup; }
-  get ingredient() { return this.prisma.ingredient; }
-  get ingredientAlias() { return this.prisma.ingredientAlias; }
-  get productIngredient() { return this.prisma.productIngredient; }
 
   // 앱 설정 테이블
   get appConfig() { return this.prisma.appConfig; }
+
+  // AI Backend 관련 테이블
+  get userDeepReport() { return this.prisma.userDeepReport; }
 
   // 메서드 바인딩
   $transaction(arg: any) {

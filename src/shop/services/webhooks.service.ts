@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { OrderStatus, PaymentStatus, SubscriptionStatus, ChallengeTicketStatus } from '../../common/enums';
+import { OrderStatus, PaymentStatus, SubscriptionStatus } from '../../common/enums';
 import { getNowKST, parseISO8601ToKST } from '../../common/utils/kst-date.util';
 import {
   ILogisticsProvider,
@@ -277,36 +277,10 @@ export class WebhooksService {
         },
       });
 
-      // 6. 챌린지 상품 티켓 발급 (동시성 방어: seq 기반 deterministic 생성 + DB unique 제약)
-      for (const item of order.items) {
-        if (item.product.categoryCode === 'CHALLENGE') {
-          // seq 기반으로 deterministic하게 티켓 생성 (1부터 quantity까지)
-          for (let seq = 1; seq <= item.quantity; seq++) {
-            try {
-              await tx.challengeTicket.create({
-                data: {
-                  userId: order.userId,
-                  productId: item.productId,
-                  orderItemId: item.id,
-                  seq, // 동일 orderItem 내 순번 (unique 제약으로 중복 방지)
-                  purchaseDate: getNowKST(),
-                  status: ChallengeTicketStatus.PURCHASED,
-                  ticketType: 'CHALLENGE',
-                  createdAt: getNowKST(),
-                },
-              });
-            } catch (error: any) {
-              // P2002: Unique constraint violation → 이미 존재하는 티켓 (정상 케이스)
-              if (error.code === 'P2002') {
-                this.logger.log(`챌린지 티켓 이미 존재 (웹훅): orderItemId=${item.id}, seq=${seq}`);
-                continue;
-              }
-              throw error;
-            }
-          }
-          this.logger.log(`챌린지 티켓 발급 완료 (웹훅): orderItemId=${item.id}, quantity=${item.quantity}`);
-        }
-      }
+      // [제거됨] 챌린지 상품 티켓 발급 로직
+      // - 챌린지: quick-start API로만 시작 (challenge.service.ts)
+      // - 구독: IAP 인앱결제로만 구매 (iap.service.ts)
+      // - 주문 플로우에서 CHALLENGE/SUBSCRIPTION 상품은 orders.service.ts에서 차단됨
 
       this.logger.log(`✅ 주문 상태 업데이트 완료 (웹훅): ${orderId} → PAID`);
 
@@ -329,63 +303,27 @@ export class WebhooksService {
   }
 
   /**
-   * 후처리 누락 보정 (PAID 상태인 주문의 티켓/물류 누락 확인 및 보정)
+   * 후처리 누락 보정 (PAID 상태인 주문의 물류 누락 확인 및 보정)
    *
    * 사용 시나리오:
-   * - confirmPayment 트랜잭션 중 장애로 티켓/물류가 일부만 처리된 경우
+   * - confirmPayment 트랜잭션 중 장애로 물류가 처리되지 않은 경우
    * - 웹훅이 먼저 도착했으나 후처리가 누락된 경우
    *
-   * 보정 대상:
-   * 1. 챌린지 티켓: orderItemId 기준으로 발급 여부 확인 후 미발급분 생성
-   * 2. 물류: logisticsUniq가 null이면 플레이오토 주문 생성
+   * [제거됨] 챌린지 티켓 보정 로직
+   * - 챌린지: quick-start API로만 시작 (challenge.service.ts)
+   * - 구독: IAP 인앱결제로만 구매 (iap.service.ts)
+   * - 주문 플로우에서 CHALLENGE/SUBSCRIPTION 상품은 orders.service.ts에서 차단됨
    */
   private async ensurePostPaymentProcessing(order: any): Promise<void> {
-    const orderId = order.id;
     const orderNumber = order.orderNumber;
 
-    this.logger.log(`🔧 후처리 누락 보정 시작: orderId=${orderId}`);
-
-    // 1. 챌린지 티켓 누락 보정 (seq 기반 deterministic 생성 + DB unique 제약)
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        if (item.product.categoryCode === 'CHALLENGE') {
-          // seq 기반으로 deterministic하게 티켓 생성 (1부터 quantity까지)
-          let created = 0;
-          for (let seq = 1; seq <= item.quantity; seq++) {
-            try {
-              await tx.challengeTicket.create({
-                data: {
-                  userId: order.userId,
-                  productId: item.productId,
-                  orderItemId: item.id,
-                  seq,
-                  purchaseDate: getNowKST(),
-                  status: ChallengeTicketStatus.PURCHASED,
-                  ticketType: 'CHALLENGE',
-                  createdAt: getNowKST(),
-                },
-              });
-              created++;
-            } catch (error: any) {
-              // P2002: Unique constraint violation → 이미 존재 (정상)
-              if (error.code === 'P2002') continue;
-              throw error;
-            }
-          }
-          if (created > 0) {
-            this.logger.log(`✅ 티켓 보정 완료: orderItemId=${item.id}, 추가 발급=${created}`);
-          }
-        }
-      }
-    });
-
-    // 2. 물류 누락 보정은 하지 않음
+    // 물류 누락 보정은 하지 않음
     // 카드/간편결제는 confirmPayment에서 비동기로 처리 중
     // 웹훅이 먼저 도착해도 confirmPayment의 플레이오토 호출이 완료될 때까지 대기해야 함
     // 중복 호출 방지를 위해 여기서는 호출하지 않음
     // 물류 누락 주문은 logistics-retry-scheduler 배치에서 재시도
 
-    this.logger.log(`✅ 후처리 보정 완료 (티켓만): ${orderNumber}`);
+    this.logger.log(`✅ 후처리 보정 완료: ${orderNumber}`);
   }
 
   /**

@@ -1,0 +1,79 @@
+# 🌐 Ingress - 운영 환경 외부 트래픽 라우팅
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: biocom-api-ingress
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+    environment: prod
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
+    networking.gke.io/managed-certificates: "biocom-api-ssl-cert"
+    cloud.google.com/backend-config: '{"default": "biocom-api-backend-config"}'
+    networking.gke.io/v1beta1.FrontendConfig: "biocom-api-frontend-config"
+    kubernetes.io/ingress.global-static-ip-name: "biocom-api-prod-external-ip"
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/load-balancer-type: "External"
+spec:
+  rules:
+  - host: api.biocom.ai.kr
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: biocom-api-service
+            port:
+              number: 80
+
+---
+# 🔒 ManagedCertificate - 운영 환경 SSL 인증서
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: biocom-api-ssl-cert
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+    environment: prod
+spec:
+  domains:
+  - api.biocom.ai.kr
+
+---
+# 🛡️ FrontendConfig - HTTPS 강제 리다이렉트
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: biocom-api-frontend-config
+  namespace: biocom-api
+spec:
+  sslPolicy: "biocom-ssl-policy"
+  redirectToHttps:
+    enabled: true
+    responseCodeName: "MOVED_PERMANENTLY_DEFAULT"

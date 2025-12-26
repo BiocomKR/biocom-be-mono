@@ -20,6 +20,7 @@ import { UsersService } from './users.service';
 import { ImwebApiService } from '../imweb/imweb-api.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdatePersonaDto } from './dto/update-persona.dto';
+import { UpdateMbtiDto } from './dto/update-mbti.dto';
 import {
   SearchImwebMembersResponseDto,
   GetMyProfileResponseDto,
@@ -242,6 +243,58 @@ export class UsersController {
     return {
       success: true,
       message: 'AI 페르소나가 업데이트되었습니다.',
+      data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 현재 로그인한 사용자의 MBTI 업데이트
+   * MBTI 유형만 안전하게 변경
+   */
+  @Patch('me/mbti')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'MBTI 업데이트',
+    description: '현재 로그인한 사용자의 MBTI 유형을 업데이트합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'MBTI 업데이트 성공',
+    schema: {
+      example: {
+        success: true,
+        message: 'MBTI가 업데이트되었습니다.',
+        data: {
+          id: 1,
+          email: 'user1@example.com',
+          name: '김철수',
+          mobile: '01012345678',
+          mbti: 'INTJ',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z',
+        },
+        timestamp: '2024-01-02T00:00:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: '사용자를 찾을 수 없음',
+    type: ApiErrorResponseDto,
+  })
+  async updateMbti(
+    @Request() req: any,
+    @Body() updateMbtiDto: UpdateMbtiDto
+  ): Promise<ApiResponseDto> {
+    // JWT payload에서 sub (user id) 추출
+    const userId = req.user.sub;
+    const user = await this.usersService.updateMbti(userId, updateMbtiDto.mbti);
+
+    return {
+      success: true,
+      message: 'MBTI가 업데이트되었습니다.',
       data: user,
       timestamp: getNowKST(),
     };

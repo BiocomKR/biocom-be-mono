@@ -10,12 +10,16 @@ dist
 # environment variables
 .env
 .env.local
+.env.dev
+.env.prod
 .env.development
 .env.production
 .env.staging
 .env.test
 .env.secrets
+.env.secrets.*
 */.env.secrets
+*/.env.secrets.*
 
 # logs
 *.log

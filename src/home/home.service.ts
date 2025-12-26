@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
 import { UserChallengeStatus, YesNo } from '../common/enums';
@@ -10,12 +11,14 @@ import {
   MissionItemDto,
   BannerInfoDto,
   HomeBannerLinkType,
+  HomeBannerContentType,
 } from './dto/home.dto';
 import { AppConfigService } from '../app-config/app-config.service';
 import { SurveyType } from '../common/enums';
-import { getNowKST, getKoreanToday } from '../common/utils/kst-date.util';
+import { getNowKST, getKoreanToday, stringToKSTDate } from '../common/utils/kst-date.util';
 import { SibApiService } from '../sib/services/sib-api.service';
 import { MissionService, MissionVisibilityContext } from '../mission/mission.service';
+import axios from 'axios';
 
 /** 캐시 TTL (1분) */
 const CACHE_TTL_MS = 60 * 1000;
@@ -48,6 +51,7 @@ interface UserChallengeData {
   status: string;
   expiresAt: Date | null;
   activatedAt: Date | null;
+  startDateSetAt: Date | null;
   createdAt: Date;
   totalPoints: number;
   isFirstEntry: boolean;
@@ -58,7 +62,6 @@ interface UserChallengeData {
     name: string;
     challengeMissions: ChallengeMissionData[];
   };
-  userMissions: UserMissionData[];
 }
 
 interface ChallengeMissionData {
@@ -92,7 +95,7 @@ interface UserData {
   aiPersonaId: number | null;
   health_type_animal_id: number | null;
   isFirstAppEntry: boolean;
-  aiPersona: { id: number; name: string; personaAnimationUrl: string | null } | null;
+  aiPersona: { id: number; name: string; torsoUrl: string | null } | null;
   healthTypeAnimal: {
     id: number;
     animalName: string;
@@ -110,13 +113,20 @@ interface UserData {
 @Injectable()
 export class HomeService {
   private readonly logger = new Logger(HomeService.name);
+  private readonly aiAgentBaseUrl: string;
+  private readonly aiAgentApiKey: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly sibApiService: SibApiService,
     private readonly missionService: MissionService,
     private readonly appConfigService: AppConfigService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    // AI Agent 서버 설정 로드
+    this.aiAgentBaseUrl = this.configService.get<string>('AI_AGENT_BASE_URL') || 'http://localhost:8000';
+    this.aiAgentApiKey = this.configService.get<string>('AI_AGENT_API_KEY') || '';
+  }
 
   /**
    * 종합건강대사 검사 완료 여부 확인
@@ -161,10 +171,11 @@ export class HomeService {
         hasPurchase: user.userChallenges.length > 0,
         hasResult: reportInfo.resultYN === YesNo.Y,
         hasPreSurvey,
-        hasChallengeStart: !!challenges.active,
-        personaImageUrl: user.aiPersona?.personaAnimationUrl || null,
+        hasChallengeStart: !!challenges.active || !!challenges.pending?.startDateSetAt,
+        personaImageUrl: user.aiPersona?.torsoUrl || null,
         healthTypeAnimalId: user.health_type_animal_id,
         animalName: user.healthTypeAnimal?.animalName || null,
+        currentDay: challengeDays.currentDay,
       });
 
       // 4. 미션 목록 조회 및 진행도 업데이트
@@ -175,13 +186,25 @@ export class HomeService {
       }
 
       // 5. 챌린지 정보 구성 (CHALLENGER만)
-      const challengeInfo = this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
+      const challengeInfo = await this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
 
       // 6. 첫 방문 플래그 처리
       const firstVisitFlags = this.handleFirstVisitFlags(userId, user, reportInfo, challenges, challengeDays.currentDay);
 
       // 7. 날짜 정보
       const { startDate, endDate } = this.getChallengeDates(challenges);
+
+      // 8. 사후문진 완료 여부 및 종료 후 일주일 이내 여부
+      const { hasAfterSurvey, isWithinOneWeekAfterEnd } = await this.getAfterChallengeStatus(
+        challenges.completed,
+        challengeDays.daysAfterChallengeEnd,
+      );
+
+      // 9. 심층리포트 및 채팅요약 생성 (비동기 - 응답 대기 없음)
+      // chartId가 있는 경우에만 AI Agent 호출
+      if (reportInfo.chartId) {
+        this.callAiAgentHomeAsync(userId, reportInfo.chartId);
+      }
 
       return {
         userType: user.status as UserSubscriptionStatus,
@@ -199,6 +222,8 @@ export class HomeService {
         endDate,
         missionList,
         ...firstVisitFlags,
+        hasAfterSurvey,
+        isWithinOneWeekAfterEnd,
       };
     } catch (error) {
       this.logger.error(`홈 화면 데이터 조회 실패 - 사용자 ID: ${userId}`, error);
@@ -223,7 +248,7 @@ export class HomeService {
         health_type_animal_id: true,
         isFirstAppEntry: true,
         aiPersona: {
-          select: { id: true, name: true, personaAnimationUrl: true },
+          select: { id: true, name: true, torsoUrl: true },
         },
         healthTypeAnimal: {
           select: {
@@ -247,6 +272,7 @@ export class HomeService {
             status: true,
             expiresAt: true,
             activatedAt: true,
+            startDateSetAt: true,
             createdAt: true,
             totalPoints: true,
             isFirstEntry: true,
@@ -271,9 +297,6 @@ export class HomeService {
                 },
               },
             },
-            userMissions: {
-              select: { id: true, challengeMissionId: true, day: true, isCompleted: true, attemptNumber: true },
-            },
           },
         },
         userCharts: {
@@ -293,8 +316,9 @@ export class HomeService {
     if (user.userCharts.length > 0) {
       const cachedChart = user.userCharts[0];
       const now = getNowKST();
+      // DB에서 가져온 updatedAt은 이미 KST로 저장된 값이므로 그대로 사용
       const cacheAge = cachedChart.updatedAt
-        ? now.getTime() - new Date(cachedChart.updatedAt).getTime()
+        ? now.getTime() - cachedChart.updatedAt.getTime()
         : Infinity;
 
       // TTL 만료 시 백그라운드 갱신
@@ -311,12 +335,20 @@ export class HomeService {
       };
     }
 
-    // 캐시 미스 - 백그라운드로 SIB API 호출
-    this.fetchAndSaveChartData(userId, user.mobile).catch((err) => {
-      this.logger.warn(`차트 데이터 백그라운드 저장 실패 - 사용자 ID: ${userId}`, err);
-    });
+    // 캐시 미스 - 동기적으로 SIB API 호출 (첫 호출 시 대기)
+    try {
+      const chartData = await this.fetchAndSaveChartDataSync(userId, user.mobile);
+      if (chartData) {
+        return {
+          chartId: chartData.chartId,
+          resultYN: chartData.resultYn as YesNo,
+        };
+      }
+    } catch (err) {
+      this.logger.warn(`차트 데이터 동기 조회 실패 - 사용자 ID: ${userId}`, err);
+    }
 
-    return { chartId: null, resultYN: YesNo.N };
+    return { chartId: null, resultYN: YesNo.N, sibError: true };
   }
 
   /**
@@ -344,7 +376,7 @@ export class HomeService {
 
     return {
       name: aiPersona.name,
-      imageUrl: aiPersona.personaAnimationUrl || '',
+      imageUrl: aiPersona.torsoUrl || '',
     };
   }
 
@@ -364,18 +396,21 @@ export class HomeService {
 
   /**
    * 챌린지 일차 계산
+   * DB에서 가져온 날짜는 이미 KST로 저장된 값이므로 그대로 사용
    */
   private calculateChallengeDays(challenges: ChallengesByStatus): ChallengeDays {
     const today = getNowKST();
 
     if (challenges.active?.activatedAt) {
-      const activatedAt = new Date(challenges.active.activatedAt);
+      // DB에서 가져온 activatedAt은 이미 KST로 저장된 값
+      const activatedAt = challenges.active.activatedAt;
       const diffTime = today.getTime() - activatedAt.getTime();
       return { currentDay: Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) };
     }
 
     if (challenges.completed?.expiresAt) {
-      const expiresAt = new Date(challenges.completed.expiresAt);
+      // DB에서 가져온 expiresAt은 이미 KST로 저장된 값
+      const expiresAt = challenges.completed.expiresAt;
       const diffTime = today.getTime() - expiresAt.getTime();
       return { daysAfterChallengeEnd: Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))) };
     }
@@ -420,8 +455,13 @@ export class HomeService {
 
   /**
    * 미션 진행도 업데이트 (CHALLENGER, SUBSCRIBER)
-   * - current: 포인트 지급 횟수 (user_missions.pointsEarned > 0)
-   * - executed: 실행 횟수 (user_records 카운트)
+   * - current: 포인트 지급 횟수
+   * - executed: 실행 횟수
+   *
+   * 데이터 소스:
+   * - user_records: 6가지 기록 (BEAUTY, DIET, SUPPLEMENT, FASTING, SLEEP, ACTIVITY)
+   * - user_missions: 챌린지 미션 (QUIZ, BALANCE_GAME, DAILY_MISSION, DECLARATION, SELF_PRAISE 등)
+   * - point_histories: 포인트 지급 내역 (relatedType으로 구분)
    */
   private async updateMissionProgress(
     userId: number,
@@ -429,14 +469,35 @@ export class HomeService {
   ): Promise<MissionItemDto[]> {
     // 오늘 날짜 (KST 기준)
     const today = getKoreanToday();
-    const todayDate = new Date(today);
+    const todayDate = stringToKSTDate(today);
+    const tomorrowDate = stringToKSTDate(today, 24, 0, 0);
 
-    // 병렬로 조회: user_records (실행 횟수), user_missions (포인트 지급 횟수)
-    const [todayRecords, todayMissions] = await Promise.all([
-      // 실행 횟수 조회
+    // 병렬로 조회: user_records (SUPPLEMENT 별도)
+    const [todayRecords, todaySupplementRecords] = await Promise.all([
+      // user_records: 기록 타입 (createdAt 기준) - SUPPLEMENT 제외
       this.prisma.userRecord.findMany({
         where: {
           userId,
+          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY', 'DECLARATION', 'SELF_PRAISE', 'QUIZ', 'BALANCE_GAME', 'DAILY_MISSION', 'WEEKLY_REPORT', 'AFTER_SURVEY'] },
+          createdAt: {
+            gte: todayDate,
+            lt: tomorrowDate,
+          },
+        },
+        select: {
+          recordType: true,
+          metadata: true,
+        },
+      }),
+      // SUPPLEMENT: date 기준으로 별도 조회
+      // 이유: saveSupplementRoutine에서 루틴 저장 시 미래 날짜의 기록을 미리 생성하는데,
+      // 이때 createdAt은 생성 시점(루틴 저장 시점)으로 저장됨.
+      // 예) 12/22에 루틴 저장 → 12/23 날짜 기록의 createdAt은 12/22
+      // 따라서 createdAt 기준 조회 시 오늘 날짜 기록이 누락되는 문제 발생
+      this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'SUPPLEMENT',
           date: todayDate,
         },
         select: {
@@ -444,42 +505,43 @@ export class HomeService {
           metadata: true,
         },
       }),
-      // 포인트 지급 횟수 조회
-      this.prisma.userMission.findMany({
-        where: {
-          userId,
-          createdAt: {
-            gte: todayDate,
-            lt: new Date(todayDate.getTime() + 24 * 60 * 60 * 1000),
-          },
-          pointsEarned: { gt: 0 },
-        },
-        select: {
-          challengeMission: {
-            select: {
-              mission: {
-                select: { recordType: true },
-              },
-            },
-          },
-        },
-      }),
     ]);
 
     // recordType별 실행 횟수 계산
     const executedMap = new Map<string, number>();
+
+    // user_records에서 실행 횟수
     for (const record of todayRecords) {
       const recordType = record.recordType;
       const currentCount = executedMap.get(recordType) || 0;
       executedMap.set(recordType, currentCount + 1);
     }
 
-    // recordType별 포인트 지급 횟수 계산
+    // SUPPLEMENT 실행 횟수 (date 기준 조회 결과)
+    for (const record of todaySupplementRecords) {
+      const currentCount = executedMap.get('SUPPLEMENT') || 0;
+      executedMap.set('SUPPLEMENT', currentCount + 1);
+    }
+
+    // recordType별 포인트 지급 횟수 계산 (metadata.pointsEarned > 0인 경우)
     const currentMap = new Map<string, number>();
-    for (const mission of todayMissions) {
-      const recordType = mission.challengeMission.mission.recordType;
-      const currentCount = currentMap.get(recordType) || 0;
-      currentMap.set(recordType, currentCount + 1);
+
+    // user_records에서 포인트 지급 횟수 (metadata.pointsEarned로 확인)
+    for (const record of todayRecords) {
+      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
+      if (pointsEarned > 0) {
+        const currentCount = currentMap.get(record.recordType) || 0;
+        currentMap.set(record.recordType, currentCount + 1);
+      }
+    }
+
+    // SUPPLEMENT도 동일하게 처리
+    for (const record of todaySupplementRecords) {
+      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
+      if (pointsEarned > 0) {
+        const currentCount = currentMap.get('SUPPLEMENT') || 0;
+        currentMap.set('SUPPLEMENT', currentCount + 1);
+      }
     }
 
     return missionList.map((m) => ({
@@ -492,17 +554,29 @@ export class HomeService {
   /**
    * 챌린지 정보 DTO 생성 (CHALLENGER만)
    */
-  private buildChallengeInfo(
+  private async buildChallengeInfo(
     userStatus: string,
     activeChallenge?: UserChallengeData,
     currentDay?: number,
-  ): ChallengeInfoDto | null {
+  ): Promise<ChallengeInfoDto | null> {
     if (userStatus !== UserSubscriptionStatus.CHALLENGER || !activeChallenge || !currentDay) {
       return null;
     }
 
     const totalMissions = activeChallenge.product.challengeMissions.length;
-    const completedMissions = activeChallenge.userMissions.filter((um) => um.isCompleted).length;
+
+    // user_records에서 완료된 미션 개수 조회
+    const completedMissions = await this.prisma.userRecord.count({
+      where: {
+        userId: activeChallenge.id, // userChallengeId가 아님, 아래에서 수정
+        userChallengeId: activeChallenge.id,
+        metadata: {
+          path: ['isCompleted'],
+          equals: true
+        }
+      }
+    });
+
     const challengePercent = totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0;
 
     return {
@@ -604,11 +678,11 @@ export class HomeService {
   /**
    * 조건별 홈 배너 정보 조회
    *
-   * 조건 우선순위 (4가지 조건 중 하나라도 N이면 챌린지 소개):
+   * 조건 우선순위:
    * 1. 구매이력/결과지/사전문진/시작일설정 중 하나라도 N → 챌린지 소개
-   * 2. 모두 Y + CHALLENGER → 콘텐츠 페이지 이동
-   * 3. 모두 Y + SUBSCRIBER → 유형별 1순위 추천 제품 상세
-   * 4. 모두 Y + NEWCOMER (챌린지 종료 후) → 지정된 칼럼
+   * 2. 모두 Y + CHALLENGER → 강의(LECTURE)
+   * 3. 모두 Y + SUBSCRIBER → 추천 제품(PRODUCT)
+   * 4. 모두 Y + NEWCOMER (챌린지 종료 후) → 칼럼(COLUMN)
    */
   private async getChallengeBanner(context: {
     userId: number;
@@ -620,6 +694,7 @@ export class HomeService {
     personaImageUrl: string | null;
     healthTypeAnimalId: number | null;
     animalName: string | null;
+    currentDay?: number;
   }): Promise<BannerInfoDto> {
     const {
       userStatus,
@@ -630,71 +705,42 @@ export class HomeService {
       personaImageUrl,
       healthTypeAnimalId,
       animalName,
+      currentDay,
     } = context;
 
-    // 기본 이미지 (페르소나 설정 전)
-    const defaultImageUrl = '';
+    // 기본 이미지 (페르소나 설정 전) - 메이브 상반신 이미지 사용
+    const defaultImageUrl = 'https://storage.googleapis.com/api-dev-biocom-uploads/persona_torso_mave.webp';
     // 페르소나 설정 후에는 페르소나 이미지 사용
     const bannerImageUrl = personaImageUrl || defaultImageUrl;
 
-    // 1. 구매 이력 없음 OR 결과지 없음 → 챌린지 소개
-    if (!hasPurchase || !hasResult) {
+    // 1. 4가지 조건 중 하나라도 N → 챌린지 소개
+    if (!hasPurchase || !hasResult || !hasPreSurvey || !hasChallengeStart) {
       return {
         title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
+        description: '이너뷰티 챌린지',
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.CHALLENGE_INTRO,
+        linkType: HomeBannerLinkType.INTERNAL,
+        contentType: HomeBannerContentType.CHALLENGE_INTRO,
         targetId: null,
-        contentType: null,
-        productType: null,
         externalUrl: null,
       };
     }
 
-    // 2. 사전문진 미완료 → 사전문진 유도
-    if (!hasPreSurvey) {
-      return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
-        imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.PRE_SURVEY,
-        targetId: null,
-        contentType: null,
-        productType: null,
-        externalUrl: null,
-      };
-    }
-
-    // 3. 챌린지 시작일 미설정 → 시작일 설정 유도
-    if (!hasChallengeStart) {
-      return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
-        imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.CHALLENGE_START,
-        targetId: null,
-        contentType: null,
-        productType: null,
-        externalUrl: null,
-      };
-    }
-
-    // 4. 챌린지 진행 중 (CHALLENGER) → 콘텐츠 페이지 이동
+    // 2. 챌린지 진행 중 (CHALLENGER) → 오늘 일차에 해당하는 강의
     if (userStatus === UserSubscriptionStatus.CHALLENGER) {
-      const contentInfo = await this.getFallbackContent('LECTURE');
+      const contentInfo = await this.getLectureByDay(currentDay);
       return {
-        title: '미션 수행하고 30,000P 받으세요',
-        description: '이너뷰티 챌린지 ›',
+        title: contentInfo?.title || '오늘의 강의',
+        description: `Day ${currentDay || 1}`,
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.CONTENT,
+        linkType: HomeBannerLinkType.INTERNAL,
+        contentType: HomeBannerContentType.LECTURE,
         targetId: contentInfo?.id || null,
-        contentType: contentInfo?.type || 'LECTURE',
-        productType: null,
         externalUrl: null,
       };
     }
 
-    // 5. 구독자 (SUBSCRIBER) → 추천 영양제 (1순위)
+    // 3. 구독자 (SUBSCRIBER) → 추천 제품
     if (userStatus === UserSubscriptionStatus.SUBSCRIBER) {
       const productInfo = await this.getTopRecommendedProduct(healthTypeAnimalId);
       const displayAnimalName = animalName || '회원';
@@ -702,26 +748,103 @@ export class HomeService {
         title: `${displayAnimalName}에게 꼭 필요한`,
         description: productInfo?.name || '',
         imageUrl: bannerImageUrl,
-        linkType: HomeBannerLinkType.PRODUCT,
+        linkType: HomeBannerLinkType.INTERNAL,
+        contentType: HomeBannerContentType.PRODUCT,
         targetId: productInfo?.id || null,
-        contentType: null,
-        productType: productInfo?.productType || null,
         externalUrl: null,
       };
     }
 
-    // 6. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 오늘의 칼럼 콘텐츠
+    // 4. 챌린지 종료 후 (NEWCOMER로 돌아온 경우) → 칼럼
     const contentInfo = await this.getFallbackContent('COLUMN');
     return {
       title: '오늘의 칼럼 콘텐츠',
       description: contentInfo?.title || '',
       imageUrl: bannerImageUrl,
-      linkType: HomeBannerLinkType.CONTENT,
+      linkType: HomeBannerLinkType.INTERNAL,
+      contentType: HomeBannerContentType.COLUMN,
       targetId: contentInfo?.id || null,
-      contentType: contentInfo?.type || 'COLUMN',
-      productType: null,
       externalUrl: null,
     };
+  }
+
+  /**
+   * 사후문진 완료 여부 및 종료 후 일주일 이내 여부 조회
+   */
+  private async getAfterChallengeStatus(
+    completedChallenge: UserChallengeData | undefined,
+    daysAfterChallengeEnd: number | undefined,
+  ): Promise<{ hasAfterSurvey: boolean; isWithinOneWeekAfterEnd: boolean }> {
+    // 완료된 챌린지가 없으면 둘 다 false
+    if (!completedChallenge) {
+      return { hasAfterSurvey: false, isWithinOneWeekAfterEnd: false };
+    }
+
+    // 사후문진 완료 여부 확인
+    const afterSurveyAnswer = await this.prisma.surveyAnswer.findFirst({
+      where: {
+        userChallengeId: completedChallenge.id,
+        type: SurveyType.AFTER,
+      },
+      select: { id: true },
+    });
+
+    // 종료 후 일주일 이내 여부
+    const isWithinOneWeekAfterEnd = daysAfterChallengeEnd !== undefined && daysAfterChallengeEnd <= 7;
+
+    return {
+      hasAfterSurvey: !!afterSurveyAnswer,
+      isWithinOneWeekAfterEnd,
+    };
+  }
+
+  /**
+   * 챌린지 일차에 해당하는 강의 콘텐츠 조회
+   * @param currentDay 챌린지 현재 일차
+   * @returns 해당 일차 강의 또는 fallback 강의
+   */
+  private async getLectureByDay(currentDay?: number): Promise<{ id: number; title: string; type: string } | null> {
+    // 1. currentDay가 있으면 해당 일차 강의 조회
+    if (currentDay) {
+      const lecture = await this.prisma.content.findFirst({
+        where: {
+          type: 'LECTURE',
+          dayNumber: currentDay,
+          isActive: true,
+        },
+        select: { id: true, title: true, type: true },
+      });
+
+      if (lecture) {
+        return lecture;
+      }
+
+      // 2. 해당 일차 강의가 없으면 21일 넘은 경우 마지막 강의 반환
+      if (currentDay > 21) {
+        const lastLecture = await this.prisma.content.findFirst({
+          where: {
+            type: 'LECTURE',
+            isActive: true,
+          },
+          orderBy: { dayNumber: 'desc' },
+          select: { id: true, title: true, type: true },
+        });
+
+        if (lastLecture) {
+          return lastLecture;
+        }
+      }
+    }
+
+    // 3. Fallback: 첫 번째 강의 반환
+    return this.prisma.content.findFirst({
+      where: {
+        type: 'LECTURE',
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+      select: { id: true, title: true, type: true },
+    });
   }
 
   /**
@@ -741,9 +864,9 @@ export class HomeService {
   }
 
   /**
-   * 동물 유형별 1순위 추천 제품 조회 (ID, 이름, 타입 포함)
+   * 동물 유형별 1순위 추천 제품 조회 (ID, 이름)
    */
-  private async getTopRecommendedProduct(healthTypeAnimalId: number | null): Promise<{ id: number; name: string; productType: string } | null> {
+  private async getTopRecommendedProduct(healthTypeAnimalId: number | null): Promise<{ id: number; name: string } | null> {
     if (!healthTypeAnimalId) return null;
 
     const topProduct = await this.prisma.healthTypeAnimalProduct.findFirst({
@@ -754,7 +877,7 @@ export class HomeService {
       orderBy: { displayOrder: 'asc' },
       select: {
         product: {
-          select: { id: true, name: true, productType: true },
+          select: { id: true, name: true },
         },
       },
     });
@@ -763,22 +886,30 @@ export class HomeService {
   }
 
   /**
-   * 외부 API에서 차트 데이터 조회 및 DB 저장
+   * 외부 API에서 차트 데이터 조회 및 DB 저장 (동기 - 결과 반환)
    */
-  private async fetchAndSaveChartData(userId: number, mobile: string): Promise<void> {
+  private async fetchAndSaveChartDataSync(userId: number, mobile: string): Promise<{ chartId: string; resultYn: string } | null> {
     try {
-      this.logger.log(`외부 API 차트 데이터 조회 시작 - 사용자 ID: ${userId}`);
+      this.logger.log(`외부 API 차트 데이터 동기 조회 시작 - 사용자 ID: ${userId}`);
 
       const chartData = await this.sibApiService.getChartIdByMobile(mobile);
 
       if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
         this.logger.log(`차트 데이터 없음 - 사용자 ID: ${userId}`);
-        return;
+        return null;
+      }
+
+      // D0004 또는 D0060 차트만 필터링
+      const targetChart = chartData.find((c) => c.orderCode === 'D0004' || c.orderCode === 'D0060');
+      if (!targetChart) {
+        this.logger.log(`대상 차트 데이터 없음 (D0004/D0060) - 사용자 ID: ${userId}`);
+        return null;
       }
 
       this.logger.log(`차트 데이터 ${chartData.length}건 조회 - 사용자 ID: ${userId}`);
 
-      const result = await this.prisma.userChart.createMany({
+      // DB에 저장
+      await this.prisma.userChart.createMany({
         data: chartData.map((chart) => ({
           userId,
           chartId: chart.chartID,
@@ -789,9 +920,15 @@ export class HomeService {
         skipDuplicates: true,
       });
 
-      this.logger.log(`차트 데이터 ${result.count}건 저장 완료 - 사용자 ID: ${userId}`);
+      this.logger.log(`차트 데이터 저장 완료 - 사용자 ID: ${userId}`);
+
+      return {
+        chartId: targetChart.chartID,
+        resultYn: targetChart.resultYN,
+      };
     } catch (error: any) {
-      this.logger.warn(`차트 데이터 조회 실패 - 사용자 ID: ${userId}`, error.message);
+      this.logger.warn(`차트 데이터 동기 조회 실패 - 사용자 ID: ${userId}`, error.message);
+      throw error;
     }
   }
 
@@ -833,5 +970,45 @@ export class HomeService {
     } catch (error: any) {
       this.logger.warn(`차트 데이터 갱신 실패 - 사용자 ID: ${userId}`, error.message);
     }
+  }
+
+  /**
+   * AI Agent /api/home 비동기 호출 (Fire-and-Forget)
+   * 심층리포트 및 채팅요약 생성을 위해 AI Agent 서버에 요청
+   * 응답을 기다리지 않고 백그라운드에서 처리
+   *
+   * @param userId 사용자 ID
+   * @param chartId 차트 ID
+   */
+  private callAiAgentHomeAsync(userId: number, chartId: string): void {
+    const url = `${this.aiAgentBaseUrl}/api/home`;
+
+    this.logger.log(`[callAiAgentHomeAsync] AI Agent 호출 시작 - userId: ${userId}, chartId: ${chartId}`);
+
+    // 비동기 호출 (응답 대기 없음)
+    axios
+      .post(
+        url,
+        {
+          userId,
+          chartId,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.aiAgentApiKey,
+          },
+          timeout: 30000, // 30초 타임아웃
+        },
+      )
+      .then(() => {
+        this.logger.log(`[callAiAgentHomeAsync] AI Agent 호출 성공 - userId: ${userId}`);
+      })
+      .catch((error) => {
+        // 에러 발생해도 홈 API 응답에 영향 없음
+        this.logger.warn(
+          `[callAiAgentHomeAsync] AI Agent 호출 실패 - userId: ${userId}, error: ${error.message}`,
+        );
+      });
   }
 }

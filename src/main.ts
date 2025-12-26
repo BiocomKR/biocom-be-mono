@@ -211,6 +211,7 @@ async function bootstrap() {
     .addTag('챌린지-설문', '설문조사')
     .addTag('챌린지-컨텐츠', '교육 컨텐츠')
     .addTag('챌린지-퀴즈', '퀴즈 완료')
+    .addTag('AI 챗봇', 'AI Agent 서버 중계 API')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

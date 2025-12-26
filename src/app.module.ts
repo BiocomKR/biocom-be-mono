@@ -30,6 +30,7 @@ import { HomeModule } from './home/home.module';
 import { BalanceGameModule } from './balance-game/balance-game.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { AiPersonaModule } from './ai-persona/ai-persona.module';
+import { HealthTypeAnimalModule } from './health-type-animal/health-type-animal.module';
 import { BannersModule } from './shop/banners.module';
 import { PhoneVerificationModule } from './phone-verification/phone-verification.module';
 import { PushModule } from './push/push.module';
@@ -43,6 +44,10 @@ import { ExamModule } from './exam/exam.module';
 import { QuizModule } from './quiz/quiz.module';
 import { QueuesModule } from './queues/queues.module';
 import { IssueModule } from './issue/issue.module';
+import { SolutionModule } from './solution/solution.module';
+import { AppConfigModule } from './app-config/app-config.module';
+import { AiChatModule } from './ai-chat/ai-chat.module';
+import { DeepReportModule } from './deep-report/deep-report.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -111,6 +116,7 @@ import { IssueModule } from './issue/issue.module';
     BalanceGameModule, // 밸런스게임 모듈
     CouponsModule,    // 쿠폰 관리 모듈
     AiPersonaModule, // AI 페르소나 관리 모듈
+    HealthTypeAnimalModule, // 건강타입 동물 관리 모듈
     PhoneVerificationModule, // 휴대폰 본인인증 모듈 (NHN KCP SMS 인증)
     PushModule,      // 푸시 알림 모듈 (FCM)
     AppEventsModule, // 앱 이벤트 수집 모듈 (GA4 대체/보조)
@@ -122,6 +128,10 @@ import { IssueModule } from './issue/issue.module';
     ExamModule,       // 검사 결과 모듈
     QuizModule,       // 퀴즈 모듈
     IssueModule,      // 문제 신고 모듈
+    SolutionModule,   // 맞춤 솔루션 모듈
+    AppConfigModule,  // 앱 설정 관리 모듈
+    AiChatModule,     // AI 챗봇 모듈 (AI Agent 서버 중계)
+    DeepReportModule, // 심층리포트 모듈
   ],
   controllers: [], // 앱 레벨 컨트롤러 없음
   providers: [

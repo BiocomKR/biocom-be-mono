@@ -880,14 +880,19 @@ export class RecordsService {
       where: { userId, status: 'ACTIVE' },
     });
 
-    // 기록 저장
+    // 기록 저장 (pointsEarned를 metadata에 포함)
+    const metadataWithPoints = {
+      ...metadata,
+      pointsEarned: pointsToAward,
+    };
+
     const userRecord = await tx.userRecord.create({
       data: {
         userId,
         userChallengeId: activeChallenge?.id || null,
         recordType: recordCode,
         date: new Date(date),
-        metadata,
+        metadata: metadataWithPoints,
         createdAt: getNowKST(),
       },
     });
@@ -900,7 +905,7 @@ export class RecordsService {
         pointsToAward,
         `${recordCode} 기록 완료`,
         'RECORD_COMPLETION',
-        userRecord.id
+        userRecord.id,
       );
     }
 
@@ -1289,11 +1294,15 @@ export class RecordsService {
       //   throw new ForbiddenException('접근 권한이 없습니다.');
       // }
 
-      this.logger.log(`D0060 검사 결과 발견 - chartID: ${latestResult.chartID}, 경과일: ${daysDiff}일`);
+      this.logger.log(`지연성 알러지 검사 결과 발견 - chartID: ${latestResult.chartID}, orderCode: ${latestResult.orderCode}, 경과일: ${daysDiff}일`);
 
-      // 2. getIggLevels API 호출
+      // 2. orderCode에 따라 신/구 API 분기 호출
+      const apiEndpoint = latestResult.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY
+        ? 'https://sib.codns.com:3001/api/report/getIggLevelOld'
+        : 'https://sib.codns.com:3001/api/report/getIggLevels';
+
       const iggResponse = await firstValueFrom(
-        this.httpService.get(`https://sib.codns.com:3001/api/report/getIggLevels`, {
+        this.httpService.get(apiEndpoint, {
           params: { chartId: latestResult.chartID },
         })
       );
@@ -1486,7 +1495,7 @@ export class RecordsService {
       const isFirstRecordOfDay = !existingRecordWithImage;
 
       // 3. RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
-      const updatePromises = data.map(async (item: any) => {
+      const updatePromises = data.map(async (item: any, index: number) => {
         const { productId, morning, afternoon, evening } = item;
 
         // 해당 productId의 기록 조회
@@ -1520,6 +1529,11 @@ export class RecordsService {
         // imageUrl이 있으면 metadata에 포함
         if (imageUrl) {
           updatedMetadata.imageUrl = imageUrl;
+        }
+
+        // 당일 최초 기록이고 첫 번째 아이템인 경우 pointsEarned 추가
+        if (isFirstRecordOfDay && index === 0) {
+          updatedMetadata.pointsEarned = 100;
         }
 
         // 레코드 업데이트

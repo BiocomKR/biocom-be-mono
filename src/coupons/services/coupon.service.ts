@@ -15,7 +15,8 @@ import {
   CouponValidationResponseDto,
   CouponDetailResponseDto,
   DiscountType,
-  CouponStatus
+  CouponStatus,
+  CouponScopeType
 } from '../dto/coupon.dto';
 
 @Injectable()
@@ -35,7 +36,12 @@ export class CouponService {
       include: {
         coupon: {
           include: {
-            product: true
+            product: true,
+            couponProducts: {
+              include: {
+                product: true
+              }
+            }
           }
         }
       },
@@ -54,6 +60,22 @@ export class CouponService {
         status = CouponStatus.EXPIRED;
       }
 
+      // 상품명 결정 (scopeType에 따라)
+      let productName = '전체 상품';
+      const scopeType = uc.coupon.scopeType as CouponScopeType;
+      if (scopeType === CouponScopeType.PRODUCT) {
+        if (uc.coupon.couponProducts.length > 0) {
+          const productNames = uc.coupon.couponProducts.map(cp => cp.product.name);
+          productName = productNames.length > 1
+            ? `${productNames[0]} 외 ${productNames.length - 1}개`
+            : productNames[0];
+        } else if (uc.coupon.product) {
+          productName = uc.coupon.product.name;
+        }
+      } else if (scopeType === CouponScopeType.CATEGORY) {
+        productName = `${uc.coupon.categoryCode} 카테고리`;
+      }
+
       return {
         id: uc.id,
         couponId: uc.couponId,
@@ -62,7 +84,7 @@ export class CouponService {
         discountType: uc.coupon.discountType as DiscountType,
         discountValue: uc.coupon.discountValue,
         maxDiscountAmount: uc.coupon.maxDiscountAmount,
-        productName: uc.coupon.product.name,
+        productName,
         status,
         issuedAt: uc.issuedAt.toISOString(),
         expiresAt: uc.expiresAt.toISOString(),
@@ -82,6 +104,7 @@ export class CouponService {
 
   /**
    * 특정 상품에 사용 가능한 쿠폰 조회
+   * scopeType에 따라 ALL, CATEGORY, PRODUCT 쿠폰 모두 조회
    */
   async getAvailableCouponsForProduct(
     userId: number,
@@ -99,6 +122,10 @@ export class CouponService {
     }
 
     // 해당 상품에 적용 가능한 활성 쿠폰 조회
+    // scopeType에 따라 필터링:
+    // - ALL: 모든 상품에 적용 가능
+    // - CATEGORY: 해당 상품의 카테고리와 일치
+    // - PRODUCT: productId 일치 또는 couponProducts에 포함
     const now = getNowKST();
     const availableUserCoupons = await this.prisma.userCoupon.findMany({
       where: {
@@ -106,8 +133,28 @@ export class CouponService {
         status: 'ACTIVE',
         expiresAt: { gt: now },
         coupon: {
-          productId,
-          isActive: true
+          isActive: true,
+          OR: [
+            // ALL: 전체 상품 적용
+            { scopeType: CouponScopeType.ALL },
+            // CATEGORY: 카테고리 일치
+            {
+              scopeType: CouponScopeType.CATEGORY,
+              categoryCode: product.categoryCode
+            },
+            // PRODUCT: 기존 productId 방식 (하위 호환)
+            {
+              scopeType: CouponScopeType.PRODUCT,
+              productId
+            },
+            // PRODUCT: couponProducts 관계 테이블 방식
+            {
+              scopeType: CouponScopeType.PRODUCT,
+              couponProducts: {
+                some: { productId }
+              }
+            }
+          ]
         }
       },
       include: {
@@ -159,6 +206,7 @@ export class CouponService {
 
   /**
    * 쿠폰 유효성 검증
+   * scopeType에 따라 ALL, CATEGORY, PRODUCT 쿠폰 검증
    */
   async validateCoupon(userId: number, userCouponId: number, productId: number): Promise<CouponValidationResponseDto> {
     this.logger.log(`사용자 ${userId}의 쿠폰 ${userCouponId} 유효성 검증 (상품: ${productId})`);
@@ -172,7 +220,8 @@ export class CouponService {
       include: {
         coupon: {
           include: {
-            product: true
+            product: true,
+            couponProducts: true
           }
         }
       }
@@ -194,14 +243,6 @@ export class CouponService {
       };
     }
 
-    // 상품 일치 확인
-    if (userCoupon.coupon.productId !== productId) {
-      return {
-        isValid: false,
-        message: '해당 상품에 사용할 수 없는 쿠폰입니다'
-      };
-    }
-
     // 상품 가격 조회
     const product = await this.prisma.product.findUnique({
       where: { id: productId }
@@ -211,6 +252,31 @@ export class CouponService {
       return {
         isValid: false,
         message: '상품을 찾을 수 없습니다'
+      };
+    }
+
+    // scopeType에 따른 상품 적용 가능 여부 확인
+    const scopeType = userCoupon.coupon.scopeType as CouponScopeType;
+    let isApplicable = false;
+
+    switch (scopeType) {
+      case CouponScopeType.ALL:
+        isApplicable = true;
+        break;
+      case CouponScopeType.CATEGORY:
+        isApplicable = userCoupon.coupon.categoryCode === product.categoryCode;
+        break;
+      case CouponScopeType.PRODUCT:
+        // 기존 productId 방식 또는 couponProducts 관계 테이블 방식
+        isApplicable = userCoupon.coupon.productId === productId ||
+          userCoupon.coupon.couponProducts.some(cp => cp.productId === productId);
+        break;
+    }
+
+    if (!isApplicable) {
+      return {
+        isValid: false,
+        message: '해당 상품에 사용할 수 없는 쿠폰입니다'
       };
     }
 
@@ -240,6 +306,7 @@ export class CouponService {
 
   /**
    * 쿠폰 사용 (주문 시 호출)
+   * scopeType에 따라 ALL, CATEGORY, PRODUCT 쿠폰 적용
    */
   async useCoupon(userId: number, userCouponId: number, orderId: number): Promise<UseCouponResponseDto> {
     this.logger.log(`사용자 ${userId}가 쿠폰 ${userCouponId} 사용 (주문: ${orderId})`);
@@ -252,7 +319,11 @@ export class CouponService {
         status: 'ACTIVE'
       },
       include: {
-        coupon: true
+        coupon: {
+          include: {
+            couponProducts: true
+          }
+        }
       }
     });
 
@@ -284,23 +355,42 @@ export class CouponService {
       throw new NotFoundException('주문을 찾을 수 없습니다');
     }
 
-    // 주문 상품 중 쿠폰 적용 가능한 상품이 있는지 확인
-    const applicableItem = order.items.find(item => item.product.id === userCoupon.coupon.productId);
-    if (!applicableItem) {
+    // scopeType에 따라 적용 가능한 상품 찾기
+    const scopeType = userCoupon.coupon.scopeType as CouponScopeType;
+    const couponProductIds = userCoupon.coupon.couponProducts.map(cp => cp.productId);
+
+    const applicableItems = order.items.filter(item => {
+      switch (scopeType) {
+        case CouponScopeType.ALL:
+          return true;
+        case CouponScopeType.CATEGORY:
+          return item.product.categoryCode === userCoupon.coupon.categoryCode;
+        case CouponScopeType.PRODUCT:
+          return item.product.id === userCoupon.coupon.productId ||
+            couponProductIds.includes(item.product.id);
+        default:
+          return false;
+      }
+    });
+
+    if (applicableItems.length === 0) {
       throw new BadRequestException('주문 상품 중 쿠폰을 적용할 수 있는 상품이 없습니다');
     }
 
-    // 할인 금액 계산
-    const productPrice = Number(applicableItem.productPrice);
+    // 할인 금액 계산 (적용 가능한 모든 상품의 합계에 대해)
+    const totalApplicablePrice = applicableItems.reduce((sum, item) => {
+      return sum + Number(item.productPrice) * item.quantity;
+    }, 0);
+
     let discountAmount = 0;
 
     if (userCoupon.coupon.discountType === 'PERCENTAGE') {
-      discountAmount = Math.floor(productPrice * applicableItem.quantity * userCoupon.coupon.discountValue / 100);
+      discountAmount = Math.floor(totalApplicablePrice * userCoupon.coupon.discountValue / 100);
       if (userCoupon.coupon.maxDiscountAmount) {
         discountAmount = Math.min(discountAmount, userCoupon.coupon.maxDiscountAmount);
       }
     } else {
-      discountAmount = Math.min(userCoupon.coupon.discountValue, productPrice * applicableItem.quantity);
+      discountAmount = Math.min(userCoupon.coupon.discountValue, totalApplicablePrice);
     }
 
     // 쿠폰 사용 처리
@@ -331,6 +421,7 @@ export class CouponService {
 
   /**
    * 쿠폰 상세 정보 조회
+   * scopeType에 따라 적용 대상 정보 반환
    */
   async getCouponDetail(userId: number, userCouponId: number): Promise<CouponDetailResponseDto> {
     this.logger.log(`사용자 ${userId}의 쿠폰 ${userCouponId} 상세 정보 조회`);
@@ -343,7 +434,12 @@ export class CouponService {
       include: {
         coupon: {
           include: {
-            product: true
+            product: true,
+            couponProducts: {
+              include: {
+                product: true
+              }
+            }
           }
         }
       }
@@ -363,6 +459,34 @@ export class CouponService {
       status = CouponStatus.EXPIRED;
     }
 
+    // scopeType에 따라 상품 정보 결정
+    const scopeType = userCoupon.coupon.scopeType as CouponScopeType;
+    let productInfo: { id: number; name: string; price?: number };
+
+    if (scopeType === CouponScopeType.ALL) {
+      productInfo = { id: 0, name: '전체 상품' };
+    } else if (scopeType === CouponScopeType.CATEGORY) {
+      productInfo = { id: 0, name: `${userCoupon.coupon.categoryCode} 카테고리` };
+    } else if (userCoupon.coupon.couponProducts.length > 0) {
+      const products = userCoupon.coupon.couponProducts.map(cp => cp.product);
+      const productNames = products.map(p => p.name);
+      productInfo = {
+        id: products[0].id,
+        name: productNames.length > 1
+          ? `${productNames[0]} 외 ${productNames.length - 1}개`
+          : productNames[0],
+        price: Number(products[0].price)
+      };
+    } else if (userCoupon.coupon.product) {
+      productInfo = {
+        id: userCoupon.coupon.product.id,
+        name: userCoupon.coupon.product.name,
+        price: Number(userCoupon.coupon.product.price)
+      };
+    } else {
+      productInfo = { id: 0, name: '상품 정보 없음' };
+    }
+
     return {
       id: userCoupon.id,
       couponId: userCoupon.couponId,
@@ -371,11 +495,7 @@ export class CouponService {
       discountType: userCoupon.coupon.discountType as DiscountType,
       discountValue: userCoupon.coupon.discountValue,
       maxDiscountAmount: userCoupon.coupon.maxDiscountAmount,
-      product: {
-        id: userCoupon.coupon.product.id,
-        name: userCoupon.coupon.product.name,
-        price: Number(userCoupon.coupon.product.price)
-      },
+      product: productInfo,
       status,
       issuedAt: userCoupon.issuedAt.toISOString(),
       expiresAt: userCoupon.expiresAt.toISOString(),

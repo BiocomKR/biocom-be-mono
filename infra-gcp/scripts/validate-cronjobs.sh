@@ -11,10 +11,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# 환경 파라미터 (dev 또는 prod)
+DEPLOY_ENV="${1:-dev}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="$SCRIPT_DIR/../k8s"
 
-echo -e "${GREEN}[검증]${NC} CronJob 설정 검증 시작..."
+echo -e "${GREEN}[검증]${NC} CronJob 설정 검증 시작... (환경: $DEPLOY_ENV)"
 
 cd "$K8S_DIR"
 
@@ -37,13 +40,26 @@ for cronjob_file in cronjob-*.yaml; do
     echo ""
     echo -e "${GREEN}[검증]${NC} $cronjob_file 확인 중..."
 
-    # 이미지 태그 확인
+    # 이미지 태그 확인 (환경별 검증)
     CRONJOB_IMAGE=$(grep "image:" "$cronjob_file" | head -1 | awk '{print $2}')
-    if [[ "$CRONJOB_IMAGE" != *":latest"* ]]; then
-        echo -e "${RED}[ERROR]${NC} $cronjob_file: 이미지가 'latest' 태그를 사용하지 않음: $CRONJOB_IMAGE"
-        VALIDATION_PASSED=false
-    else
-        echo -e "${GREEN}  ✓${NC} 이미지: latest 태그 사용"
+    if [[ "$DEPLOY_ENV" == "dev" ]]; then
+        # 개발: dev-{timestamp} 또는 latest 허용
+        if [[ "$CRONJOB_IMAGE" == *":dev-"* ]] || [[ "$CRONJOB_IMAGE" == *":latest"* ]]; then
+            echo -e "${GREEN}  ✓${NC} 이미지: 개발 태그 사용 ($CRONJOB_IMAGE)"
+        else
+            echo -e "${YELLOW}[WARN]${NC} $cronjob_file: 개발 이미지 태그 권장 (dev-* 또는 latest): $CRONJOB_IMAGE"
+            # 개발에서는 경고만, 실패 처리 안함
+        fi
+    elif [[ "$DEPLOY_ENV" == "prod" ]]; then
+        # 운영: prod-{timestamp} 필수 (latest 금지)
+        if [[ "$CRONJOB_IMAGE" == *":prod-"* ]]; then
+            echo -e "${GREEN}  ✓${NC} 이미지: 운영 태그 사용 ($CRONJOB_IMAGE)"
+        elif [[ "$CRONJOB_IMAGE" == *":latest"* ]]; then
+            echo -e "${RED}[ERROR]${NC} $cronjob_file: 운영에서 latest 태그 사용 금지: $CRONJOB_IMAGE"
+            VALIDATION_PASSED=false
+        else
+            echo -e "${YELLOW}[WARN]${NC} $cronjob_file: 운영 이미지 태그 권장 (prod-*): $CRONJOB_IMAGE"
+        fi
     fi
 
     # 실행 경로 확인

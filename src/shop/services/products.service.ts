@@ -13,7 +13,7 @@ import {
 } from '../dto/products/product-response.dto';
 import { ProductDetailDto, ReviewSummaryDto, QnaSummaryDto } from '../dto/products/product-detail.dto';
 import { Prisma } from '@prisma/client';
-import { ProductCategory, CategoryNameMap, CategorySortOrder } from '../enums/product-category.enum';
+import { ProductCategory, CategorySortOrder } from '../enums/product-category.enum';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 
@@ -31,6 +31,7 @@ export class ProductsService {
       where: {
         id,
         status: ProductStatus.ACTIVE,
+        categoryCode: { not: ProductCategory.SOLUTION },
       },
       include: {
         productFiles: {
@@ -71,6 +72,7 @@ export class ProductsService {
       where: {
         id,
         status: ProductStatus.ACTIVE,
+        categoryCode: { not: ProductCategory.SOLUTION },
       },
       include: {
         productFiles: {
@@ -232,7 +234,11 @@ export class ProductsService {
   async increaseViewCount(id: number, userId: number): Promise<{ viewCount: number; isNewView: boolean }> {
     // 상품 존재 확인
     const product = await this.prisma.product.findFirst({
-      where: { id, status: ProductStatus.ACTIVE },
+      where: {
+        id,
+        status: ProductStatus.ACTIVE,
+        categoryCode: { not: ProductCategory.SOLUTION },
+      },
       select: { id: true, viewCount: true },
     });
 
@@ -308,10 +314,16 @@ export class ProductsService {
     // WHERE 조건 구성 (기존 필터 로직 사용)
     const where: Prisma.ProductWhereInput = {
       status: query?.status || ProductStatus.ACTIVE,
+      categoryCode: { not: ProductCategory.SOLUTION },
     };
 
     if (query?.categoryCode) {
-      where.categoryCode = query.categoryCode;
+      // 특정 카테고리 조회 시에도 SOLUTION은 제외
+      where.AND = [
+        { categoryCode: query.categoryCode },
+        { categoryCode: { not: ProductCategory.SOLUTION } },
+      ];
+      delete where.categoryCode;
     }
 
     if (query?.featured === 'true') {

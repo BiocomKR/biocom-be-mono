@@ -238,6 +238,7 @@ export class AiPersonaService {
       intimacyTitle: persona.intimacyTitle,
       intimacyContent: persona.intimacyContent,
       intimacyImageUrl: persona.intimacyImageUrl,
+      challengeDescription: persona.challengeDescription,
       isActive: persona.isActive,
       sortOrder: persona.sortOrder,
       createdAt: persona.createdAt.toISOString(),

@@ -1,5 +1,29 @@
-import { IsOptional, IsString, IsNumber, IsObject, ValidateIf } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsObject, ValidateIf, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+/**
+ * recordType으로 미션 제출 요청 DTO
+ * challengeMissionId 없이 recordType만으로 미션 제출
+ */
+export class SubmitMissionByTypeDto {
+  @ApiProperty({
+    description: '미션 기록 타입',
+    example: 'DECLARATION',
+    enum: ['DECLARATION', 'SELF_PRAISE']
+  })
+  @IsString({ message: 'recordType은 문자열이어야 합니다' })
+  recordType: string;
+
+  @ApiProperty({
+    description: '메타데이터 - TEXT 미션의 경우 { text: "내용" }, PHOTO 미션의 경우 { fileUploadId: 123 }',
+    example: { text: '나는 21일 동안 건강한 습관을 실천하겠습니다.' }
+  })
+  @IsObject({ message: '메타데이터는 객체여야 합니다' })
+  metadata: {
+    text?: string;
+    fileUploadId?: number;
+  };
+}
 
 /**
  * 미션 완료 요청 DTO

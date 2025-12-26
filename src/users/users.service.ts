@@ -413,4 +413,53 @@ export class UsersService {
       throw error;
     }
   }
+
+  /**
+   * MBTI 업데이트 전용 메서드
+   * 사용자의 MBTI 유형만 안전하게 업데이트
+   */
+  async updateMbti(userId: number, mbti: string) {
+    this.logger.log(`사용자 ${userId}의 MBTI 업데이트 시도 - MBTI: ${mbti}`);
+
+    try {
+      // 사용자 존재 확인
+      const existingUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        throw new NotFoundException(`ID ${userId}인 사용자를 찾을 수 없습니다.`);
+      }
+
+      // MBTI 대문자로 정규화
+      const normalizedMbti = mbti.toUpperCase();
+
+      this.logger.log(`MBTI 변경 - 사용자: ${userId}, 기존: ${existingUser.mbti}, 새로운: ${normalizedMbti}`);
+
+      // MBTI 업데이트
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data: { mbti: normalizedMbti },
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          points: true,
+          mbti: true,
+          aiPersonaId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      this.logger.log(`MBTI 업데이트 성공 - 사용자 ID: ${userId}, MBTI: ${normalizedMbti}`);
+      return user;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`MBTI 업데이트 실패 - 사용자 ID: ${userId}, ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 }

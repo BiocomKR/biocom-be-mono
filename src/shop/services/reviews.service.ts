@@ -143,7 +143,7 @@ export class ReviewsService {
         await tx.pointHistory.create({
           data: {
             userId,
-            type: 'EARN',
+            type: 'EARNED',
             amount: rewardAmount,
             balance: updatedUser.points,
             description: `리뷰 작성 적립금 (상품: ${product.name})`,

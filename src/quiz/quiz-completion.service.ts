@@ -93,13 +93,26 @@ export class QuizCompletionService {
           throw new BadRequestException(`오늘은 ${currentDay}일차입니다. 이 퀴즈는 ${challengeMission.day}일차 퀴즈입니다.`);
         }
 
-        // 5️⃣ 이미 정답을 맞췄는지 확인 (정답 맞춘 경우만 차단)
-        const correctAttempt = await tx.userMission.findFirst({
+        const now = getNowKST();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        // 5️⃣ 이미 정답을 맞췄는지 확인 (user_records 기반)
+        const correctAttempt = await tx.userRecord.findFirst({
           where: {
             userId,
-            challengeMissionId: challengeMission.id,
-            day: currentDay,
-            isCompleted: true  // 정답 맞춘 경우
+            userChallengeId: activeChallenge.id,
+            recordType: 'QUIZ',
+            date: today,
+            metadata: {
+              path: ['challengeMissionId'],
+              equals: challengeMission.id
+            },
+            AND: {
+              metadata: {
+                path: ['isCorrect'],
+                equals: true
+              }
+            }
           }
         });
 
@@ -107,12 +120,17 @@ export class QuizCompletionService {
           throw new ConflictException('이미 정답을 맞춘 퀴즈입니다');
         }
 
-        // 기존 오답 시도 횟수 확인
-        const attemptCount = await tx.userMission.count({
+        // 기존 시도 횟수 확인 (user_records 기반)
+        const attemptCount = await tx.userRecord.count({
           where: {
             userId,
-            challengeMissionId: challengeMission.id,
-            day: currentDay
+            userChallengeId: activeChallenge.id,
+            recordType: 'QUIZ',
+            date: today,
+            metadata: {
+              path: ['challengeMissionId'],
+              equals: challengeMission.id
+            }
           }
         });
 
@@ -120,65 +138,44 @@ export class QuizCompletionService {
         const isCorrect = dto.selectedAnswer === quiz.correctAnswer;
         const pointsEarned = isCorrect ? (quiz.points || 200) : 0;
 
-        const now = getNowKST();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        // 7️⃣ user_records에 정답일 경우에만 저장 (완전한 역추적 정보 포함)
-        let userRecordId: number | null = null;
-
-        if (isCorrect) {
-          const userRecord = await tx.userRecord.create({
-            data: {
-              userId,
-              userChallengeId: activeChallenge.id,
-              recordType: 'QUIZ',
-              date: today,
-              metadata: {
-                // 챌린지 컨텍스트
-                challengeMissionId: challengeMission.id,
-                missionId: challengeMission.missionId,
-                day: challengeMission.day,
-                productId: challengeMission.productId,
-                productName: challengeMission.product.name,
-
-                // 실제 퀴즈 컨텐츠
-                quizId: quiz.id,
-                question: quiz.question,
-                options: quiz.options,
-                selectedAnswer: dto.selectedAnswer,
-                correctAnswer: quiz.correctAnswer,
-                isCorrect,
-                explanation: quiz.explanation,
-                pointsEarned
-              },
-              createdAt: now
-            }
-          });
-          userRecordId = userRecord.id;
-          this.logger.log(`퀴즈 정답 기록 저장 완료 - user_records ID: ${userRecordId}`);
-        }
-
-        // 8️⃣ user_missions에 모든 시도 기록 저장 (정답/오답 모두)
-        const userMission = await tx.userMission.create({
+        // 7️⃣ user_records에 모든 시도 기록 저장 (정답/오답 모두)
+        const userRecord = await tx.userRecord.create({
           data: {
             userId,
-            challengeMissionId: challengeMission.id,
             userChallengeId: activeChallenge.id,
-            day: currentDay,
-            attemptNumber: attemptCount + 1,  // 시도 횟수 증가
-            isCompleted: isCorrect,
-            pointsEarned,
-            trackingRecordId: userRecordId,  // 정답일 때만 ID 연결, 오답일 때는 null
+            recordType: 'QUIZ',
+            date: today,
             metadata: {
+              // 챌린지 컨텍스트
+              challengeMissionId: challengeMission.id,
+              missionId: challengeMission.missionId,
+              missionName: '퀴즈',
+              missionType: 'QUIZ',
+              day: challengeMission.day,
+              productId: challengeMission.productId,
+              productName: challengeMission.product.name,
+
+              // 미션 진행 정보
+              attemptNumber: attemptCount + 1,
+              isCompleted: isCorrect,
+              pointsEarned,
+
+              // 실제 퀴즈 컨텐츠
               quizId: quiz.id,
+              question: quiz.question,
+              options: quiz.options,
               selectedAnswer: dto.selectedAnswer,
-              isCorrect
+              correctAnswer: quiz.correctAnswer,
+              isCorrect,
+              explanation: quiz.explanation
             },
             createdAt: now
           }
         });
 
-        // 9️⃣ 정답일 경우 포인트 적립
+        this.logger.log(`퀴즈 시도 기록 저장 완료 - user_records ID: ${userRecord.id}, 정답: ${isCorrect}`);
+
+        // 8️⃣ 정답일 경우 포인트 적립
         if (isCorrect) {
           await this.pointService.addPoints(
             userId,
@@ -235,7 +232,8 @@ export class QuizCompletionService {
           data: {
             userChallengeId: activeChallenge.id,
             day: activeChallenge.currentDay,
-            date: new Date(todayStr)
+            date: new Date(todayStr),
+            createdAt: getNowKST(),
           }
         });
       }

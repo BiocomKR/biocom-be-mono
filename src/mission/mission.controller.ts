@@ -12,7 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MissionCompletionService } from './mission-completion.service';
-import { CompleteMissionDto } from './dto/mission-completion.dto';
+import { CompleteMissionDto, SubmitMissionByTypeDto } from './dto/mission-completion.dto';
 
 /**
  * 미션 컨트롤러
@@ -212,5 +212,91 @@ export class MissionController {
   async getRecords(@Request() req: any) {
     const userId = req.user?.userId || req.user?.sub;
     return this.missionCompletionService.getRecords(userId);
+  }
+
+  /**
+   * recordType으로 미션 정보 조회
+   * @description ID 없이 recordType만으로 미션 정보와 완료 여부 조회
+   */
+  @Get('by-record-type')
+  @ApiOperation({
+    summary: 'recordType으로 미션 조회',
+    description: 'recordType(DECLARATION, SELF_PRAISE 등)으로 미션 정보를 조회합니다. ID를 모르는 경우 사용합니다.'
+  })
+  @ApiQuery({
+    name: 'recordType',
+    required: true,
+    description: '미션 기록 타입',
+    example: 'DECLARATION',
+    enum: ['DECLARATION', 'SELF_PRAISE']
+  })
+  @ApiResponse({
+    status: 200,
+    description: '미션 조회 성공',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          challengeMissionId: 123,
+          missionId: 22,
+          name: '자기 선언문',
+          description: '챌린지 시작을 위한 자기 선언문을 작성해주세요',
+          points: 1000,
+          recordType: 'DECLARATION',
+          verifyType: 'TEXT',
+          requireUpload: false,
+          day: 1,
+          currentDay: 3,
+          isCompleted: false,
+          isAvailable: true,
+          completedAt: null,
+          contents: null
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: '활성화된 챌린지가 없거나 미션을 찾을 수 없음'
+  })
+  async getMissionByRecordType(
+    @Request() req: any,
+    @Query('recordType') recordType: string
+  ) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.missionCompletionService.getMissionByRecordType(userId, recordType);
+  }
+
+  /**
+   * recordType으로 미션 제출
+   * @description ID 없이 recordType만으로 미션 제출
+   */
+  @Post('submit-by-type')
+  @ApiOperation({
+    summary: 'recordType으로 미션 제출',
+    description: 'recordType(DECLARATION, SELF_PRAISE 등)으로 미션을 제출합니다. challengeMissionId를 모르는 경우 사용합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '미션 제출 성공'
+  })
+  @ApiResponse({
+    status: 400,
+    description: '이미 완료한 미션이거나 아직 수행할 수 없는 미션'
+  })
+  @ApiResponse({
+    status: 404,
+    description: '활성화된 챌린지가 없거나 미션을 찾을 수 없음'
+  })
+  async submitMissionByRecordType(
+    @Body() dto: SubmitMissionByTypeDto,
+    @Request() req: any
+  ) {
+    const userId = req.user?.userId || req.user?.sub;
+    return this.missionCompletionService.submitMissionByRecordType(
+      userId,
+      dto.recordType,
+      dto.metadata
+    );
   }
 }

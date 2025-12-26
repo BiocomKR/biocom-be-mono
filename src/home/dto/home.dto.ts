@@ -45,18 +45,24 @@ export class PersonaInfoDto {
  * 홈 배너 링크 타입
  */
 export enum HomeBannerLinkType {
-  /** 챌린지 소개 페이지 */
-  CHALLENGE_INTRO = 'CHALLENGE_INTRO',
-  /** 사전 문진 */
-  PRE_SURVEY = 'PRE_SURVEY',
-  /** 챌린지 시작일 설정 */
-  CHALLENGE_START = 'CHALLENGE_START',
-  /** 콘텐츠(강의) 상세 */
-  CONTENT = 'CONTENT',
-  /** 상품 상세 */
-  PRODUCT = 'PRODUCT',
+  /** 내부 페이지 이동 */
+  INTERNAL = 'INTERNAL',
   /** 외부 URL */
   EXTERNAL = 'EXTERNAL',
+}
+
+/**
+ * 홈 배너 콘텐츠 타입 (linkType이 INTERNAL일 때 사용)
+ */
+export enum HomeBannerContentType {
+  /** 챌린지 소개 페이지 */
+  CHALLENGE_INTRO = 'CHALLENGE_INTRO',
+  /** 강의 상세 */
+  LECTURE = 'LECTURE',
+  /** 칼럼 상세 */
+  COLUMN = 'COLUMN',
+  /** 상품 상세 */
+  PRODUCT = 'PRODUCT',
 }
 
 /**
@@ -73,20 +79,21 @@ export class BannerInfoDto {
   imageUrl: string;
 
   @ApiProperty({
-    description: '링크 타입',
-    example: 'CHALLENGE_INTRO',
+    description: '링크 타입 (INTERNAL: 앱 내부, EXTERNAL: 외부 URL)',
+    example: 'INTERNAL',
     enum: HomeBannerLinkType,
   })
   linkType: HomeBannerLinkType;
 
+  @ApiProperty({
+    description: '콘텐츠 타입 (CHALLENGE_INTRO, LECTURE, COLUMN, PRODUCT)',
+    example: 'CHALLENGE_INTRO',
+    enum: HomeBannerContentType,
+  })
+  contentType: HomeBannerContentType;
+
   @ApiPropertyOptional({ description: '이동 대상 ID (콘텐츠ID, 상품ID 등)', example: 123 })
   targetId?: number | null;
-
-  @ApiPropertyOptional({ description: '콘텐츠 타입 (linkType이 CONTENT일 때)', example: 'COLUMN' })
-  contentType?: string | null;
-
-  @ApiPropertyOptional({ description: '상품 타입 (linkType이 PRODUCT일 때)', example: 'SUPPLEMENT' })
-  productType?: string | null;
 
   @ApiPropertyOptional({ description: '외부 URL (linkType이 EXTERNAL일 때)', example: 'https://example.com' })
   externalUrl?: string | null;
@@ -196,5 +203,11 @@ export class HomeResponseDto {
 
   @ApiProperty({ description: '챌린지 이력이 있는 뉴커머 여부 (과거 챌린지 완료했으나 현재 진행 중인 챌린지 없음)', example: false })
   hasCompletedChallengeHistory: boolean;
+
+  @ApiProperty({ description: '사후문진 완료 여부 (가장 최근 완료된 챌린지 기준)', example: false })
+  hasAfterSurvey: boolean;
+
+  @ApiProperty({ description: '챌린지 종료 후 일주일 이내 여부 (가장 최근 완료된 챌린지 기준)', example: false })
+  isWithinOneWeekAfterEnd: boolean;
 }
 

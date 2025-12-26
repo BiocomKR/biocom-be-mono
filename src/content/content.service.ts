@@ -540,7 +540,8 @@ export class ContentService {
                 data: {
                   userChallengeId: activeChallenge.id,
                   day: activeChallenge.currentDay,
-                  date: new Date(todayStr)
+                  date: new Date(todayStr),
+                  createdAt: getNowKST(),
                 }
               });
             }

@@ -551,4 +551,69 @@ PAYMENT_FAILED → CANCELLED
 
 ---
 
+## 🖼️ 상품 이미지 관리 규칙
+
+### 상품 이미지는 반드시 ProductFile → File 관계로 참조할 것!
+
+**올바른 방법:**
+```typescript
+// 상품 조회 시 이미지 include
+const product = await prisma.product.findUnique({
+  where: { id },
+  include: {
+    productFiles: {
+      where: { imageType: 'MAIN' },
+      include: { file: true },
+      take: 1,
+    },
+  },
+});
+
+// 이미지 URL 가져오기
+const imageUrl = product.productFiles?.[0]?.file?.filePath;
+```
+
+**잘못된 방법 (절대 사용 금지):**
+```typescript
+// ❌ product.images 사용 금지 - ProductImage 테이블은 다른 용도임
+const thumbnail = product.images?.[0]?.imageUrl;  // 잘못됨!
+```
+
+### 테이블 구조
+- `File`: 파일 원본 정보 (filePath, mimeType 등)
+- `ProductFile`: Product ↔ File 연결 테이블 (imageType: MAIN, DETAIL 등)
+- `ProductImage`: **사용하지 않음** (legacy 또는 다른 용도)
+
+### 신규 상품 이미지 등록 시
+1. `File` 테이블에 파일 정보 등록
+2. `ProductFile` 테이블에 연결 정보 등록 (imageType: 'MAIN')
+
+**예시:**
+```typescript
+// 1. File 등록
+const file = await prisma.file.create({
+  data: {
+    originalName: 'product.webp',
+    storedName: 'product.webp',
+    filePath: 'https://storage.googleapis.com/...',
+    mimeType: 'image/webp',
+    fileSize: 0,
+    createdAt: getNowKST(),
+  }
+});
+
+// 2. ProductFile 연결
+await prisma.productFile.create({
+  data: {
+    productId: product.id,
+    fileId: file.id,
+    imageType: 'MAIN',
+    sortOrder: 1,
+    createdAt: getNowKST(),
+  }
+});
+```
+
+---
+
 형님, 화이팅! 💪
