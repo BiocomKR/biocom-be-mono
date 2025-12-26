@@ -426,7 +426,48 @@ npx prisma generate # Client만 재생성
 
 ---
 
-#### 🔴 사례 2: 전체 데이터베이스 삭제 (2025-09-16)
+#### 🔴 사례 2: 존재하지 않는 스키마 필드 참조 (2025-12-26)
+**Claude Code가 Prisma 스키마 확인 없이 코드를 작성한 어이없는 실수**
+
+**문제 상황:**
+- 조건부 추천 제품(메타드림/리셋데이)의 수면 점수 조회 로직 구현
+- `UserChallenge.sleepScore` 필드를 쿼리에서 사용
+
+**Claude의 개쌉노답 행동:**
+1. 스키마에 `sleepScore` 필드가 있는지 **확인 안 함**
+2. survey.service.ts에서 사용하는 걸 보고 당연히 있겠지 추측
+3. 서버 실행하니 Prisma 에러: `Unknown field sleepScore`
+4. 그제서야 스키마 확인 → 필드 없음
+
+**실제 에러:**
+```
+Invalid `this.prisma.userChallenge.findFirst()` invocation
+Unknown field `sleepScore` for select statement on model `UserChallenge`
+```
+
+**진짜 문제:**
+- `sleepScore`는 survey.service.ts에서 **계산되는 값**이지 DB에 저장되는 필드가 아니었음
+- 스키마 확인 없이 다른 파일 코드만 보고 추측해서 작성
+
+**교훈:**
+1. **필드 사용 전 반드시 스키마 확인:**
+   ```bash
+   grep -n "필드명" prisma/schema.prisma
+   ```
+
+2. **절대 하지 말 것:**
+   - ❌ 다른 코드 보고 "있겠지" 추측
+   - ❌ 스키마 확인 없이 쿼리 작성
+   - ❌ 에러 나고 나서야 확인
+
+3. **반드시 할 것:**
+   - ✅ Prisma 쿼리 작성 전 schema.prisma에서 필드 존재 확인
+   - ✅ 필드가 없으면 다른 방법으로 데이터 조회 (관계 테이블, 직접 계산 등)
+   - ✅ "이 필드가 DB에 있나?" 항상 의심
+
+---
+
+#### 🔴 사례 3: 전체 데이터베이스 삭제 (2025-09-16)
 **Claude Code가 저질러서 형님을 개빡치게 한 심각한 실수**
 - **문제**: user_records 테이블의 date 컬럼 타입만 변경하면 되는 상황
 - **형님 의도**: user_records 테이블 데이터만 삭제 후 컬럼 타입 변경
@@ -438,7 +479,7 @@ npx prisma generate # Client만 재생성
   - 데이터 손실 위험이 있는 명령어는 반드시 확인 후 실행할 것
   - **"데이터 삭제"와 "스키마 변경"을 구분해서 처리할 것**
 
-#### 🔴 사례 2: 운영 중인 Docker 이미지 전체 삭제 (2025-11-06)
+#### 🔴 사례 4: 운영 중인 Docker 이미지 전체 삭제 (2025-11-06)
 **Claude Code가 "현재 돌고있는 이미지 제외하고 싹다 정리해" 명령을 잘못 이해한 치명적 실수**
 - **문제**: GCP Artifact Registry에 Docker 이미지가 많이 쌓여있어서 정리 필요
 - **형님 의도**: 현재 운영 중인 Pod가 사용하는 이미지는 보호하고, 나머지만 삭제

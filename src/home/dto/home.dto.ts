@@ -66,6 +66,15 @@ export enum HomeBannerContentType {
 }
 
 /**
+ * 퀴즈 상태 DTO (강의 배너용)
+ * - alreadyCompleted만 제공, 나머지 상태는 프론트에서 currentDay와 dayNumber로 계산
+ */
+export class QuizStatusDto {
+  @ApiProperty({ description: '이미 풀었는지 여부', example: false })
+  alreadyCompleted: boolean;
+}
+
+/**
  * 배너 정보 DTO
  */
 export class BannerInfoDto {
@@ -97,6 +106,9 @@ export class BannerInfoDto {
 
   @ApiPropertyOptional({ description: '외부 URL (linkType이 EXTERNAL일 때)', example: 'https://example.com' })
   externalUrl?: string | null;
+
+  @ApiPropertyOptional({ description: '퀴즈 상태 (강의 배너일 때만)' })
+  quizStatus?: QuizStatusDto | null;
 }
 
 /**

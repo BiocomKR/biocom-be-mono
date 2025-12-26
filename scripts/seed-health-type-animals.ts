@@ -15,7 +15,7 @@ const healthTypeAnimals = [
     healthType: 'SKIN_HEALTH',
     typeName: '염증형',
     animalName: '화끈한 불여우',
-    catchphrase: '화끈한 불여우',
+    catchphrase: '몸속 불씨를\n진정 모드로 돌려야 해요.',
     symptoms: `
       피부가 자주 붉어지고 가렵다
       얼굴에 뾰루지가 잘 생긴다
@@ -28,7 +28,7 @@ const healthTypeAnimals = [
     healthType: 'METABOLISM',
     typeName: '대사형',
     animalName: '동면 중인 북극곰',
-    catchphrase: '동면 중인 북극곰',
+    catchphrase: '저전력 모드를\n체계적으로 관리해야 해요.',
     symptoms: `
       요즘 특히 피곤하다
       작은 일에도 쉽게 지친다
@@ -41,7 +41,7 @@ const healthTypeAnimals = [
     healthType: 'GUT_HEALTH',
     typeName: '장형',
     animalName: '배 빵빵 펭귄',
-    catchphrase: '배 빵빵 펭귄',
+    catchphrase: '장속 가스 폭풍을\n잔잔 모드로 돌려야 해요.',
     symptoms: `
       배에 가스가 자주 찬다
       변비나 설사가 잦다
@@ -54,7 +54,7 @@ const healthTypeAnimals = [
     healthType: 'IMMUNE_BALANCE',
     typeName: '면역형',
     animalName: '예민한 고슴도치',
-    catchphrase: '예민한 고슴도치',
+    catchphrase: '면역 시스템의\n밸런스를 찾아야해요.',
     symptoms: `
       환절기만 되면 감기에 걸린다
       입술이나 입안이 자주 헌다

@@ -10,6 +10,7 @@ import {
   DietProductDto,
   LineupDto,
   IngredientLevelDto,
+  ConditionalProductDto,
 } from './dto/solution.dto';
 
 /**
@@ -126,14 +127,31 @@ export class SolutionService {
     const lineups = await this.getLineups();
 
     // 8. 식단 섭취 가이드 (별도 필드)
-    const dietGuide = metadata?.intakeGuide?.diet;
+    const dietGuideRaw = metadata?.intakeGuide?.diet;
+    const dietGuide = dietGuideRaw?.routine || dietGuideRaw?.synergy
+      ? {
+          ...dietGuideRaw,
+          items: [
+            ...(dietGuideRaw.routine ? [{ label: '루틴', content: dietGuideRaw.routine }] : []),
+            ...(dietGuideRaw.synergy ? [{ label: '시너지', content: dietGuideRaw.synergy }] : []),
+          ],
+        }
+      : undefined;
+
+    // 9. 조건부 추천 제품 (메타드림/리셋데이)
+    const conditionalProducts = await this.getConditionalProducts(
+      userId,
+      healthTypeAnimal.id,
+      foodLevelResult,
+    );
 
     return {
       animal,
       supplements,
       diets,
       lineups,
-      dietGuide: dietGuide?.routine || dietGuide?.synergy ? dietGuide : undefined,
+      dietGuide,
+      conditionalProducts: conditionalProducts.length > 0 ? conditionalProducts : undefined,
     };
   }
 
@@ -199,9 +217,14 @@ export class SolutionService {
         mechanisms = rp.mechanisms;
       }
 
+      // FORMULA 타입이면 mechanisms.formulaName 사용, 아니면 product.name 사용
+      const name = isFormula && rp.mechanisms?.formulaName
+        ? rp.mechanisms.formulaName
+        : product.name;
+
       return {
         id: product.id,
-        name: product.name,
+        name,
         thumbnail,
         type: rp.type,
         keyword: rp.keyword || undefined,
@@ -231,7 +254,7 @@ export class SolutionService {
   ): DietProductDto[] {
     const diets: DietProductDto[] = recommendedProducts.map((rp) => {
       const product = rp.product;
-      const thumbnail = product.images?.[0]?.imageUrl || undefined;
+      const thumbnail = product.productFiles?.[0]?.file?.filePath || undefined;
 
       // 식재료 목록 (metadata에서 가져오기)
       const metadata = product.metadata as { ingredients?: string[] } | null;
@@ -462,5 +485,133 @@ export class SolutionService {
     }
 
     return { safe, caution };
+  }
+
+  /**
+   * 조건부 추천 제품 조회 (메타드림/리셋데이)
+   * - 메타드림: 수면 문진 60점 이상일 때 추천
+   * - 리셋데이: 글루텐 과민증 4~5단계일 때 추천
+   */
+  private async getConditionalProducts(
+    userId: number,
+    healthTypeAnimalId: number,
+    foodLevelResult: FoodLevelItem | null,
+  ): Promise<ConditionalProductDto[]> {
+    // 1. CONDITIONAL 타입 제품 조회
+    const conditionalProducts = await this.prisma.healthTypeAnimalProduct.findMany({
+      where: {
+        healthTypeAnimalId,
+        type: 'CONDITIONAL',
+        isActive: true,
+      },
+      include: {
+        product: {
+          include: {
+            productFiles: {
+              where: { imageType: 'MAIN' },
+              include: { file: true },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { displayOrder: 'asc' },
+    });
+
+    if (conditionalProducts.length === 0) {
+      return [];
+    }
+
+    // 2. 사용자의 수면 점수 계산 (설문 응답에서 직접 계산)
+    // SLEEP 카테고리 질문들의 점수 합산
+    const sleepQuestions = await this.prisma.surveyQuestion.findMany({
+      where: { categoryCode: 'SLEEP' },
+      select: { id: true },
+    });
+    const sleepQuestionIds = sleepQuestions.map(q => q.id);
+
+    let sleepScore = 0;
+    if (sleepQuestionIds.length > 0) {
+      const sleepAnswers = await this.prisma.surveyAnswer.findMany({
+        where: {
+          userId,
+          surveyQuestionId: { in: sleepQuestionIds },
+        },
+        include: {
+          surveyOption: { select: { score: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: sleepQuestionIds.length, // 최근 답변만
+      });
+
+      sleepScore = sleepAnswers.reduce(
+        (sum: number, answer) => sum + (answer.surveyOption?.score || 0),
+        0,
+      );
+    }
+
+    // 3. 글루텐 과민 레벨 확인 (SIB 결과에서)
+    let glutenLevel = 0;
+    if (foodLevelResult) {
+      // level4, level5에 글루텐이 포함되어 있는지 확인
+      const level4Foods = foodLevelResult.level4?.split(',').map(f => f.trim()) || [];
+      const level5Foods = foodLevelResult.level5?.split(',').map(f => f.trim()) || [];
+
+      const glutenKeywords = ['글루텐', '밀', '밀가루', '글루텐(밀)', '밀(글루텐)'];
+
+      if (level5Foods.some(food => glutenKeywords.some(keyword => food.includes(keyword)))) {
+        glutenLevel = 5;
+      } else if (level4Foods.some(food => glutenKeywords.some(keyword => food.includes(keyword)))) {
+        glutenLevel = 4;
+      }
+    }
+
+    // 4. 조건부 추천 매핑
+    const result: ConditionalProductDto[] = [];
+
+    for (const cp of conditionalProducts) {
+      const product = cp.product;
+      const thumbnail = product.productFiles?.[0]?.file?.filePath || undefined;
+
+      // 메타드림: 수면 점수 60 이상
+      if (product.name === '메타드림') {
+        const isRecommended = sleepScore >= 60;
+        result.push({
+          id: product.id,
+          name: product.name,
+          thumbnail,
+          conditionType: 'SLEEP',
+          keyword: cp.keyword || undefined,
+          originalPrice: product.originalPrice ? Number(product.originalPrice) : undefined,
+          price: product.price ? Number(product.price) : undefined,
+          recommendReason: cp.recommendReason || undefined,
+          dosage: cp.dosage || undefined,
+          mechanisms: Array.isArray(cp.mechanisms) ? cp.mechanisms : undefined,
+          isRecommended,
+          conditionScore: sleepScore,
+        });
+      }
+
+      // 리셋데이: 글루텐 4~5단계
+      if (product.name === '리셋데이') {
+        const isRecommended = glutenLevel >= 4;
+        result.push({
+          id: product.id,
+          name: product.name,
+          thumbnail,
+          conditionType: 'GLUTEN',
+          keyword: cp.keyword || undefined,
+          originalPrice: product.originalPrice ? Number(product.originalPrice) : undefined,
+          price: product.price ? Number(product.price) : undefined,
+          recommendReason: cp.recommendReason || undefined,
+          dosage: cp.dosage || undefined,
+          mechanisms: Array.isArray(cp.mechanisms) ? cp.mechanisms : undefined,
+          isRecommended,
+          conditionScore: glutenLevel,
+        });
+      }
+    }
+
+    return result;
   }
 }

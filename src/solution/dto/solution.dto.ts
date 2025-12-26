@@ -184,6 +184,17 @@ export class HealthTypeAnimalDto {
 }
 
 /**
+ * 식단 섭취 가이드 항목 DTO
+ */
+export class DietGuideItemDto {
+  @ApiProperty({ description: '라벨 (루틴, 시너지)' })
+  label: string;
+
+  @ApiProperty({ description: '설명' })
+  content: string;
+}
+
+/**
  * 식단 섭취 가이드 DTO
  */
 export class DietGuideDto {
@@ -192,6 +203,50 @@ export class DietGuideDto {
 
   @ApiPropertyOptional({ description: '시너지 효과 설명' })
   synergy?: string;
+
+  @ApiPropertyOptional({ description: '가이드 항목 배열 (프론트 렌더링용)', type: [DietGuideItemDto] })
+  items?: DietGuideItemDto[];
+}
+
+/**
+ * 조건부 추천 상품 DTO (메타드림/리셋데이)
+ */
+export class ConditionalProductDto {
+  @ApiProperty({ description: '상품 ID' })
+  id: number;
+
+  @ApiProperty({ description: '상품명' })
+  name: string;
+
+  @ApiPropertyOptional({ description: '상품 이미지' })
+  thumbnail?: string;
+
+  @ApiProperty({ description: '추천 조건 타입', example: 'SLEEP | GLUTEN' })
+  conditionType: string;
+
+  @ApiPropertyOptional({ description: '추천 키워드' })
+  keyword?: string;
+
+  @ApiPropertyOptional({ description: '정가' })
+  originalPrice?: number;
+
+  @ApiPropertyOptional({ description: '할인가' })
+  price?: number;
+
+  @ApiPropertyOptional({ description: '추천 이유' })
+  recommendReason?: string;
+
+  @ApiPropertyOptional({ description: '복용량' })
+  dosage?: string;
+
+  @ApiPropertyOptional({ description: '작용기전 목록' })
+  mechanisms?: any[];
+
+  @ApiProperty({ description: '추천 여부 (조건 충족 시 true)' })
+  isRecommended: boolean;
+
+  @ApiPropertyOptional({ description: '조건 점수 (수면: sleepScore, 글루텐: glutenLevel)' })
+  conditionScore?: number;
 }
 
 /**
@@ -212,4 +267,7 @@ export class SolutionResponseDto {
 
   @ApiPropertyOptional({ description: '식단 섭취 가이드 (건강유형별)', type: DietGuideDto })
   dietGuide?: DietGuideDto;
+
+  @ApiPropertyOptional({ description: '조건부 추천 제품 (메타드림/리셋데이)', type: [ConditionalProductDto] })
+  conditionalProducts?: ConditionalProductDto[];
 }

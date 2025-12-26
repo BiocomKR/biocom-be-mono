@@ -499,6 +499,41 @@ export class QuizCompletionService {
           }
         });
 
+        // 8-1️⃣ user_records에도 기록 저장 (홈 미션 진행도 반영용)
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (activeChallenge) {
+          const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+          await tx.userRecord.create({
+            data: {
+              userId,
+              userChallengeId: activeChallenge.id,
+              recordType: 'QUIZ',
+              date: today,
+              metadata: {
+                // 퀴즈 정보
+                quizId: quiz.id,
+                question: quiz.question,
+                selectedAnswer,
+                correctAnswer: quiz.correctAnswer,
+                isCorrect,
+                // 강의 정보
+                contentId: linkedContent.id,
+                contentTitle: linkedContent.title,
+                lectureDayNumber: linkedContent.dayNumber,
+                // 챌린지 정보
+                day: currentDay,
+                productId: activeChallenge.productId,
+                // 포인트 정보
+                pointsEarned,
+                canEarnPoints,
+                // 완료 여부
+                isCompleted: true,
+              },
+              createdAt: now,
+            },
+          });
+        }
+
         // 9️⃣ 포인트 지급 (조건 충족 시만)
         if (pointsEarned > 0) {
           await this.pointService.addPoints(

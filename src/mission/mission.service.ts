@@ -124,7 +124,8 @@ export class MissionService {
         title: m.name,
         description: m.description || '',
         point: m.points,
-        max: m.maxPointsPerDay ?? m.dailyLimit,
+        // DIET(식단)은 포인트 기준 횟수가 3회/day이므로 하드코딩
+        max: m.recordType === 'DIET' ? 3 : (m.maxPointsPerDay ?? m.dailyLimit),
         current: 0,
         executed: 0,
         recordType: m.recordType,
@@ -237,7 +238,8 @@ export class MissionService {
       title: m.name,
       description: m.description || '',
       point: m.points,
-      max: m.maxPointsPerDay ?? m.dailyLimit,
+      // DIET(식단)은 포인트 기준 횟수가 3회/day이므로 하드코딩
+      max: m.recordType === 'DIET' ? 3 : (m.maxPointsPerDay ?? m.dailyLimit),
       current: 0,
       executed: 0,
       recordType: m.recordType,

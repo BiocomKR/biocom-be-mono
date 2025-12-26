@@ -318,6 +318,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get missionCompletion() { return this.prisma.missionCompletion; }
   get quiz() { return this.prisma.quiz; }
   get quizAnswer() { return this.prisma.quizAnswer; }
+  get quizAttempt() { return this.prisma.quizAttempt; }
   get apiKey() { return this.prisma.apiKey; }
   get content() { return this.prisma.content; }
   get contentFile() { return this.prisma.contentFile; }

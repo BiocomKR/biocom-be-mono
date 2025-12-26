@@ -100,12 +100,19 @@ async function main() {
   const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
   const newActivatedAt = new Date(todayUTC.getTime() - (targetDay - 1) * 24 * 60 * 60 * 1000);
 
+  // 챌린지 기간 계산 (기존 expiresAt - activatedAt)
+  const oldActivatedAt = challenge.activatedAt;
+  const oldExpiresAt = challenge.expiresAt;
+  const challengeDuration = oldExpiresAt.getTime() - oldActivatedAt.getTime();
+
+  // 새로운 expiresAt 계산: newActivatedAt + 기존 챌린지 기간
+  const newExpiresAt = new Date(newActivatedAt.getTime() + challengeDuration);
+
   // 상태 결정: targetDay >= 1이면 ACTIVE, 0 이하면 PENDING
   const newStatus = targetDay >= 1 ? 'ACTIVE' : 'PENDING';
   const newUserStatus = targetDay >= 1 ? 'CHALLENGER' : 'NEWCOMER';
 
   // 기존 값 출력
-  const oldActivatedAt = challenge.activatedAt;
   const oldDiffTime = now.getTime() - oldActivatedAt.getTime();
   const oldDay = Math.ceil(oldDiffTime / (1000 * 60 * 60 * 24));
 
@@ -113,14 +120,19 @@ async function main() {
   console.log(`userId: ${userId}`);
   console.log(`challengeId: ${challenge.id}`);
   console.log('');
-  console.log(`변경 전: ${oldDay >= 1 ? oldDay + '일차' : 'D' + oldDay} (status: ${challenge.status}, activatedAt: ${oldActivatedAt.toISOString().split('T')[0]})`);
-  console.log(`변경 후: ${targetDay >= 1 ? targetDay + '일차' : 'D' + targetDay} (status: ${newStatus}, activatedAt: ${newActivatedAt.toISOString().split('T')[0]})`);
+  console.log(`변경 전: ${oldDay >= 1 ? oldDay + '일차' : 'D' + oldDay} (status: ${challenge.status})`);
+  console.log(`  activatedAt: ${oldActivatedAt.toISOString().split('T')[0]}`);
+  console.log(`  expiresAt: ${oldExpiresAt.toISOString().split('T')[0]}`);
+  console.log(`변경 후: ${targetDay >= 1 ? targetDay + '일차' : 'D' + targetDay} (status: ${newStatus})`);
+  console.log(`  activatedAt: ${newActivatedAt.toISOString().split('T')[0]}`);
+  console.log(`  expiresAt: ${newExpiresAt.toISOString().split('T')[0]}`);
 
   // 업데이트
   await prisma.userChallenge.update({
     where: { id: challenge.id },
     data: {
       activatedAt: newActivatedAt,
+      expiresAt: newExpiresAt,
       status: newStatus,
     },
   });

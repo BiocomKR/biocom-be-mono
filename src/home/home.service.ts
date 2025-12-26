@@ -729,6 +729,10 @@ export class HomeService {
     // 2. 챌린지 진행 중 (CHALLENGER) → 오늘 일차에 해당하는 강의
     if (userStatus === UserSubscriptionStatus.CHALLENGER) {
       const contentInfo = await this.getLectureByDay(currentDay);
+
+      // 퀴즈 상태 계산
+      const quizStatus = await this.getQuizStatusForLecture(context.userId, contentInfo?.id, currentDay);
+
       return {
         title: contentInfo?.title || '오늘의 강의',
         description: `Day ${currentDay || 1}`,
@@ -737,6 +741,7 @@ export class HomeService {
         contentType: HomeBannerContentType.LECTURE,
         targetId: contentInfo?.id || null,
         externalUrl: null,
+        quizStatus,
       };
     }
 
@@ -883,6 +888,50 @@ export class HomeService {
     });
 
     return topProduct?.product || null;
+  }
+
+  /**
+   * 강의에 연결된 퀴즈의 상태 조회 (배너용)
+   * - alreadyCompleted만 반환, 나머지 상태는 프론트에서 currentDay와 dayNumber로 계산
+   */
+  private async getQuizStatusForLecture(
+    userId: number,
+    contentId: number | null | undefined,
+    currentDay: number | undefined,
+  ): Promise<{ alreadyCompleted: boolean } | null> {
+    if (!contentId) return null;
+
+    // 강의 정보 및 연결된 퀴즈 조회
+    const lecture = await this.prisma.content.findUnique({
+      where: { id: contentId },
+      select: {
+        lectureQuizzes: {
+          where: { isActive: true },
+          select: {
+            quiz: {
+              select: { id: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!lecture || lecture.lectureQuizzes.length === 0) {
+      return null;
+    }
+
+    const quizId = lecture.lectureQuizzes[0].quiz.id;
+
+    // 이미 퀴즈를 풀었는지 확인
+    const existingAttempt = await this.prisma.quizAttempt.findFirst({
+      where: {
+        userId,
+        quizId,
+      },
+      select: { id: true }
+    });
+
+    return { alreadyCompleted: !!existingAttempt };
   }
 
   /**
