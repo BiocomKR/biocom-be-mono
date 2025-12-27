@@ -49,12 +49,14 @@ spec:
             image: biocom-api
             imagePullPolicy: Always
 
-            # 배치 실행 명령어
-            command:
-            - node
-            - dist/src/main.js
-            - --run-scheduler
-            - expire-challenges
+            # 배치 실행 명령어 (DATABASE_URL 조합 후 실행)
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              ENCODED_PASSWORD=$(node -e "console.log(encodeURIComponent(process.env.DB_PASSWORD))")
+              export DATABASE_URL="postgresql://${DB_USERNAME}:${ENCODED_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?${DATABASE_URL_OPTIONS}"
+              echo "DATABASE_URL configured"
+              exec node dist/src/main.js --run-scheduler expire-challenges
 
             # 환경변수는 ConfigMap + Secret에서 가져옴
             envFrom:
