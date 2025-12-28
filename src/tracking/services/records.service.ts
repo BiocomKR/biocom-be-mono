@@ -1667,10 +1667,11 @@ export class RecordsService {
         routineList.map((r) => [r.productId, r.displayOrder]),
       );
 
-      // products 테이블에서 상품명 + product_info 조회
+      // products 테이블에서 상품명 + product_info 조회 (영양제 카테고리만)
       const products = await this.prisma.product.findMany({
         where: {
           id: { in: productIds },
+          categoryCode: 'SUPPLEMENT',
         },
         select: {
           id: true,
@@ -1695,32 +1696,40 @@ export class RecordsService {
         ]),
       );
 
-      // 영양제 배열 생성
-      const supplementList = typeRecords.map((record) => {
-        const metadata = record.metadata as any;
-        const productInfo = productInfoMap.get(metadata.productId);
-        const displayOrder = displayOrderMap.get(metadata.productId) || 9999;
+      // 영양제 카테고리인 productId만 필터링
+      const supplementProductIds = new Set(products.map((p) => p.id));
 
-        // 섭취 횟수 계산 (morning, afternoon, evening 중 true 개수)
-        const morning = metadata.morning || false;
-        const afternoon = metadata.afternoon || false;
-        const evening = metadata.evening || false;
-        const intakeCount = [morning, afternoon, evening].filter(Boolean).length;
+      // 영양제 배열 생성 (영양제 카테고리만)
+      const supplementList = typeRecords
+        .filter((record) => {
+          const metadata = record.metadata as any;
+          return supplementProductIds.has(metadata.productId);
+        })
+        .map((record) => {
+          const metadata = record.metadata as any;
+          const productInfo = productInfoMap.get(metadata.productId)!;
+          const displayOrder = displayOrderMap.get(metadata.productId) || 9999;
 
-        // 권장 섭취량
-        const recommendedCount = productInfo?.frequencyPerDay || 1;
+          // 섭취 횟수 계산 (morning, afternoon, evening 중 true 개수)
+          const morning = metadata.morning || false;
+          const afternoon = metadata.afternoon || false;
+          const evening = metadata.evening || false;
+          const intakeCount = [morning, afternoon, evening].filter(Boolean).length;
 
-        // 최대값 제한 (섭취량이 권장량보다 많으면 권장량으로 제한)
-        const actualIntakeCount = Math.min(intakeCount, recommendedCount);
+          // 권장 섭취량
+          const recommendedCount = productInfo.frequencyPerDay;
 
-        return {
-          productId: metadata.productId,
-          productName: productInfo?.name || '알 수 없는 영양제',
-          intakeCount: actualIntakeCount,
-          recommendedCount: recommendedCount,
-          displayOrder, // 정렬용
-        };
-      });
+          // 최대값 제한 (섭취량이 권장량보다 많으면 권장량으로 제한)
+          const actualIntakeCount = Math.min(intakeCount, recommendedCount);
+
+          return {
+            productId: metadata.productId,
+            productName: productInfo.name,
+            intakeCount: actualIntakeCount,
+            recommendedCount: recommendedCount,
+            displayOrder, // 정렬용
+          };
+        });
 
       // display_order 순서로 정렬 후 displayOrder 필드 제거
       supplementList.sort((a, b) => a.displayOrder - b.displayOrder);

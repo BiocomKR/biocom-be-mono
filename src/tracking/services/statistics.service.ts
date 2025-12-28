@@ -604,9 +604,10 @@ export class StatisticsService {
         });
       });
 
-      // 7. 영양제별 주간 통계 생성
-      const supplements = productIds.map((productId) => {
-        const productInfo = productInfoMap.get(productId);
+      // 7. 영양제별 주간 통계 생성 (영양제 카테고리만)
+      const supplementProductIds = products.map((p) => p.id);
+      const supplements = supplementProductIds.map((productId) => {
+        const productInfo = productInfoMap.get(productId)!;
         const displayOrder = displayOrderMap.get(productId) || 999;
 
         // 7일 매트릭스 생성
@@ -636,7 +637,7 @@ export class StatisticsService {
 
         return {
           productId,
-          productName: productInfo?.name || '알 수 없는 영양제',
+          productName: productInfo.name,
           displayOrder,
           dailyStats,
         };
