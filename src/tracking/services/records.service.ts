@@ -1501,24 +1501,28 @@ export class RecordsService {
         );
       }
 
-      // 3. 당일 포인트 이미 받았는지 확인 (pointsEarned가 있는 기록이 있는지)
-      const existingRecordWithPoints = await this.prisma.userRecord.findFirst({
+      // 3. 당일 포인트 이미 받았는지 확인 (point_histories 테이블에서 직접 확인)
+      // KST 기준 오늘 00:00:00 ~ 내일 00:00:00 범위
+      const todayStart = new Date(today + 'T00:00:00+09:00');
+      const todayEnd = new Date(today + 'T00:00:00+09:00');
+      todayEnd.setDate(todayEnd.getDate() + 1);
+
+      const existingPointHistory = await this.prisma.pointHistory.findFirst({
         where: {
           userId,
-          recordType: 'SUPPLEMENT',
-          date: dateObj,
-          metadata: {
-            path: ['pointsEarned'],
-            gte: 1,  // pointsEarned >= 1 인 기록이 있는지
+          description: '영양제 섭취 기록',
+          createdAt: {
+            gte: todayStart,
+            lt: todayEnd,
           },
         },
       });
 
       // 포인트 지급 여부 (당일 포인트를 아직 안 받았으면 true)
-      const isFirstRecordOfDay = !existingRecordWithPoints;
+      const isFirstRecordOfDay = !existingPointHistory;
 
       this.logger.log(
-        `당일 포인트 지급 여부: ${isFirstRecordOfDay ? '지급 예정' : '이미 지급됨'}`,
+        `당일 포인트 지급 여부: ${isFirstRecordOfDay ? '지급 예정' : '이미 지급됨'} (point_histories 확인)`,
       );
 
       // 3. RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
