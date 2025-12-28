@@ -5,7 +5,8 @@ import {
   ConflictException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { getNowKST } from '../../common/utils/kst-date.util';
+import { getNowKST, calculateChallengeDay } from '../../common/utils/kst-date.util';
+import { UserChallengeStatus } from '../../common/enums';
 import {
   TodayBalanceGameResponseDto,
   BalanceGameStepResponseDto,
@@ -46,10 +47,23 @@ export class BalanceGameService {
         personaUrl: true,
         name: true
       }
-    }); 
+    });
 
-    // 테스트를 위해 1일차로 고정
-    const challengeDay = 5;
+    // 사용자의 활성 챌린지 조회
+    const activeChallenge = await this.prisma.userChallenge.findFirst({
+      where: {
+        userId,
+        status: UserChallengeStatus.ACTIVE
+      },
+      select: { activatedAt: true }
+    });
+
+    if (!activeChallenge) {
+      throw new NotFoundException('활성화된 챌린지가 없습니다');
+    }
+
+    // 챌린지 일차 계산
+    const challengeDay = calculateChallengeDay(activeChallenge.activatedAt);
 
     // 해당 일차의 게임 찾기
     const game = await this.prisma.balanceGame.findFirst({
