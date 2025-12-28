@@ -4,7 +4,7 @@ import { UserChallengeStatus } from '../common/enums';
 import { PointService } from '../point/point.service';
 import { CompleteMissionDto } from './dto/mission-completion.dto';
 import { Logger } from '@nestjs/common';
-import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { getNowKST, calculateChallengeDay, stringToKSTDate } from '../common/utils/kst-date.util';
 
 /**
  * 챌린지 미션 서비스
@@ -609,26 +609,20 @@ export class MissionCompletionService {
         throw new NotFoundException('활성화된 챌린지가 없습니다');
       }
 
-      // 2️⃣ 날짜 범위를 챌린지 일차로 변환
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const activatedAt = new Date(activeChallenge.activatedAt);
+      // 2️⃣ 날짜 범위를 KST 기준 Date로 변환 (createdAt 기준 조회)
+      const startDateTime = stringToKSTDate(startDate); // 시작일 00:00:00 KST
+      const endDateTime = stringToKSTDate(endDate, 24, 0, 0); // 종료일 다음날 00:00:00 KST
 
-      // 시작일의 챌린지 일차 계산
-      const startDay = Math.floor((start.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      // 종료일의 챌린지 일차 계산
-      const endDay = Math.floor((end.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      this.logger.log(`날짜 범위 (createdAt 기준): ${startDate} ~ ${endDate}`);
 
-      this.logger.log(`날짜 범위 → 챌린지 일차: ${startDay}일차 ~ ${endDay}일차`);
-
-      // 3️⃣ 완료한 미션 조회 (user_records 기반, isCompleted = true)
+      // 3️⃣ 완료한 미션 조회 (user_records 기반, isCompleted = true, createdAt 기준)
       const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
           userChallengeId: activeChallenge.id,
-          date: {
-            gte: start,
-            lte: end
+          createdAt: {
+            gte: startDateTime,
+            lt: endDateTime
           },
           metadata: {
             path: ['isCompleted'],
@@ -636,7 +630,6 @@ export class MissionCompletionService {
           }
         },
         orderBy: [
-          { date: 'asc' },
           { createdAt: 'asc' }
         ]
       });
@@ -669,7 +662,6 @@ export class MissionCompletionService {
         success: true,
         data: {
           dateRange: { startDate, endDate },
-          dayRange: { startDay, endDay },
           missions: missionsByDay,
           totalCount: completedRecords.length
         }
@@ -706,42 +698,22 @@ export class MissionCompletionService {
         throw new NotFoundException('활성화된 챌린지가 없습니다');
       }
 
-      // 2️⃣ 날짜 범위를 챌린지 일차로 변환
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const activatedAt = new Date(activeChallenge.activatedAt);
-
-      const startDay = Math.floor((start.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      const endDay = Math.floor((end.getTime() - activatedAt.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-      // 현재 일차 계산
+      // 2️⃣ 현재 일차 계산 및 날짜 범위 설정
       const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
 
-      // 미래 일차는 제외 (오늘까지 포함)
-      const adjustedEndDay = Math.min(endDay, currentDay);
+      // 날짜 범위를 KST 기준 Date로 변환 (createdAt 기준 조회)
+      const startDateTime = stringToKSTDate(startDate); // 시작일 00:00:00 KST
+      const endDateTime = stringToKSTDate(endDate, 24, 0, 0); // 종료일 다음날 00:00:00 KST
 
-      if (adjustedEndDay < startDay) {
-        return {
-          success: true,
-          data: {
-            dateRange: { startDate, endDate },
-            dayRange: { startDay, endDay: adjustedEndDay },
-            missions: {},
-            totalCount: 0,
-            message: '조회 가능한 과거 미션이 없습니다'
-          }
-        };
-      }
+      this.logger.log(`놓친 미션 조회 - 날짜 범위: ${startDate} ~ ${endDate}, 현재: ${currentDay}일차`);
 
-      this.logger.log(`날짜 범위 → 챌린지 일차: ${startDay}일차 ~ ${adjustedEndDay}일차 (현재: ${currentDay}일차)`);
-
-      // 3️⃣ 해당 기간의 전체 챌린지 미션 조회
+      // 3️⃣ 해당 기간의 전체 챌린지 미션 조회 (1일차 ~ 현재일차)
       const allMissions = await this.prisma.challengeMission.findMany({
         where: {
           challengeId: activeChallenge.challengeId,
           day: {
-            gte: startDay,
-            lte: adjustedEndDay
+            gte: 1,
+            lte: currentDay
           },
           isActive: true
         },
@@ -754,11 +726,15 @@ export class MissionCompletionService {
         ]
       });
 
-      // 4️⃣ 완료한 미션 ID 목록 조회 (user_records 기반)
+      // 4️⃣ 해당 기간에 완료한 미션 ID 목록 조회 (user_records 기반, createdAt 기준)
       const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
           userChallengeId: activeChallenge.id,
+          createdAt: {
+            gte: startDateTime,
+            lt: endDateTime
+          },
           metadata: {
             path: ['isCompleted'],
             equals: true
@@ -804,7 +780,7 @@ export class MissionCompletionService {
         success: true,
         data: {
           dateRange: { startDate, endDate },
-          dayRange: { startDay, endDay: adjustedEndDay },
+          currentDay,
           missions: missionsByDay,
           totalCount: missedMissions.length
         }
