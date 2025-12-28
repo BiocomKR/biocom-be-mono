@@ -6,7 +6,8 @@ import {
   getNowKST,
   parseKSTDateTime,
   extractKSTDate,
-  getKoreanToday
+  getKoreanToday,
+  calculateChallengeDay
 } from '../../common/utils/kst-date.util';
 import {
   CreateBeautyRecordDto,
@@ -880,10 +881,15 @@ export class RecordsService {
       where: { userId, status: 'ACTIVE' },
     });
 
-    // 기록 저장 (pointsEarned를 metadata에 포함)
+    // 챌린지 일차 계산
+    const currentDay = activeChallenge ? calculateChallengeDay(activeChallenge.activatedAt) : null;
+
+    // 기록 저장 (pointsEarned, isCompleted, day를 metadata에 포함)
     const metadataWithPoints = {
       ...metadata,
       pointsEarned: pointsToAward,
+      isCompleted: true,
+      day: currentDay,
     };
 
     const userRecord = await tx.userRecord.create({
