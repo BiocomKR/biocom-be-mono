@@ -3,7 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
 import { ExamCode } from '../../common/enums/exam-code.enum';
-import { getNowKST, getDayOfWeek, formatKoreanDate } from '../../common/utils/kst-date.util';
+import { getNowKST, getDayOfWeek, formatKoreanDate, getKoreanToday } from '../../common/utils/kst-date.util';
 import {
   BeautyStatisticsDto,
   DietStatisticsDto,
@@ -296,14 +296,20 @@ export class StatisticsService {
       outerWeekScore.push({ date, value: dayOuterScore.toString() });
     });
 
-    // 주간 평균 계산 (실제 기록이 있는 날 수 기준)
-    // 월요일=1일, 화요일=2일, ..., 일요일=7일로 나눠야 정확한 평균이 됨
-    const daysCount = recordCount > 0 ? recordCount : 1; // 기록이 없으면 0으로 나누기 방지
+    // 주간 평균 계산 (월요일부터 오늘까지 경과된 일수 기준)
+    // 월요일=1, 화요일=2, ..., 일요일=7로 나눔
+    // 예: 월요일에 63점 기록 → 월요일 시점에서 63/1=63점
+    //     화요일에 기록 없음 → 화요일 시점에서 63/2=32점 (기록 없어도 2로 나눔)
+    const today = getKoreanToday(); // YYYY-MM-DD
+    const todayIndex = weekDates.findIndex(d => d === today);
+    // 오늘이 주간 범위 내에 있으면 (월=0, 화=1, ..., 일=6) → +1 해서 일수로 변환
+    // 오늘이 주간 범위 밖이면 (미래 주 조회 시) 전체 7일로 계산
+    const daysCount = todayIndex >= 0 ? todayIndex + 1 : weekDates.length;
     const innerScore = daysCount > 0 ? Math.round(totalInnerScore / daysCount) : 0;
     const outerScore = daysCount > 0 ? Math.round(totalOuterScore / daysCount) : 0;
     const summaryScore = Math.round((innerScore + outerScore) / 2);
 
-    // 답변별 평균 점수 계산 (실제 기록이 있는 날 수 기준, 소수점 반올림)
+    // 답변별 평균 점수 계산 (월요일부터 오늘까지 경과된 일수 기준, 소수점 반올림)
     const innerAnswers = [
       { no: 1, score: daysCount > 0 ? Math.round(innerQ1Total / daysCount) : 0 },
       { no: 2, score: daysCount > 0 ? Math.round(innerQ2Total / daysCount) : 0 },
