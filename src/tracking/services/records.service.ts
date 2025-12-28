@@ -20,6 +20,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ExamCode } from '@/common/enums/exam-code.enum';
+import { CategoryCode } from '@/common/enums/category-code.enum';
 
 /**
  * 기록 서비스
@@ -1363,11 +1364,14 @@ export class RecordsService {
       const today = getKoreanToday();
       const dateObj = new Date(today);
 
-      // user_supplement_routine과 products를 조인하여 조회
+      // user_supplement_routine과 products를 조인하여 조회 (영양제 카테고리만)
       const routines = await this.prisma.userSupplementRoutine.findMany({
         where: {
           userId,
           isActive: true,
+          product: {
+            categoryCode: CategoryCode.SUPPLEMENT,
+          },
         },
         include: {
           product: {

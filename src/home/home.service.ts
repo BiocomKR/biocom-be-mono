@@ -809,7 +809,7 @@ export class HomeService {
    * @returns 해당 일차 강의 또는 fallback 강의
    */
   private async getLectureByDay(currentDay?: number): Promise<{ id: number; title: string; type: string } | null> {
-    // 1. currentDay가 있으면 해당 일차 강의 조회
+    // n일차 → day_number n인 강의 반환
     if (currentDay) {
       const lecture = await this.prisma.content.findFirst({
         where: {
