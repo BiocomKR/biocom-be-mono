@@ -962,6 +962,11 @@ export class RecordsService {
    * 기록 타입별 현재 기록 횟수 / 최대 기록 횟수 반환
    * @param recordType 기록 타입
    * @param records 해당 날짜의 해당 타입 기록 배열
+   *
+   * currentCount/maxCount 의미:
+   * - SUPPLEMENT: 실제 섭취 체크 횟수 (morning/afternoon/evening 중 true 개수 합계) / 10
+   *   → 영양제는 종류별로 1개 레코드가 미리 생성되므로 records.length가 아닌 실제 체크 횟수로 계산
+   * - 기타 타입: 당일 기록 횟수 / dailyLimit
    */
   private async getRecordLimit(recordType: string, records: any[]): Promise<{ currentCount: number; maxCount: number }> {
     // missions 테이블에서 dailyLimit 조회
@@ -971,6 +976,21 @@ export class RecordsService {
     });
 
     const maxCount = mission?.dailyLimit ?? -1;
+
+    // SUPPLEMENT: 실제 섭취 체크 횟수로 계산 (morning/afternoon/evening 중 true인 개수 합계)
+    if (recordType === 'SUPPLEMENT') {
+      const intakeCount = records.reduce((total, record) => {
+        const metadata = record.metadata as any;
+        const checkCount = [
+          metadata?.morning,
+          metadata?.afternoon,
+          metadata?.evening,
+        ].filter(Boolean).length;
+        return total + checkCount;
+      }, 0);
+      return { currentCount: intakeCount, maxCount };
+    }
+
     return { currentCount: records.length, maxCount };
   }
 

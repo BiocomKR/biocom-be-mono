@@ -165,13 +165,18 @@ export class HomeService {
       const hasPreSurvey = await this.checkPreSurveyCompleted(userId);
 
       // 5. 조건별 홈 배너 조회
+      // hasChallengeStart: ACTIVE 상태이거나, PENDING이면서 시작일이 오늘 이전인 경우
+      // (시작일 지정만 하고 아직 시작일이 안 된 경우는 false)
+      const isPendingAndStarted = challenges.pending?.activatedAt
+        ? getNowKST() >= new Date(challenges.pending.activatedAt)
+        : false;
       const banner = await this.getChallengeBanner({
         userId,
         userStatus: user.status as UserSubscriptionStatus,
         hasPurchase: user.userChallenges.length > 0,
         hasResult: reportInfo.resultYN === YesNo.Y,
         hasPreSurvey,
-        hasChallengeStart: !!challenges.active || !!challenges.pending?.startDateSetAt,
+        hasChallengeStart: !!challenges.active || isPendingAndStarted,
         personaImageUrl: user.aiPersona?.torsoUrl || null,
         healthTypeAnimalId: user.health_type_animal_id,
         animalName: user.healthTypeAnimal?.animalName || null,
