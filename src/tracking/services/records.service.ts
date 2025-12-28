@@ -1477,7 +1477,7 @@ export class RecordsService {
 
       this.logger.log(`영양제 섭취 기록 저장 시작: userId=${userId}, date=${today}`);
 
-      // 1. 당일 영양제 기록 중 imageUrl이 있는지 조회
+      // 1. 당일 영양제 기록 중 imageUrl이 있는지 조회 (사진 필수 검증용)
       const existingRecordWithImage = await this.prisma.userRecord.findFirst({
         where: {
           userId,
@@ -1501,8 +1501,25 @@ export class RecordsService {
         );
       }
 
-      // 포인트 지급 여부 (당일 최초 기록인지 확인)
-      const isFirstRecordOfDay = !existingRecordWithImage;
+      // 3. 당일 포인트 이미 받았는지 확인 (pointsEarned가 있는 기록이 있는지)
+      const existingRecordWithPoints = await this.prisma.userRecord.findFirst({
+        where: {
+          userId,
+          recordType: 'SUPPLEMENT',
+          date: dateObj,
+          metadata: {
+            path: ['pointsEarned'],
+            gte: 1,  // pointsEarned >= 1 인 기록이 있는지
+          },
+        },
+      });
+
+      // 포인트 지급 여부 (당일 포인트를 아직 안 받았으면 true)
+      const isFirstRecordOfDay = !existingRecordWithPoints;
+
+      this.logger.log(
+        `당일 포인트 지급 여부: ${isFirstRecordOfDay ? '지급 예정' : '이미 지급됨'}`,
+      );
 
       // 3. RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
       const updatePromises = data.map(async (item: any, index: number) => {
