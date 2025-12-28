@@ -653,10 +653,9 @@ export class MissionCompletionService {
 
         acc[day].push({
           id: record.id,
-          missionId: metadata.missionId,
-          missionName: metadata.missionName,
-          missionType: metadata.missionType,
-          pointsEarned: metadata.pointsEarned || 0,
+          recordType: record.recordType,
+          title: metadata.missionName || this.getRecordTypeTitle(record.recordType),
+          points: metadata.pointsEarned || 0,
           completedAt: record.createdAt
         });
 
@@ -1039,5 +1038,28 @@ export class MissionCompletionService {
       this.logger.error(`recordType 미션 제출 실패 - ${recordType}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * recordType에 따른 기본 타이틀 반환
+   */
+  private getRecordTypeTitle(recordType: string): string {
+    const titles: Record<string, string> = {
+      'BEAUTY': '뷰티 점수 측정',
+      'DIET': '식사 기록',
+      'FASTING': '공복 시간 기록',
+      'SLEEP': '수면 기록',
+      'SUPPLEMENT': '영양제 섭취 기록',
+      'ACTIVITY': '운동 기록',
+      'QUIZ': '퀴즈',
+      'DAILY_CONTENT': '콘텐츠 시청',
+      'DAILY_MISSION': '1일 1미션',
+      'BALANCE_GAME': '밸런스 게임',
+      'WEEKLY_REPORT': '주간 리포트',
+      'DECLARATION': '자기선언문',
+      'SELF_PRAISE': '자기칭찬',
+      'AFTER_SURVEY': '사후설문',
+    };
+    return titles[recordType] || recordType;
   }
 }
