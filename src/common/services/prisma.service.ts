@@ -202,16 +202,20 @@ function createExtendedPrismaClient() {
           return query(args);
         },
       },
-      // 모든 테이블 updatedAt KST 자동 설정
+      // 모든 테이블 updatedAt KST 자동 설정 (updatedAt 컬럼이 없는 테이블 제외)
       $allModels: {
-        async update({ args, query }) {
-          if (args.data && typeof args.data === 'object') {
+        async update({ args, query, model }) {
+          // updatedAt 컬럼이 없는 모델 제외
+          const modelsWithoutUpdatedAt = ['Consent', 'UserConsent'];
+          if (args.data && typeof args.data === 'object' && !modelsWithoutUpdatedAt.includes(model)) {
             (args.data as any).updatedAt = getNowKST();
           }
           return query(args);
         },
-        async updateMany({ args, query }) {
-          if (args.data && typeof args.data === 'object') {
+        async updateMany({ args, query, model }) {
+          // updatedAt 컬럼이 없는 모델 제외
+          const modelsWithoutUpdatedAt = ['Consent', 'UserConsent'];
+          if (args.data && typeof args.data === 'object' && !modelsWithoutUpdatedAt.includes(model)) {
             (args.data as any).updatedAt = getNowKST();
           }
           return query(args);

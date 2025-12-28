@@ -83,6 +83,12 @@ PAYMENT_FAILED → CANCELLED
 - N+1 문제 방지: 반복문 안에서 Prisma 쿼리 금지
 - 독립적인 쿼리는 `Promise.all()` 병렬 실행
 
+### ⚠️ Prisma 쿼리 작성 전 필수 확인
+- **절대 금지**: 스키마 확인 없이 필드 사용
+- **반드시 확인**: `grep -n "필드명" prisma/schema.prisma`
+- **실수 사례**: `UserChallenge.sleepScore` 필드가 없는데 쿼리에서 사용 → 런타임 에러
+- **교훈**: 다른 코드에서 사용하는 것처럼 보여도 DB에 없을 수 있음 (계산되는 값일 수 있음)
+
 ---
 
 ## 핵심 파일 구조
