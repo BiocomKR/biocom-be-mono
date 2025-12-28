@@ -45,4 +45,5 @@ google-service-account-key.json
 *service-account*.json
 *firebase*.json
 *firebase*adminsdk*.json
+gcs-key*.json
 logs/
