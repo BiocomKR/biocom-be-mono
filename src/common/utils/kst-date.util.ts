@@ -120,7 +120,9 @@ export const calculateChallengeDay = (activatedAt: Date): number => {
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
   // 1일차부터 시작 (경과일 + 1)
-  return diffDays + 1;
+  // activatedAt이 미래인 경우 최소 1일차로 보정
+  const challengeDay = diffDays + 1;
+  return challengeDay < 1 ? 1 : challengeDay;
 };
 
 /**
