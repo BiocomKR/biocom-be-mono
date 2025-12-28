@@ -296,13 +296,14 @@ export class StatisticsService {
       outerWeekScore.push({ date, value: dayOuterScore.toString() });
     });
 
-    // 주간 평균 계산 (검색일 수 기준)
-    const daysCount = weekDates.length;
+    // 주간 평균 계산 (실제 기록이 있는 날 수 기준)
+    // 월요일=1일, 화요일=2일, ..., 일요일=7일로 나눠야 정확한 평균이 됨
+    const daysCount = recordCount > 0 ? recordCount : 1; // 기록이 없으면 0으로 나누기 방지
     const innerScore = daysCount > 0 ? Math.round(totalInnerScore / daysCount) : 0;
     const outerScore = daysCount > 0 ? Math.round(totalOuterScore / daysCount) : 0;
     const summaryScore = Math.round((innerScore + outerScore) / 2);
 
-    // 답변별 평균 점수 계산 (검색일 수 기준, 소수점 반올림)
+    // 답변별 평균 점수 계산 (실제 기록이 있는 날 수 기준, 소수점 반올림)
     const innerAnswers = [
       { no: 1, score: daysCount > 0 ? Math.round(innerQ1Total / daysCount) : 0 },
       { no: 2, score: daysCount > 0 ? Math.round(innerQ2Total / daysCount) : 0 },
