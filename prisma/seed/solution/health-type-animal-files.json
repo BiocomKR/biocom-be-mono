@@ -1,0 +1,262 @@
+[
+  {
+    "healthType": "SKIN_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "lab_animal_result-2.png",
+      "storedName": "skin_health_description_1766822204795.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/description/skin_health_description.png",
+      "mimeType": "image/png",
+      "fileSize": 220482,
+      "storageType": "gcs"
+    }
+  },
+  {
+    "healthType": "SKIN_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 1,
+    "file": {
+      "originalName": "fox_1.png",
+      "storedName": "fox_1.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/1/fox_1.png",
+      "mimeType": "image/png",
+      "fileSize": 296996,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "SKIN_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 2,
+    "file": {
+      "originalName": "fox_2.png",
+      "storedName": "fox_2.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/1/fox_2.png",
+      "mimeType": "image/png",
+      "fileSize": 258986,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "SKIN_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 3,
+    "file": {
+      "originalName": "fox_3.png",
+      "storedName": "fox_3.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/1/fox_3.png",
+      "mimeType": "image/png",
+      "fileSize": 224816,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "SKIN_HEALTH",
+    "imageType": "THUMBNAIL",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "fox.png",
+      "storedName": "thumbnail_19b4e62cb53.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/1/thumbnail_19b4e62cb53.png",
+      "mimeType": "image/png",
+      "fileSize": 0,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "METABOLISM",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "lab_animal_result-3.png",
+      "storedName": "metabolism_description_1766822205675.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/description/metabolism_description.png",
+      "mimeType": "image/png",
+      "fileSize": 168427,
+      "storageType": "gcs"
+    }
+  },
+  {
+    "healthType": "METABOLISM",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 1,
+    "file": {
+      "originalName": "polarbear_1.png",
+      "storedName": "polarbear_1.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/2/polarbear_1.png",
+      "mimeType": "image/png",
+      "fileSize": 188544,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "METABOLISM",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 2,
+    "file": {
+      "originalName": "polarbear_2.png",
+      "storedName": "polarbear_2.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/2/polarbear_2.png",
+      "mimeType": "image/png",
+      "fileSize": 159543,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "METABOLISM",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 3,
+    "file": {
+      "originalName": "polarbear_3.png",
+      "storedName": "polarbear_3.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/2/polarbear_3.png",
+      "mimeType": "image/png",
+      "fileSize": 158386,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "METABOLISM",
+    "imageType": "THUMBNAIL",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "polarbear.png",
+      "storedName": "thumbnail_19b4e62d62b.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/2/thumbnail_19b4e62d62b.png",
+      "mimeType": "image/png",
+      "fileSize": 0,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "GUT_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "lab_animal_result.png",
+      "storedName": "gut_health_description_1766822202809.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/description/gut_health_description.png",
+      "mimeType": "image/png",
+      "fileSize": 156081,
+      "storageType": "gcs"
+    }
+  },
+  {
+    "healthType": "GUT_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 1,
+    "file": {
+      "originalName": "penguin_1.png",
+      "storedName": "penguin_1.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/3/penguin_1.png",
+      "mimeType": "image/png",
+      "fileSize": 131238,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "GUT_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 2,
+    "file": {
+      "originalName": "penguin_2.png",
+      "storedName": "penguin_2.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/3/penguin_2.png",
+      "mimeType": "image/png",
+      "fileSize": 171679,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "GUT_HEALTH",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 3,
+    "file": {
+      "originalName": "penguin_3.png",
+      "storedName": "penguin_3.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/3/penguin_3.png",
+      "mimeType": "image/png",
+      "fileSize": 153446,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "GUT_HEALTH",
+    "imageType": "THUMBNAIL",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "penguin.png",
+      "storedName": "thumbnail_19b4e62de39.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/3/thumbnail_19b4e62de39.png",
+      "mimeType": "image/png",
+      "fileSize": 0,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "IMMUNE_BALANCE",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "lab_animal_result-1.png",
+      "storedName": "immune_balance_description_1766822203759.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/description/immune_balance_description.png",
+      "mimeType": "image/png",
+      "fileSize": 273792,
+      "storageType": "gcs"
+    }
+  },
+  {
+    "healthType": "IMMUNE_BALANCE",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 1,
+    "file": {
+      "originalName": "hedgehog_1.png",
+      "storedName": "hedgehog_1.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/4/hedgehog_1.png",
+      "mimeType": "image/png",
+      "fileSize": 189613,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "IMMUNE_BALANCE",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 2,
+    "file": {
+      "originalName": "hedgehog_2.png",
+      "storedName": "hedgehog_2.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/4/hedgehog_2.png",
+      "mimeType": "image/png",
+      "fileSize": 199074,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "IMMUNE_BALANCE",
+    "imageType": "DESCRIPTION",
+    "sortOrder": 3,
+    "file": {
+      "originalName": "hedgehog_3.png",
+      "storedName": "hedgehog_3.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/4/hedgehog_3.png",
+      "mimeType": "image/png",
+      "fileSize": 186877,
+      "storageType": "GCS"
+    }
+  },
+  {
+    "healthType": "IMMUNE_BALANCE",
+    "imageType": "THUMBNAIL",
+    "sortOrder": 0,
+    "file": {
+      "originalName": "hedgehog.png",
+      "storedName": "thumbnail_19b4e62e6fa.png",
+      "filePath": "https://storage.googleapis.com/api-dev-biocom-uploads/health-type-animals/4/thumbnail_19b4e62e6fa.png",
+      "mimeType": "image/png",
+      "fileSize": 0,
+      "storageType": "GCS"
+    }
+  }
+]

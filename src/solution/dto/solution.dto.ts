@@ -49,7 +49,7 @@ export class NutritionDto {
   calories?: number;
 
   @ApiPropertyOptional({ description: '순탄수화물 (g)' })
-  netCarbs?: number;
+  carbs?: number;
 
   @ApiPropertyOptional({ description: '단백질 (g)' })
   protein?: number;

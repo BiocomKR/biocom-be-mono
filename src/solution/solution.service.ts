@@ -32,6 +32,22 @@ export class SolutionService {
    * @returns 맞춤 솔루션 응답 데이터
    */
   async getSolution(userId: number): Promise<SolutionResponseDto> {
+    return this.getSolutionByUserId(userId);
+  }
+
+  /**
+   * 동물 ID로 맞춤 솔루션 조회 (테스트용)
+   * @param healthTypeAnimalId 건강유형 동물 ID
+   * @returns 맞춤 솔루션 응답 데이터
+   */
+  async getSolutionByAnimalId(healthTypeAnimalId: number): Promise<SolutionResponseDto> {
+    return this.buildSolutionResponse(healthTypeAnimalId, null);
+  }
+
+  /**
+   * 사용자 ID로 맞춤 솔루션 조회 (내부용)
+   */
+  private async getSolutionByUserId(userId: number): Promise<SolutionResponseDto> {
     // 1. 사용자 건강유형 및 전화번호 조회
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -39,7 +55,7 @@ export class SolutionService {
         health_type_animal_id: true,
         mobile: true,
         healthTypeAnimal: {
-          select: { healthType: true },
+          select: { id: true, healthType: true },
         },
       },
     });
@@ -50,9 +66,33 @@ export class SolutionService {
       );
     }
 
-    // 2. 건강유형 동물 정보 조회
+    // SIB 음식물 과민증 검사 결과 조회
+    let foodLevelResult: FoodLevelItem | null = null;
+    if (user.mobile) {
+      foodLevelResult = await this.getFoodLevelResult(user.mobile);
+    }
+
+    return this.buildSolutionResponse(
+      user.healthTypeAnimal.id,
+      foodLevelResult,
+      userId,
+    );
+  }
+
+  /**
+   * 맞춤 솔루션 응답 데이터 생성 (공통 로직)
+   * @param healthTypeAnimalId 건강유형 동물 ID
+   * @param foodLevelResult SIB 검사 결과 (없으면 null)
+   * @param userId 사용자 ID (조건부 추천용, 없으면 undefined)
+   */
+  private async buildSolutionResponse(
+    healthTypeAnimalId: number,
+    foodLevelResult: FoodLevelItem | null,
+    userId?: number,
+  ): Promise<SolutionResponseDto> {
+    // 1. 건강유형 동물 정보 조회
     const healthTypeAnimal = await this.prisma.healthTypeAnimal.findUnique({
-      where: { healthType: user.healthTypeAnimal.healthType },
+      where: { id: healthTypeAnimalId },
       include: {
         // 동물 썸네일 이미지
         images: {
@@ -83,14 +123,8 @@ export class SolutionService {
       throw new NotFoundException('건강유형 정보를 찾을 수 없습니다.');
     }
 
-    // 3. 동물 정보 매핑
+    // 2. 동물 정보 매핑
     const animal = this.mapAnimal(healthTypeAnimal);
-
-    // 4. SIB 음식물 과민증 검사 결과 조회
-    let foodLevelResult: FoodLevelItem | null = null;
-    if (user.mobile) {
-      foodLevelResult = await this.getFoodLevelResult(user.mobile);
-    }
 
     // metadata에서 intakeGuide 추출
     const metadata = healthTypeAnimal.metadata as {
@@ -104,7 +138,7 @@ export class SolutionService {
       };
     } | null;
 
-    // 5. 영양제 추천 목록 - FORMULA를 맨 앞에, SUPPLEMENT는 뒤에
+    // 3. 영양제 추천 목록 - FORMULA를 맨 앞에, SUPPLEMENT는 뒤에
     const supplementFormula = metadata?.intakeGuide?.supplement?.formula;
     const formulaProducts = healthTypeAnimal.recommendedProducts.filter(
       (rp) => rp.type === 'FORMULA',
@@ -117,16 +151,16 @@ export class SolutionService {
       supplementFormula,
     );
 
-    // 6. 식단 추천 목록 (type = 'DIET') - SIB 결과 포함
+    // 4. 식단 추천 목록 (type = 'DIET') - SIB 결과 포함
     const diets = this.mapDiets(
       healthTypeAnimal.recommendedProducts.filter((rp) => rp.type === 'DIET'),
       foodLevelResult,
     );
 
-    // 7. 라인업 목록 조회
+    // 5. 라인업 목록 조회
     const lineups = await this.getLineups();
 
-    // 8. 식단 섭취 가이드 (별도 필드)
+    // 6. 식단 섭취 가이드 (별도 필드)
     const dietGuideRaw = metadata?.intakeGuide?.diet;
     const dietGuide = dietGuideRaw?.routine || dietGuideRaw?.synergy
       ? {
@@ -138,12 +172,15 @@ export class SolutionService {
         }
       : undefined;
 
-    // 9. 조건부 추천 제품 (메타드림/리셋데이)
-    const conditionalProducts = await this.getConditionalProducts(
-      userId,
-      healthTypeAnimal.id,
-      foodLevelResult,
-    );
+    // 7. 조건부 추천 제품 (메타드림/리셋데이) - userId가 있을 때만
+    let conditionalProducts: ConditionalProductDto[] = [];
+    if (userId) {
+      conditionalProducts = await this.getConditionalProducts(
+        userId,
+        healthTypeAnimal.id,
+        foodLevelResult,
+      );
+    }
 
     return {
       animal,
@@ -308,7 +345,7 @@ export class SolutionService {
         lineup,
         nutrition: {
           calories: product.calories ? Number(product.calories) : undefined,
-          netCarbs: product.netCarbs ? Number(product.netCarbs) : undefined,
+          carbs: product.netCarbs ? Number(product.netCarbs) : undefined,
           protein: product.protein ? Number(product.protein) : undefined,
           fat: product.fat ? Number(product.fat) : undefined,
           fiber: product.fiber ? Number(product.fiber) : undefined,
@@ -332,24 +369,42 @@ export class SolutionService {
   }
 
   /**
-   * 라인업 목록 조회
+   * 라인업 목록 조회 (상품 가격 총합 포함)
    */
   private async getLineups(): Promise<LineupDto[]> {
     const lineups = await this.prisma.productLineup.findMany({
       where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
+      include: {
+        products: {
+          where: { status: 'ACTIVE', categoryCode: 'LUNCHBOX' },
+          select: { price: true, originalPrice: true },
+        },
+      },
     });
 
-    return lineups.map((l) => ({
-      id: l.id,
-      key: l.key,
-      name: l.name,
-      description: l.description || undefined,
-      imageUrl: l.imageUrl || undefined,
-      sortOrder: l.sortOrder,
-      originalPrice: l.originalPrice ? Number(l.originalPrice) : undefined,
-      price: l.price ? Number(l.price) : undefined,
-    }));
+    return lineups.map((l) => {
+      // 상품 가격 총합 계산
+      const totalPrice = l.products.reduce(
+        (sum, p) => sum + (p.price ? Number(p.price) : 0),
+        0,
+      );
+      const totalOriginalPrice = l.products.reduce(
+        (sum, p) => sum + (p.originalPrice ? Number(p.originalPrice) : 0),
+        0,
+      );
+
+      return {
+        id: l.id,
+        key: l.key,
+        name: l.name,
+        description: l.description || undefined,
+        imageUrl: l.imageUrl || undefined,
+        sortOrder: l.sortOrder,
+        price: totalPrice > 0 ? totalPrice : undefined,
+        originalPrice: totalOriginalPrice > 0 ? totalOriginalPrice : undefined,
+      };
+    });
   }
 
   /**

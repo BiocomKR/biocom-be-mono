@@ -1,193 +1,11 @@
 [
   {
-    "healthType": "GUT_HEALTH",
-    "typeName": "장 건강 저하",
-    "animalName": "배 빵빵 펭귄",
-    "description": "장내 미생물 불균형으로 장-피부 축(Gut-Skin Axis)에 문제가 생긴 장 건강 저하형입니다.",
-    "solution": "(1) 장벽 복구(바이오 밸런스) (2) 독소 제거(바이오 밸런스, 클린 밸런스) (3) 유해균 먹이 차단(당당케어)을 '동시에' 진행해야 빠르게 개선될 수 있습니다. 아연과 마그네슘이 장벽 틈을 메우고, 클로렐라가 독소를 배출하며, 혈당 조절로 유해균 증식을 억제합니다. 지연성 알러지 식품, 고포드맵 식품, 가공 식품을 제한을 병행하면 장과 피부 건강을 근본적으로 개선할 수 있습니다.",
-    "metadata": {
-      "synergyEffects": [
-        {
-          "number": "①",
-          "title": "장벽 3중 강화 시스템",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "아연+마그네슘이 밀착연접 단백질 합성" },
-            { "productName": "클린 밸런스", "description": "비타민A가 점액층 두껍게 형성" },
-            { "productName": "당당케어", "description": "비타민B군이 장 세포 재생 에너지 공급" }
-          ],
-          "summary": "→ 3단계 방어벽 완성으로 장누수 완화",
-          "sortOrder": 1
-        },
-        {
-          "number": "②",
-          "title": "독소 완전 제거 루트",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "셀레늄+망간+몰리브덴이 장내 독소 중화" },
-            { "productName": "클린 밸런스", "description": "클로렐라가 독소 흡착하여 체외 배출" },
-            { "productName": null, "description": "비타민C+E가 혈액 속 염증 물질 제거" }
-          ],
-          "summary": "→ 장-피부 축 염증 차단으로 턱 트러블 개선",
-          "sortOrder": 2
-        },
-        {
-          "number": "③",
-          "title": "장내 유해균 이중 억제",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "비타민D가 항균 펩타이드 생성" },
-            { "productName": "클린 밸런스", "description": "아연이 유해균 증식 억제" },
-            { "productName": "당당케어", "description": "크롬+바나바잎이 혈당 조절로 유해균 먹이 차단" }
-          ],
-          "summary": "→ 복부 팽만과 가스 생성 근본 해결",
-          "sortOrder": 3
-        },
-        {
-          "number": "④",
-          "title": "세포 재생 가속화",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "아연이 DNA 합성 촉진" },
-            { "productName": "클린 밸런스", "description": "비타민A+C가 콜라겐 합성 지원" },
-            { "productName": "당당케어", "description": "비타민B군(B₂,B₃,B₆,B₉)이 세포 분열 에너지 공급" }
-          ],
-          "summary": "→ 손상된 장 점막 빠른 회복",
-          "sortOrder": 4
-        }
-      ],
-      "intakeGuide": {
-        "diet": {
-          "routine": "최소 2주간 점심은 '저포드맵', 저녁은 '오리지널'로 고정하여 섭취하세요.",
-          "synergy": "점심에는 가스가 찰 수 있는 발효 원인 자체를 차단하고, 저녁에는 유해균의 활성도를 낮추는 식단을 섭취함으로써 하루 24시간 내내 장이 팽창하지 않고 휴식하는 선순환 환경이 완성됩니다."
-        },
-        "supplement": {
-          "formula": "바이오 밸런스, 클린 밸런스, 당당케어 세 제품을 함께 복용하면 단순 합산이 아닌 배수 효과가 나타납니다. 장벽 복구 → 독소 제거 → 유해균 먹이 차단으로 3단계 선순환 시스템이 작동하여 장누수증후군과 SIBO를 근본적으로 해결합니다."
-        }
-      },
-      "dietRecommendation": {
-        "lunch": { "lineupKey": "LOW_FODMAP", "priority": 1 },
-        "dinner": { "lineupKey": "ORIGINAL", "priority": 2 }
-      }
-    }
-  },
-  {
-    "healthType": "IMMUNE_BALANCE",
-    "typeName": "면역 과민 반응",
-    "animalName": "예민한 고슴도치",
-    "description": "우리 몸을 지키는 면역계가 너무 예민해져, 사소한 자극에도 피부에 가려움과 붉은 반응을 일으키는 면역 과민 반응형입니다.",
-    "solution": "(1) 면역 과민 반응 개선(다래케어) (2) 장벽 복구(바이오 밸런스, 다래케어) (3) 독소 제거(클린 밸런스, 바이오 밸런스)를 '동시에' 진행해야 빠르게 개선될 수 있습니다. 다래추출물이 과민해진 면역 반응 스위치를 내리고, 아연과 마그네슘이 장벽을 복구하며, 클로렐라가 독소를 배출합니다. 지연성 알러지 식품을 즉시 중단하고, 스트레스 관리와 충분한 수면을 병행하면 면역계와 피부 건강을 근본적으로 개선할 수 있습니다.",
-    "metadata": {
-      "synergyEffects": [
-        {
-          "number": "①",
-          "title": "면역 이중 안정화 시스템",
-          "items": [
-            { "productName": "다래케어", "description": "다래추출물이 면역 과민 반응 스위치 직접 OFF" },
-            { "productName": "바이오 밸런스", "description": "비타민D가 면역 균형(Th17/Treg) 조절로 근본 정상화" },
-            { "productName": null, "description": "아연이 장벽 복구로 면역 과민 상태의 출발점 차단" }
-          ],
-          "summary": "→ 2단계 면역 조절로 사소한 자극에도 반응하던 면역계 정상화",
-          "sortOrder": 1
-        },
-        {
-          "number": "②",
-          "title": "장벽 3중 복구 시스템",
-          "items": [
-            { "productName": "다래케어", "description": "아연 8.5mg이 밀착연접 단백질 합성" },
-            { "productName": "바이오 밸런스", "description": "아연 12mg + 마그네슘 315mg이 장벽 세포 간 이음새 촘촘하게 결합" },
-            { "productName": "클린 밸런스", "description": "비타민A가 장 점막 보호층(뮤신) 두껍게 형성" }
-          ],
-          "summary": "→ 장누수 완화로 면역 '전군 비상 경계령' 해제",
-          "sortOrder": 2
-        },
-        {
-          "number": "③",
-          "title": "면역 자극 독소 완전 제거",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "셀레늄+망간+몰리브덴이 장내 독소 중화" },
-            { "productName": "클린 밸런스", "description": "클로렐라가 면역 자극 내독소(LPS) 흡착하여 체외 배출" },
-            { "productName": null, "description": "비타민C+E가 항산화로 염증 물질 제거" }
-          ],
-          "summary": "→ 면역계 부담 직접 감소로 과민 반응 완화",
-          "sortOrder": 3
-        },
-        {
-          "number": "④",
-          "title": "피부 장벽 강화로 자극 방어",
-          "items": [
-            { "productName": "클린 밸런스", "description": "비타민A가 피부 각질 정상화로 외부 자극 방어력 증가" },
-            { "productName": null, "description": "아연이 피부 재생 촉진으로 자극 내성 증가" },
-            { "productName": "클린 밸런스", "description": "비타민C+E가 피부 세포 보호 및 염증 완화" }
-          ],
-          "summary": "→ 외부 자극에도 쉽게 흔들리지 않는 탄탄한 방어막 형성",
-          "sortOrder": 4
-        }
-      ],
-      "intakeGuide": {
-        "diet": {
-          "routine": "최소 2주간 점심은 '저포드맵', 저녁은 '저속노화'로 고정하여 섭취하세요.",
-          "synergy": "점심에는 면역계에 '휴식'을 주고, 저녁에는 방어벽을 '재건'하는 영양소를 공급합니다. 이 두 가지 과정이 맞물려 외부 자극에도 쉽게 흔들리지 않는 탄탄한 방어막을 형성합니다."
-        },
-        "supplement": {
-          "formula": "다래케어, 바이오 밸런스, 클린 밸런스 세 제품을 함께 복용하면 면역계를 다각도로 안정화합니다. 과민 반응 직접 조절 → 장벽 복구 → 독소 제거로 3단계 시너지가 작동하여 사소한 자극에도 반응하던 면역계가 정상화됩니다."
-        }
-      },
-      "dietRecommendation": {
-        "lunch": { "lineupKey": "LOW_FODMAP", "priority": 1 },
-        "dinner": { "lineupKey": "SLOW_AGING", "priority": 2 }
-      }
-    }
-  },
-  {
     "healthType": "SKIN_HEALTH",
-    "typeName": "염증 과다",
+    "typeName": "염증형",
     "animalName": "화끈한 불여우",
     "description": "염증 스위치가 남들보다 쉽게 켜지고(ON) 잘 꺼지지 않는(OFF) 유형입니다.",
     "solution": "(1) 염증 ON 스위치 차단, 염증 OFF 스위치 활성화(바이오 밸런스) (2) 염증 유발 독소 제거(클린 밸런스) (3) 염증 진압과 세포 보호(영데이즈)를 '동시에' 진행해야 빠르게 개선될 수 있습니다. 비타민D와 마그네슘이 염증 해소 시스템을 활성화하고, 셀레늄과 망간이 염증 생성을 억제하며, 클로렐라가 염증 유발 독소를 배출하고, SOD효소가 급성 염증을 진압합니다. 지연성 알러지 식품과 정제 탄수화물 섭취를 줄이고, 오메가-3 섭취와 충분한 수면을 병행하면 염증을 근본적으로 개선할 수 있습니다.",
     "metadata": {
-      "synergyEffects": [
-        {
-          "number": "①",
-          "title": "염증 해소 시스템 완벽 구축",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "비타민D+마그네슘이 염증 해소 물질(SPMs) 생성 효소 활성화" },
-            { "productName": "클린 밸런스", "description": "비타민E+C가 오메가-3 산화 방지 및 재생 시스템 구축" },
-            { "productName": "영데이즈", "description": "비타민E+C+글루타치온이 항산화 네트워크로 오메가-3 완벽 보호" }
-          ],
-          "summary": "→ 염증을 끄는 시스템 완벽 작동으로 잔불까지 완전 소화",
-          "sortOrder": 1
-        },
-        {
-          "number": "②",
-          "title": "이중 항산화 시스템 구축",
-          "items": [
-            { "productName": "영데이즈", "description": "SOD+카탈레이즈가 활성산소 1차 대량 제거 (효소 방어)" },
-            { "productName": "클린 밸런스", "description": "비타민E+C가 항산화 네트워크 강화로 시너지 효과 극대화" },
-            { "productName": "바이오 밸런스", "description": "셀레늄+망간이 항산화 효소 활성화로 1차 방어 지원" }
-          ],
-          "summary": "→ 1차+2차 이중 방어로 활성산소 완전 차단하여 세포 완벽 보호",
-          "sortOrder": 2
-        },
-        {
-          "number": "③",
-          "title": "독소 완전 제거 루트",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "셀레늄+망간+몰리브덴이 장내 독소 중화" },
-            { "productName": "클린 밸런스", "description": "클로렐라가 염증 유발 내독소(LPS) 흡착하여 체외 배출" },
-            { "productName": "영데이즈", "description": "글루타치온이 독소 결합 및 배출로 염증 환경 정리" }
-          ],
-          "summary": "→ 독소 완전 제거로 염증 재발 원천 차단",
-          "sortOrder": 3
-        },
-        {
-          "number": "④",
-          "title": "염증 생성 3중 차단 시스템",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "셀레늄+망간이 염증성 신호물질 및 활성산소 직접 제거" },
-            { "productName": "클린 밸런스", "description": "비타민E+C가 염증 매개물질 생성 억제 및 염증 신호 차단" },
-            { "productName": "영데이즈", "description": "SOD+카탈레이즈가 염증 촉발 활성산소 2단계 완전 제거" }
-          ],
-          "summary": "→ 3중 차단으로 염증 생성 원천 봉쇄",
-          "sortOrder": 4
-        }
-      ],
       "intakeGuide": {
         "diet": {
           "routine": "최소 2주간 점심은 '저속노화', 저녁은 '저포드맵'으로 고정하여 섭취하세요.",
@@ -197,64 +15,109 @@
           "formula": "바이오 밸런스, 클린 밸런스, 영데이즈 세 제품을 함께 복용하면 염증을 다각도로 완전 제어합니다. 양방향 염증 제어 → 독소 제거 → 이중 항산화 시스템 구축으로 염증 생성을 원천 봉쇄하고 잔불까지 완전 소화합니다."
         }
       },
+      "synergyEffects": [
+        {
+          "items": [
+            {
+              "description": "비타민D+마그네슘이 염증 해소 물질(SPMs) 생성 효소 활성화",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "비타민E+C가 오메가-3 산화 방지 및 재생 시스템 구축",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "비타민E+C+글루타치온이 항산화 네트워크로 오메가-3 완벽 보호",
+              "productName": "영데이즈"
+            }
+          ],
+          "title": "염증 해소 시스템 완벽 구축",
+          "number": "①",
+          "summary": "→ 염증을 끄는 시스템 완벽 작동으로 잔불까지 완전 소화",
+          "sortOrder": 1
+        },
+        {
+          "items": [
+            {
+              "description": "SOD+카탈레이즈가 활성산소 1차 대량 제거 (효소 방어)",
+              "productName": "영데이즈"
+            },
+            {
+              "description": "비타민E+C가 항산화 네트워크 강화로 시너지 효과 극대화",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "셀레늄+망간이 항산화 효소 활성화로 1차 방어 지원",
+              "productName": "바이오 밸런스"
+            }
+          ],
+          "title": "이중 항산화 시스템 구축",
+          "number": "②",
+          "summary": "→ 1차+2차 이중 방어로 활성산소 완전 차단하여 세포 완벽 보호",
+          "sortOrder": 2
+        },
+        {
+          "items": [
+            {
+              "description": "셀레늄+망간+몰리브덴이 장내 독소 중화",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "클로렐라가 염증 유발 내독소(LPS) 흡착하여 체외 배출",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "글루타치온이 독소 결합 및 배출로 염증 환경 정리",
+              "productName": "영데이즈"
+            }
+          ],
+          "title": "독소 완전 제거 루트",
+          "number": "③",
+          "summary": "→ 독소 완전 제거로 염증 재발 원천 차단",
+          "sortOrder": 3
+        },
+        {
+          "items": [
+            {
+              "description": "셀레늄+망간이 염증성 신호물질 및 활성산소 직접 제거",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "비타민E+C가 염증 매개물질 생성 억제 및 염증 신호 차단",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "SOD+카탈레이즈가 염증 촉발 활성산소 2단계 완전 제거",
+              "productName": "영데이즈"
+            }
+          ],
+          "title": "염증 생성 3중 차단 시스템",
+          "number": "④",
+          "summary": "→ 3중 차단으로 염증 생성 원천 봉쇄",
+          "sortOrder": 4
+        }
+      ],
       "dietRecommendation": {
-        "lunch": { "lineupKey": "SLOW_AGING", "priority": 1 },
-        "dinner": { "lineupKey": "LOW_FODMAP", "priority": 2 }
+        "lunch": {
+          "priority": 1,
+          "lineupKey": "SLOW_AGING"
+        },
+        "dinner": {
+          "priority": 2,
+          "lineupKey": "LOW_FODMAP"
+        }
       }
-    }
+    },
+    "catchphrase": "몸속 불씨를\n진정 모드로 돌려야 해요.",
+    "symptoms": "피부가 자주 붉어지고 가렵다\n      얼굴에 뾰루지가 잘 생긴다\n      생리통이 심하다\n      갑자기 얼굴이 달아오른다\n      속이 자주 더부룩하다"
   },
   {
     "healthType": "METABOLISM",
-    "typeName": "대사 저하 / 인슐린 저항성",
+    "typeName": "대사형",
     "animalName": "동면 중인 북극곰",
     "description": "인슐린 저항성으로 피부 노화와 탄력 저하뿐 아니라 만성 피로를 겪는 유형입니다.",
     "solution": "(1) 인슐린 저항성 개선(당당케어) (2) 기초 대사 증가(뉴로마스터) (3) 만성 염증 제거(바이오 밸런스)를 '동시에' 진행해야 빠르게 개선될 수 있습니다. 코로솔산과 비타민B군이 인슐린 감수성을 회복하고, 요오드가 갑상선 호르몬을 생성해 기초 대사량 증가에 도움을 주며, 셀레늄과 망간이 인슐린 저항성을 악화시키는 염증을 제거합니다. 지연성 알러지 식품과 정제 탄수화물 섭취를 줄이고, 규칙적인 운동과 충분한 수면을 병행하면 대사를 근본적으로 회복할 수 있습니다.",
     "metadata": {
-      "synergyEffects": [
-        {
-          "number": "①",
-          "title": "인슐린 저항성 개선",
-          "items": [
-            { "productName": "당당케어", "description": "코로솔산과 크롬이 세포의 포도당 흡수 촉진" },
-            { "productName": "당당케어", "description": "HCA가 높은 혈당이 체지방으로 저장되는 것을 차단" },
-            { "productName": "당당케어", "description": "비타민B군 8종이 에너지 대사 활성화" }
-          ],
-          "summary": "→ 멈춰있던 세포가 다시 당을 받아들이기 시작",
-          "sortOrder": 1
-        },
-        {
-          "number": "②",
-          "title": "갑상선 호르몬 생성",
-          "items": [
-            { "productName": "뉴로마스터", "description": "요오드가 갑상선 호르몬(T4) 생성" },
-            { "productName": "뉴로마스터", "description": "은행잎추출물이 혈액 순환 개선" },
-            { "productName": "뉴로마스터", "description": "세포 에너지 공급 극대화" }
-          ],
-          "summary": "→ 대사 호르몬 T4 생성되지만 활성화 필요",
-          "sortOrder": 2
-        },
-        {
-          "number": "③",
-          "title": "호르몬 활성화 + 염증 제거",
-          "items": [
-            { "productName": "바이오 밸런스", "description": "셀레늄, 아연, 마그네슘, 비타민D가 T4를 활성형 T3로 전환 후 작용 증폭" },
-            { "productName": "바이오 밸런스", "description": "셀레늄과 망간이 염증 차단하여 인슐린 저항성 악화 방지" }
-          ],
-          "summary": "→ T4→T3 전환으로 갑상선 호르몬 완전 활성화",
-          "sortOrder": 3
-        },
-        {
-          "number": "④",
-          "title": "3단계 시너지 효과",
-          "items": [
-            { "productName": "당당케어", "description": "인슐린 저항성 개선으로 대사 기반 마련" },
-            { "productName": null, "description": "뉴로마스터 + 바이오 밸런스가 T4 생성 후 T3로 전환하여 기초 대사량 증가" },
-            { "productName": "바이오 밸런스", "description": "염증 제거로 대사 방해 요인 차단" }
-          ],
-          "summary": "→ 대사가 근본적으로 회복되어 피로·쉽게 찌는 체질·피부 노화 개선",
-          "sortOrder": 4
-        }
-      ],
       "intakeGuide": {
         "diet": {
           "routine": "최소 2주간 점심은 '오리지널', 저녁은 '시그니처'로 고정하여 섭취하세요.",
@@ -264,10 +127,320 @@
           "formula": "당당케어, 뉴로마스터, 바이오 밸런스 세 제품을 동시에 복용하면 대사 개선을 위한 최적의 환경이 조성됩니다. 뉴로마스터가 생성한 갑상선 호르몬 T4는 바이오 밸런스의 셀레늄, 아연, 마그네슘, 비타민D가 활성형 T3로 전환해야 비로소 제대로 작동하며, 당당케어는 인슐린 저항성 개선에 도움을 줍니다."
         }
       },
+      "synergyEffects": [
+        {
+          "items": [
+            {
+              "description": "코로솔산과 크롬이 세포의 포도당 흡수 촉진",
+              "productName": "당당케어"
+            },
+            {
+              "description": "HCA가 높은 혈당이 체지방으로 저장되는 것을 차단",
+              "productName": "당당케어"
+            },
+            {
+              "description": "비타민B군 8종이 에너지 대사 활성화",
+              "productName": "당당케어"
+            }
+          ],
+          "title": "인슐린 저항성 개선",
+          "number": "①",
+          "summary": "→ 멈춰있던 세포가 다시 당을 받아들이기 시작",
+          "sortOrder": 1
+        },
+        {
+          "items": [
+            {
+              "description": "요오드가 갑상선 호르몬(T4) 생성",
+              "productName": "뉴로마스터"
+            },
+            {
+              "description": "은행잎추출물이 혈액 순환 개선",
+              "productName": "뉴로마스터"
+            },
+            {
+              "description": "세포 에너지 공급 극대화",
+              "productName": "뉴로마스터"
+            }
+          ],
+          "title": "갑상선 호르몬 생성",
+          "number": "②",
+          "summary": "→ 대사 호르몬 T4 생성되지만 활성화 필요",
+          "sortOrder": 2
+        },
+        {
+          "items": [
+            {
+              "description": "셀레늄, 아연, 마그네슘, 비타민D가 T4를 활성형 T3로 전환 후 작용 증폭",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "셀레늄과 망간이 염증 차단하여 인슐린 저항성 악화 방지",
+              "productName": "바이오 밸런스"
+            }
+          ],
+          "title": "호르몬 활성화 + 염증 제거",
+          "number": "③",
+          "summary": "→ T4→T3 전환으로 갑상선 호르몬 완전 활성화",
+          "sortOrder": 3
+        },
+        {
+          "items": [
+            {
+              "description": "인슐린 저항성 개선으로 대사 기반 마련",
+              "productName": "당당케어"
+            },
+            {
+              "description": "뉴로마스터 + 바이오 밸런스가 T4 생성 후 T3로 전환하여 기초 대사량 증가",
+              "productName": null
+            },
+            {
+              "description": "염증 제거로 대사 방해 요인 차단",
+              "productName": "바이오 밸런스"
+            }
+          ],
+          "title": "3단계 시너지 효과",
+          "number": "④",
+          "summary": "→ 대사가 근본적으로 회복되어 피로·쉽게 찌는 체질·피부 노화 개선",
+          "sortOrder": 4
+        }
+      ],
       "dietRecommendation": {
-        "lunch": { "lineupKey": "ORIGINAL", "priority": 1 },
-        "dinner": { "lineupKey": "SIGNATURE", "priority": 2 }
+        "lunch": {
+          "priority": 1,
+          "lineupKey": "ORIGINAL"
+        },
+        "dinner": {
+          "priority": 2,
+          "lineupKey": "SIGNATURE"
+        }
       }
-    }
+    },
+    "catchphrase": "몸속 에너지 대사를\n활성 모드로 바꿔야 해요.",
+    "symptoms": "쉽게 피로해지고 기운이 없다\n      살이 잘 빠지지 않는다\n      단 것이 자주 당긴다\n      피부 탄력이 떨어졌다\n      집중력이 자주 흐려진다"
+  },
+  {
+    "healthType": "GUT_HEALTH",
+    "typeName": "장형",
+    "animalName": "배 빵빵 펭귄",
+    "description": "장내 미생물 불균형으로 장-피부 축(Gut-Skin Axis)에 문제가 생긴 장 건강 저하형입니다.",
+    "solution": "(1) 장벽 복구(바이오 밸런스) (2) 독소 제거(바이오 밸런스, 클린 밸런스) (3) 유해균 먹이 차단(당당케어)을 '동시에' 진행해야 빠르게 개선될 수 있습니다. 아연과 마그네슘이 장벽 틈을 메우고, 클로렐라가 독소를 배출하며, 혈당 조절로 유해균 증식을 억제합니다. 지연성 알러지 식품, 고포드맵 식품, 가공 식품을 제한을 병행하면 장과 피부 건강을 근본적으로 개선할 수 있습니다.",
+    "metadata": {
+      "intakeGuide": {
+        "diet": {
+          "routine": "최소 2주간 점심은 '저포드맵', 저녁은 '오리지널'로 고정하여 섭취하세요.",
+          "synergy": "점심에는 가스가 찰 수 있는 발효 원인 자체를 차단하고, 저녁에는 유해균의 활성도를 낮추는 식단을 섭취함으로써 하루 24시간 내내 장이 팽창하지 않고 휴식하는 선순환 환경이 완성됩니다."
+        },
+        "supplement": {
+          "formula": "바이오 밸런스, 클린 밸런스, 당당케어 세 제품을 함께 복용하면 단순 합산이 아닌 배수 효과가 나타납니다. 장벽 복구 → 독소 제거 → 유해균 먹이 차단으로 3단계 선순환 시스템이 작동하여 장누수증후군과 SIBO를 근본적으로 해결합니다."
+        }
+      },
+      "synergyEffects": [
+        {
+          "items": [
+            {
+              "description": "아연+마그네슘이 밀착연접 단백질 합성",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "비타민A가 점액층 두껍게 형성",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "비타민B군이 장 세포 재생 에너지 공급",
+              "productName": "당당케어"
+            }
+          ],
+          "title": "장벽 3중 강화 시스템",
+          "number": "①",
+          "summary": "→ 3단계 방어벽 완성으로 장누수 완화",
+          "sortOrder": 1
+        },
+        {
+          "items": [
+            {
+              "description": "셀레늄+망간+몰리브덴이 장내 독소 중화",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "클로렐라가 독소 흡착하여 체외 배출",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "비타민C+E가 혈액 속 염증 물질 제거",
+              "productName": null
+            }
+          ],
+          "title": "독소 완전 제거 루트",
+          "number": "②",
+          "summary": "→ 장-피부 축 염증 차단으로 턱 트러블 개선",
+          "sortOrder": 2
+        },
+        {
+          "items": [
+            {
+              "description": "비타민D가 항균 펩타이드 생성",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "아연이 유해균 증식 억제",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "크롬+바나바잎이 혈당 조절로 유해균 먹이 차단",
+              "productName": "당당케어"
+            }
+          ],
+          "title": "장내 유해균 이중 억제",
+          "number": "③",
+          "summary": "→ 복부 팽만과 가스 생성 근본 해결",
+          "sortOrder": 3
+        },
+        {
+          "items": [
+            {
+              "description": "아연이 DNA 합성 촉진",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "비타민A+C가 콜라겐 합성 지원",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "비타민B군(B₂,B₃,B₆,B₉)이 세포 분열 에너지 공급",
+              "productName": "당당케어"
+            }
+          ],
+          "title": "세포 재생 가속화",
+          "number": "④",
+          "summary": "→ 손상된 장 점막 빠른 회복",
+          "sortOrder": 4
+        }
+      ],
+      "dietRecommendation": {
+        "lunch": {
+          "priority": 1,
+          "lineupKey": "LOW_FODMAP"
+        },
+        "dinner": {
+          "priority": 2,
+          "lineupKey": "ORIGINAL"
+        }
+      }
+    },
+    "catchphrase": "장속 가스 폭풍을\n잔잔 모드로 돌려야 해요.",
+    "symptoms": "배에 가스가 자주 찬다\n      변비나 설사가 잦다\n      배가 자주 아프다\n      소화가 잘 안 된다\n      트림이 자주 나온다"
+  },
+  {
+    "healthType": "IMMUNE_BALANCE",
+    "typeName": "면역형",
+    "animalName": "예민한 고슴도치",
+    "description": "우리 몸을 지키는 면역계가 너무 예민해져, 사소한 자극에도 피부에 가려움과 붉은 반응을 일으키는 면역 과민 반응형입니다.",
+    "solution": "(1) 면역 과민 반응 개선(다래케어) (2) 장벽 복구(바이오 밸런스, 다래케어) (3) 독소 제거(클린 밸런스, 바이오 밸런스)를 '동시에' 진행해야 빠르게 개선될 수 있습니다. 다래추출물이 과민해진 면역 반응 스위치를 내리고, 아연과 마그네슘이 장벽을 복구하며, 클로렐라가 독소를 배출합니다. 지연성 알러지 식품을 즉시 중단하고, 스트레스 관리와 충분한 수면을 병행하면 면역계와 피부 건강을 근본적으로 개선할 수 있습니다.",
+    "metadata": {
+      "intakeGuide": {
+        "diet": {
+          "routine": "최소 2주간 점심은 '저포드맵', 저녁은 '저속노화'로 고정하여 섭취하세요.",
+          "synergy": "점심에는 면역계에 '휴식'을 주고, 저녁에는 방어벽을 '재건'하는 영양소를 공급합니다. 이 두 가지 과정이 맞물려 외부 자극에도 쉽게 흔들리지 않는 탄탄한 방어막을 형성합니다."
+        },
+        "supplement": {
+          "formula": "다래케어, 바이오 밸런스, 클린 밸런스 세 제품을 함께 복용하면 면역계를 다각도로 안정화합니다. 과민 반응 직접 조절 → 장벽 복구 → 독소 제거로 3단계 시너지가 작동하여 사소한 자극에도 반응하던 면역계가 정상화됩니다."
+        }
+      },
+      "synergyEffects": [
+        {
+          "items": [
+            {
+              "description": "다래추출물이 면역 과민 반응 스위치 직접 OFF",
+              "productName": "다래케어"
+            },
+            {
+              "description": "비타민D가 면역 균형(Th17/Treg) 조절로 근본 정상화",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "아연이 장벽 복구로 면역 과민 상태의 출발점 차단",
+              "productName": null
+            }
+          ],
+          "title": "면역 이중 안정화 시스템",
+          "number": "①",
+          "summary": "→ 2단계 면역 조절로 사소한 자극에도 반응하던 면역계 정상화",
+          "sortOrder": 1
+        },
+        {
+          "items": [
+            {
+              "description": "아연 8.5mg이 밀착연접 단백질 합성",
+              "productName": "다래케어"
+            },
+            {
+              "description": "아연 12mg + 마그네슘 315mg이 장벽 세포 간 이음새 촘촘하게 결합",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "비타민A가 장 점막 보호층(뮤신) 두껍게 형성",
+              "productName": "클린 밸런스"
+            }
+          ],
+          "title": "장벽 3중 복구 시스템",
+          "number": "②",
+          "summary": "→ 장누수 완화로 면역 '전군 비상 경계령' 해제",
+          "sortOrder": 2
+        },
+        {
+          "items": [
+            {
+              "description": "셀레늄+망간+몰리브덴이 장내 독소 중화",
+              "productName": "바이오 밸런스"
+            },
+            {
+              "description": "클로렐라가 면역 자극 내독소(LPS) 흡착하여 체외 배출",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "비타민C+E가 항산화로 염증 물질 제거",
+              "productName": null
+            }
+          ],
+          "title": "면역 자극 독소 완전 제거",
+          "number": "③",
+          "summary": "→ 면역계 부담 직접 감소로 과민 반응 완화",
+          "sortOrder": 3
+        },
+        {
+          "items": [
+            {
+              "description": "비타민A가 피부 각질 정상화로 외부 자극 방어력 증가",
+              "productName": "클린 밸런스"
+            },
+            {
+              "description": "아연이 피부 재생 촉진으로 자극 내성 증가",
+              "productName": null
+            },
+            {
+              "description": "비타민C+E가 피부 세포 보호 및 염증 완화",
+              "productName": "클린 밸런스"
+            }
+          ],
+          "title": "피부 장벽 강화로 자극 방어",
+          "number": "④",
+          "summary": "→ 외부 자극에도 쉽게 흔들리지 않는 탄탄한 방어막 형성",
+          "sortOrder": 4
+        }
+      ],
+      "dietRecommendation": {
+        "lunch": {
+          "priority": 1,
+          "lineupKey": "LOW_FODMAP"
+        },
+        "dinner": {
+          "priority": 2,
+          "lineupKey": "SLOW_AGING"
+        }
+      }
+    },
+    "catchphrase": "몸속 경보 시스템을\n잔잔 모드로 돌려야 해요.",
+    "symptoms": "피부가 자주 간지럽다\n      알레르기가 있다\n      피부가 쉽게 붓는다\n      가려움으로 긁은 자국이 있다\n      피부에 열감이 느껴진다"
   }
 ]

@@ -24,6 +24,13 @@ interface MealProduct {
   originalPrice: number;
   status: 'ACTIVE' | 'INACTIVE';
   imageFile: string;
+  ingredients?: string[];
+  // 영양성분 (CSV 데이터 기반)
+  calories?: number; // 칼로리 (kcal)
+  protein?: number; // 단백질 (g)
+  fat?: number; // 지방 (g)
+  netCarbs?: number; // 순탄수화물 (g)
+  fiber?: number; // 식이섬유 (g)
 }
 
 interface LineupData {
@@ -41,14 +48,14 @@ const mealLineups: LineupData[] = [
     totalDiscountPrice: 71200,
     totalOriginalPrice: 82400,
     products: [
-      { name: '수비드 통삽겹 된장 덮밥', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'pork-soybean.webp' },
-      { name: '수비드 통삽겹 들기름 두부면 막국수', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'pork-tofu.webp' },
-      { name: '훈제오리&들깨크림리조또', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'duck-risotto.webp' },
-      { name: '우삼겹 규동&브로콜리', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'beef-broccoli.webp' },
-      { name: '우삼겹 구이&두부면 오일 파스타', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'beef-oil.webp' },
-      { name: 'b.t.s. 치킨 치즈 리조또', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'bts-chicken.webp' },
-      { name: '소고기 버섯 들깨 덮밥', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'beef-mushroom.webp' },
-      { name: '저당 키토 라자냐', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'rasagna.webp' },
+      { name: '수비드 통삼겹 된장 덮밥', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'pork-soybean.webp', ingredients: ['돼지고기', '된장', '대두', '두부', '마늘', '양파', '브로콜리', '시금치'], calories: 480, protein: 27, fat: 29, netCarbs: 24, fiber: 3 },
+      { name: '수비드 통삼겹 들기름 두부면 막국수', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'pork-tofu.webp', ingredients: ['돼지고기', '두부', '대두', '들기름', '오이', '배', '참깨', '고춧가루'], calories: 714, protein: 44, fat: 50, netCarbs: 15, fiber: 6 },
+      { name: '훈제오리&들깨크림리조또', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'duck-risotto.webp', ingredients: ['오리고기', '대두', '컬리플라워', '들깨', '우유', '쌀', '부추'], calories: 651, protein: 27, fat: 46, netCarbs: 17, fiber: 14 },
+      { name: '우삼겹 규동&브로콜리', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'beef-broccoli.webp', ingredients: ['소고기', '브로콜리', '양파', '간장', '대두', '마늘', '생강', '참기름'], calories: 457, protein: 22, fat: 33, netCarbs: 13, fiber: 5 },
+      { name: '우삼겹 구이&두부면 오일 파스타', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'beef-oil.webp', ingredients: ['대두', '소고기', '올리브유', '마늘', '우유', '치즈', '브로콜리', '닭고기'], calories: 802, protein: 44, fat: 64, netCarbs: 6, fiber: 7 },
+      { name: 'b.t.s. 치킨 치즈 리조또', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'bts-chicken.webp', ingredients: ['닭고기', '치즈', '우유', '베이컨', '돼지고기', '토마토', '양파', '마늘'], calories: 475, protein: 46, fat: 22, netCarbs: 20, fiber: 4 },
+      { name: '소고기 버섯 들깨 덮밥', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'beef-mushroom.webp', ingredients: ['소고기', '컬리플라워', '부추', '버섯', '들깨', '들기름', '마늘'], calories: 608, protein: 36, fat: 44, netCarbs: 5, fiber: 12.5 },
+      { name: '저당 키토 라자냐', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: 'rasagna.webp', ingredients: ['토마토', '치즈', '양파', '소고기', '마늘', '와인', '우유', '올리브유', '바질', '닭고기', '대두', '파슬리'], calories: 604, protein: 57, fat: 29, netCarbs: 21, fiber: 9.4 },
     ],
   },
   {
@@ -57,12 +64,12 @@ const mealLineups: LineupData[] = [
     totalDiscountPrice: 59400,
     totalOriginalPrice: 67800,
     products: [
-      { name: '강남역 호랑이 삼겹', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'gangnam-tiger.webp' },
-      { name: '왕갈비통 닭목살', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'suwon-chicken.webp' },
-      { name: '기사식당 최강 제육', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'spicy-pork-1.webp' },
-      { name: '춘천 들깨 닭갈비', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'chuncheon-chicken.webp' },
-      { name: '수랏간 삼치 솥밥', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'fish.webp' },
-      { name: '항아리 차돌 된장', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'clay-pot.webp' },
+      { name: '강남역 호랑이 삼겹', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'gangnam-tiger.webp', ingredients: ['돼지고기', '브로콜리', '시금치', '참깨', '현미', '대두', '밀', '꽈리고추', '타피오카', '계피', '고춧가루'], calories: 687, protein: 28, fat: 51, netCarbs: 25, fiber: 6 },
+      { name: '왕갈비통 닭목살', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'suwon-chicken.webp', ingredients: ['닭고기', '브로콜리', '시금치', '참깨', '현미', '대두', '밀', '꽈리고추', '타피오카', '계피', '후추'], calories: 402, protein: 36, fat: 18, netCarbs: 22, fiber: 1 },
+      { name: '기사식당 최강 제육', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'spicy-pork-1.webp', ingredients: ['돼지고기', '브로콜리', '시금치', '참깨', '쌀', '고춧가루', '마늘', '양파', '대두', '밀', '들기름'], calories: 598, protein: 34, fat: 35, netCarbs: 32, fiber: 8 },
+      { name: '춘천 들깨 닭갈비', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'chuncheon-chicken.webp', ingredients: ['닭고기', '들깨', '고춧가루', '양파', '마늘', '고구마', '양배추', '대두', '참기름'], calories: 351, protein: 48, fat: 19, netCarbs: 19, fiber: 5 },
+      { name: '수랏간 삼치 솥밥', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'fish.webp', ingredients: ['삼치', '쌀', '고춧가루', '마늘', '양파', '대두', '밀', '들기름', '후추', '브로콜리', '시금치', '참깨', '대파', '표고버섯', '토마토'], calories: 289, protein: 28, fat: 8, netCarbs: 14, fiber: 5 },
+      { name: '항아리 차돌 된장', price: 9900, originalPrice: 11300, status: 'ACTIVE', imageFile: 'clay-pot.webp', ingredients: ['소고기', '브로콜리', '시금치', '참깨', '대두', '양파', '쥬키니호박', '마늘', '고춧가루', '청양고추', '들기름', '대파'], calories: 429, protein: 25, fat: 27, netCarbs: 18, fiber: 4 },
     ],
   },
   {
@@ -71,13 +78,13 @@ const mealLineups: LineupData[] = [
     totalDiscountPrice: 62300,
     totalOriginalPrice: 72100,
     products: [
-      { name: '수비드간장치킨', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '수비드 간장치킨.webp' },
-      { name: '시트러스대구', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '시트러스 대구 찜.webp' },
-      { name: '로제 닭갈비', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '토마토 로제 닭갈비.webp' },
-      { name: '미소버터 대구 조림', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '미소버터 대구 조림.webp' },
-      { name: '미소버터 연어 조림', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '미소버터 연어 조림.webp' },
-      { name: '코코넛치킨 커리', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '코코넛 크림 치킨 커리.webp' },
-      { name: '아라비아따 오리 찜', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '아라비아따 오리 찜.webp' },
+      { name: '수비드간장치킨', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '수비드 간장치킨.webp', ingredients: ['닭고기', '간장', '대두', '마늘', '생강', '참기름', '브로콜리', '시금치'], calories: 293, protein: 25, fat: 9, netCarbs: 28, fiber: 7 },
+      { name: '시트러스대구', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '시트러스 대구 찜.webp', ingredients: ['대구', '레몬', '오렌지', '올리브유', '마늘', '허브', '브로콜리'], calories: 311, protein: 19, fat: 11, netCarbs: 34, fiber: 9 },
+      { name: '로제 닭갈비', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '토마토 로제 닭갈비.webp', ingredients: ['닭고기', '토마토', '우유', '치즈', '양파', '마늘', '고춧가루', '대두'], calories: 314, protein: 20, fat: 14, netCarbs: 26.8, fiber: 8.2 },
+      { name: '미소버터 대구 조림', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '미소버터 대구 조림.webp', ingredients: ['대구', '미소', '버터', '우유', '대두', '마늘', '청경채'], calories: 237, protein: 21, fat: 9, netCarbs: 18, fiber: 8 },
+      { name: '미소버터 연어 조림', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '미소버터 연어 조림.webp', ingredients: ['연어', '미소', '버터', '우유', '대두', '마늘', '브로콜리'], calories: 286, protein: 20, fat: 14, netCarbs: 20, fiber: 8 },
+      { name: '코코넛치킨 커리', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '코코넛 크림 치킨 커리.webp', ingredients: ['닭고기', '코코넛밀크', '커리파우더', '양파', '마늘', '생강', '토마토'], calories: 332, protein: 21, fat: 16, netCarbs: 26, fiber: 10 },
+      { name: '아라비아따 오리 찜', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '아라비아따 오리 찜.webp', ingredients: ['오리고기', '토마토', '마늘', '올리브유', '고추', '바질', '양파'], calories: 305, protein: 14, fat: 13, netCarbs: 33.6, fiber: 8.4 },
     ],
   },
   {
@@ -86,13 +93,13 @@ const mealLineups: LineupData[] = [
     totalDiscountPrice: 62300,
     totalOriginalPrice: 72100,
     products: [
-      { name: '치킨스튜&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '토마토 치킨 스튜.webp' },
-      { name: '비프스튜&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '토마토 비프 스튜.webp' },
-      { name: '순살갈비찜&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '순살 갈비찜 두부.webp' },
-      { name: '수비드닭다리살&오믈렛', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '간장 수비드 닭다리살 오믈렛.webp' },
-      { name: '수비드목살&오믈렛', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '간장 수비드 목살 오믈렛.webp' },
-      { name: '순살삼계찜닭&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '순살 삼계찜닭 두부.webp' },
-      { name: '오리불고기&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '들깨 오리불고기 두부.webp' },
+      { name: '치킨스튜&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '토마토 치킨 스튜.webp', ingredients: ['닭고기', '토마토', '두부', '대두', '감자', '당근', '셀러리', '올리브유'], calories: 345, protein: 19, fat: 13, netCarbs: 38.4, fiber: 6.6 },
+      { name: '비프스튜&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '토마토 비프 스튜.webp', ingredients: ['소고기', '토마토', '두부', '대두', '감자', '당근', '셀러리', '올리브유'], calories: 347.4, protein: 15, fat: 15, netCarbs: 38.1, fiber: 6.9 },
+      { name: '순살갈비찜&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '순살 갈비찜 두부.webp', ingredients: ['소고기', '두부', '대두', '간장', '배', '마늘', '생강', '참기름'], calories: 342, protein: 26, fat: 10, netCarbs: 37, fiber: 1 },
+      { name: '수비드닭다리살&오믈렛', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '간장 수비드 닭다리살 오믈렛.webp', ingredients: ['닭고기', '계란', '간장', '대두', '마늘', '버터', '우유', '파슬리'], calories: 424, protein: 28, fat: 16, netCarbs: 41, fiber: 1 },
+      { name: '수비드목살&오믈렛', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '간장 수비드 목살 오믈렛.webp', ingredients: ['돼지고기', '계란', '간장', '대두', '마늘', '버터', '우유', '파슬리'], calories: 414, protein: 26, fat: 18, netCarbs: 37, fiber: 3 },
+      { name: '순살삼계찜닭&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '순살 삼계찜닭 두부.webp', ingredients: ['닭고기', '두부', '대두', '인삼', '대추', '마늘', '찹쌀', '생강'], calories: 342, protein: 25, fat: 10, netCarbs: 38, fiber: 1 },
+      { name: '오리불고기&두부', price: 8900, originalPrice: 10300, status: 'ACTIVE', imageFile: '들깨 오리불고기 두부.webp', ingredients: ['오리고기', '두부', '대두', '들깨', '간장', '마늘', '생강', '참기름'], calories: 365, protein: 22, fat: 17, netCarbs: 31, fiber: 7 },
     ],
   },
 ];
@@ -206,18 +213,29 @@ async function main() {
 
       if (existing) {
         // 기존 데이터 업데이트
+        const updateData: any = {
+          name: product.name,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          status: product.status,
+          lineupId: productLineup.id,
+          updatedAt: now,
+          // 영양성분 컬럼
+          calories: product.calories,
+          protein: product.protein,
+          fat: product.fat,
+          netCarbs: product.netCarbs,
+          fiber: product.fiber,
+        };
+        // ingredients가 있으면 metadata에 추가
+        if (product.ingredients) {
+          updateData.metadata = { ingredients: product.ingredients };
+        }
         await prisma.product.update({
           where: { id: existing.id },
-          data: {
-            name: product.name,
-            price: product.price,
-            originalPrice: product.originalPrice,
-            status: product.status,
-            lineupId: productLineup.id,
-            updatedAt: now,
-          },
+          data: updateData,
         });
-        console.log(`   ✅ 업데이트: ${product.name} (ID: ${existing.id}, ₩${product.price.toLocaleString()})`);
+        console.log(`   ✅ 업데이트: ${product.name} (ID: ${existing.id}, ₩${product.price.toLocaleString()})${product.ingredients ? ' [+ingredients]' : ''}`);
         lineupUpdated++;
 
         // 이미지 처리
@@ -257,24 +275,35 @@ async function main() {
         }
       } else {
         // 신규 생성
+        const createData: any = {
+          sku,
+          name: product.name,
+          description: `${lineup.lineupName} - ${product.name}`,
+          categoryCode: 'LUNCHBOX',
+          categoryName: '도시락',
+          productType: 'SINGLE',
+          price: product.price,
+          originalPrice: product.originalPrice,
+          status: product.status,
+          lineupId: productLineup.id,
+          shippingPolicy: 'CONDITIONAL',
+          shippingFee: 3000,
+          createdAt: now,
+          // 영양성분 컬럼
+          calories: product.calories,
+          protein: product.protein,
+          fat: product.fat,
+          netCarbs: product.netCarbs,
+          fiber: product.fiber,
+        };
+        // ingredients가 있으면 metadata에 추가
+        if (product.ingredients) {
+          createData.metadata = { ingredients: product.ingredients };
+        }
         const createdProduct = await prisma.product.create({
-          data: {
-            sku,
-            name: product.name,
-            description: `${lineup.lineupName} - ${product.name}`,
-            categoryCode: 'MEAL',
-            categoryName: '도시락',
-            productType: 'SINGLE',
-            price: product.price,
-            originalPrice: product.originalPrice,
-            status: product.status,
-            lineupId: productLineup.id,
-            shippingPolicy: 'CONDITIONAL',
-            shippingFee: 3000,
-            createdAt: now,
-          },
+          data: createData,
         });
-        console.log(`   ✅ 생성: ${product.name} (ID: ${createdProduct.id}, SKU: ${sku}, ₩${product.price.toLocaleString()})`);
+        console.log(`   ✅ 생성: ${product.name} (ID: ${createdProduct.id}, SKU: ${sku}, ₩${product.price.toLocaleString()})${product.ingredients ? ' [+ingredients]' : ''}`);
         lineupCreated++;
 
         // 이미지 등록
@@ -321,13 +350,13 @@ async function main() {
     const count = await prisma.product.count({
       where: {
         lineup: { key: lineup.lineupKey },
-        categoryCode: 'MEAL',
+        categoryCode: 'LUNCHBOX',
       },
     });
     const activeCount = await prisma.product.count({
       where: {
         lineup: { key: lineup.lineupKey },
-        categoryCode: 'MEAL',
+        categoryCode: 'LUNCHBOX',
         status: 'ACTIVE',
       },
     });

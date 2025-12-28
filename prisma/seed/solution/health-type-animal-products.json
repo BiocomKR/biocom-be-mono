@@ -1,94 +1,5 @@
 [
   {
-    "healthType": "GUT_HEALTH",
-    "products": [
-      {
-        "productId": 4,
-        "type": "SUPPLEMENT",
-        "priority": 1,
-        "keyword": "장벽 복구",
-        "recommendReason": "장벽을 복구해 장누수 증후군을 개선하는 아연, 마그네슘, 비타민D와 유해균이 만드는 독소를 제거하고 장벽 손상을 막는 셀레늄, 망간, 몰리브덴, 크롬이 모두 들어있습니다. 이 성분들을 한 번에 섭취할 때 더 큰 시너지 효과를 만들어낼 수 있습니다.",
-        "dosage": "1일 1회, 1회 3정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "zinc", "name": "아연", "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄", "descriptions": ["장벽 세포 간 이음새를 촘촘하게 결합", "유해균 독소나 염증 유발 물질의 혈관 누수 방지"], "sortOrder": 1},
-          {"ingredientKey": "magnesium", "name": "마그네슘", "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄", "descriptions": ["장 점막 세포의 정상적인 기능과 회복에 도움", "유해균 독소나 염증 유발 물질의 혈관 누수 방지"], "sortOrder": 2},
-          {"ingredientKey": "vitaminD", "name": "비타민 D", "summary": "장 면역 기능과 장벽 세포 방어 기능의 핵심 비타민", "descriptions": ["장 면역 시스템을 조절", "장 상피 세포의 방어벽 기능을 강화", "장내 염증 반응 조절"], "sortOrder": 3},
-          {"ingredientKey": "selenium", "name": "셀레늄", "summary": "장 독소 및 염증 유발 물질 제거의 핵심 미네랄", "descriptions": ["강력한 항산화 작용으로, 유해균 독소와 장내 염증 감소", "세포 손상을 방지해 장벽 회복 환경 조성"], "sortOrder": 4},
-          {"ingredientKey": "molybdenum", "name": "몰리브덴", "summary": "장 독소 및 염증 유발 물질 제거의 핵심 미네랄", "descriptions": ["해독 과정에 관여하여 독소 제거에 도움", "유해균 독소를 중화하고 배출하는 과정에 도움", "장내 염증 부담을 줄여 장벽 회복 환경 조성"], "sortOrder": 5},
-          {"ingredientKey": "manganese", "name": "망간", "summary": "독소로 인한 활성산소 제거 및 장벽 복구를 보조하는 미네랄", "descriptions": ["항산화 효소의 구성 성분으로 독소 제거", "면역 과민 반응으로 발생한 활성산소 제거", "장내 염증 환경 개선으로 면역 안정 지원"], "sortOrder": 6},
-          {"ingredientKey": "chromium", "name": "크롬", "summary": "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움을 주는 미네랄", "descriptions": ["인슐린 작용을 도와 안정적 혈당 유지에 도움", "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움"], "sortOrder": 7}
-        ]
-      },
-      {
-        "productId": 5,
-        "type": "SUPPLEMENT",
-        "priority": 2,
-        "keyword": "장 독소 배출",
-        "recommendReason": "장내 독소를 직접 흡착 배출하는 클로렐라와 장벽 회복을 돕는 아연, 비타민 A가 들어있습니다. 또한, 비타민 C, E 항산화 성분과 세포 재생을 돕는 비타민 B군(B3, B9)이 독소로 인한 염증을 막고 장-피부 축을 개선하여 시너지 효과를 냅니다.",
-        "dosage": "1일 2회, 1회 2정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "chlorella", "name": "클로렐라", "summary": "장내 독소와 노폐물을 흡착 배출하는 독소 제거의 핵심 성분", "descriptions": ["유해균 독소 및 노폐물에 흡착하여 체외로 배출", "독소로 인한 장내 염증 부담 감소", "장벽 회복 환경 조성"], "sortOrder": 1},
-          {"ingredientKey": "vitaminE", "name": "비타민 E", "summary": "세포막을 보호하여 독소 제거를 돕는 항산화 물질", "descriptions": ["독소로 인한 산화 스트레스로부터 장 점막 세포 손상 방지", "비타민 C와 함께 장내 염증 반응 감소에 기여"], "sortOrder": 2},
-          {"ingredientKey": "vitaminA", "name": "비타민 A", "summary": "손상된 장 점막 재생과 피부 트러블 개선의 핵심 비타민", "descriptions": ["손상된 장 점막의 재생과 회복에 직접 도움", "장-피부 축 개선에 기여, 턱 트러블 완화에 도움"], "sortOrder": 3},
-          {"ingredientKey": "vitaminC", "name": "비타민 C", "summary": "독소 제거와 장벽 복구(콜라겐 합성)를 돕는 핵심 비타민", "descriptions": ["유해균 독소로 인한 장내 염증 및 산화 스트레스 억제", "장벽 회복에 필수적인 콜라겐 합성 촉진"], "sortOrder": 4},
-          {"ingredientKey": "zinc", "name": "아연", "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄", "descriptions": ["장벽 세포 간 이음새를 촘촘하게 결합", "유해균 독소나 염증 유발 물질의 혈관 누수 방지"], "sortOrder": 5},
-          {"ingredientKey": "vitaminB9", "name": "비타민 B9(엽산)", "summary": "손상된 장 점막 세포의 신속한 재생을 돕는 핵심 비타민", "descriptions": ["새로운 세포 분열과 성장에 필수적", "손상된 장 점막 세포의 신속한 재생에 도움"], "sortOrder": 6},
-          {"ingredientKey": "vitaminB3", "name": "비타민 B3(나이아신)", "summary": "장 점막 세포 회복(장벽 복구)과 에너지 생성의 핵심 비타민", "descriptions": ["염증으로 손상된 장 점막 세포의 회복 및 재생에 도움", "장 건강 저하로 인한 에너지 저하 개선에 기여"], "sortOrder": 7}
-        ]
-      },
-      {
-        "productId": 1,
-        "type": "SUPPLEMENT",
-        "priority": 3,
-        "keyword": "유해균 감소",
-        "recommendReason": "유해균의 먹이가 되는 식후 혈당 상승을 억제하는 바나바잎추출물과 크롬이 들어있습니다. 또한, 비타민 B군이 탄수화물 대사를 촉진해 유해균 먹이를 차단하고 장벽 회복(B2, B3, B6, B9)과 에너지 생성을 도와 근본적인 장 건강 개선에 시너지 효과를 냅니다.",
-        "dosage": "1일 2회, 1회 2정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "banaba", "name": "바나바잎추출물", "summary": "식후 혈당 상승을 억제하는 유해균 먹이 차단의 핵심 성분", "descriptions": ["식후 혈당 상승 억제, 혈당 조절에 도움", "유해균의 주된 먹이(당) 공급 차단"], "sortOrder": 1},
-          {"ingredientKey": "chromium", "name": "크롬", "summary": "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움을 주는 물질", "descriptions": ["인슐린 작용을 도와 안정적 혈당 유지에 도움", "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움"], "sortOrder": 2},
-          {"ingredientKey": "garcinia", "name": "가르시니아캄보지아추출물", "summary": "탄수화물 대사 관리를 도와 유해균 먹이 차단을 보조하는 물질", "descriptions": ["탄수화물이 지방으로 합성되는 것 억제에 도움", "혈당 부담을 줄여 유해균 증식 환경 개선에 도움"], "sortOrder": 3},
-          {"ingredientKey": "vitaminB1", "name": "비타민 B1(티아민)", "summary": "탄수화물 대사 촉진으로 유해균 먹이 차단을 돕는 핵심 조효소", "descriptions": ["탄수화물 대사 및 에너지 생성의 핵심 조효소", "탄수화물이 유해균 먹이가 아닌 에너지로 전환되도록 도움"], "sortOrder": 4}
-        ]
-      },
-      {
-        "productId": 19,
-        "type": "DIET",
-        "priority": 1,
-        "keyword": "오리지널",
-        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
-      },
-      {
-        "productId": 20,
-        "type": "DIET",
-        "priority": 1,
-        "keyword": "오리지널",
-        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
-      },
-      {
-        "productId": 21,
-        "type": "DIET",
-        "priority": 1,
-        "keyword": "오리지널",
-        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
-      },
-      {
-        "productId": 22,
-        "type": "DIET",
-        "priority": 1,
-        "keyword": "오리지널",
-        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
-      }
-    ]
-  },
-  {
     "healthType": "IMMUNE_BALANCE",
     "products": [
       {
@@ -99,8 +10,25 @@
         "recommendReason": "면역 과민반응에 의한 피부상태 개선에 도움을 줄 수 있는 다래추출물이 들어있습니다. 예민해진 면역계의 과민 반응 스위치를 직접 내려주고, 아연이 장벽을 복구하여 면역 반응 안정화의 기반을 마련합니다.",
         "dosage": "1일 2회, 1회 3정 섭취",
         "mechanisms": [
-          {"ingredientKey": "kiwi", "name": "다래추출물분말", "summary": "면역 과민반응을 조절하는 핵심 성분", "descriptions": ["면역 균형(Th17/Treg)을 조절하여 과민해진 면역계 안정화"], "sortOrder": 1},
-          {"ingredientKey": "zinc", "name": "아연", "summary": "장벽 복구로 면역 안정화 기반을 마련하는 핵심 미네랄", "descriptions": ["장벽 세포 간 이음새를 촘촘하게 결합하여 장누수 개선", "T세포 기능 정상화로 면역 조절에 도움"], "sortOrder": 2}
+          {
+            "name": "다래추출물분말",
+            "summary": "면역 과민반응을 조절하는 핵심 성분",
+            "sortOrder": 1,
+            "descriptions": [
+              "면역 균형(Th17/Treg)을 조절하여 과민해진 면역계 안정화"
+            ],
+            "ingredientKey": "kiwi"
+          },
+          {
+            "name": "아연",
+            "summary": "장벽 복구로 면역 안정화 기반을 마련하는 핵심 미네랄",
+            "sortOrder": 2,
+            "descriptions": [
+              "장벽 세포 간 이음새를 촘촘하게 결합하여 장누수 개선",
+              "T세포 기능 정상화로 면역 조절에 도움"
+            ],
+            "ingredientKey": "zinc"
+          }
         ]
       },
       {
@@ -111,10 +39,50 @@
         "recommendReason": "장벽을 복구하는 아연, 마그네슘, 비타민D와 독소를 제거하는 셀레늄, 망간, 몰리브덴이 모두 들어있습니다. 장 점막 손상으로 과민해진 면역계를 안정화시키고, 독소와 염증 물질을 제거하여 면역 부담을 줄입니다.",
         "dosage": "1일 1회, 1회 3정 섭취",
         "mechanisms": [
-          {"ingredientKey": "zinc", "name": "아연", "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄", "descriptions": ["장벽 세포 간 이음새를 촘촘하게 결합", "유해균 독소나 염증 유발 물질의 혈관 누수 방지", "면역 시스템의 핵심인 T세포 분화 및 기능 정상화"], "sortOrder": 1},
-          {"ingredientKey": "magnesium", "name": "마그네슘", "summary": "장벽 복구와 염증 억제로 면역 안정화의 핵심 미네랄", "descriptions": ["염증 반응(NF-κB 경로) 억제로 면역계 진정", "장 점막 세포 회복으로 면역 과민 반응의 출발점 차단", "장벽 세포 간 이음새 생성에 필요한 단백질 합성에 도움"], "sortOrder": 2},
-          {"ingredientKey": "vitaminD", "name": "비타민 D", "summary": "면역 균형 조절 및 장벽 방어 강화의 핵심 비타민", "descriptions": ["면역 시스템(Th17/Treg) 균형 조절로 과민 반응 정상화", "장벽 세포 간 이음새를 촘촘하게 결합해 방어벽 기능 강화", "장내 염증 반응 조절로 면역계 안정 환경 조성"], "sortOrder": 3},
-          {"ingredientKey": "selenium", "name": "셀레늄", "summary": "독소 제거 및 염증 반응 억제의 핵심 미네랄", "descriptions": ["강력한 항산화 효소(GPx) 활성화로 독소 중화", "염증성 사이토카인(IL-6, TNF-α) 억제로 면역 과민 반응 완화", "면역 과민 반응으로 발생한 산화 스트레스 제거"], "sortOrder": 4}
+          {
+            "name": "아연",
+            "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄",
+            "sortOrder": 1,
+            "descriptions": [
+              "장벽 세포 간 이음새를 촘촘하게 결합",
+              "유해균 독소나 염증 유발 물질의 혈관 누수 방지",
+              "면역 시스템의 핵심인 T세포 분화 및 기능 정상화"
+            ],
+            "ingredientKey": "zinc"
+          },
+          {
+            "name": "마그네슘",
+            "summary": "장벽 복구와 염증 억제로 면역 안정화의 핵심 미네랄",
+            "sortOrder": 2,
+            "descriptions": [
+              "염증 반응(NF-κB 경로) 억제로 면역계 진정",
+              "장 점막 세포 회복으로 면역 과민 반응의 출발점 차단",
+              "장벽 세포 간 이음새 생성에 필요한 단백질 합성에 도움"
+            ],
+            "ingredientKey": "magnesium"
+          },
+          {
+            "name": "비타민 D",
+            "summary": "면역 균형 조절 및 장벽 방어 강화의 핵심 비타민",
+            "sortOrder": 3,
+            "descriptions": [
+              "면역 시스템(Th17/Treg) 균형 조절로 과민 반응 정상화",
+              "장벽 세포 간 이음새를 촘촘하게 결합해 방어벽 기능 강화",
+              "장내 염증 반응 조절로 면역계 안정 환경 조성"
+            ],
+            "ingredientKey": "vitaminD"
+          },
+          {
+            "name": "셀레늄",
+            "summary": "독소 제거 및 염증 반응 억제의 핵심 미네랄",
+            "sortOrder": 4,
+            "descriptions": [
+              "강력한 항산화 효소(GPx) 활성화로 독소 중화",
+              "염증성 사이토카인(IL-6, TNF-α) 억제로 면역 과민 반응 완화",
+              "면역 과민 반응으로 발생한 산화 스트레스 제거"
+            ],
+            "ingredientKey": "selenium"
+          }
         ]
       },
       {
@@ -125,112 +93,57 @@
         "recommendReason": "장내 독소를 직접 흡착 배출하는 클로렐라와 피부 장벽을 강화하는 비타민A, 항산화 성분인 비타민C, E, 아연이 들어있습니다. 면역계를 자극하는 독소를 제거하고, 강화된 피부 장벽으로 외부 자극에 대한 방어력을 높입니다.",
         "dosage": "1일 2회, 1회 2정 섭취",
         "mechanisms": [
-          {"ingredientKey": "chlorella", "name": "클로렐라", "summary": "독소 흡착 배출로 면역 부담을 감소시키는 핵심 물질", "descriptions": ["면역계를 자극하는 장 독소(LPS)를 흡착하여 체외 배출", "장내 독소 제거로 면역 과민 반응 요인 차단", "장벽 회복 환경 조성으로 면역 안정화에 도움"], "sortOrder": 1},
-          {"ingredientKey": "vitaminE", "name": "비타민 E", "summary": "세포막 보호 및 염증 매개물질 억제의 핵심 비타민", "descriptions": ["산화 스트레스로부터 장 점막 및 피부 세포 보호", "염증 매개물질(프로스타글란딘 E2) 감소로 면역 과민 반응 완화", "비타민C와 함께 항산화 시너지로 면역 부담 감소"], "sortOrder": 2},
-          {"ingredientKey": "vitaminA", "name": "비타민 A", "summary": "피부 장벽 강화로 외부 자극 방어력 증가의 핵심 비타민", "descriptions": ["피부 각질 정상화로 외부 자극에 대한 피부 방어력 증가", "장 점막 보호층(뮤신)을 두껍게 형성하는데 도움", "장-피부 축 개선으로 가려움과 붉어짐 완화"], "sortOrder": 3}
-        ]
-      }
-    ]
-  },
-  {
-    "healthType": "SKIN_HEALTH",
-    "products": [
-      {
-        "productId": 4,
-        "type": "SUPPLEMENT",
-        "priority": 1,
-        "keyword": "염증 개선",
-        "recommendReason": "염증 ON/OFF 스위치를 모두 제어하는 성분이 조합되어 있습니다. 셀레늄과 망간이 염증 생성을 직접 억제하고, 비타민D, 아연, 마그네슘이 염증 해소 시스템을 활성화합니다.",
-        "dosage": "1일 1회, 1회 3정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "vitaminD", "name": "비타민 D", "summary": "염증 해소 물질 생성에 도움을 주는 핵심 비타민", "descriptions": ["염증 해소 물질(SPMs) 생성 효소 활성화", "레졸빈, 프로텍틴 등 염증 해소 물질 생성 촉진"], "sortOrder": 1},
-          {"ingredientKey": "magnesium", "name": "마그네슘", "summary": "염증 해소 물질 생성에 도움을 주는 핵심 보조인자", "descriptions": ["지방산 대사 효소의 필수 보조인자", "오메가-3를 염증 해소 물질(SPMs)로 전환하는 과정에 필수"], "sortOrder": 2},
-          {"ingredientKey": "zinc", "name": "아연", "summary": "염증 해소 효소 활성화 및 면역 정상화의 핵심 미네랄", "descriptions": ["염증을 해소하는 효소(A20) 활성화", "면역 세포(T세포) 기능 정상화로 염증 종료 신호 촉진"], "sortOrder": 3},
-          {"ingredientKey": "selenium", "name": "셀레늄", "summary": "염증성 신호물질을 억제하는 핵심 미네랄", "descriptions": ["강력한 항산화 효소(GPx) 활성화로 산화 스트레스 제거", "염증성 신호물질(IL-6, TNF-α) 직접 억제", "염증 신호 전달 경로(NF-κB) 차단"], "sortOrder": 4},
-          {"ingredientKey": "manganese", "name": "망간", "summary": "활성산소 제거로 염증 촉발을 원천 차단하는 핵심 미네랄", "descriptions": ["항산화 효소(MnSOD)의 핵심 성분", "가장 유독한 활성 산소(슈퍼옥사이드 라디칼)를 1차적으로 제거"], "sortOrder": 5}
-        ]
-      },
-      {
-        "productId": 5,
-        "type": "SUPPLEMENT",
-        "priority": 2,
-        "keyword": "독소 배출",
-        "recommendReason": "염증 유발 독소를 직접 흡착하여 배출하는 성분으로 구성되어 있습니다. 클로렐라가 장내 내독소(LPS)를 흡착 배출하고, 비타민 E와 비타민 C가 염증 매개 물질을 차단합니다.",
-        "dosage": "1일 2회, 1회 2정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "chlorella", "name": "클로렐라", "summary": "염증 유발 독소를 흡착 후 배출하는 핵심 물질", "descriptions": ["염증 유발 내독소(LPS) 직접 흡착하여 체외 배출", "장에서 흡수되는 독소 차단으로 염증 촉발 원천 제거", "중금속 등 염증 유발 물질 제거"], "sortOrder": 1},
-          {"ingredientKey": "vitaminE", "name": "비타민 E", "summary": "염증 매개 물질의 생성을 억제하는 핵심 비타민", "descriptions": ["염증 매개물질(프로스타글란딘 E2) 생성 억제", "세포막 보호로 염증 신호 차단", "항산화로 염증 촉발 산화 스트레스 제거"], "sortOrder": 2},
-          {"ingredientKey": "vitaminC", "name": "비타민 C", "summary": "염증성 신호물질 생성을 억제하는 핵심 비타민", "descriptions": ["염증성 신호물질(IL-6, TNF-α) 생성 억제", "강력한 항산화로 염증 신호 차단", "염증 신호 전달 경로(NF-κB) 억제로 염증 반응 차단"], "sortOrder": 3}
-        ]
-      },
-      {
-        "productId": 7,
-        "type": "SUPPLEMENT",
-        "priority": 3,
-        "keyword": "세포 보호",
-        "recommendReason": "급성 염증으로부터 세포를 보호하는 항산화 시스템의 구성 성분이 모두 포함되어 있습니다. SOD 효소가 염증을 유발하는 활성산소를 1차로 제거하고 비타민 E, 비타민 C, 글루타치온이 활성산소로 부터 세포를 보호하는 2차 방어막(항산화 네트워크)을 형성합니다.",
-        "dosage": "1일 1회, 1회 1포 섭취",
-        "mechanisms": [
-          {"ingredientKey": "sod", "name": "SOD효소", "summary": "염증을 유발하는 활성산소 1차 제거의 핵심 물질", "descriptions": ["활성산소를 덜 유해한 과산화수소로 전환", "염증 신호의 출발점 차단"], "sortOrder": 1},
-          {"ingredientKey": "catalase", "name": "카탈레이즈 효소", "summary": "활성산소에서 전환된 과산화수소를 최종 분해하는 핵심 물질", "descriptions": ["SOD효소가 전환한 과산화수소를 물과 산소로 완전 분해", "염증 촉발 환경 차단"], "sortOrder": 2},
-          {"ingredientKey": "vitaminE", "name": "비타민 E", "summary": "세포를 보호하는 항산화 네트워크의 핵심 비타민", "descriptions": ["지용성 항산화제로 세포막에서 활성산소 직접 차단", "세포막의 산화 방지(세포 손상 차단)"], "sortOrder": 3},
-          {"ingredientKey": "vitaminC", "name": "비타민 C", "summary": "세포를 보호하는 항산화 네트워크의 핵심 비타민", "descriptions": ["수용성 항산화제로 세포 외부(혈액, 세포질)에서 활성산소 차단", "산화된 비타민E를 항산화 물질로 재활용", "글루타치온과 함께 세포의 수용성 방어막 구축"], "sortOrder": 4},
-          {"ingredientKey": "glutathione", "name": "글루타치온", "summary": "항산화 네트워크의 핵심 물질이자 가장 강력한 항산화제", "descriptions": ["체내 가장 강력한 항산화제로 활성산소를 직접 중화", "산화된 비타민C를 항산화 물질로 재활용", "체내 독소와 결합하여 몸 밖으로 배출"], "sortOrder": 5}
+          {
+            "name": "클로렐라",
+            "summary": "독소 흡착 배출로 면역 부담을 감소시키는 핵심 물질",
+            "sortOrder": 1,
+            "descriptions": [
+              "면역계를 자극하는 장 독소(LPS)를 흡착하여 체외 배출",
+              "장내 독소 제거로 면역 과민 반응 요인 차단",
+              "장벽 회복 환경 조성으로 면역 안정화에 도움"
+            ],
+            "ingredientKey": "chlorella"
+          },
+          {
+            "name": "비타민 E",
+            "summary": "세포막 보호 및 염증 매개물질 억제의 핵심 비타민",
+            "sortOrder": 2,
+            "descriptions": [
+              "산화 스트레스로부터 장 점막 및 피부 세포 보호",
+              "염증 매개물질(프로스타글란딘 E2) 감소로 면역 과민 반응 완화",
+              "비타민C와 함께 항산화 시너지로 면역 부담 감소"
+            ],
+            "ingredientKey": "vitaminE"
+          },
+          {
+            "name": "비타민 A",
+            "summary": "피부 장벽 강화로 외부 자극 방어력 증가의 핵심 비타민",
+            "sortOrder": 3,
+            "descriptions": [
+              "피부 각질 정상화로 외부 자극에 대한 피부 방어력 증가",
+              "장 점막 보호층(뮤신)을 두껍게 형성하는데 도움",
+              "장-피부 축 개선으로 가려움과 붉어짐 완화"
+            ],
+            "ingredientKey": "vitaminA"
+          }
         ]
       }
     ]
   },
   {
     "healthType": "METABOLISM",
+    "products": []
+  },
+  {
+    "healthType": "GUT_HEALTH",
     "products": [
-      {
-        "productId": 1,
-        "type": "SUPPLEMENT",
-        "priority": 1,
-        "keyword": "혈당 조절",
-        "recommendReason": "인슐린 저항성의 원인인 식후 혈당 상승 억제와 대사 개선을 위한 최적의 조합입니다. 코로솔산과 크롬이 세포의 포도당 흡수를 촉진하여 인슐린 저항성 개선에 도움을 주며, HCA가 높은 혈당이 체지방으로 저장되지 않도록 막아줍니다. 비타민B군과 포스콜린은 지방 대사를 개선합니다.",
-        "dosage": "1일 2회, 1회 2정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "banaba", "name": "바나바잎추출물(코로솔산)", "summary": "식후 혈당 상승 억제를 위한 핵심 기능성 성분", "descriptions": ["식후 혈당 상승 억제에 필수인 포도당 수송체(GLUT4) 증가", "알파-글루코시다제 억제로 포도당 신생 속도 감소"], "sortOrder": 1},
-          {"ingredientKey": "chromium", "name": "크롬", "summary": "인슐린 저항성 개선의 핵심 물질", "descriptions": ["인슐린 수용체 감수성 증가로 세포 내 포도당 흡수 촉진", "바나바잎추출물과 함께 상승 효과"], "sortOrder": 2},
-          {"ingredientKey": "garcinia", "name": "HCA(가르시니아캄보지아추출물)", "summary": "지방 합성 억제 및 식욕 조절을 위한 핵심 기능성 성분", "descriptions": ["HCA가 지방 합성 효소(ATP citrate lyase) 억제", "과잉 탄수화물이 지방으로 전환되는 과정 차단", "세로토닌 증가로 식욕 및 탄수화물 갈망 감소에 도움"], "sortOrder": 3},
-          {"ingredientKey": "forskolin", "name": "포스콜린(콜레우스포스콜리추출물)", "summary": "지방 분해 촉진 및 대사율 증가를 위한 핵심 기능성 성분", "descriptions": ["세포 내 cAMP 수치 증가로 지방 분해 효소 활성화", "피하지방과 내장지방을 에너지로 전환하는데 도움"], "sortOrder": 4}
-        ]
-      },
-      {
-        "productId": 6,
-        "type": "SUPPLEMENT",
-        "priority": 2,
-        "keyword": "대사량 증가",
-        "recommendReason": "저하된 대사 기능을 개선하기 위한 최적의 조합입니다. 요오드가 갑상선 호르몬인 T4를 생성해 기초대사량을 높이고, 은행잎추출물이 혈행을 개선하여 세포 에너지 공급과 대사량을 증가시킵니다.",
-        "dosage": "1일 1회, 2정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "iodine", "name": "요오드", "summary": "기초 대사량을 결정하는 갑상선 호르몬(T4)의 핵심 원료", "descriptions": ["갑상선 호르몬(T4)을 생성하여 기초 대사량 증가", "세포 내 에너지 공장인 미토콘드리아 수 증가", "세포의 산소 소비를 촉진하여 체온 상승"], "sortOrder": 1},
-          {"ingredientKey": "ginkgo", "name": "은행잎추출물(플라보놀배당체)", "summary": "혈행 개선을 통해 대사 효율을 높이는 핵심 기능성 성분", "descriptions": ["혈관 확장과 혈류 흐름을 개선해 세포에 에너지 공급", "세포 내 산소 공급 증가로 에너지 대사 효율 개선"], "sortOrder": 2}
-        ]
-      },
-      {
-        "productId": 4,
-        "type": "SUPPLEMENT",
-        "priority": 3,
-        "keyword": "대사 시너지",
-        "recommendReason": "만성 염증 제거로 인슐린 저항성 악화를 차단하고, 갑상선 호르몬 활성화를 지원하는 이중 기능 제품입니다. 셀레늄과 망간이 인슐린 수용체를 손상시키는 염증을 제거하며, 셀레늄, 아연, 마그네슘, 비타민D가 갑상선 호르몬 활성화를 도와 기초 대사량을 극대화합니다.",
-        "dosage": "1일 1회, 1회 3정 섭취",
-        "mechanisms": [
-          {"ingredientKey": "chromium", "name": "크롬", "summary": "인슐린 저항성 개선의 핵심 미네랄", "descriptions": ["세포 내 포도당 흡수를 촉진해 식후 혈당 상승 억제에 도움", "잉여 포도당이 체지방으로 전환되는 과정 차단"], "sortOrder": 1},
-          {"ingredientKey": "selenium", "name": "셀레늄", "summary": "염증 억제와 갑상선 호르몬 활성화의 핵심 미네랄", "descriptions": ["염증성 신호물질(IL-6, TNF-α) 차단으로 인슐린 저항성 개선에 도움", "갑상선 호르몬 활성화(T4 → T3)의 필수 성분"], "sortOrder": 2},
-          {"ingredientKey": "magnesium", "name": "마그네슘", "summary": "인슐린 저항성 개선과 에너지 대사의 핵심 미네랄", "descriptions": ["인슐린 수용체 활성화로 혈당 조절에 도움", "세포의 에너지 생산과 포도당 대사 효소의 필수 조효소"], "sortOrder": 3},
-          {"ingredientKey": "zinc", "name": "아연", "summary": "인슐린 수용체 기능 개선의 핵심 미네랄", "descriptions": ["인슐린 수용체(IRS-1/PI3K/Akt) 신호를 강화해 혈당 조절에 도움", "활성형 갑상선 호르몬(T3)의 세포 결합에 도움"], "sortOrder": 4},
-          {"ingredientKey": "vitaminD", "name": "비타민 D", "summary": "인슐린 분비 개선과 호르몬 민감도 조절의 핵심 비타민", "descriptions": ["췌장 베타 세포의 기능을 최적화해 인슐린 분비 개선", "염증(NF-κB) 억제로 인슐린 저항성 개선에 도움", "인슐린 및 갑상선 호르몬 수용체 발현을 증가시켜 대사 효율 개선"], "sortOrder": 5}
-        ]
-      },
       {
         "productId": 19,
         "type": "DIET",
         "priority": 1,
         "keyword": "오리지널",
-        "recommendReason": "탄수화물 섭취를 최소화하여 우리 몸이 당 대신 지방을 태우도록 대사 스위치를 강하게 켜줍니다. 인슐린 저항성의 핵심 원인인 혈당 스파이크를 가장 확실하게 잡아주어, 무거워진 대사 흐름을 활성화하고 인슐린 기능을 정상화하는 데 집중합니다.",
-        "dosage": "점심 식사로 섭취",
+        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
+        "dosage": "저녁 식사로 섭취",
         "mechanisms": []
       },
       {
@@ -238,8 +151,8 @@
         "type": "DIET",
         "priority": 1,
         "keyword": "오리지널",
-        "recommendReason": "탄수화물 섭취를 최소화하여 우리 몸이 당 대신 지방을 태우도록 대사 스위치를 강하게 켜줍니다. 인슐린 저항성의 핵심 원인인 혈당 스파이크를 가장 확실하게 잡아주어, 무거워진 대사 흐름을 활성화하고 인슐린 기능을 정상화하는 데 집중합니다.",
-        "dosage": "점심 식사로 섭취",
+        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
+        "dosage": "저녁 식사로 섭취",
         "mechanisms": []
       },
       {
@@ -247,8 +160,8 @@
         "type": "DIET",
         "priority": 1,
         "keyword": "오리지널",
-        "recommendReason": "탄수화물 섭취를 최소화하여 우리 몸이 당 대신 지방을 태우도록 대사 스위치를 강하게 켜줍니다. 인슐린 저항성의 핵심 원인인 혈당 스파이크를 가장 확실하게 잡아주어, 무거워진 대사 흐름을 활성화하고 인슐린 기능을 정상화하는 데 집중합니다.",
-        "dosage": "점심 식사로 섭취",
+        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
+        "dosage": "저녁 식사로 섭취",
         "mechanisms": []
       },
       {
@@ -256,55 +169,228 @@
         "type": "DIET",
         "priority": 1,
         "keyword": "오리지널",
-        "recommendReason": "탄수화물 섭취를 최소화하여 우리 몸이 당 대신 지방을 태우도록 대사 스위치를 강하게 켜줍니다. 인슐린 저항성의 핵심 원인인 혈당 스파이크를 가장 확실하게 잡아주어, 무거워진 대사 흐름을 활성화하고 인슐린 기능을 정상화하는 데 집중합니다.",
-        "dosage": "점심 식사로 섭취",
-        "mechanisms": []
-      },
-      {
-        "productId": 14,
-        "type": "DIET",
-        "priority": 2,
-        "keyword": "시그니처",
-        "recommendReason": "인슐린 저항성 개선에 도움을 주면서도, 엄격한 식단이 부담스러울 때 편안하게 선택할 수 있는 라인업입니다. 현미 등 건강한 탄수화물을 사용하여 급격한 혈당 변화는 막아주되, 저탄수화물 식단에 우리 몸이 서서히 적응할 수 있도록 돕습니다.",
+        "recommendReason": "정제된 탄수화물 대신 단백질과 건강한 지방 위주로 구성하여, 장내 유해균이 과도하게 증식할 수 있는 영양 공급을 자연스럽게 조절합니다. 장 점막을 느슨하게 만드는 글루텐을 배제하여 장 건강 회복을 돕습니다.",
         "dosage": "저녁 식사로 섭취",
         "mechanisms": []
       },
       {
-        "productId": 15,
-        "type": "DIET",
-        "priority": 2,
-        "keyword": "시그니처",
-        "recommendReason": "인슐린 저항성 개선에 도움을 주면서도, 엄격한 식단이 부담스러울 때 편안하게 선택할 수 있는 라인업입니다. 현미 등 건강한 탄수화물을 사용하여 급격한 혈당 변화는 막아주되, 저탄수화물 식단에 우리 몸이 서서히 적응할 수 있도록 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
+        "productId": 4,
+        "type": "SUPPLEMENT",
+        "priority": 1,
+        "keyword": "장벽 복구",
+        "recommendReason": "장벽을 복구해 장누수 증후군을 개선하는 아연, 마그네슘, 비타민D와 유해균이 만드는 독소를 제거하고 장벽 손상을 막는 셀레늄, 망간, 몰리브덴, 크롬이 모두 들어있습니다. 이 성분들을 한 번에 섭취할 때 더 큰 시너지 효과를 만들어낼 수 있습니다.",
+        "dosage": "1일 1회, 1회 3정 섭취",
+        "mechanisms": [
+          {
+            "name": "아연",
+            "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄",
+            "sortOrder": 1,
+            "descriptions": [
+              "장벽 세포 간 이음새를 촘촘하게 결합",
+              "유해균 독소나 염증 유발 물질의 혈관 누수 방지"
+            ],
+            "ingredientKey": "zinc"
+          },
+          {
+            "name": "마그네슘",
+            "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄",
+            "sortOrder": 2,
+            "descriptions": [
+              "장 점막 세포의 정상적인 기능과 회복에 도움",
+              "유해균 독소나 염증 유발 물질의 혈관 누수 방지"
+            ],
+            "ingredientKey": "magnesium"
+          },
+          {
+            "name": "비타민 D",
+            "summary": "장 면역 기능과 장벽 세포 방어 기능의 핵심 비타민",
+            "sortOrder": 3,
+            "descriptions": [
+              "장 면역 시스템을 조절",
+              "장 상피 세포의 방어벽 기능을 강화",
+              "장내 염증 반응 조절"
+            ],
+            "ingredientKey": "vitaminD"
+          },
+          {
+            "name": "셀레늄",
+            "summary": "장 독소 및 염증 유발 물질 제거의 핵심 미네랄",
+            "sortOrder": 4,
+            "descriptions": [
+              "강력한 항산화 작용으로, 유해균 독소와 장내 염증 감소",
+              "세포 손상을 방지해 장벽 회복 환경 조성"
+            ],
+            "ingredientKey": "selenium"
+          },
+          {
+            "name": "몰리브덴",
+            "summary": "장 독소 및 염증 유발 물질 제거의 핵심 미네랄",
+            "sortOrder": 5,
+            "descriptions": [
+              "해독 과정에 관여하여 독소 제거에 도움",
+              "유해균 독소를 중화하고 배출하는 과정에 도움",
+              "장내 염증 부담을 줄여 장벽 회복 환경 조성"
+            ],
+            "ingredientKey": "molybdenum"
+          },
+          {
+            "name": "망간",
+            "summary": "독소로 인한 활성산소 제거 및 장벽 복구를 보조하는 미네랄",
+            "sortOrder": 6,
+            "descriptions": [
+              "항산화 효소의 구성 성분으로 독소 제거",
+              "면역 과민 반응으로 발생한 활성산소 제거",
+              "장내 염증 환경 개선으로 면역 안정 지원"
+            ],
+            "ingredientKey": "manganese"
+          },
+          {
+            "name": "크롬",
+            "summary": "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움을 주는 미네랄",
+            "sortOrder": 7,
+            "descriptions": [
+              "인슐린 작용을 도와 안정적 혈당 유지에 도움",
+              "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움"
+            ],
+            "ingredientKey": "chromium"
+          }
+        ]
       },
       {
-        "productId": 16,
-        "type": "DIET",
+        "productId": 5,
+        "type": "SUPPLEMENT",
         "priority": 2,
-        "keyword": "시그니처",
-        "recommendReason": "인슐린 저항성 개선에 도움을 주면서도, 엄격한 식단이 부담스러울 때 편안하게 선택할 수 있는 라인업입니다. 현미 등 건강한 탄수화물을 사용하여 급격한 혈당 변화는 막아주되, 저탄수화물 식단에 우리 몸이 서서히 적응할 수 있도록 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
+        "keyword": "장 독소 배출",
+        "recommendReason": "장내 독소를 직접 흡착 배출하는 클로렐라와 장벽 회복을 돕는 아연, 비타민 A가 들어있습니다. 또한, 비타민 C, E 항산화 성분과 세포 재생을 돕는 비타민 B군(B3, B9)이 독소로 인한 염증을 막고 장-피부 축을 개선하여 시너지 효과를 냅니다.",
+        "dosage": "1일 2회, 1회 2정 섭취",
+        "mechanisms": [
+          {
+            "name": "클로렐라",
+            "summary": "장내 독소와 노폐물을 흡착 배출하는 독소 제거의 핵심 성분",
+            "sortOrder": 1,
+            "descriptions": [
+              "유해균 독소 및 노폐물에 흡착하여 체외로 배출",
+              "독소로 인한 장내 염증 부담 감소",
+              "장벽 회복 환경 조성"
+            ],
+            "ingredientKey": "chlorella"
+          },
+          {
+            "name": "비타민 E",
+            "summary": "세포막을 보호하여 독소 제거를 돕는 항산화 물질",
+            "sortOrder": 2,
+            "descriptions": [
+              "독소로 인한 산화 스트레스로부터 장 점막 세포 손상 방지",
+              "비타민 C와 함께 장내 염증 반응 감소에 기여"
+            ],
+            "ingredientKey": "vitaminE"
+          },
+          {
+            "name": "비타민 A",
+            "summary": "손상된 장 점막 재생과 피부 트러블 개선의 핵심 비타민",
+            "sortOrder": 3,
+            "descriptions": [
+              "손상된 장 점막의 재생과 회복에 직접 도움",
+              "장-피부 축 개선에 기여, 턱 트러블 완화에 도움"
+            ],
+            "ingredientKey": "vitaminA"
+          },
+          {
+            "name": "비타민 C",
+            "summary": "독소 제거와 장벽 복구(콜라겐 합성)를 돕는 핵심 비타민",
+            "sortOrder": 4,
+            "descriptions": [
+              "유해균 독소로 인한 장내 염증 및 산화 스트레스 억제",
+              "장벽 회복에 필수적인 콜라겐 합성 촉진"
+            ],
+            "ingredientKey": "vitaminC"
+          },
+          {
+            "name": "아연",
+            "summary": "느슨해진 장벽을 강화하는 장누수 회복의 핵심 미네랄",
+            "sortOrder": 5,
+            "descriptions": [
+              "장벽 세포 간 이음새를 촘촘하게 결합",
+              "유해균 독소나 염증 유발 물질의 혈관 누수 방지"
+            ],
+            "ingredientKey": "zinc"
+          },
+          {
+            "name": "비타민 B9(엽산)",
+            "summary": "손상된 장 점막 세포의 신속한 재생을 돕는 핵심 비타민",
+            "sortOrder": 6,
+            "descriptions": [
+              "새로운 세포 분열과 성장에 필수적",
+              "손상된 장 점막 세포의 신속한 재생에 도움"
+            ],
+            "ingredientKey": "vitaminB9"
+          },
+          {
+            "name": "비타민 B3(나이아신)",
+            "summary": "장 점막 세포 회복(장벽 복구)과 에너지 생성의 핵심 비타민",
+            "sortOrder": 7,
+            "descriptions": [
+              "염증으로 손상된 장 점막 세포의 회복 및 재생에 도움",
+              "장 건강 저하로 인한 에너지 저하 개선에 기여"
+            ],
+            "ingredientKey": "vitaminB3"
+          }
+        ]
       },
       {
-        "productId": 17,
-        "type": "DIET",
-        "priority": 2,
-        "keyword": "시그니처",
-        "recommendReason": "인슐린 저항성 개선에 도움을 주면서도, 엄격한 식단이 부담스러울 때 편안하게 선택할 수 있는 라인업입니다. 현미 등 건강한 탄수화물을 사용하여 급격한 혈당 변화는 막아주되, 저탄수화물 식단에 우리 몸이 서서히 적응할 수 있도록 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
-      },
-      {
-        "productId": 18,
-        "type": "DIET",
-        "priority": 2,
-        "keyword": "시그니처",
-        "recommendReason": "인슐린 저항성 개선에 도움을 주면서도, 엄격한 식단이 부담스러울 때 편안하게 선택할 수 있는 라인업입니다. 현미 등 건강한 탄수화물을 사용하여 급격한 혈당 변화는 막아주되, 저탄수화물 식단에 우리 몸이 서서히 적응할 수 있도록 돕습니다.",
-        "dosage": "저녁 식사로 섭취",
-        "mechanisms": []
+        "productId": 1,
+        "type": "SUPPLEMENT",
+        "priority": 3,
+        "keyword": "유해균 감소",
+        "recommendReason": "유해균의 먹이가 되는 식후 혈당 상승을 억제하는 바나바잎추출물과 크롬이 들어있습니다. 또한, 비타민 B군이 탄수화물 대사를 촉진해 유해균 먹이를 차단하고 장벽 회복(B2, B3, B6, B9)과 에너지 생성을 도와 근본적인 장 건강 개선에 시너지 효과를 냅니다.",
+        "dosage": "1일 2회, 1회 2정 섭취",
+        "mechanisms": [
+          {
+            "name": "바나바잎추출물",
+            "summary": "식후 혈당 상승을 억제하는 유해균 먹이 차단의 핵심 성분",
+            "sortOrder": 1,
+            "descriptions": [
+              "식후 혈당 상승 억제, 혈당 조절에 도움",
+              "유해균의 주된 먹이(당) 공급 차단"
+            ],
+            "ingredientKey": "banaba"
+          },
+          {
+            "name": "크롬",
+            "summary": "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움을 주는 물질",
+            "sortOrder": 2,
+            "descriptions": [
+              "인슐린 작용을 도와 안정적 혈당 유지에 도움",
+              "혈당 조절에 관여하여 유해균 먹이(당) 차단에 도움"
+            ],
+            "ingredientKey": "chromium"
+          },
+          {
+            "name": "가르시니아캄보지아추출물",
+            "summary": "탄수화물 대사 관리를 도와 유해균 먹이 차단을 보조하는 물질",
+            "sortOrder": 3,
+            "descriptions": [
+              "탄수화물이 지방으로 합성되는 것 억제에 도움",
+              "혈당 부담을 줄여 유해균 증식 환경 개선에 도움"
+            ],
+            "ingredientKey": "garcinia"
+          },
+          {
+            "name": "비타민 B1(티아민)",
+            "summary": "탄수화물 대사 촉진으로 유해균 먹이 차단을 돕는 핵심 조효소",
+            "sortOrder": 4,
+            "descriptions": [
+              "탄수화물 대사 및 에너지 생성의 핵심 조효소",
+              "탄수화물이 유해균 먹이가 아닌 에너지로 전환되도록 도움"
+            ],
+            "ingredientKey": "vitaminB1"
+          }
+        ]
       }
     ]
+  },
+  {
+    "healthType": "SKIN_HEALTH",
+    "products": []
   }
 ]

@@ -17,7 +17,7 @@ resources:
 images:
   - name: biocom-api
     newName: asia-northeast3-docker.pkg.dev/api-prod-biocom/biocom-api/biocom-api
-    newTag: "20251226135355"
+    newTag: "20251228182639"
 
 # 환경별 레이블
 commonLabels:
