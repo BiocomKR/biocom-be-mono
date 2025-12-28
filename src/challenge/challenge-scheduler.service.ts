@@ -220,11 +220,14 @@ export class ChallengeSchedulerService {
     userId: number,
     baseDate: Date,
   ) {
-    // 사용자의 활성화된 영양제 루틴 조회
+    // 사용자의 활성화된 영양제 루틴 조회 (영양제 카테고리만)
     const supplementRoutines = await tx.userSupplementRoutine.findMany({
       where: {
         userId,
         isActive: true,
+        product: {
+          categoryCode: 'SUPPLEMENT',
+        },
       },
       orderBy: {
         displayOrder: 'asc',

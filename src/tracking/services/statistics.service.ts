@@ -552,10 +552,11 @@ export class StatisticsService {
         routineList.map((r) => [r.productId, r.displayOrder]),
       );
 
-      // 5. Product 정보 조회
+      // 5. Product 정보 조회 (영양제 카테고리만)
       const products = await this.prisma.product.findMany({
         where: {
           id: { in: productIds },
+          categoryCode: 'SUPPLEMENT',
         },
         select: {
           id: true,
@@ -714,10 +715,11 @@ export class StatisticsService {
           },
         });
 
-      // 3. 각 영양제의 frequency_per_day 및 제품명 조회
+      // 3. 각 영양제의 frequency_per_day 및 제품명 조회 (영양제 카테고리만)
       const products = await this.prisma.product.findMany({
         where: {
           id: { in: defaultProductIds },
+          categoryCode: 'SUPPLEMENT',
         },
         select: {
           id: true,
