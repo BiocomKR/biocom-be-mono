@@ -174,9 +174,16 @@ export class ConsentService {
       throw new BadRequestException('삭제된 약관은 수정할 수 없습니다.');
     }
 
+    // 허용된 필드만 추출하여 업데이트 (updatedAt 등 스키마에 없는 필드 제외)
+    const updateData: Partial<UpdateConsentDto> = {};
+    if (dto.title !== undefined) updateData.title = dto.title;
+    if (dto.content !== undefined) updateData.content = dto.content;
+    if (dto.isRequired !== undefined) updateData.isRequired = dto.isRequired;
+    if (dto.displayOrder !== undefined) updateData.displayOrder = dto.displayOrder;
+
     const consent = await this.prisma.consent.update({
       where: { id },
-      data: dto,
+      data: updateData,
     });
 
     return consent;
