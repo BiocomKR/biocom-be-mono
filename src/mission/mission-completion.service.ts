@@ -203,21 +203,30 @@ export class MissionCompletionService {
          *   예) 식단 기록 maxPointsPerDay=3 → 1~3회차까지만 포인트 지급, 4~9회차는 기록만
          *
          * [지급 조건]
-         * 1. 지정된 일차(challengeMission.day)에 수행한 경우만 포인트 지급
-         * 2. maxPointsPerDay가 설정된 경우: attemptNumber <= maxPointsPerDay 까지 매회 포인트 지급
-         * 3. maxPointsPerDay가 없는 경우: dailyLimit 달성 시 1회만 포인트 지급 (기존 로직)
+         * 1. ONCE 미션(자기선언문, 나칭찬하기): visibleFromDay~visibleToDay 범위 내에서 1회 수행 시 포인트 지급
+         * 2. DAILY 미션: 지정된 일차(challengeMission.day)에 수행한 경우만 포인트 지급
+         * 3. maxPointsPerDay가 설정된 경우: attemptNumber <= maxPointsPerDay 까지 매회 포인트 지급
+         * 4. maxPointsPerDay가 없는 경우: dailyLimit 달성 시 1회만 포인트 지급 (기존 로직)
          *
          * [예시]
+         * - 자기선언문 (frequency=ONCE, visibleFromDay=1, visibleToDay=10)
+         *   → 1~10일차 중 언제든 1회 수행 시 1000P
          * - 식단 기록 (dailyLimit=9, maxPointsPerDay=3, points=100)
          *   → 1회차: 100P, 2회차: 100P, 3회차: 100P, 4~9회차: 0P (총 300P)
          * - 공복 시간 기록 (dailyLimit=1, maxPointsPerDay=null, points=100)
          *   → 1회차(완료): 100P (총 100P)
          */
+        const isOnceMission = mission.frequency === 'ONCE';
+        const isWithinVisibleRange = isOnceMission
+          ? (currentDay >= (mission.visibleFromDay ?? 1) && currentDay <= (mission.visibleToDay ?? 21))
+          : false;
         const isOnScheduledDay = challengeMission.day === currentDay;
         const maxPointsCount = mission.maxPointsPerDay ?? null;
 
         let pointsEarned = 0;
-        if (isOnScheduledDay) {
+        // ONCE 미션: 노출 기간 내 1회 수행 시 포인트 지급
+        // DAILY 미션: 지정 일차에 수행 시 포인트 지급
+        if (isOnceMission ? isWithinVisibleRange : isOnScheduledDay) {
           if (maxPointsCount !== null) {
             // maxPointsPerDay 설정됨: 해당 횟수까지 매 시도마다 포인트 지급
             if (attemptNumber <= maxPointsCount) {
