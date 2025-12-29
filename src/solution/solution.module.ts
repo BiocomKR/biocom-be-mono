@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CommonModule } from '../common/common.module';
 import { SibModule } from '../sib/sib.module';
 import { SolutionController } from './solution.controller';
+import { SolutionV2Controller } from './solution-v2.controller';
 import { SolutionService } from './solution.service';
 
 /**
@@ -10,7 +11,7 @@ import { SolutionService } from './solution.service';
  */
 @Module({
   imports: [CommonModule, SibModule],
-  controllers: [SolutionController],
+  controllers: [SolutionController, SolutionV2Controller],
   providers: [SolutionService],
   exports: [SolutionService],
 })

@@ -49,7 +49,7 @@ export class NutritionDto {
   calories?: number;
 
   @ApiPropertyOptional({ description: '순탄수화물 (g)' })
-  carbs?: number;
+  netCarbs?: number;
 
   @ApiPropertyOptional({ description: '단백질 (g)' })
   protein?: number;
@@ -95,10 +95,8 @@ export class SupplementProductDto {
   @ApiPropertyOptional({ description: '작용기전 목록 (SUPPLEMENT용)' })
   mechanisms?: any[];
 
-  @ApiPropertyOptional({ description: '시너지 효과 (FORMULA용 - formulaName, formulaDescription, synergyEffects 포함)' })
+  @ApiPropertyOptional({ description: '시너지 효과 (FORMULA용)' })
   synergyEffects?: {
-    formulaName?: string;
-    formulaDescription?: string;
     synergyEffects?: any[];
   };
 
@@ -267,6 +265,88 @@ export class SolutionResponseDto {
 
   @ApiPropertyOptional({ description: '식단 섭취 가이드 (건강유형별)', type: DietGuideDto })
   dietGuide?: DietGuideDto;
+
+  @ApiPropertyOptional({ description: '조건부 추천 제품 (메타드림/리셋데이)', type: [ConditionalProductDto] })
+  conditionalProducts?: ConditionalProductDto[];
+}
+
+/**
+ * 라인업 설명 DTO (동물별)
+ */
+export class LineupDescriptionDto {
+  @ApiProperty({ description: '라인업 키 (ORIGINAL, SIGNATURE 등)' })
+  lineupKey: string;
+
+  @ApiProperty({ description: '우선순위 (1순위, 2순위)' })
+  priority: number;
+
+  @ApiProperty({ description: '동물별 라인업 설명' })
+  description: string;
+}
+
+/**
+ * 동물별 라인업 정보 DTO (식단 솔루션용)
+ */
+export class AnimalLineupDto {
+  @ApiProperty({ description: '라인업 ID' })
+  id: number;
+
+  @ApiProperty({ description: '라인업 키 (ORIGINAL, SIGNATURE 등)' })
+  key: string;
+
+  @ApiProperty({ description: '라인업명' })
+  name: string;
+
+  @ApiPropertyOptional({ description: '동물별 라인업 설명' })
+  description?: string;
+
+  @ApiPropertyOptional({ description: '대표 이미지 URL' })
+  imageUrl?: string;
+
+  @ApiProperty({ description: '정렬 순서' })
+  sortOrder: number;
+
+  @ApiPropertyOptional({ description: '정가' })
+  originalPrice?: number;
+
+  @ApiPropertyOptional({ description: '할인가' })
+  price?: number;
+
+  @ApiPropertyOptional({ description: '우선순위 (1순위, 2순위)' })
+  priority?: number;
+}
+
+/**
+ * 식단 솔루션 응답 DTO
+ * GET /api/solution/diet
+ */
+export class DietSolutionResponseDto {
+  @ApiProperty({ description: '건강유형 동물 정보', type: HealthTypeAnimalDto })
+  animal: HealthTypeAnimalDto;
+
+  @ApiProperty({ description: '라인업 목록 (동물별 설명 포함)', type: [AnimalLineupDto] })
+  lineups: AnimalLineupDto[];
+
+  @ApiProperty({ description: '식단 추천 목록', type: [DietProductDto] })
+  diets: DietProductDto[];
+
+  @ApiPropertyOptional({ description: '식단 섭취 가이드 (건강유형별)', type: DietGuideDto })
+  dietGuide?: DietGuideDto;
+}
+
+/**
+ * 영양제 솔루션 응답 DTO
+ * GET /api/solution/supplement
+ */
+export class SupplementSolutionResponseDto {
+  @ApiProperty({ description: '건강유형 동물 정보', type: HealthTypeAnimalDto })
+  animal: HealthTypeAnimalDto;
+
+  @ApiProperty({ description: '영양제 추천 목록', type: [SupplementProductDto] })
+  supplements: SupplementProductDto[];
+
+  @ApiPropertyOptional({ description: '맞춤 포뮬러 설명' })
+  formulaGuide?: string;
 
   @ApiPropertyOptional({ description: '조건부 추천 제품 (메타드림/리셋데이)', type: [ConditionalProductDto] })
   conditionalProducts?: ConditionalProductDto[];

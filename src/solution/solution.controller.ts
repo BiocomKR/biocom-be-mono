@@ -1,9 +1,8 @@
-import { Controller, Get, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SolutionService } from './solution.service';
 import { SolutionResponseDto } from './dto/solution.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Public } from '../common/decorators/public.decorator';
 
 /**
  * 맞춤 솔루션 컨트롤러
@@ -52,44 +51,5 @@ export class SolutionController {
   async getSolution(@Request() req: any): Promise<SolutionResponseDto> {
     const userId = req.user?.userId || req.user?.sub;
     return this.solutionService.getSolution(userId);
-  }
-
-  /**
-   * 동물 ID로 맞춤 솔루션 조회 (테스트용)
-   * @description 로그인 없이 동물 ID만으로 솔루션 데이터를 조회합니다
-   */
-  @Public()
-  @Get('test/:animalId')
-  @ApiOperation({
-    summary: '[테스트] 동물 ID로 솔루션 조회',
-    description: `
-동물 ID를 직접 지정하여 맞춤 솔루션 데이터를 조회합니다.
-로그인/SIB 검사 결과 없이 테스트할 수 있습니다.
-
-## 동물 ID
-- 1: SKIN_HEALTH (화끈한 불여우)
-- 2: METABOLISM (동면 중인 북극곰)
-- 3: GUT_HEALTH (배 빵빵 펭귄)
-- 4: IMMUNE_BALANCE (예민한 고슴도치)
-    `,
-  })
-  @ApiParam({
-    name: 'animalId',
-    description: '건강유형 동물 ID (1~4)',
-    example: 1,
-  })
-  @ApiResponse({
-    status: 200,
-    description: '맞춤 솔루션 조회 성공',
-    type: SolutionResponseDto,
-  })
-  @ApiResponse({
-    status: 404,
-    description: '건강유형 정보를 찾을 수 없음',
-  })
-  async getSolutionByAnimalId(
-    @Param('animalId', ParseIntPipe) animalId: number,
-  ): Promise<SolutionResponseDto> {
-    return this.solutionService.getSolutionByAnimalId(animalId);
   }
 }
