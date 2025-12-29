@@ -38,20 +38,25 @@ export class StatisticsService {
   ) {}
 
   /**
-   * 1주일 날짜 범위 계산 (전일기준 7일치)
-   * @returns 시작일, 종료일 정보 (String 형식)
+   * 이번 주 날짜 범위 계산 (월요일~일요일)
+   * @returns 시작일(월요일), 종료일(일요일) 정보 (String 형식)
    */
   private getWeekDateRange() {
     const today = getNowKST();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1); // 어제를 종료일로
+    const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
 
-    const startDate = new Date(yesterday);
-    startDate.setDate(yesterday.getDate() - 6); // 어제부터 역산 7일
+    // 이번 주 월요일 계산 (일요일=0이면 6일 전, 나머지는 (dayOfWeek-1)일 전)
+    const mondayOffset = dayOfWeek === 0 ? -6 : -(dayOfWeek - 1);
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + mondayOffset);
+
+    // 이번 주 일요일 계산 (월요일 + 6일)
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
 
     return {
-      startDate: formatKoreanDate(startDate),
-      endDate: formatKoreanDate(yesterday)
+      startDate: formatKoreanDate(monday),
+      endDate: formatKoreanDate(sunday)
     };
   }
 

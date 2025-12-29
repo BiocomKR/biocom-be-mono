@@ -263,7 +263,7 @@ export class BalanceGameService {
         description: earnedCoupon.description,
         discountType: earnedCoupon.discountType,
         discountValue: earnedCoupon.discountValue,
-        productName: earnedCoupon.product.name,
+        productName: earnedCoupon.product?.name,
         expiresAt: new Date(getNowKST().getTime() + earnedCoupon.validHours * 60 * 60 * 1000).toISOString()
       } : undefined
     };
@@ -287,7 +287,7 @@ export class BalanceGameService {
         description: step.coupon.description,
         discountType: step.coupon.discountType,
         discountValue: step.coupon.discountValue,
-        productName: step.coupon.product.name
+        productName: step.coupon.product?.name
       } : undefined
     };
   }

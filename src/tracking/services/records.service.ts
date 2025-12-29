@@ -885,12 +885,49 @@ export class RecordsService {
     // 챌린지 일차 계산
     const currentDay = activeChallenge ? calculateChallengeDay(activeChallenge.activatedAt) : null;
 
-    // 기록 저장 (pointsEarned, isCompleted, day를 metadata에 포함)
+    // 해당 recordType에 맞는 challengeMission 조회 (놓친 미션 로직에서 완료 여부 판단용)
+    let challengeMissionId: number | null = null;
+    let missionId: number | null = null;
+    let missionName: string | null = null;
+
+    if (activeChallenge && currentDay) {
+      // missions 테이블에서 recordType으로 미션 조회
+      const mission = await tx.mission.findFirst({
+        where: {
+          recordType: recordCode,
+          isActive: true,
+        },
+      });
+
+      if (mission) {
+        missionId = mission.id;
+        missionName = mission.name;
+
+        // challenge_missions 테이블에서 해당 일차의 미션 조회
+        const challengeMission = await tx.challengeMission.findFirst({
+          where: {
+            productId: activeChallenge.productId,
+            missionId: mission.id,
+            day: currentDay,
+            isActive: true,
+          },
+        });
+
+        if (challengeMission) {
+          challengeMissionId = challengeMission.id;
+        }
+      }
+    }
+
+    // 기록 저장 (pointsEarned, isCompleted, day, challengeMissionId를 metadata에 포함)
     const metadataWithPoints = {
       ...metadata,
       pointsEarned: pointsToAward,
       isCompleted: true,
       day: currentDay,
+      challengeMissionId,
+      missionId,
+      missionName,
     };
 
     const userRecord = await tx.userRecord.create({
