@@ -63,6 +63,9 @@ data:
   REDIS_HOST: "10.213.120.195"
   REDIS_PORT: "6379"
 
+  # biocom-api 연결 (cross-namespace)
+  BIOCOM_API_URL: "http://biocom-api-service.biocom-api.svc.cluster.local"
+
   # 공공데이터포털 API (공휴일 조회)
   PUBLIC_DATA_PORTAL_HOLIDAY_ENDPOINT: "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService"
 
