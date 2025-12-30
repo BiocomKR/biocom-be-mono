@@ -35,12 +35,14 @@ import {
   SetProfileImageDto,
   ProfileImageResponseDto,
 } from './dto/profile-image.dto';
+import { WithdrawDto, WithdrawResponseDto } from './dto/withdraw.dto';
 
 /**
  * 마이페이지 컨트롤러
  * - 배송 주소 관리
  * - 환불 계좌 관리
  * - 프로필 이미지 관리
+ * - 회원탈퇴
  */
 @ApiTags('마이페이지')
 @ApiBearerAuth()
@@ -214,5 +216,28 @@ export class MypageController {
   @ApiResponse({ status: 204, description: '삭제 완료' })
   async deleteProfileImage(@Req() req: Request): Promise<void> {
     return this.mypageService.deleteProfileImage(req.user.sub);
+  }
+
+  // ============================================
+  // 회원탈퇴 API
+  // ============================================
+
+  @Post('withdraw')
+  @ApiOperation({
+    summary: '회원탈퇴',
+    description: '회원탈퇴를 처리합니다. 개인정보는 별도 테이블에 보관되며, 기존 정보는 마스킹됩니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '회원탈퇴 완료',
+    type: WithdrawResponseDto,
+  })
+  @ApiResponse({ status: 400, description: '이미 탈퇴한 회원' })
+  @ApiResponse({ status: 404, description: '사용자를 찾을 수 없음' })
+  async withdraw(
+    @Req() req: Request,
+    @Body() dto: WithdrawDto,
+  ): Promise<WithdrawResponseDto> {
+    return this.mypageService.withdraw(req.user.sub, dto.reason);
   }
 }
