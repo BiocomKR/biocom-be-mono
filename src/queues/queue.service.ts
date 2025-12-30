@@ -178,12 +178,13 @@ export class QueueService {
     return job;
   }
 
-  // 테스트용 메서드
+  // 테스트용 메서드 - Redis 연결만 확인 (실제 job 추가 안 함)
   async testConnection() {
     try {
-      const job = await this.appEventQueue.add('test', { test: true, timestamp: new Date().toISOString() });
-      this.logger.log(`Test job added: ${job.id}`);
-      return { success: true, jobId: job.id };
+      const client = await this.appEventQueue.client;
+      const pong = await client.ping();
+      this.logger.log(`Redis ping: ${pong}`);
+      return { success: true, ping: pong };
     } catch (error) {
       this.logger.error('Queue connection test failed', error);
       return { success: false, error: error.message };
