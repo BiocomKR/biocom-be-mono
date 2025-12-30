@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheckService, HealthCheck, DiskHealthIndicator, MemoryHealthIndicator } from '@nestjs/terminus';
 import { HttpService } from '@nestjs/axios';
@@ -210,6 +210,13 @@ export class HealthController {
   })
   async testMq() {
     const result = await this.queueService.testConnection();
+    if (!result.success) {
+      throw new ServiceUnavailableException({
+        success: false,
+        error: result.error,
+        timestamp: getNowKST().toISOString(),
+      });
+    }
     return {
       ...result,
       timestamp: getNowKST().toISOString(),
@@ -248,11 +255,11 @@ export class HealthController {
         timestamp: getNowKST().toISOString(),
       };
     } catch (error) {
-      return {
+      throw new ServiceUnavailableException({
         success: false,
         error: error.message,
         timestamp: getNowKST().toISOString(),
-      };
+      });
     }
   }
 
@@ -288,11 +295,11 @@ export class HealthController {
         timestamp: getNowKST().toISOString(),
       };
     } catch (error) {
-      return {
+      throw new ServiceUnavailableException({
         success: false,
         error: error.message,
         timestamp: getNowKST().toISOString(),
-      };
+      });
     }
   }
 }
