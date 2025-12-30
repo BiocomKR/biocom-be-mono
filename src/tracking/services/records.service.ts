@@ -1582,6 +1582,14 @@ export class RecordsService {
         `당일 포인트 지급 여부: ${isFirstRecordOfDay ? '지급 예정' : '이미 지급됨'} (point_histories 확인)`,
       );
 
+      // 3-1. 활성 챌린지 조회 (userChallengeId 업데이트용)
+      const activeChallenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE',
+        },
+      });
+
       // 3. RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
       const updatePromises = data.map(async (item: any, index: number) => {
         const { productId, morning, afternoon, evening } = item;
@@ -1606,15 +1614,18 @@ export class RecordsService {
           return null;
         }
 
-        // 4. metadata 업데이트
+        // 4. metadata 업데이트 (기존 metadata 유지하면서 업데이트)
+        const existingMetadata = (record.metadata as any) || {};
         const updatedMetadata: any = {
+          ...existingMetadata, // 기존 metadata 유지 (imageUrl 등)
           productId,
           morning,
           afternoon,
           evening,
+          isCompleted: true, // 기록 완료 표식 (홈 미션목록 완료 판단용)
         };
 
-        // imageUrl이 있으면 metadata에 포함
+        // 새 imageUrl이 있으면 덮어쓰기 (없으면 기존 imageUrl 유지)
         if (imageUrl) {
           updatedMetadata.imageUrl = imageUrl;
         }
@@ -1624,11 +1635,12 @@ export class RecordsService {
           updatedMetadata.pointsEarned = 100;
         }
 
-        // 레코드 업데이트
+        // 레코드 업데이트 (userChallengeId도 함께 업데이트)
         return this.prisma.userRecord.update({
           where: { id: record.id },
           data: {
             metadata: updatedMetadata,
+            userChallengeId: activeChallenge?.id || null,
             updatedAt: getNowKST(),
           },
         });

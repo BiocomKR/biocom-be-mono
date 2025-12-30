@@ -715,13 +715,30 @@ export class MissionCompletionService {
 
       this.logger.log(`놓친 미션 조회 - 날짜 범위: ${startDate} ~ ${endDate}, 현재: ${currentDay}일차`);
 
-      // 3️⃣ 해당 기간의 전체 챌린지 미션 조회 (1일차 ~ 현재일차)
+      // 3️⃣ 해당 기간의 전체 챌린지 미션 조회 (1일차 ~ 어제까지, 당일/미래 제외)
+      // 놓친 미션은 "이미 지나간 날"의 미완료 미션만 해당
+      const maxDayForMissed = currentDay - 1;
+
+      // 1일차인 경우 놓친 미션 없음 (아직 지나간 날이 없음)
+      if (maxDayForMissed < 1) {
+        this.logger.log(`놓친 미션 없음 - 현재 ${currentDay}일차 (아직 지나간 날이 없음)`);
+        return {
+          success: true,
+          data: {
+            dateRange: { startDate, endDate },
+            currentDay,
+            missions: {},
+            totalCount: 0
+          }
+        };
+      }
+
       const allMissions = await this.prisma.challengeMission.findMany({
         where: {
           challengeId: activeChallenge.challengeId,
           day: {
             gte: 1,
-            lte: currentDay
+            lte: maxDayForMissed  // 어제(currentDay - 1)까지만 조회
           },
           isActive: true
         },

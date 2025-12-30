@@ -512,20 +512,26 @@ export class HomeService {
       }),
     ]);
 
-    // recordType별 실행 횟수 계산
+    // recordType별 실행 횟수 계산 (isCompleted = true인 레코드만)
     const executedMap = new Map<string, number>();
 
-    // user_records에서 실행 횟수
+    // user_records에서 실행 횟수 (isCompleted = true인 레코드만)
     for (const record of todayRecords) {
       const recordType = record.recordType;
-      const currentCount = executedMap.get(recordType) || 0;
-      executedMap.set(recordType, currentCount + 1);
+      const isCompleted = (record.metadata as any)?.isCompleted === true;
+      if (isCompleted) {
+        const currentCount = executedMap.get(recordType) || 0;
+        executedMap.set(recordType, currentCount + 1);
+      }
     }
 
-    // SUPPLEMENT 실행 횟수 (date 기준 조회 결과)
+    // SUPPLEMENT 실행 횟수 (isCompleted = true인 레코드만)
     for (const record of todaySupplementRecords) {
-      const currentCount = executedMap.get('SUPPLEMENT') || 0;
-      executedMap.set('SUPPLEMENT', currentCount + 1);
+      const isCompleted = (record.metadata as any)?.isCompleted === true;
+      if (isCompleted) {
+        const currentCount = executedMap.get('SUPPLEMENT') || 0;
+        executedMap.set('SUPPLEMENT', currentCount + 1);
+      }
     }
 
     // recordType별 포인트 지급 횟수 계산 (metadata.pointsEarned > 0인 경우)
@@ -549,11 +555,20 @@ export class HomeService {
       }
     }
 
-    return missionList.map((m) => ({
-      ...m,
-      current: currentMap.get(m.recordType) || 0,
-      executed: executedMap.get(m.recordType) || 0,
-    }));
+    return missionList.map((m) => {
+      const current = currentMap.get(m.recordType) || 0;
+      const executed = executedMap.get(m.recordType) || 0;
+      const max = m.max || 1;
+
+      // executed >= max 이면 current를 max로 설정 (완료 표시용)
+      const finalCurrent = executed >= max ? max : current;
+
+      return {
+        ...m,
+        current: finalCurrent,
+        executed,
+      };
+    });
   }
 
   /**

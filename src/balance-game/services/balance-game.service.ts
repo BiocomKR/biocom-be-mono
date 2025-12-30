@@ -233,6 +233,58 @@ export class BalanceGameService {
         }
       });
 
+      // user_records에도 기록 추가 (홈 미션목록 완료 판단용)
+      const activeChallenge = await tx.userChallenge.findFirst({
+        where: {
+          userId,
+          status: UserChallengeStatus.ACTIVE
+        }
+      });
+
+      if (activeChallenge) {
+        const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+        const todayStr = today.toISOString().split('T')[0];
+
+        // BALANCE_GAME 미션 정보 조회
+        const mission = await tx.mission.findFirst({
+          where: {
+            recordType: 'BALANCE_GAME',
+            isActive: true
+          }
+        });
+
+        // challengeMission 조회
+        const challengeMission = mission ? await tx.challengeMission.findFirst({
+          where: {
+            productId: activeChallenge.productId,
+            missionId: mission.id,
+            day: currentDay,
+            isActive: true
+          }
+        }) : null;
+
+        await tx.userRecord.create({
+          data: {
+            userId,
+            userChallengeId: activeChallenge.id,
+            recordType: 'BALANCE_GAME',
+            date: new Date(todayStr),
+            metadata: {
+              gameId,
+              isCompleted: true,
+              isFirstCompletion,
+              day: currentDay,
+              challengeMissionId: challengeMission?.id || null,
+              missionId: mission?.id || null,
+              missionName: mission?.name || '밸런스게임',
+              pointsEarned: challengeMission?.points || 100, // 홈 미션목록 완료 표시용
+            },
+            createdAt: getNowKST(),
+            updatedAt: getNowKST()
+          }
+        });
+      }
+
       // 쿠폰 지급 (최초 완료시에만)
       if (isFirstCompletion && resultStep?.coupon) {
         const expiresAt = getNowKST();

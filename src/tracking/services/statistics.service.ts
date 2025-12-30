@@ -920,10 +920,11 @@ export class StatisticsService {
         };
       });
 
-      // 평균 단식시간 계산 (시간 단위)
+      // 평균 단식시간 계산 (시간 단위) - 실제 기록이 있는 일수로만 나눔
       const totalHours = weekScore.reduce((sum, item) => sum + parseFloat(item.value), 0);
-      const daysCount = weekDates.length;
-      const averageHours = daysCount > 0 ? totalHours / daysCount : 0;
+      // 실제 기록이 있는 일수 (value > 0인 날)
+      const recordedDaysCount = weekScore.filter(item => parseFloat(item.value) > 0).length;
+      const averageHours = recordedDaysCount > 0 ? totalHours / recordedDaysCount : 0;
       const averageScore = Math.round(averageHours);
 
       // 평균 단식시간 계산 (분 단위)
@@ -1035,10 +1036,11 @@ export class StatisticsService {
         };
       });
 
-      // 평균 수면시간 계산 (시간 단위)
+      // 평균 수면시간 계산 (시간 단위) - 실제 기록이 있는 일수로만 나눔
       const totalHours = weekScore.reduce((sum, item) => sum + parseFloat(item.value), 0);
-      const daysCount = weekDates.length;
-      const averageHours = daysCount > 0 ? totalHours / daysCount : 0;
+      // 실제 기록이 있는 일수 (value > 0인 날)
+      const recordedDaysCount = weekScore.filter(item => parseFloat(item.value) > 0).length;
+      const averageHours = recordedDaysCount > 0 ? totalHours / recordedDaysCount : 0;
       const averageScore = Math.round(averageHours);
 
       // 평균 수면시간 계산 (분 단위)
@@ -1169,8 +1171,8 @@ export class StatisticsService {
       const totalDays = weekScore.length;
       const complianceRate = Math.round((performedDays / totalDays) * 100);
 
-      // 주간 평균 점수 (평균 칼로리)
-      const weekAverageScore = Math.round(totalCalories / totalDays);
+      // 주간 평균 점수 (평균 칼로리) - 실제 기록이 있는 일수로만 나눔
+      const weekAverageScore = performedDays > 0 ? Math.round(totalCalories / performedDays) : 0;
 
       this.logger.log(`활동 통계 조회 완료 - 사용자: ${userId}, 총 칼로리: ${totalCalories}kcal, 평균 칼로리: ${weekAverageScore}kcal, 준수율: ${complianceRate}%`);
 

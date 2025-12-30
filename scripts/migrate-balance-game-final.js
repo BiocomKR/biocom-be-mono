@@ -4,26 +4,31 @@ const ExcelJS = require('exceljs');
 const prisma = new PrismaClient();
 
 /**
- * AI 페르소나 이름으로 ID 찾기
+ * AI 페르소나 이름으로 ID 찾기 (하드코딩 매핑)
+ * - DB 조회 없이 고정 매핑 사용
+ * - 개발/운영 DB 모두 동일한 ID 체계
  */
-async function findAiPersonaByName(personaName) {
+function getAiPersonaId(personaName) {
   if (!personaName) return null;
 
-  try {
-    const persona = await prisma.aiPersona.findFirst({
-      where: { name: personaName },
-      select: { id: true }
-    });
+  // trim 처리
+  const name = typeof personaName === 'string' ? personaName.trim() : String(personaName).trim();
 
-    if (!persona) {
-      console.warn(`  ⚠️  AI 페르소나를 찾을 수 없습니다: ${personaName}`);
-    }
+  const personaMap = {
+    '스텔라': 1,
+    '메이브': 2,
+    '헤이즐': 3,
+    '이안': 4,
+    '테오': 5,
+    '헨리': 6,
+  };
 
-    return persona?.id || null;
-  } catch (error) {
-    console.error(`AI 페르소나 찾기 오류 (${personaName}):`, error.message);
-    return null;
+  const id = personaMap[name];
+  if (!id) {
+    console.warn(`  ⚠️  AI 페르소나를 찾을 수 없습니다: "${name}"`);
   }
+
+  return id || null;
 }
 
 /**
@@ -258,7 +263,7 @@ async function migrateBalanceGameFinal(excelPath) {
 
       // 각 페르소나별로 스텝 생성
       for (const [personaName, personaSteps] of Object.entries(stepsByPersona)) {
-        const aiPersonaId = await findAiPersonaByName(personaName);
+        const aiPersonaId = getAiPersonaId(personaName);
         if (!aiPersonaId) {
           console.error(`  ❌ AI 페르소나를 찾을 수 없습니다: ${personaName}`);
           continue;
