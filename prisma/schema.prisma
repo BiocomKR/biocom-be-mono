@@ -7,6 +7,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// 탈퇴 회원 정보 테이블
+/// 개인정보보호법 준수를 위해 탈퇴 회원 정보를 별도 보관
+model WithdrawnUser {
+  id           Int       @id @default(autoincrement())
+  /// 원본 사용자 ID (추적용)
+  userId       Int       @map("user_id")
+  /// 이름 (암호화된 상태로 이관)
+  name         String
+  /// 휴대폰 번호 (암호화된 상태로 이관)
+  mobile       String
+  /// 탈퇴 사유 (선택)
+  reason       String?
+  /// 탈퇴 일시
+  withdrawnAt  DateTime  @map("withdrawn_at")
+  /// 생성 일시
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([withdrawnAt])
+  @@map("withdrawn_users")
+}
+
 /// 사용자 테이블
 /// 애플리케이션의 모든 사용자 정보를 저장
 model User {
@@ -36,9 +58,12 @@ model User {
   refundBankName               String?                        @map("refund_bank_name") @db.VarChar(50)
   refundHolder                 String?                        @map("refund_holder") @db.VarChar(50)
   mbti                         String?                        @db.VarChar(4)
+  /// 푸시 알림 수신 동의 여부
+  pushEnabled                  Boolean?                       @map("push_enabled")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
+  issueReports                 IssueReport[]
   orders                       Order[]
   pointHistories               PointHistory[]
   productFeedback              ProductFeedback[]
@@ -70,7 +95,6 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
-  issueReports                 IssueReport[]
 
   @@map("users")
 }
@@ -293,6 +317,16 @@ model HealthTypeAnimal {
   symptoms            String
   createdAt           DateTime                  @default(now()) @map("created_at")
   updatedAt           DateTime?                 @updatedAt @map("updated_at")
+  /// 유형 설명
+  description         String?
+  /// 어떻게 해결할 수 있나요?
+  solution            String?
+  /// 대표 이미지 URL
+  imageUrl            String?                   @map("image_url") @db.VarChar(500)
+  /// 메타데이터 JSON (synergyEffects, intakeGuide, dietRecommendation)
+  metadata            Json?
+  /// 활성화 여부
+  isActive            Boolean                   @default(true) @map("is_active")
   images              HealthTypeAnimalFile[]
   recommendedProducts HealthTypeAnimalProduct[]
   solutionScreens     SolutionScreen[]
@@ -558,6 +592,8 @@ model UserChallenge {
   isFirstEntry        Boolean         @default(true) @map("is_first_entry")
   /// 챌린지 종료 후 첫 접속 여부 (true: 첫 접속, false: 재접속)
   isFirstChallengeEnd Boolean         @default(true) @map("is_first_challenge_end")
+  /// 시작일 설정 시점 (null = 미설정)
+  startDateSetAt      DateTime?       @map("start_date_set_at")
   dailyProgress       DailyProgress[]
   surveyAnswers       SurveyAnswer[]
   product             Product         @relation(fields: [productId], references: [id])
@@ -709,12 +745,25 @@ model Product {
   tags                         String?
   /// 챌린지 메타데이터 (challengeType, totalDays, description 등)
   metadata                     Json?
+  /// 라인업 ID (식단용)
+  lineupId                     Int?                           @map("lineup_id")
+  /// 칼로리 (식단용)
+  calories                     Decimal?                       @db.Decimal(6, 1)
+  /// 순탄수화물 (식단용)
+  netCarbs                     Decimal?                       @map("net_carbs") @db.Decimal(5, 1)
+  /// 단백질 (식단용)
+  protein                      Decimal?                       @db.Decimal(5, 1)
+  /// 지방 (식단용)
+  fat                          Decimal?                       @db.Decimal(5, 1)
+  /// 식이섬유 (식단용)
+  fiber                        Decimal?                       @db.Decimal(5, 1)
   cartItems                    CartItem[]
   challengeMissions            ChallengeMission[]
   challengeSurveys             ChallengeSurvey[]
   challengeTickets             ChallengeTicket[]
   challengeContents            Content[]                      @relation("ChallengeContents")
   coupons                      Coupon[]
+  couponProducts               CouponProduct[]
   healthTypeAnimalProducts     HealthTypeAnimalProduct[]
   iapProducts                  IAPProduct[]
   lectureProducts              LectureProduct[]
@@ -722,6 +771,7 @@ model Product {
   feedback                     ProductFeedback[]
   productFiles                 ProductFile[]
   images                       ProductImage[]
+  lineup                       ProductLineup?                 @relation(fields: [lineupId], references: [id])
   recentlyViewed               RecentlyViewed[]
   supplementNutrients          SupplementNutrient[]
   userChallengeSurveyResults   UserChallengeSurveyResult[]
@@ -732,6 +782,7 @@ model Product {
 
   @@index([sku])
   @@index([categoryCode, status])
+  @@index([lineupId])
   @@map("products")
 }
 
@@ -1191,63 +1242,63 @@ model RecentlyViewed {
 /// AI 페르소나 테이블
 /// 챌린지를 도와주는 AI 페르소나들
 model AiPersona {
-  id               Int               @id(map: "ai_characters_pkey") @default(autoincrement())
+  id                   Int               @id(map: "ai_characters_pkey") @default(autoincrement())
   /// 페르소나 이름 (철민님, 유진님, 뽑이)
-  name             String            @db.VarChar(50)
+  name                 String            @db.VarChar(50)
   /// 페르소나 설명
-  description      String?
+  description          String?
   /// 페르소나 성격/대화 스타일
-  personality      String?
+  personality          String?
   /// 페르소나 이미지 URL (놀이터 1번 이미지)
-  personaUrl       String?           @map("persona_url") @db.VarChar(500)
-  /// 페르소나 애니메이션 URL (기존 비디오)
-  personaAnimationUrl String?        @map("persona_animation_url") @db.VarChar(500)
+  personaUrl           String?           @map("persona_url") @db.VarChar(500)
   /// 활성화 여부
-  isActive         Boolean           @default(true) @map("is_active")
+  isActive             Boolean           @default(true) @map("is_active")
   /// 정렬 순서
-  sortOrder        Int               @default(0) @map("sort_order")
+  sortOrder            Int               @default(0) @map("sort_order")
   /// 생성일시
-  createdAt        DateTime          @map("created_at")
+  createdAt            DateTime          @map("created_at")
   /// 수정일시
-  updatedAt        DateTime?         @updatedAt @map("updated_at")
+  updatedAt            DateTime?         @updatedAt @map("updated_at")
   /// 페르소나 성별 (M: 남성, F: 여성)
-  gender           Gender?
+  gender               Gender?
   /// 소개 제목
-  introTitle       String?           @map("intro_title") @db.VarChar(200)
+  introTitle           String?           @map("intro_title") @db.VarChar(200)
   /// 소개 내용
-  introContent     String?           @map("intro_content")
+  introContent         String?           @map("intro_content")
   /// 해시태그 (JSON 배열)
-  hashtags         String?
+  hashtags             String?
   /// 특징 제목
-  featureTitle     String?           @map("feature_title") @db.VarChar(200)
+  featureTitle         String?           @map("feature_title") @db.VarChar(200)
   /// 특징 내용
-  featureContent   String?           @map("feature_content")
+  featureContent       String?           @map("feature_content")
   /// 말투 제목
-  speechTitle      String?           @map("speech_title") @db.VarChar(200)
+  speechTitle          String?           @map("speech_title") @db.VarChar(200)
   /// 말투 이미지 URL
-  speechImageUrl   String?           @map("speech_image_url") @db.VarChar(500)
+  speechImageUrl       String?           @map("speech_image_url") @db.VarChar(500)
   /// 친밀도 제목
-  intimacyTitle    String?           @map("intimacy_title") @db.VarChar(200)
+  intimacyTitle        String?           @map("intimacy_title") @db.VarChar(200)
   /// 친밀도 내용
-  intimacyContent  String?           @map("intimacy_content")
+  intimacyContent      String?           @map("intimacy_content")
   /// 친밀도 이미지 URL
-  intimacyImageUrl String?           @map("intimacy_image_url") @db.VarChar(500)
+  intimacyImageUrl     String?           @map("intimacy_image_url") @db.VarChar(500)
   /// 페르소나 썸네일 이미지 URL
-  thumbnailUrl     String?           @map("thumbnail_url") @db.VarChar(500)
+  thumbnailUrl         String?           @map("thumbnail_url") @db.VarChar(500)
   /// 말투 내용
-  speechContent    String?           @map("speech_content")
+  speechContent        String?           @map("speech_content")
   /// 페르소나 상반신 이미지 URL
-  torsoUrl         String?           @map("torso_url") @db.VarChar(500)
-  /// 페르소나 상반신 배경 이미지 URL
-  torsoBgUrl       String?           @map("torso_bg_url") @db.VarChar(500)
+  torsoUrl             String?           @map("torso_url") @db.VarChar(500)
   /// 시스템 프롬프트
-  systemPrompt     String?           @map("system_prompt")
+  systemPrompt         String?           @map("system_prompt")
+  /// 페르소나 상반신 배경 이미지 URL
+  torsoBgUrl           String?           @map("torso_bg_url") @db.VarChar(500)
   /// 인사말 (성별 통합)
-  greeting         String?
+  greeting             String?
   /// 챌린지 시작 멘트 (페르소나별)
-  challengeDescription String?       @map("challenge_description")
-  balanceGameSteps BalanceGameStep[]
-  users            User[]
+  challengeDescription String?           @map("challenge_description")
+  /// 페르소나 애니메이션 URL (기존 비디오)
+  personaAnimationUrl  String?           @map("persona_animation_url") @db.VarChar(500)
+  balanceGameSteps     BalanceGameStep[]
+  users                User[]
 
   @@index([isActive, sortOrder], map: "ai_characters_is_active_sort_order_idx")
   @@map("ai_personas")
@@ -1514,8 +1565,12 @@ model Coupon {
   discountValue     Int                      @map("discount_value")
   /// 최대 할인 금액 (퍼센트 할인인 경우)
   maxDiscountAmount Int?                     @map("max_discount_amount")
-  /// 적용 상품 ID (특정 상품에만 적용)
-  productId         Int                      @map("product_id")
+  /// 적용 범위 타입 (ALL: 전체, CATEGORY: 카테고리, PRODUCT: 특정 상품)
+  scopeType         String                   @default("PRODUCT") @map("scope_type") @db.VarChar(20)
+  /// 적용 카테고리 코드 (scopeType=CATEGORY일 때)
+  categoryCode      String?                  @map("category_code") @db.VarChar(50)
+  /// 적용 상품 ID (scopeType=PRODUCT일 때, 단일 상품) - nullable로 변경
+  productId         Int?                     @map("product_id")
   /// 유효시간 (시간 단위, 48시간 = 48)
   validHours        Int                      @default(48) @map("valid_hours")
   /// 활성화 여부
@@ -1525,12 +1580,35 @@ model Coupon {
   /// 수정일시
   updatedAt         DateTime?                @updatedAt @map("updated_at")
   gameSteps         BalanceGameStep[]
-  product           Product                  @relation(fields: [productId], references: [id])
+  product           Product?                 @relation(fields: [productId], references: [id])
+  couponProducts    CouponProduct[]
   earnedInGames     UserBalanceGameHistory[]
   userCoupons       UserCoupon[]
 
+  @@index([scopeType, isActive])
+  @@index([categoryCode, isActive])
   @@index([productId, isActive])
   @@map("coupons")
+}
+
+/// 쿠폰-상품 연결 테이블 (다대다)
+/// scopeType=PRODUCT일 때 여러 상품에 적용 가능
+model CouponProduct {
+  id        Int      @id @default(autoincrement())
+  /// 쿠폰 ID
+  couponId  Int      @map("coupon_id")
+  /// 상품 ID
+  productId Int      @map("product_id")
+  /// 생성일시
+  createdAt DateTime @default(now()) @map("created_at")
+
+  coupon  Coupon  @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, productId])
+  @@index([couponId])
+  @@index([productId])
+  @@map("coupon_products")
 }
 
 /// 사용자 쿠폰 테이블
@@ -2263,15 +2341,15 @@ model UserSupplementRoutineHistory {
   @@map("user_supplement_routine_history")
 }
 
-/// 건강 타입 동물별 추천 영양제 관계 테이블
-/// 각 동물 타입별로 맞춤 영양제 정보를 관리 (최대 3개)
+/// 건강 타입 동물별 추천 상품 관계 테이블
+/// 각 동물 타입별로 맞춤 영양제/식단/포뮬러 정보를 관리
 model HealthTypeAnimalProduct {
   id                 Int              @id @default(autoincrement())
   /// 건강 타입 동물 ID
   healthTypeAnimalId Int              @map("health_type_animal_id")
   /// 상품 ID
   productId          Int              @map("product_id")
-  /// 노출 순서 (1~3)
+  /// 노출 순서 (기존 호환용)
   displayOrder       Int              @map("display_order")
   /// 활성화 여부
   isActive           Boolean          @default(true) @map("is_active")
@@ -2279,14 +2357,28 @@ model HealthTypeAnimalProduct {
   createdAt          DateTime         @default(now()) @map("created_at")
   /// 수정일시
   updatedAt          DateTime?        @updatedAt @map("updated_at")
+  /// 상품 타입 (SUPPLEMENT: 영양제, DIET: 식단, FORMULA: 맞춤 포뮬러)
+  type               String?          @db.VarChar(20)
+  /// 우선순위 (1, 2, 3)
+  priority           Int?
+  /// 키워드 (장벽 복구, 독소 배출 등)
+  keyword            String?          @db.VarChar(100)
+  /// 추천 이유
+  recommendReason    String?          @map("recommend_reason")
+  /// 복용법 (1일 1회, 1회 3정)
+  dosage             String?          @db.VarChar(100)
+  /// 영양제 성분별 메커니즘 JSON
+  mechanisms         Json?
   healthTypeAnimal   HealthTypeAnimal @relation(fields: [healthTypeAnimalId], references: [id], onDelete: Cascade)
   product            Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([healthTypeAnimalId, displayOrder])
   @@unique([healthTypeAnimalId, productId])
+  @@unique([healthTypeAnimalId, displayOrder])
   @@index([healthTypeAnimalId])
   @@index([productId])
   @@index([isActive])
+  @@index([healthTypeAnimalId, type], map: "health_type_animal_products_type_idx")
+  @@index([healthTypeAnimalId, type, priority], map: "health_type_animal_products_type_priority_idx")
   @@map("health_type_animal_products")
 }
 
@@ -2605,8 +2697,6 @@ model AppVersion {
   version            String    @db.VarChar(20)
   /// 빌드 번호 (모바일용)
   buildNumber        Int?      @map("build_number")
-  /// 최소 지원 버전 (이 버전 미만 → 강제 업데이트)
-  minRequiredVersion String    @map("min_required_version") @db.VarChar(20)
   /// 강제 업데이트 여부
   isForceUpdate      Boolean   @default(false) @map("is_force_update")
   /// 점검 모드 여부
@@ -2878,45 +2968,91 @@ model SolutionScreenVersion {
   @@map("solution_screen_versions")
 }
 
-/// 성분 마스터 테이블
-/// 영양제 성분 정보 관리
-model Ingredient {
-  id        Int      @id @default(autoincrement())
-  /// 소문자 식별자 (payload, 템플릿에서 사용)
-  key       String   @unique @db.VarChar(50)
-  /// 대문자 코드 (레거시/표시용)
-  code      String   @unique @db.VarChar(50)
-  /// 성분 한글명
-  name      String   @db.VarChar(100)
-  /// 성분 영문명
-  nameEn    String?  @map("name_en") @db.VarChar(100)
-  /// 카테고리 (미네랄, 비타민, 추출물 등)
-  category  String?  @db.VarChar(50)
-  /// 정렬 순서
-  sortOrder Int      @default(0) @map("sort_order")
-  /// 활성화 여부
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
+/// 문제 신고 테이블
+model IssueReport {
+  /// 신고 ID
+  id         Int       @id @default(autoincrement())
+  /// 사용자 ID
+  userId     Int       @map("user_id")
+  /// 신고 내용
+  content    String
+  /// 관리자 답변
+  answer     String?
+  /// 답변 일시
+  answeredAt DateTime? @map("answered_at")
+  /// 앱 버전
+  appVersion String?   @map("app_version") @db.VarChar(20)
+  /// 디바이스 정보
+  deviceInfo String?   @map("device_info") @db.VarChar(200)
+  /// 생성일시
+  createdAt  DateTime  @default(now()) @map("created_at")
+  /// 첨부파일 ID 배열
+  fileIds    Int[]     @default([]) @map("file_ids")
+  user       User      @relation(fields: [userId], references: [id])
 
-  @@index([category])
-  @@map("ingredients")
+  @@index([userId], map: "idx_issue_reports_user_id")
+  @@map("issue_reports")
 }
 
-/// 성분 순서 템플릿 테이블
-/// 화면별 성분 표시 순서 관리
-model IngredientOrderTemplate {
-  id              Int      @id @default(autoincrement())
-  /// 템플릿 고유 키
-  templateKey     String   @unique @map("template_key") @db.VarChar(50)
-  /// 템플릿 이름
-  name            String   @db.VarChar(100)
-  /// 성분 키 배열 (Ingredient.key 기준)
-  ingredientOrder String[] @map("ingredient_order")
+/// 식단 라인업 테이블
+/// 오리지널, 시그니처, 저속노화, 저포드맵
+model ProductLineup {
+  id          Int       @id @default(autoincrement())
+  /// 라인업 키 (ORIGINAL, SIGNATURE, SLOW_AGING, LOW_FODMAP)
+  key         String    @unique @db.VarChar(50)
+  /// 라인업명
+  name        String    @db.VarChar(100)
+  /// 설명
+  description String?
+  /// 대표 이미지 URL
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
+  /// 정렬 순서
+  sortOrder   Int       @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
+  isActive    Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// 수정일시
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  products    Product[]
 
-  @@map("ingredient_order_templates")
+  @@map("product_lineups")
+}
+
+
+model ingredient_order_templates {
+  id               Int      @id @default(autoincrement())
+  template_key     String   @unique @db.VarChar(50)
+  name             String   @db.VarChar(100)
+  ingredient_order String[]
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+}
+
+/// 앱 설정 테이블
+/// 시스템 전역 설정값 관리 (배너 설정, API 키 등)
+/// 민감정보는 isEncrypted=true로 암호화 저장
+model AppConfig {
+  id          Int       @id @default(autoincrement())
+  /// 설정 키 (고유)
+  configKey   String    @unique @map("config_key") @db.VarChar(100)
+  /// 설정 값 (암호화된 경우 암호문 저장)
+  configValue String?   @map("config_value") @db.Text
+  /// 값 타입 (STRING, NUMBER, JSON, BOOLEAN)
+  valueType   String    @default("STRING") @map("value_type") @db.VarChar(20)
+  /// 암호화 여부 (민감정보는 true)
+  isEncrypted Boolean   @default(false) @map("is_encrypted")
+  /// 설명
+  description String?   @db.VarChar(255)
+  /// 활성화 여부
+  isActive    Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt   DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@map("app_configs")
 }
 
 /// AI 페르소나 성별 Enum
@@ -3007,31 +3143,4 @@ enum SolutionScreenVersionStatus {
   PUBLISHED
   /// 보관됨
   ARCHIVED
-}
-
-/// 문제 신고 테이블
-model IssueReport {
-  /// 신고 ID
-  id          Int       @id @default(autoincrement())
-  /// 사용자 ID
-  userId      Int       @map("user_id")
-  /// 신고 내용
-  content     String    @db.Text
-  /// 첨부파일 ID 배열
-  fileIds     Int[]     @default([]) @map("file_ids")
-  /// 관리자 답변
-  answer      String?   @db.Text
-  /// 답변 일시
-  answeredAt  DateTime? @map("answered_at")
-  /// 앱 버전
-  appVersion  String?   @map("app_version") @db.VarChar(20)
-  /// 디바이스 정보
-  deviceInfo  String?   @map("device_info") @db.VarChar(200)
-  /// 생성일시
-  createdAt   DateTime  @default(now()) @map("created_at")
-
-  user        User      @relation(fields: [userId], references: [id])
-
-  @@index([userId], map: "idx_issue_reports_user_id")
-  @@map("issue_reports")
 }

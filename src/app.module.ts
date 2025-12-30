@@ -58,8 +58,6 @@ import { LogisticsLogController } from './logistics/logistics-log.controller';
 import { LogisticsLogService } from './logistics/logistics-log.service';
 import { OrdersController } from './orders/orders.controller';
 import { OrdersService } from './orders/orders.service';
-import { SolutionController } from './solution/solution.controller';
-import { SolutionService } from './solution/solution.service';
 import { UtilsModule } from './utils/utils.module';
 import { IssueController } from './issue/issue.controller';
 import { IssueService } from './issue/issue.service';
@@ -128,7 +126,6 @@ import { IssueService } from './issue/issue.service';
     BannerController,
     LogisticsLogController,
     OrdersController,
-    SolutionController,
     IssueController,
   ],
   providers: [
@@ -148,7 +145,6 @@ import { IssueService } from './issue/issue.service';
     BannerService,
     LogisticsLogService,
     OrdersService,
-    SolutionService,
     IssueService,
     {
       provide: APP_INTERCEPTOR,

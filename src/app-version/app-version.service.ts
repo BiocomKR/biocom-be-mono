@@ -18,12 +18,15 @@ export class AppVersionService {
    * 앱 버전 목록 조회
    */
   async findAll(query: AppVersionQueryDto) {
-    const { platform, page = 1, limit = 10 } = query;
+    const { platform, bundleId, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (platform) {
       where.platform = platform;
+    }
+    if (bundleId) {
+      where.bundleId = bundleId;
     }
 
     const [items, total] = await Promise.all([
@@ -64,10 +67,11 @@ export class AppVersionService {
    * 앱 버전 등록
    */
   async create(dto: CreateAppVersionDto) {
-    // 중복 체크
+    // 중복 체크 (platform + bundleId + version)
     const existing = await this.prisma.appVersion.findFirst({
       where: {
         platform: dto.platform,
+        bundleId: dto.bundleId || null,
         version: dto.version,
       },
     });
@@ -79,9 +83,9 @@ export class AppVersionService {
     return this.prisma.appVersion.create({
       data: {
         platform: dto.platform,
+        bundleId: dto.bundleId || null,
         version: dto.version,
         buildNumber: dto.buildNumber,
-        minRequiredVersion: dto.minRequiredVersion,
         isForceUpdate: dto.isForceUpdate ?? false,
         isMaintenanceMode: dto.isMaintenanceMode ?? false,
         maintenanceMessage: dto.maintenanceMessage,
@@ -105,12 +109,16 @@ export class AppVersionService {
       throw new NotFoundException('앱 버전을 찾을 수 없습니다.');
     }
 
-    // 버전 변경 시 중복 체크
-    if (dto.version && dto.version !== version.version) {
+    // 버전 또는 bundleId 변경 시 중복 체크
+    if (
+      (dto.version && dto.version !== version.version) ||
+      (dto.bundleId !== undefined && dto.bundleId !== version.bundleId)
+    ) {
       const existing = await this.prisma.appVersion.findFirst({
         where: {
           platform: dto.platform || version.platform,
-          version: dto.version,
+          bundleId: dto.bundleId !== undefined ? dto.bundleId : version.bundleId,
+          version: dto.version || version.version,
           id: { not: id },
         },
       });
