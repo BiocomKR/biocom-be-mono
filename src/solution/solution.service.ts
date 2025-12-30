@@ -361,7 +361,6 @@ export class SolutionService {
     return {
       animal,
       supplements,
-      formulaGuide: supplementFormula,
       conditionalProducts: conditionalProducts.length > 0 ? conditionalProducts : undefined,
     };
   }
@@ -405,26 +404,12 @@ export class SolutionService {
     // 썸네일 이미지는 images 관계에서 가져옴
     const thumbnailImage = healthTypeAnimal.images?.[0]?.file?.filePath;
 
-    // intakeGuide, dietRecommendation은 lineups와 supplements로 이동했으므로 제외
-    const rawMetadata = healthTypeAnimal.metadata as {
-      synergyEffects?: any[];
-      intakeGuide?: any;
-      dietRecommendation?: any;
-    } | null;
-
-    // synergyEffects만 포함
-    const metadata = rawMetadata?.synergyEffects
-      ? { synergyEffects: rawMetadata.synergyEffects }
-      : undefined;
-
     return {
       healthType: healthTypeAnimal.healthType,
       typeName: healthTypeAnimal.typeName,
       animalName: healthTypeAnimal.animalName,
       description: healthTypeAnimal.description || undefined,
-      solution: healthTypeAnimal.solution || undefined,
       imageUrl: thumbnailImage || healthTypeAnimal.imageUrl || undefined,
-      metadata,
     };
   }
 
@@ -540,12 +525,6 @@ export class SolutionService {
         id: product.id,
         name: product.name,
         thumbnail,
-        originalPrice: product.originalPrice
-          ? Number(product.originalPrice)
-          : undefined,
-        price: product.price ? Number(product.price) : undefined,
-        recommendReason: rp.recommendReason || undefined,
-        dosage: rp.dosage || undefined,
         lineup,
         nutrition: {
           calories: product.calories ? Number(product.calories) : undefined,
@@ -554,7 +533,6 @@ export class SolutionService {
           fat: product.fat ? Number(product.fat) : undefined,
           fiber: product.fiber ? Number(product.fiber) : undefined,
         },
-        ingredients: ingredients.length > 0 ? ingredients : undefined,
         ingredientLevels,
         isEdible,
         displayOrder: rp.displayOrder,
@@ -725,6 +703,14 @@ export class SolutionService {
       }
     }
 
+    // caution 배열 정렬: 문자열 길이 오름차순, 길이가 같으면 가나다순
+    caution.sort((a, b) => {
+      if (a.length !== b.length) {
+        return a.length - b.length;
+      }
+      return a.localeCompare(b, 'ko');
+    });
+
     return { safe, caution };
   }
 
@@ -814,41 +800,33 @@ export class SolutionService {
       const product = cp.product;
       const thumbnail = product.productFiles?.[0]?.file?.filePath || undefined;
 
-      // 메타드림: 수면 점수 60 이상
-      if (product.name === '메타드림') {
-        const isRecommended = sleepScore >= 60;
+      // 메타드림: 수면 점수 60 이상인 경우에만 추천
+      if (product.name === '메타드림' && sleepScore >= 60) {
         result.push({
           id: product.id,
           name: product.name,
           thumbnail,
-          conditionType: 'SLEEP',
           keyword: cp.keyword || undefined,
           originalPrice: product.originalPrice ? Number(product.originalPrice) : undefined,
           price: product.price ? Number(product.price) : undefined,
           recommendReason: cp.recommendReason || undefined,
           dosage: cp.dosage || undefined,
           mechanisms: Array.isArray(cp.mechanisms) ? cp.mechanisms : undefined,
-          isRecommended,
-          conditionScore: sleepScore,
         });
       }
 
-      // 리셋데이: 글루텐 4~5단계
-      if (product.name === '리셋데이') {
-        const isRecommended = glutenLevel >= 4;
+      // 리셋데이: 글루텐 4~5단계인 경우에만 추천
+      if (product.name === '리셋데이' && glutenLevel >= 4) {
         result.push({
           id: product.id,
           name: product.name,
           thumbnail,
-          conditionType: 'GLUTEN',
           keyword: cp.keyword || undefined,
           originalPrice: product.originalPrice ? Number(product.originalPrice) : undefined,
           price: product.price ? Number(product.price) : undefined,
           recommendReason: cp.recommendReason || undefined,
           dosage: cp.dosage || undefined,
           mechanisms: Array.isArray(cp.mechanisms) ? cp.mechanisms : undefined,
-          isRecommended,
-          conditionScore: glutenLevel,
         });
       }
     }

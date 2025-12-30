@@ -120,26 +120,11 @@ export class DietProductDto {
   @ApiPropertyOptional({ description: '상품 이미지' })
   thumbnail?: string;
 
-  @ApiPropertyOptional({ description: '정가' })
-  originalPrice?: number;
-
-  @ApiPropertyOptional({ description: '할인가' })
-  price?: number;
-
-  @ApiPropertyOptional({ description: '추천 이유' })
-  recommendReason?: string;
-
-  @ApiPropertyOptional({ description: '섭취량' })
-  dosage?: string;
-
   @ApiProperty({ description: '라인업 정보', type: LineupDto })
   lineup: LineupDto;
 
   @ApiPropertyOptional({ description: '영양 정보', type: NutritionDto })
   nutrition?: NutritionDto;
-
-  @ApiPropertyOptional({ description: '전체 식재료 목록', type: [String] })
-  ingredients?: string[];
 
   @ApiPropertyOptional({ description: '식재료 레벨 정보 (음식물 과민증 결과 기반)', type: IngredientLevelDto })
   ingredientLevels?: IngredientLevelDto;
@@ -167,18 +152,8 @@ export class HealthTypeAnimalDto {
   @ApiPropertyOptional({ description: '설명' })
   description?: string;
 
-  @ApiPropertyOptional({ description: '솔루션 설명' })
-  solution?: string;
-
   @ApiPropertyOptional({ description: '이미지 URL' })
   imageUrl?: string;
-
-  @ApiPropertyOptional({ description: '메타데이터 (시너지 효과, 섭취 가이드 등)' })
-  metadata?: {
-    synergyEffects?: string[];
-    intakeGuide?: string[];
-    cautions?: string[];
-  };
 }
 
 /**
@@ -219,9 +194,6 @@ export class ConditionalProductDto {
   @ApiPropertyOptional({ description: '상품 이미지' })
   thumbnail?: string;
 
-  @ApiProperty({ description: '추천 조건 타입', example: 'SLEEP | GLUTEN' })
-  conditionType: string;
-
   @ApiPropertyOptional({ description: '추천 키워드' })
   keyword?: string;
 
@@ -239,12 +211,6 @@ export class ConditionalProductDto {
 
   @ApiPropertyOptional({ description: '작용기전 목록' })
   mechanisms?: any[];
-
-  @ApiProperty({ description: '추천 여부 (조건 충족 시 true)' })
-  isRecommended: boolean;
-
-  @ApiPropertyOptional({ description: '조건 점수 (수면: sleepScore, 글루텐: glutenLevel)' })
-  conditionScore?: number;
 }
 
 /**
@@ -344,9 +310,6 @@ export class SupplementSolutionResponseDto {
 
   @ApiProperty({ description: '영양제 추천 목록', type: [SupplementProductDto] })
   supplements: SupplementProductDto[];
-
-  @ApiPropertyOptional({ description: '맞춤 포뮬러 설명' })
-  formulaGuide?: string;
 
   @ApiPropertyOptional({ description: '조건부 추천 제품 (메타드림/리셋데이)', type: [ConditionalProductDto] })
   conditionalProducts?: ConditionalProductDto[];
