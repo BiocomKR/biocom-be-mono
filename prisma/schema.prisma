@@ -36,6 +36,8 @@ model User {
   refundBankName               String?                        @map("refund_bank_name") @db.VarChar(50)
   refundHolder                 String?                        @map("refund_holder") @db.VarChar(50)
   mbti                         String?                        @db.VarChar(4)
+  /// 푸시 알림 수신 동의 여부
+  pushEnabled                  Boolean?                       @map("push_enabled")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
