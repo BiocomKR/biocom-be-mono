@@ -11,7 +11,7 @@ dist/
 .env.secrets
 
 # Google Cloud Service Account Keys
-google-service-account-key.json
+google-service-account-key*.json
 *-firebase-adminsdk-*.json
 
 # IDE
