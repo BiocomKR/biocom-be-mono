@@ -1,10 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheckService, HealthCheck, DiskHealthIndicator, MemoryHealthIndicator } from '@nestjs/terminus';
+import { HttpService } from '@nestjs/axios';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { PrismaHealthIndicator } from './indicators/prisma.health';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { QueueService } from '../queues/queue.service';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * Health Check 컨트롤러
@@ -24,6 +28,9 @@ export class HealthController {
     private prismaHealth: PrismaHealthIndicator,
     private disk: DiskHealthIndicator,
     private memory: MemoryHealthIndicator,
+    private queueService: QueueService,
+    private httpService: HttpService,
+    private configService: ConfigService,
   ) {}
 
   /**
@@ -178,5 +185,114 @@ export class HealthController {
       timestamp: getNowKST().toISOString(),
       environment: process.env.NODE_ENV || 'development',
     };
+  }
+
+  /**
+   * MQ 연결 테스트
+   * Redis/BullMQ 연결 상태 확인
+   */
+  @Get('mq')
+  @Public()
+  @ApiOperation({
+    summary: 'MQ 연결 테스트',
+    description: 'Redis/BullMQ 연결 상태를 확인합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'MQ 연결 테스트 결과',
+    schema: {
+      example: {
+        success: true,
+        jobId: '123',
+        timestamp: '2024-01-01T00:00:00.000Z'
+      }
+    }
+  })
+  async testMq() {
+    const result = await this.queueService.testConnection();
+    return {
+      ...result,
+      timestamp: getNowKST().toISOString(),
+    };
+  }
+
+  /**
+   * biocom-api 기본 헬스체크
+   */
+  @Get('biocom-api')
+  @Public()
+  @ApiOperation({
+    summary: 'biocom-api 헬스체크',
+    description: 'biocom-api 서버의 기본 상태를 확인합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'biocom-api 연결 성공',
+    schema: {
+      example: {
+        success: true,
+        data: { status: 'ok', service: 'biocom-api' },
+        timestamp: '2024-01-01T00:00:00.000Z'
+      }
+    }
+  })
+  async testBiocomApi() {
+    try {
+      const apiUrl = this.configService.get<string>('BIOCOM_API_URL', 'http://localhost:10804');
+      const response = await firstValueFrom(
+        this.httpService.get(`${apiUrl}/api/health`)
+      );
+      return {
+        success: true,
+        data: response.data,
+        timestamp: getNowKST().toISOString(),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: getNowKST().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * biocom-api → biocom-mq 연결 테스트
+   */
+  @Get('biocom-api/mq')
+  @Public()
+  @ApiOperation({
+    summary: 'biocom-api → biocom-mq 연결 테스트',
+    description: 'biocom-api를 통해 biocom-mq(Redis/BullMQ) 연결 상태를 확인합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '연결 테스트 결과',
+    schema: {
+      example: {
+        success: true,
+        data: { success: true, jobId: '123' },
+        timestamp: '2024-01-01T00:00:00.000Z'
+      }
+    }
+  })
+  async testBiocomApiMq() {
+    try {
+      const apiUrl = this.configService.get<string>('BIOCOM_API_URL', 'http://localhost:10804');
+      const response = await firstValueFrom(
+        this.httpService.get(`${apiUrl}/api/queue-test/ping`)
+      );
+      return {
+        success: true,
+        data: response.data,
+        timestamp: getNowKST().toISOString(),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: getNowKST().toISOString(),
+      };
+    }
   }
 }
