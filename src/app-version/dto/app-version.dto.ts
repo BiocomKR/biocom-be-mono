@@ -5,6 +5,7 @@
 import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AppBundleId } from '../../common/enums';
 
 export enum Platform {
   IOS = 'IOS',
@@ -17,6 +18,11 @@ export class CreateAppVersionDto {
   @IsEnum(Platform)
   platform: Platform;
 
+  @ApiPropertyOptional({ description: '앱 번들 ID', enum: AppBundleId })
+  @IsOptional()
+  @IsString()
+  bundleId?: string;
+
   @ApiProperty({ description: '버전 (예: 1.0.0)' })
   @IsString()
   version: string;
@@ -26,10 +32,6 @@ export class CreateAppVersionDto {
   @IsNumber()
   @Type(() => Number)
   buildNumber?: number;
-
-  @ApiProperty({ description: '최소 지원 버전' })
-  @IsString()
-  minRequiredVersion: string;
 
   @ApiPropertyOptional({ description: '강제 업데이트 여부' })
   @IsOptional()
@@ -73,6 +75,11 @@ export class UpdateAppVersionDto {
   @IsEnum(Platform)
   platform?: Platform;
 
+  @ApiPropertyOptional({ description: '앱 번들 ID', enum: AppBundleId })
+  @IsOptional()
+  @IsString()
+  bundleId?: string;
+
   @ApiPropertyOptional({ description: '버전' })
   @IsOptional()
   @IsString()
@@ -83,11 +90,6 @@ export class UpdateAppVersionDto {
   @IsNumber()
   @Type(() => Number)
   buildNumber?: number;
-
-  @ApiPropertyOptional({ description: '최소 지원 버전' })
-  @IsOptional()
-  @IsString()
-  minRequiredVersion?: string;
 
   @ApiPropertyOptional({ description: '강제 업데이트 여부' })
   @IsOptional()
@@ -130,6 +132,11 @@ export class AppVersionQueryDto {
   @IsOptional()
   @IsEnum(Platform)
   platform?: Platform;
+
+  @ApiPropertyOptional({ description: '번들 ID 필터', enum: AppBundleId })
+  @IsOptional()
+  @IsString()
+  bundleId?: string;
 
   @ApiPropertyOptional({ description: '페이지 번호', default: 1 })
   @IsOptional()
