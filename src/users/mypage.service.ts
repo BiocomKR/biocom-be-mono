@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import {
@@ -14,6 +15,7 @@ import {
   RefundAccountResponseDto,
 } from './dto/refund-account.dto';
 import { ProfileImageResponseDto } from './dto/profile-image.dto';
+import { WithdrawResponseDto } from './dto/withdraw.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
@@ -25,6 +27,7 @@ import { getNowKST } from '../common/utils/kst-date.util';
 @Injectable()
 export class MypageService {
   private static readonly MAX_ADDRESSES = 10;
+  private readonly logger = new Logger(MypageService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -360,6 +363,104 @@ export class MypageService {
     await this.prisma.userFile.deleteMany({
       where: { userId, fileType: 'PROFILE' },
     });
+  }
+
+  // ============================================
+  // 회원탈퇴
+  // ============================================
+
+  /**
+   * 회원탈퇴 처리
+   * 1. 탈퇴 회원 정보를 withdrawn_users 테이블에 이관
+   * 2. users 테이블의 개인정보 마스킹 처리
+   * 3. is_active = false, deleted_at 설정
+   *
+   * @param userId 사용자 ID
+   * @param reason 탈퇴 사유 (선택)
+   * @returns 탈퇴 처리 결과
+   */
+  async withdraw(userId: number, reason?: string): Promise<WithdrawResponseDto> {
+    this.logger.log(`회원탈퇴 요청: userId=${userId}`);
+
+    // 1. 사용자 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        mobile: true,
+        isActive: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다');
+    }
+
+    if (!user.isActive || user.deletedAt) {
+      throw new BadRequestException('이미 탈퇴한 회원입니다');
+    }
+
+    const now = getNowKST();
+
+    // 2. 트랜잭션으로 탈퇴 처리
+    await this.prisma.$transaction(async (tx) => {
+      // 2-1. withdrawn_users 테이블에 정보 이관
+      await tx.withdrawnUser.create({
+        data: {
+          userId: user.id,
+          name: user.name,
+          mobile: user.mobile,
+          reason: reason || null,
+          withdrawnAt: now,
+          createdAt: now,
+        },
+      });
+
+      // 2-2. users 테이블 개인정보 삭제 및 비활성화
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          // 개인정보 삭제 (NOT NULL 컬럼은 빈 문자열)
+          name: '',
+          mobile: '',
+          email: null,
+          password: null,
+          birthDate: null,
+          telecom: null,
+          sex: null,
+          localCode: null,
+          // 계정 비활성화
+          isActive: false,
+          deletedAt: now,
+          // 빌링키, 환불계좌 등 민감정보 삭제
+          billingKey: null,
+          customerKey: null,
+          refundAccountNo: null,
+          refundBankCode: null,
+          refundBankName: null,
+          refundHolder: null,
+        },
+      });
+
+      // 2-3. Refresh Token 삭제 (로그아웃 처리)
+      await tx.refreshToken.deleteMany({
+        where: { userId },
+      });
+
+      // 2-4. Push Token 삭제
+      await tx.pushToken.deleteMany({
+        where: { userId },
+      });
+    });
+
+    this.logger.log(`회원탈퇴 완료: userId=${userId}`);
+
+    return {
+      success: true,
+      message: '회원탈퇴가 완료되었습니다.',
+    };
   }
 
   // ============================================
