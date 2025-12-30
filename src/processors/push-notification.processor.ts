@@ -104,12 +104,13 @@ export class PushNotificationProcessor extends WorkerHost {
 
     this.logger.log(`📤 [PushProcessor] 유저 푸시 전송: userId=${userId}`);
 
-    // 1. 활성화된 FCM 푸시 토큰 조회
+    // 1. 활성화된 FCM 푸시 토큰 조회 (pushEnabled 체크)
     const pushTokens = await this.prisma.pushToken.findMany({
       where: {
         userId,
         isActive: true,
         provider: 'FCM',
+        user: { pushEnabled: true },
       },
     });
 
@@ -231,11 +232,12 @@ export class PushNotificationProcessor extends WorkerHost {
 
     this.logger.log(`📣 [PushProcessor] 전체 푸시 전송: title="${message.title}"`);
 
-    // 활성화된 모든 FCM 푸시 토큰 조회
+    // 활성화된 모든 FCM 푸시 토큰 조회 (pushEnabled 체크)
     const pushTokens = await this.prisma.pushToken.findMany({
       where: {
         isActive: true,
         provider: 'FCM',
+        user: { pushEnabled: true },
         ...(filter?.marketingEnabled !== undefined && {
           marketingEnabled: filter.marketingEnabled,
         }),
