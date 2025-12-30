@@ -277,12 +277,39 @@ export class BalanceGameService {
               challengeMissionId: challengeMission?.id || null,
               missionId: mission?.id || null,
               missionName: mission?.name || '밸런스게임',
-              pointsEarned: challengeMission?.points || 100, // 홈 미션목록 완료 표시용
+              pointsEarned: challengeMission ? challengeMission.points : 0,
             },
             createdAt: getNowKST(),
             updatedAt: getNowKST()
           }
         });
+
+        // 포인트 지급 (챌린지 미션이 있을 때만)
+        if (challengeMission && challengeMission.points > 0) {
+          const pointsToAward = challengeMission.points;
+
+          // 사용자 포인트 증가
+          const updatedUser = await tx.user.update({
+            where: { id: userId },
+            data: { points: { increment: pointsToAward } }
+          });
+
+          // 포인트 히스토리 기록
+          await tx.pointHistory.create({
+            data: {
+              userId,
+              type: 'EARNED',
+              amount: pointsToAward,
+              balance: updatedUser.points,
+              description: `밸런스게임 완료 (${currentDay}일차)`,
+              relatedType: 'BALANCE_GAME',
+              relatedId: gameId,
+              createdAt: getNowKST()
+            }
+          });
+
+          this.logger.log(`사용자 ${userId}에게 밸런스게임 포인트 ${pointsToAward}점 지급 완료`);
+        }
       }
 
       // 쿠폰 지급 (최초 완료시에만)
