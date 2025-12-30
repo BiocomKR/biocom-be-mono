@@ -6,6 +6,7 @@ import { PrismaHealthIndicator } from './indicators/prisma.health';
 import { DiskHealthIndicator } from './indicators/disk.health';
 import { MemoryHealthIndicator } from './indicators/memory.health';
 import { PrismaService } from '../common/services/prisma.service';
+import { QueuesModule } from '../queues/queues.module';
 
 /**
  * Health Check 모듈
@@ -18,7 +19,7 @@ import { PrismaService } from '../common/services/prisma.service';
  * - 애플리케이션 가동 시간
  */
 @Module({
-  imports: [TerminusModule, HttpModule],
+  imports: [TerminusModule, HttpModule, QueuesModule],
   controllers: [HealthController],
   providers: [
     PrismaHealthIndicator,

@@ -39,12 +39,12 @@ export class HealthController {
    */
   @Get()
   @Public()
-  @ApiOperation({ 
-    summary: '기본 헬스체크', 
-    description: '서버가 응답 가능한 상태인지 확인합니다.' 
+  @ApiOperation({
+    summary: '기본 헬스체크',
+    description: '서버가 응답 가능한 상태인지 확인합니다.'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: '서버가 정상 작동 중',
     schema: {
       example: {
@@ -79,12 +79,12 @@ export class HealthController {
   @Get('detailed')
   @Public()
   @HealthCheck()
-  @ApiOperation({ 
-    summary: '상세 헬스체크', 
-    description: '데이터베이스, 디스크, 메모리 등 상세한 시스템 상태를 확인합니다.' 
+  @ApiOperation({
+    summary: '상세 헬스체크',
+    description: '데이터베이스, 디스크, 메모리 등 상세한 시스템 상태를 확인합니다.'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: '시스템 상태 정상',
     schema: {
       example: {
@@ -99,21 +99,21 @@ export class HealthController {
       }
     }
   })
-  @ApiResponse({ 
-    status: 503, 
-    description: '시스템 구성 요소 중 일부가 비정상' 
+  @ApiResponse({
+    status: 503,
+    description: '시스템 구성 요소 중 일부가 비정상'
   })
   async checkDetailed() {
     return this.health.check([
       // 데이터베이스 연결 상태
       () => this.prismaHealth.isHealthy('database'),
-      
+
       // 디스크 사용량 체크 (80% 이상 사용 시 경고)
-      () => this.disk.checkStorage('disk', { 
+      () => this.disk.checkStorage('disk', {
         path: '/',
         thresholdPercent: 0.8,
       }),
-      
+
       // 메모리 사용량 체크 (RSS 1GB 이상 사용 시 경고)
       () => this.memory.checkHeap('memory_heap', 1024 * 1024 * 1024),
       () => this.memory.checkRSS('memory_rss', 1024 * 1024 * 1024),
@@ -126,9 +126,9 @@ export class HealthController {
    */
   @Get('liveness')
   @Public()
-  @ApiOperation({ 
-    summary: '라이브니스 프로브', 
-    description: '애플리케이션이 살아있는지 확인합니다. (K8s liveness probe용)' 
+  @ApiOperation({
+    summary: '라이브니스 프로브',
+    description: '애플리케이션이 살아있는지 확인합니다. (K8s liveness probe용)'
   })
   @ApiResponse({ status: 200, description: '애플리케이션 정상' })
   liveness() {
