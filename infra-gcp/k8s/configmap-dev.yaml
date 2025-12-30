@@ -17,8 +17,8 @@ data:
   # 데이터베이스 설정 (개발 Cloud SQL)
   DATABASE_URL: "postgresql://biocom:bico0825%21%40%23@34.47.124.132:5432/biocom?connection_limit=5&pool_timeout=30&connect_timeout=10"
 
-  # Redis 설정 (BullMQ Queue)
-  REDIS_HOST: "redis-master"
+  # Redis 설정 (Cloud Memorystore)
+  REDIS_HOST: "10.213.120.195"
   REDIS_PORT: "6379"
 
   # Firebase 설정 (FCM 푸시용)
