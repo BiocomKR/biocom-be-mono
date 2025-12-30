@@ -20,6 +20,7 @@ export class AppVersionController {
   })
   @ApiQuery({ name: 'platform', required: true, description: '플랫폼 (IOS, ANDROID, WEB)' })
   @ApiQuery({ name: 'version', required: true, description: '현재 앱 버전 (1.0.0)' })
+  @ApiQuery({ name: 'bundleId', required: false, description: '앱 번들 ID (kr.biocom.challenge)' })
   @ApiResponse({
     status: 200,
     description: '버전 체크 성공',
