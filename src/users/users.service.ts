@@ -415,6 +415,50 @@ export class UsersService {
   }
 
   /**
+   * 사용자 설정 조회
+   * pushEnabled 등 사용자 설정 정보 반환
+   */
+  async getSettings(userId: number) {
+    this.logger.log(`사용자 ${userId}의 설정 조회`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { pushEnabled: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`ID ${userId}인 사용자를 찾을 수 없습니다.`);
+    }
+
+    return { pushEnabled: user.pushEnabled };
+  }
+
+  /**
+   * 사용자 설정 업데이트
+   * pushEnabled 등 사용자 설정 정보 변경
+   */
+  async updateSettings(userId: number, pushEnabled: boolean) {
+    this.logger.log(`사용자 ${userId}의 설정 업데이트 - pushEnabled: ${pushEnabled}`);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`ID ${userId}인 사용자를 찾을 수 없습니다.`);
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pushEnabled },
+    });
+
+    this.logger.log(`사용자 ${userId}의 설정 업데이트 완료 - pushEnabled: ${pushEnabled}`);
+
+    return { pushEnabled };
+  }
+
+  /**
    * MBTI 업데이트 전용 메서드
    * 사용자의 MBTI 유형만 안전하게 업데이트
    */

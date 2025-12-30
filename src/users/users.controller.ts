@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Put,
   Patch,
   Body,
   Param,
@@ -21,12 +22,11 @@ import { ImwebApiService } from '../imweb/imweb-api.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdatePersonaDto } from './dto/update-persona.dto';
 import { UpdateMbtiDto } from './dto/update-mbti.dto';
+import { SearchImwebMembersResponseDto } from './dto/user-response.dto';
 import {
-  SearchImwebMembersResponseDto,
-  GetMyProfileResponseDto,
-  UpdateUserResponseDto,
-  GetMyPointsResponseDto,
-} from './dto/user-response.dto';
+  UserSettingsResponseDto,
+  UpdateUserSettingsDto,
+} from './dto/user-settings.dto';
 import { ApiErrorResponseDto } from '../common/dto/api-response.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 
@@ -296,6 +296,63 @@ export class UsersController {
       success: true,
       message: 'MBTI가 업데이트되었습니다.',
       data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 사용자 설정 조회
+   */
+  @Get('me/settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 설정 조회',
+    description: '푸시 알림 수신 동의 등 사용자 설정을 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '설정 조회 성공',
+    type: UserSettingsResponseDto,
+  })
+  async getSettings(@Request() req: any): Promise<ApiResponseDto> {
+    const userId = req.user.sub;
+    const settings = await this.usersService.getSettings(userId);
+
+    return {
+      success: true,
+      message: '설정을 조회했습니다.',
+      data: settings,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 사용자 설정 업데이트
+   */
+  @Put('me/settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 설정 업데이트',
+    description: '푸시 알림 수신 동의 등 사용자 설정을 업데이트합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '설정 업데이트 성공',
+    type: UserSettingsResponseDto,
+  })
+  async updateSettings(
+    @Request() req: any,
+    @Body() dto: UpdateUserSettingsDto
+  ): Promise<ApiResponseDto> {
+    const userId = req.user.sub;
+    const settings = await this.usersService.updateSettings(userId, dto.pushEnabled);
+
+    return {
+      success: true,
+      message: '설정이 업데이트되었습니다.',
+      data: settings,
       timestamp: getNowKST(),
     };
   }
