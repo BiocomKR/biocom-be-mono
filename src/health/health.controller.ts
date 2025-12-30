@@ -138,9 +138,9 @@ export class HealthController {
   @Get('readiness')
   @Public()
   @HealthCheck()
-  @ApiOperation({ 
-    summary: '레디니스 프로브', 
-    description: '애플리케이션이 트래픽을 받을 준비가 되었는지 확인합니다. (K8s readiness probe용)' 
+  @ApiOperation({
+    summary: '레디니스 프로브',
+    description: '애플리케이션이 트래픽을 받을 준비가 되었는지 확인합니다. (K8s readiness probe용)'
   })
   @ApiResponse({ status: 200, description: '트래픽 수신 준비 완료' })
   @ApiResponse({ status: 503, description: '트래픽 수신 준비 안됨' })
@@ -149,5 +149,34 @@ export class HealthController {
     return this.health.check([
       () => this.prismaHealth.isHealthy('database'),
     ]);
+  }
+
+  /**
+   * 테스트 엔드포인트
+   * CI/CD 배포 확인 및 간단한 동작 테스트용
+   */
+  @Get('test')
+  @Public()
+  @ApiOperation({
+    summary: '테스트 엔드포인트',
+    description: 'CI/CD 배포 확인 및 간단한 동작 테스트용 엔드포인트입니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '테스트 성공',
+    schema: {
+      example: {
+        message: 'biocom-bo-api is running!',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        environment: 'development'
+      }
+    }
+  })
+  test() {
+    return {
+      message: 'biocom-bo-api is running!',
+      timestamp: getNowKST().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+    };
   }
 }
