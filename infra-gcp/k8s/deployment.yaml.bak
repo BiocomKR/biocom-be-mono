@@ -41,7 +41,7 @@ spec:
       containers:
       # biocom-mq Worker 컨테이너
       - name: biocom-mq
-        image: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-mq:20251216114314
+        image: asia-northeast3-docker.pkg.dev/api-prod-biocom/biocom-api/biocom-mq:20251224203032
         imagePullPolicy: Always
 
         ports:
