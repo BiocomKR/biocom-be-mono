@@ -284,31 +284,52 @@ export class BalanceGameService {
           }
         });
 
-        // 포인트 지급 (챌린지 미션이 있을 때만)
+        // 포인트 지급 (챌린지 미션이 있고, 오늘 아직 지급 안 했을 때만)
         if (challengeMission && challengeMission.points > 0) {
-          const pointsToAward = challengeMission.points;
+          // 오늘 이미 포인트 지급했는지 확인
+          const todayStart = new Date(todayStr);
+          const todayEnd = new Date(todayStr);
+          todayEnd.setDate(todayEnd.getDate() + 1);
 
-          // 사용자 포인트 증가
-          const updatedUser = await tx.user.update({
-            where: { id: userId },
-            data: { points: { increment: pointsToAward } }
-          });
-
-          // 포인트 히스토리 기록
-          await tx.pointHistory.create({
-            data: {
+          const existingPointHistory = await tx.pointHistory.findFirst({
+            where: {
               userId,
-              type: 'EARNED',
-              amount: pointsToAward,
-              balance: updatedUser.points,
-              description: `밸런스게임 완료 (${currentDay}일차)`,
               relatedType: 'BALANCE_GAME',
               relatedId: gameId,
-              createdAt: getNowKST()
+              createdAt: {
+                gte: todayStart,
+                lt: todayEnd
+              }
             }
           });
 
-          this.logger.log(`사용자 ${userId}에게 밸런스게임 포인트 ${pointsToAward}점 지급 완료`);
+          if (!existingPointHistory) {
+            const pointsToAward = challengeMission.points;
+
+            // 사용자 포인트 증가
+            const updatedUser = await tx.user.update({
+              where: { id: userId },
+              data: { points: { increment: pointsToAward } }
+            });
+
+            // 포인트 히스토리 기록
+            await tx.pointHistory.create({
+              data: {
+                userId,
+                type: 'EARNED',
+                amount: pointsToAward,
+                balance: updatedUser.points,
+                description: `밸런스게임 완료 (${currentDay}일차)`,
+                relatedType: 'BALANCE_GAME',
+                relatedId: gameId,
+                createdAt: getNowKST()
+              }
+            });
+
+            this.logger.log(`사용자 ${userId}에게 밸런스게임 포인트 ${pointsToAward}점 지급 완료`);
+          } else {
+            this.logger.log(`사용자 ${userId}는 오늘 이미 밸런스게임 포인트를 받았습니다`);
+          }
         }
       }
 
