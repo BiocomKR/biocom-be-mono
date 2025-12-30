@@ -59,9 +59,23 @@ data:
   SLACK_NOTIFICATION_ENABLED: "true"
   PROJECT_NAME: "biocom-bo-api"
 
-  # Redis 설정 (biocom-api와 동일한 Redis 공유)
-  REDIS_HOST: "10.213.120.195"
+  # Redis 설정 (GKE 내부)
+  REDIS_HOST: "redis-master"
   REDIS_PORT: "6379"
+
+  # 공공데이터포털 API (공휴일 조회)
+  PUBLIC_DATA_PORTAL_HOLIDAY_ENDPOINT: "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService"
+
+  # OpenAI 설정
+  OPENAI_MODEL: "gpt-4o"
+  AI_ANALYSIS_TIMEOUT: "30000"
+
+  # Google Gemini AI 설정
+  GEMINI_MODEL: "gemini-2.5-flash-image-preview"
+  FACE_SLIMMING_TIMEOUT: "60000"
+
+  # Google Cloud Storage 버킷
+  GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
 
 ---
 # 📝 로깅 설정용 ConfigMap
