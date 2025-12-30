@@ -59,8 +59,8 @@ data:
   SLACK_NOTIFICATION_ENABLED: "true"
   PROJECT_NAME: "biocom-bo-api"
 
-  # Redis 설정 (GKE 내부)
-  REDIS_HOST: "redis-master"
+  # Redis 설정 (cross-namespace: biocom-api 네임스페이스의 Redis IP)
+  REDIS_HOST: "10.213.120.195"
   REDIS_PORT: "6379"
 
   # 공공데이터포털 API (공휴일 조회)
