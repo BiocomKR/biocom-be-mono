@@ -418,14 +418,20 @@ export class MypageService {
         },
       });
 
-      // 2-2. users 테이블 개인정보 마스킹 및 비활성화
+      // 2-2. users 테이블 개인정보 삭제 및 비활성화
       await tx.user.update({
         where: { id: userId },
         data: {
-          name: `탈퇴회원_${userId}`,
-          mobile: `deleted_${userId}`,
+          // 개인정보 삭제 (NOT NULL 컬럼은 빈 문자열)
+          name: '',
+          mobile: '',
           email: null,
           password: null,
+          birthDate: null,
+          telecom: null,
+          sex: null,
+          localCode: null,
+          // 계정 비활성화
           isActive: false,
           deletedAt: now,
           // 빌링키, 환불계좌 등 민감정보 삭제
