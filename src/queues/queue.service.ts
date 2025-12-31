@@ -60,6 +60,7 @@ export class QueueService {
     @InjectQueue(QUEUE_NAMES.APP_EVENT) private appEventQueue: Queue,
     @InjectQueue(QUEUE_NAMES.PUSH_NOTIFICATION) private pushQueue: Queue,
     @InjectQueue(QUEUE_NAMES.ORDER_SYNC) private orderSyncQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.HEALTH_CHECK) private healthCheckQueue: Queue,
   ) {}
 
   async addAppEvent(data: {
@@ -189,5 +190,21 @@ export class QueueService {
       this.logger.error('Queue connection test failed', error);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * MQ 헬스체크 Job 추가
+   * MQ 워커가 이 잡을 처리하면서 app_configs에 MQ_HEALTH_CHECK 값을 기록
+   */
+  async addHealthCheck() {
+    const job = await this.healthCheckQueue.add('check', {
+      source: 'biocom-api',
+      requestedAt: new Date().toISOString(),
+    }, {
+      removeOnComplete: 10,
+      removeOnFail: 10,
+    });
+    this.logger.log(`🏥 [Queue] health-check job added: ${job.id}`);
+    return job;
   }
 }

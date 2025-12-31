@@ -3,11 +3,34 @@ import { QueueService, PushNotificationType } from './queue.service';
 
 @Controller('queue-test')
 export class QueueTestController {
-  constructor(private readonly queueService: QueueService) {}
+  constructor(
+    private readonly queueService: QueueService,
+  ) {}
 
   @Get('ping')
   async testConnection() {
     return this.queueService.testConnection();
+  }
+
+  /**
+   * MQ 헬스체크 Job 추가
+   * health-check 큐에 잡을 넣어서 MQ 워커가 DB에 기록하도록 함
+   */
+  @Get('health-check')
+  async healthCheck() {
+    try {
+      const job = await this.queueService.addHealthCheck();
+      return {
+        success: true,
+        jobId: job.id,
+        message: 'Health check job added to queue',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 
   @Post('app-event')
