@@ -59,9 +59,12 @@ data:
   SLACK_NOTIFICATION_ENABLED: "true"
   PROJECT_NAME: "biocom-bo-api-prod"
 
-  # Redis 설정 (GKE 내부)
-  REDIS_HOST: "redis-master"
+  # Redis 설정 (GKE 내부 - biocom-api 네임스페이스의 redis 사용)
+  REDIS_HOST: "redis-master.biocom-api.svc.cluster.local"
   REDIS_PORT: "6379"
+
+  # biocom-api 내부 호출 URL (같은 클러스터, 다른 네임스페이스)
+  BIOCOM_API_URL: "http://biocom-api-service.biocom-api.svc.cluster.local"
 
   # 공공데이터포털 API (공휴일 조회)
   PUBLIC_DATA_PORTAL_HOLIDAY_ENDPOINT: "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService"

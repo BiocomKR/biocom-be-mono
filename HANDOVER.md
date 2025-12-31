@@ -11,6 +11,31 @@
 
 ---
 
+## GKE 배포 정보
+
+### 운영 환경
+| 항목 | 값 |
+|------|-----|
+| 클러스터 | `biocom-cluster-prod` (biocom-api와 같은 클러스터) |
+| 프로젝트 | `api-prod-biocom` |
+| 네임스페이스 | `biocom-bo-api` |
+| Zone | `asia-northeast3-a` |
+
+### 개발 환경
+| 항목 | 값 |
+|------|-----|
+| 클러스터 | `biocom-cluster-dev` |
+| 프로젝트 | `api-dev-biocom` |
+| 네임스페이스 | `biocom-bo-api` |
+| Zone | `asia-northeast3-a` |
+
+### 주의사항
+- **biocom-bo-cluster-prod**: 백오피스 Firebase 프로젝트 전용. biocom-bo-api는 여기에 없음!
+- biocom-bo-api는 biocom-api와 **같은 클러스터(biocom-cluster-prod/dev)**에 배포됨
+- 네임스페이스만 다름 (biocom-api vs biocom-bo-api)
+
+---
+
 ## 프로젝트 간 관계
 
 ### 바이오컴 프로젝트 구조
