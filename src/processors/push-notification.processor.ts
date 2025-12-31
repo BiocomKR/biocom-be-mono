@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Inject } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { PushToken } from '@prisma/client';
 import { PrismaService } from '../common/services/prisma.service';
 import { FcmProvider } from '../push/providers/fcm.provider';
 import {
@@ -264,11 +265,11 @@ export class PushNotificationProcessor extends WorkerHost {
     let failureCount = 0;
 
     for (let i = 0; i < pushTokens.length; i += BATCH_SIZE) {
-      const batch = pushTokens.slice(i, i + BATCH_SIZE);
+      const batch: PushToken[] = pushTokens.slice(i, i + BATCH_SIZE);
 
       // 1. 배치 내 모든 토큰에 대해 로그 미리 생성
       const logIds: (number | null)[] = await Promise.all(
-        batch.map((pushToken) =>
+        batch.map((pushToken: PushToken) =>
           this.createPendingLog(
             pushToken,
             message,
@@ -283,7 +284,7 @@ export class PushNotificationProcessor extends WorkerHost {
 
       // 3. 각 토큰별 결과 처리
       await Promise.all(
-        batch.map(async (pushToken, index) => {
+        batch.map(async (pushToken: PushToken, index: number) => {
           const result = batchResults[index];
           const logId = logIds[index];
 

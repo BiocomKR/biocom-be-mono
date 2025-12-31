@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
 
@@ -242,7 +243,7 @@ export class OrderSyncProcessor extends WorkerHost {
     }
 
     // 6. 트랜잭션으로 업데이트
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 주문 상태 업데이트
       if (Object.keys(updates).length > 0) {
         updates.updatedAt = now;
