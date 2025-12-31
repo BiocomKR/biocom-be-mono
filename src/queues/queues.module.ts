@@ -5,6 +5,7 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { AppEventProcessor } from '../processors/app-event.processor';
 import { PushNotificationProcessor } from '../processors/push-notification.processor';
 import { OrderSyncProcessor } from '../processors/order-sync.processor';
+import { HealthCheckProcessor } from '../processors/health-check.processor';
 import { FirebaseAdminModule } from '../push/firebase-admin.module';
 import { FcmProvider } from '../push/providers/fcm.provider';
 
@@ -46,6 +47,12 @@ export const QUEUE_OPTIONS = {
       ...QUEUE_OPTIONS,
     }),
 
+    // Health Check Queue
+    BullModule.registerQueue({
+      name: 'health-check',
+      ...QUEUE_OPTIONS,
+    }),
+
     // Bull Board - Queue 모니터링
     BullBoardModule.forFeature({
       name: 'app-event',
@@ -60,7 +67,7 @@ export const QUEUE_OPTIONS = {
       adapter: BullMQAdapter as any,
     }),
   ],
-  providers: [AppEventProcessor, PushNotificationProcessor, OrderSyncProcessor, FcmProvider],
+  providers: [AppEventProcessor, PushNotificationProcessor, OrderSyncProcessor, HealthCheckProcessor, FcmProvider],
   exports: [],
 })
 export class QueuesModule {}
