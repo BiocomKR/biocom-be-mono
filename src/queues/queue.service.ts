@@ -46,6 +46,7 @@ export class QueueService {
 
   constructor(
     @InjectQueue(QUEUE_NAMES.PUSH_NOTIFICATION) private pushQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.HEALTH_CHECK) private healthCheckQueue: Queue,
   ) {}
 
   /**
@@ -134,5 +135,20 @@ export class QueueService {
       this.logger.error('Queue connection test failed', error);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * MQ 헬스체크 Job 추가
+   */
+  async addHealthCheck() {
+    const job = await this.healthCheckQueue.add('check', {
+      source: 'biocom-bo-api',
+      requestedAt: new Date().toISOString(),
+    }, {
+      removeOnComplete: 10,
+      removeOnFail: 10,
+    });
+    this.logger.log(`🏥 [Queue] health-check job added: ${job.id}`);
+    return job;
   }
 }

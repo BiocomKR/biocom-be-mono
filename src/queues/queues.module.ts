@@ -20,6 +20,7 @@ export { QUEUE_NAMES };
       inject: [ConfigService],
     }),
     BullModule.registerQueue({ name: QUEUE_NAMES.PUSH_NOTIFICATION }),
+    BullModule.registerQueue({ name: QUEUE_NAMES.HEALTH_CHECK }),
   ],
   providers: [QueueService],
   exports: [QueueService],
