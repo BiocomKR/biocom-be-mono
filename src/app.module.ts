@@ -58,6 +58,9 @@ import { UtilsModule } from './utils/utils.module';
 import { IssueController } from './issue/issue.controller';
 import { IssueService } from './issue/issue.service';
 import { AppConfigModule } from './app-config/app-config.module';
+import { RecordsModule } from './records/records.module';
+import { SolutionController } from './solution/solution.controller';
+import { SolutionService } from './solution/solution.service';
 
 /**
  * 애플리케이션 루트 모듈
@@ -106,6 +109,7 @@ import { AppConfigModule } from './app-config/app-config.module';
     QueuesModule,     // BullMQ 메시지 큐 모듈
     UtilsModule,      // 유틸리티 모듈 (이미지 변환 등)
     AppConfigModule,  // 앱 설정 관리 모듈
+    RecordsModule,    // 기록 통계 모듈
   ],
   controllers: [
     UsersController,
@@ -123,6 +127,7 @@ import { AppConfigModule } from './app-config/app-config.module';
     BannerController,
     OrdersController,
     IssueController,
+    SolutionController,
   ],
   providers: [
     UsersService,
@@ -140,6 +145,7 @@ import { AppConfigModule } from './app-config/app-config.module';
     BannerService,
     OrdersService,
     IssueService,
+    SolutionService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

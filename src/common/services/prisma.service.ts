@@ -359,6 +359,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   // 쇼핑몰 도메인 테이블
   get category() { return this.prisma.category; }
   get product() { return this.prisma.product; }
+  get productLineup() { return this.prisma.productLineup; }
   get productImage() { return this.prisma.productImage; }
   get productFile() { return this.prisma.productFile; }
   get cart() { return this.prisma.cart; }
@@ -468,6 +469,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 앱 설정 테이블
   get appConfig() { return this.prisma.appConfig; }
+
+  // 솔루션 화면 테이블
+  get solutionScreen() { return this.prisma.solutionScreen; }
+  get solutionScreenVersion() { return this.prisma.solutionScreenVersion; }
 
   // 메서드 바인딩
   $transaction(arg: any) {
