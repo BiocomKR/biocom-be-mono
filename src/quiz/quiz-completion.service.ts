@@ -480,8 +480,8 @@ export class QuizCompletionService {
         // 6️⃣ 정답 채점
         const isCorrect = selectedAnswer === quiz.correctAnswer;
 
-        // 7️⃣ 포인트 계산 (정답 + 당일 퀴즈 + 최초 1회만 200점 지급)
-        const basePoints = 200;
+        // 7️⃣ 포인트 계산 (정답 + 당일 퀴즈 + 최초 1회만 퀴즈 포인트 지급)
+        const basePoints = quiz.points ?? 300;
         const pointsEarned = (isCorrect && canEarnPoints && !pointsAlreadyGiven) ? basePoints : 0;
 
         const now = getNowKST();
