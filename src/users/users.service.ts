@@ -144,6 +144,7 @@ export class UsersService {
         sex: true,
         telecom: true,
         billingKey: true,
+        pushEnabled: true,
         health_type_animal_id: true,
         createdAt: true,
         updatedAt: true,
@@ -183,6 +184,7 @@ export class UsersService {
       sex: user.sex,
       telecom: user.telecom,
       hasBillingKey: !!user.billingKey,
+      pushEnabled: user.pushEnabled,
       healthTypeAnimalId: user.health_type_animal_id,
       healthTypeAnimalName: user.healthTypeAnimal?.animalName,
       createdAt: user.createdAt,
@@ -224,6 +226,7 @@ export class UsersService {
         telecom: true,
         localCode: true,
         billingKey: true,
+        pushEnabled: true,
         createdAt: true,
         updatedAt: true,
         deletedAt: true,
@@ -369,6 +372,7 @@ export class UsersService {
       telecom: user.telecom,
       localCode: user.localCode,
       hasBillingKey: !!user.billingKey,
+      pushEnabled: user.pushEnabled,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       deletedAt: user.deletedAt,
@@ -657,6 +661,14 @@ export class UsersService {
           name: true,
           mobile: true,
           status: true,
+          pushEnabled: true,
+          _count: {
+            select: {
+              pushTokens: {
+                where: { isActive: true },
+              },
+            },
+          },
         },
         take: limit,
       });
@@ -667,6 +679,8 @@ export class UsersService {
           name: CryptoUtil.decrypt(user.name),
           mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
           status: user.status,
+          pushEnabled: user.pushEnabled,
+          hasPushToken: user._count.pushTokens > 0,
         });
       }
     } else {
@@ -681,6 +695,14 @@ export class UsersService {
           name: true,
           mobile: true,
           status: true,
+          pushEnabled: true,
+          _count: {
+            select: {
+              pushTokens: {
+                where: { isActive: true },
+              },
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         take: 1000, // 최대 1000명까지만 검색
@@ -694,6 +716,8 @@ export class UsersService {
             name: decryptedName,
             mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
             status: user.status,
+            pushEnabled: user.pushEnabled,
+            hasPushToken: user._count.pushTokens > 0,
           });
 
           if (results.length >= limit) break;
