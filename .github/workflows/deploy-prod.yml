@@ -65,8 +65,8 @@ jobs:
           PROXY_PID=$!
           sleep 5
 
-          # DB 마이그레이션 실행
-          npx prisma db push --accept-data-loss
+          # DB 마이그레이션 실행 (스키마 추가만 허용, 데이터 손실 발생 시 실패)
+          npx prisma db push
 
           # Proxy 종료
           kill $PROXY_PID || true
