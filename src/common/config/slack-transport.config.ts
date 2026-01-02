@@ -235,8 +235,10 @@ class SlackTransport extends Transport {
       return;
     }
 
-    // 404 에러는 Slack 알림 제외 (악성 크롤러 스캔 등 노이즈 방지)
-    if (info.statusCode === 404) {
+    // 401, 404 에러는 Slack 알림 제외
+    // - 401: 인증 실패 (토큰 만료 등 정상적인 상황)
+    // - 404: 악성 크롤러 스캔 등 노이즈 방지
+    if (info.statusCode === 401 || info.statusCode === 404) {
       callback();
       return;
     }
