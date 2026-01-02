@@ -24,6 +24,7 @@ export { QUEUE_NAMES };
       { name: QUEUE_NAMES.APP_EVENT },
       { name: QUEUE_NAMES.PUSH_NOTIFICATION },
       { name: QUEUE_NAMES.ORDER_SYNC },
+      { name: QUEUE_NAMES.HEALTH_CHECK },
     ),
   ],
   controllers: [QueueTestController],

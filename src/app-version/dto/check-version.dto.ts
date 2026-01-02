@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CheckVersionDto {
   @ApiProperty({
@@ -18,4 +18,12 @@ export class CheckVersionDto {
   @IsString()
   @IsNotEmpty()
   version: string;
+
+  @ApiPropertyOptional({
+    description: '앱 번들 ID (패키지명)',
+    example: 'kr.biocom.challenge',
+  })
+  @IsString()
+  @IsOptional()
+  bundleId?: string;
 }

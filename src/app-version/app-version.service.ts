@@ -13,12 +13,16 @@ export class AppVersionService {
    * 앱 시작 시 호출하여 업데이트/점검 여부 확인
    */
   async checkVersion(dto: CheckVersionDto) {
-    this.logger.log(`버전 체크: ${dto.platform} v${dto.version}`);
+    this.logger.log(
+      `버전 체크: ${dto.platform} v${dto.version}${dto.bundleId ? ` (${dto.bundleId})` : ''}`,
+    );
 
-    // 해당 플랫폼의 활성 버전 중 최신 버전 조회
+    // 해당 플랫폼(+번들ID)의 활성 버전 중 최신 버전 조회
+    // bundleId가 있으면 bundleId로 조회, 없으면 기존처럼 플랫폼만으로 조회 (하위호환)
     const latestVersion = await this.prisma.appVersion.findFirst({
       where: {
         platform: dto.platform,
+        ...(dto.bundleId && { bundleId: dto.bundleId }),
         isActive: true,
       },
       orderBy: { releasedAt: 'desc' },
@@ -26,13 +30,12 @@ export class AppVersionService {
 
     if (!latestVersion) {
       this.logger.warn(
-        `[${dto.platform}] 활성 버전 정보가 없습니다. 버전 관리 페이지에서 등록해주세요.`,
+        `[${dto.platform}${dto.bundleId ? `/${dto.bundleId}` : ''}] 활성 버전 정보가 없습니다. 버전 관리 페이지에서 등록해주세요.`,
       );
       return {
         needsUpdate: false,
         forceUpdate: false,
         latestVersion: dto.version,
-        minRequiredVersion: dto.version,
         storeUrl: null,
         maintenance: false,
         maintenanceMessage: null,
@@ -41,17 +44,13 @@ export class AppVersionService {
 
     // 버전 비교 (semver)
     const currentVersion = this.parseVersion(dto.version);
-    const minRequired = this.parseVersion(latestVersion.minRequiredVersion);
     const latest = this.parseVersion(latestVersion.version);
-
-    const needsForceUpdate = this.compareVersions(currentVersion, minRequired) < 0;
     const needsUpdate = this.compareVersions(currentVersion, latest) < 0;
 
     return {
       needsUpdate,
-      forceUpdate: needsForceUpdate || latestVersion.isForceUpdate,
+      forceUpdate: latestVersion.isForceUpdate,
       latestVersion: latestVersion.version,
-      minRequiredVersion: latestVersion.minRequiredVersion,
       storeUrl: latestVersion.storeUrl,
       maintenance: latestVersion.isMaintenanceMode,
       maintenanceMessage: latestVersion.maintenanceMessage,

@@ -1,5 +1,5 @@
 # 🚚 CronJob - 배송 상태 동기화 배치
-# 1시간마다 실행 (UTC 기준)
+# 30분마다 실행 (UTC 기준)
 # 플레이오토 API로 주문 상태 조회 후 DB 업데이트
 
 apiVersion: batch/v1
@@ -11,9 +11,9 @@ metadata:
     app: biocom-api
     job-type: sync-shipping-status
 spec:
-  # Cron 표현식 (매 1시간마다 실행: 정각)
+  # Cron 표현식 (30분마다 실행: 0분, 30분)
   # 분 시 일 월 요일
-  schedule: "0 * * * *"
+  schedule: "*/30 * * * *"
 
   # 성공한 Job 히스토리 보관 개수
   successfulJobsHistoryLimit: 3
