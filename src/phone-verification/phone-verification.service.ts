@@ -22,6 +22,24 @@ import {
 } from './kcp/kcp.types';
 
 /**
+ * 앱 심사용 테스트 계정 설정
+ * - KCP 본인인증을 우회하여 고정 OTP로 인증 가능
+ * - 회원가입/로그인은 정상 API 흐름을 탐
+ */
+const TEST_ACCOUNT = {
+  /** 테스트 휴대폰 번호 */
+  MOBILE: '01005190519',
+  /** 고정 OTP (만료 없음) */
+  OTP: '250519',
+  /** 테스트용 거래번호 */
+  CERT_NUMBER: 'TEST_CERT_APP_REVIEW_250519',
+  /** 테스트용 CI */
+  CI: 'TEST_CI_APP_REVIEW_01005190519',
+  /** 테스트용 DI */
+  DI: 'TEST_DI_APP_REVIEW_01005190519',
+} as const;
+
+/**
  * 본인인증 단계 enum
  */
 export enum VerificationStep {
@@ -72,6 +90,35 @@ export class PhoneVerificationService {
     dto: RequestVerificationDto,
   ): Promise<RequestVerificationResponseDto> {
     this.logger.log(`🚀 본인인증 요청 시작 - 이름: ${dto.userName}`);
+
+    // 테스트 계정: KCP 호출 없이 바로 성공 처리
+    if (dto.mobile === TEST_ACCOUNT.MOBILE) {
+      this.logger.log(`📱 테스트 계정 감지: ${dto.mobile}`);
+
+      // 기존 테스트 로그 삭제 (중복 방지)
+      await this.prisma.phoneVerificationLog.deleteMany({
+        where: { certNumber: TEST_ACCOUNT.CERT_NUMBER },
+      });
+
+      // 테스트용 로그 저장
+      await this.saveLog({
+        certNumber: TEST_ACCOUNT.CERT_NUMBER,
+        orderId: 'TEST_ORDER_APP_REVIEW',
+        mobile: dto.mobile,
+        userName: dto.userName,
+        birthDay: dto.birthDay,
+        telecom: dto.telecom,
+        sex: dto.sex,
+        step: VerificationStep.SMS_SENT,
+      });
+
+      this.logger.log(`✅ 테스트 계정 본인인증 요청 완료`);
+
+      return {
+        certNumber: TEST_ACCOUNT.CERT_NUMBER,
+        message: 'SMS가 발송되었습니다. 인증번호를 확인해주세요.',
+      };
+    }
 
     // 주문번호 생성
     const orderId = this.generateOrderId();
@@ -207,6 +254,32 @@ export class PhoneVerificationService {
     this.logger.log(`  - mobile: ${log.mobile}`);
     this.logger.log(`  - userName: ${log.userName}`);
     this.logger.log(`  - telecom: ${log.telecom}`);
+
+    // 테스트 계정: KCP 호출 없이 바로 성공 처리
+    if (log.mobile === TEST_ACCOUNT.MOBILE && dto.otpNumber === TEST_ACCOUNT.OTP) {
+      this.logger.log(`📱 테스트 계정 OTP 검증: ${log.mobile}`);
+
+      // DB 업데이트 (CI/DI 저장)
+      await this.prisma.phoneVerificationLog.update({
+        where: { id: log.id },
+        data: {
+          ci: TEST_ACCOUNT.CI,
+          di: TEST_ACCOUNT.DI,
+          step: VerificationStep.VERIFIED,
+          verificationStatus: VerificationStatus.COMPLETED,
+          updatedAt: getNowKST(),
+        },
+      });
+
+      this.logger.log('✅ 테스트 계정 본인인증 완료');
+
+      return {
+        success: true,
+        ci: TEST_ACCOUNT.CI,
+        di: TEST_ACCOUNT.DI,
+        message: '본인인증이 완료되었습니다.',
+      };
+    }
 
     // === 3단계: 인증번호 확인 ===
     const step3Request = {
