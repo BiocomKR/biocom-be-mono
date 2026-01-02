@@ -165,7 +165,12 @@ export class MissionCompletionService {
 
         } else {
           // 일반 미션 처리 (1일1미션 등)
-          if (mission.requireUpload && !fileUploadIdFromMetadata) {
+          // dailyMission이 있으면 verifyType 기준, 없으면 mission.requireUpload 기준
+          const requiresFileUpload = dailyMission
+            ? dailyMission.verifyType === 'PHOTO'  // daily_missions의 verifyType이 PHOTO인 경우만
+            : mission.requireUpload;  // dailyMission 없으면 기존 로직 유지
+
+          if (requiresFileUpload && !fileUploadIdFromMetadata) {
             throw new BadRequestException('이 미션은 인증샷 업로드가 필요합니다 (metadata.fileUploadId)');
           }
 
