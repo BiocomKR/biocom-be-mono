@@ -55,10 +55,25 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Setup Cloud SQL Proxy
+        run: |
+          curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.2/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+
       - name: Run DB Migration
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
-        run: npx prisma db push --accept-data-loss
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD_PROXY }}
+        run: |
+          # Cloud SQL Proxy 백그라운드 실행
+          ./cloud-sql-proxy --port 5432 ${{ env.PROJECT_ID }}:${{ env.REGION }}:biocom-postgres-prod &
+          PROXY_PID=$!
+          sleep 5
+
+          # DB 마이그레이션 실행
+          npx prisma db push --accept-data-loss
+
+          # Proxy 종료
+          kill $PROXY_PID || true
 
       - name: Get GKE Credentials
         uses: google-github-actions/get-gke-credentials@v2
