@@ -40,3 +40,14 @@ infra-gcp/terraform/.terraform/
 # Davia
 .davia/
 .claude/skills/davia-documentation/SKILL.md
+# Secrets
+.env.secrets
+.env.secrets.prod
+infra-gcp/.env.secrets
+infra-gcp/.env.secrets.prod
+
+# Secrets
+.env.secrets
+.env.secrets.prod
+infra-gcp/.env.secrets
+infra-gcp/.env.secrets.prod
