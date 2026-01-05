@@ -12,8 +12,8 @@ export class IssueService {
   /**
    * 신고 목록 조회
    */
-  async getReports(page: number = 1, limit: number = 20, isAnswered?: boolean) {
-    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}`);
+  async getReports(page: number = 1, limit: number = 20, isAnswered?: boolean, type?: string) {
+    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}, type=${type}`);
 
     const skip = (page - 1) * limit;
 
@@ -22,6 +22,9 @@ export class IssueService {
       where.answer = { not: null };
     } else if (isAnswered === false) {
       where.answer = null;
+    }
+    if (type) {
+      where.type = type;
     }
 
     const [items, total] = await Promise.all([
@@ -53,6 +56,7 @@ export class IssueService {
         deviceInfo: item.deviceInfo,
         createdAt: item.createdAt,
         isAnswered: item.answer !== null,
+        type: item.type,
         user: item.user,
       })),
       total,
