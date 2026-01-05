@@ -86,10 +86,10 @@ export class UploadController {
     status: HttpStatus.BAD_REQUEST, 
     description: '잘못된 파일 형식 또는 크기' 
   })
-  @ApiQueryDecorator({ 
-    name: 'relatedType', 
-    required: true, 
-    description: '연관된 활동 타입 (예: DIET, DAILY_MISSION, SUPPLEMENT)',
+  @ApiQueryDecorator({
+    name: 'relatedType',
+    required: true,
+    description: '연관된 활동 타입 (DIET, DAILY_MISSION, SUPPLEMENT, ACTIVITY, QUIZ, REVIEW, QNA, PROFILE)',
     example: 'DIET'
   })
   async uploadImage(

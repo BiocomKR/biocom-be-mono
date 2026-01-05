@@ -122,6 +122,15 @@ export class UploadService {
 
   /**
    * 이미지 파일 업로드 및 기록 (메모리 스토리지 + Google Cloud Storage)
+   * @param relatedType 연관 타입 (자유 문자열, 검증 없음)
+   *   - DIET: 식단 기록
+   *   - DAILY_MISSION: 데일리 미션
+   *   - SUPPLEMENT: 영양제
+   *   - ACTIVITY: 활동 기록
+   *   - QUIZ: 퀴즈
+   *   - REVIEW: 구매평
+   *   - QNA: 상품 Q&A
+   *   - PROFILE: 프로필 이미지
    */
   async uploadImage(
     userId: number,

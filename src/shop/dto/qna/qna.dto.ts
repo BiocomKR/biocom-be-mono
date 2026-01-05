@@ -6,7 +6,10 @@ import {
   IsOptional,
   IsEnum,
   IsBoolean,
-  MaxLength
+  MaxLength,
+  IsArray,
+  ArrayMaxSize,
+  IsUrl
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -73,6 +76,17 @@ export class CreateQnaDto {
   @IsOptional()
   @IsBoolean()
   isSecret?: boolean;
+
+  @ApiPropertyOptional({
+    description: '이미지 URL 배열 (최대 5장)',
+    example: ['https://example.com/image1.jpg'],
+    maxItems: 5
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsUrl({}, { each: true })
+  mediaUrls?: string[];
 }
 
 /**
@@ -102,6 +116,17 @@ export class UpdateQnaDto {
   @IsOptional()
   @IsBoolean()
   isSecret?: boolean;
+
+  @ApiPropertyOptional({
+    description: '이미지 URL 배열 (최대 5장)',
+    example: ['https://example.com/image1.jpg'],
+    maxItems: 5
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsUrl({}, { each: true })
+  mediaUrls?: string[];
 }
 
 /**
@@ -222,6 +247,12 @@ export class QnaResponseDto {
     name: string;
     sku: string;
   };
+
+  @ApiPropertyOptional({
+    description: '이미지 URL 배열',
+    example: ['https://example.com/image1.jpg']
+  })
+  mediaUrls?: string[];
 }
 
 /**

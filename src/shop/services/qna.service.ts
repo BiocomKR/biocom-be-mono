@@ -57,6 +57,7 @@ export class QnaService {
         questionType: dto.questionType,
         isSecret: dto.isSecret || false,
         hasAnswer: false,
+        mediaUrls: dto.mediaUrls || [],
         createdAt: getNowKST(),
       },
       include: {
@@ -369,7 +370,8 @@ export class QnaService {
         title: dto.title,
         content: dto.content,
         questionType: dto.questionType,
-        isSecret: dto.isSecret
+        isSecret: dto.isSecret,
+        ...(dto.mediaUrls !== undefined && { mediaUrls: dto.mediaUrls }),
       },
       include: {
         user: {
@@ -689,7 +691,8 @@ export class QnaService {
         id: question.product.id,
         name: question.product.name,
         sku: question.product.sku
-      } : undefined
+      } : undefined,
+      mediaUrls: question.mediaUrls as string[] || [],
     };
   }
 
