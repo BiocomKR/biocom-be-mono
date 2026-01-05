@@ -58,7 +58,7 @@ data:
   # ==========================================
   # 토스페이먼츠 결제 설정 (테스트 키)
   # ==========================================
-  TOSS_PAYMENTS_CLIENT_KEY: "test_ck_0RnYX2w532qNWYYLpqXP8NeyqApQ"
+  TOSS_PAYMENTS_CLIENT_KEY: "test_ck_d46qopOB89POOvXxk1EarZmM75y0"
 
   # ==========================================
   # Google Cloud Storage 설정
