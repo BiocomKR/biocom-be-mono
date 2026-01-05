@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { CreateIssueReportDto } from './dto/create-issue-report.dto';
+import { CreateAccountDeletionDto } from './dto/create-account-deletion.dto';
 import { IssueReportResponseDto, IssueReportListResponseDto, FileInfoDto } from './dto/issue-report-response.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 
@@ -67,6 +68,36 @@ export class IssueService {
     return {
       items: items.map((report: any) => this.toResponseDto(report, fileMap)),
       total,
+    };
+  }
+
+  /**
+   * 계정 삭제 요청 접수 (Public API)
+   * 휴대폰 번호로 계정 삭제 요청을 받음
+   */
+  async createAccountDeletionRequest(dto: CreateAccountDeletionDto): Promise<{ success: boolean; message: string }> {
+    this.logger.log(`계정 삭제 요청 접수: mobile=${dto.mobile}`);
+
+    // 해당 휴대폰 번호로 가입된 사용자 조회
+    const user = await this.prisma.user.findFirst({
+      where: { mobile: dto.mobile, deletedAt: null },
+    });
+
+    // 사용자가 없어도 보안상 같은 응답을 반환 (존재 여부를 노출하지 않음)
+    if (user) {
+      await this.prisma.issueReport.create({
+        data: {
+          userId: user.id,
+          content: dto.reason || '계정 삭제 요청',
+          type: 'ACCOUNT_DELETION',
+          createdAt: getNowKST(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: '계정 삭제 요청이 접수되었습니다. 영업일 기준 7일 이내에 처리됩니다.',
     };
   }
 
