@@ -24,17 +24,20 @@ export class IssueController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: '페이지 번호 (기본: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '페이지당 개수 (기본: 20)' })
   @ApiQuery({ name: 'isAnswered', required: false, type: Boolean, description: '답변 여부 필터' })
+  @ApiQuery({ name: 'type', required: false, type: String, description: '유형 필터 (ISSUE, ACCOUNT_DELETION)' })
   @ApiResponse({ status: 200, description: '목록 조회 성공' })
   async getReports(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('isAnswered') isAnswered?: string,
+    @Query('type') type?: string,
   ) {
     this.logger.log(`신고 목록 조회 요청`);
     return this.issueService.getReports(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
       isAnswered === 'true' ? true : isAnswered === 'false' ? false : undefined,
+      type,
     );
   }
 
