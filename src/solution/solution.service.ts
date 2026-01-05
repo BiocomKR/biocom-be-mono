@@ -92,7 +92,7 @@ export class SolutionService {
     // 4. SIB 음식물 과민증 검사 결과 조회
     let foodLevelResult: FoodLevelItem | null = null;
     if (user.mobile) {
-      foodLevelResult = await this.getFoodLevelResult(user.mobile);
+      foodLevelResult = await this.getFoodLevelResult(userId, user.mobile);
     }
 
     // metadata에서 intakeGuide 추출
@@ -219,7 +219,7 @@ export class SolutionService {
     // 4. SIB 음식물 과민증 검사 결과 조회
     let foodLevelResult: FoodLevelItem | null = null;
     if (user.mobile) {
-      foodLevelResult = await this.getFoodLevelResult(user.mobile);
+      foodLevelResult = await this.getFoodLevelResult(userId, user.mobile);
     }
 
     // 5. metadata에서 추출
@@ -328,7 +328,7 @@ export class SolutionService {
     // 4. SIB 음식물 과민증 검사 결과 조회 (조건부 추천용)
     let foodLevelResult: FoodLevelItem | null = null;
     if (user.mobile) {
-      foodLevelResult = await this.getFoodLevelResult(user.mobile);
+      foodLevelResult = await this.getFoodLevelResult(userId, user.mobile);
     }
 
     // 5. metadata에서 추출
@@ -575,10 +575,13 @@ export class SolutionService {
    * SIB 음식물 과민증 검사 결과 조회
    * - D0004(구), D0060(신) 중 최신 검사 결과 조회
    * - orderCode에 따라 신/구 API 분기 호출
+   * - DB 캐싱 활용 (SIB 장애 시에도 캐시 데이터 반환)
+   * @param userId 사용자 ID (캐시 저장용)
    * @param mobile 전화번호
    * @returns 레벨별 음식 목록 또는 null
    */
   private async getFoodLevelResult(
+    userId: number,
     mobile: string,
   ): Promise<FoodLevelItem | null> {
     try {
@@ -609,12 +612,12 @@ export class SolutionService {
         `SIB 검사 조회 - chartId: ${targetExam.chartID}, orderCode: ${targetExam.orderCode}`,
       );
 
-      // 3. orderCode에 따라 신/구 API 분기 호출
+      // 3. orderCode에 따라 신/구 API 분기 호출 (userId 전달하여 캐싱)
       let iggLevels;
       if (targetExam.orderCode === ExamType.IGG_OLD) {
-        iggLevels = await this.sibApiService.getIggLevelsOld(targetExam.chartID);
+        iggLevels = await this.sibApiService.getIggLevelsOld(targetExam.chartID, userId);
       } else {
-        iggLevels = await this.sibApiService.getIggLevels(targetExam.chartID);
+        iggLevels = await this.sibApiService.getIggLevels(targetExam.chartID, userId);
       }
 
       if (!iggLevels || iggLevels.length === 0) {
