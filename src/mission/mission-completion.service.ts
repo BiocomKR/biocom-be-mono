@@ -718,15 +718,31 @@ export class MissionCompletionService {
       const startDateTime = stringToKSTDate(startDate); // 시작일 00:00:00 KST
       const endDateTime = stringToKSTDate(endDate, 24, 0, 0); // 종료일 다음날 00:00:00 KST
 
-      this.logger.log(`놓친 미션 조회 - 날짜 범위: ${startDate} ~ ${endDate}, 현재: ${currentDay}일차`);
+      // 3️⃣ startDate/endDate를 챌린지 일차(day)로 변환
+      // activatedAt 기준으로 startDate/endDate가 몇 일차인지 계산
+      const activatedDateStr = activeChallenge.activatedAt.toISOString().split('T')[0];
+      const activatedDate = new Date(activatedDateStr);
 
-      // 3️⃣ 해당 기간의 전체 챌린지 미션 조회 (1일차 ~ 어제까지, 당일/미래 제외)
+      // startDate가 챌린지 몇 일차인지 계산 (activatedAt = 1일차)
+      const startDateObj = new Date(startDate);
+      const startDay = Math.floor((startDateObj.getTime() - activatedDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+      // endDate가 챌린지 몇 일차인지 계산
+      const endDateObj = new Date(endDate);
+      const endDay = Math.floor((endDateObj.getTime() - activatedDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
       // 놓친 미션은 "이미 지나간 날"의 미완료 미션만 해당
       const maxDayForMissed = currentDay - 1;
 
-      // 1일차인 경우 놓친 미션 없음 (아직 지나간 날이 없음)
-      if (maxDayForMissed < 1) {
-        this.logger.log(`놓친 미션 없음 - 현재 ${currentDay}일차 (아직 지나간 날이 없음)`);
+      // 실제 조회할 일차 범위 계산 (요청 범위와 가능한 범위의 교집합)
+      const queryStartDay = Math.max(1, startDay);
+      const queryEndDay = Math.min(maxDayForMissed, endDay);
+
+      this.logger.log(`놓친 미션 조회 - 날짜 범위: ${startDate}(${startDay}일차) ~ ${endDate}(${endDay}일차), 현재: ${currentDay}일차, 조회 범위: ${queryStartDay}~${queryEndDay}일차`);
+
+      // 조회할 범위가 없으면 빈 결과 반환
+      if (queryEndDay < queryStartDay || maxDayForMissed < 1) {
+        this.logger.log(`놓친 미션 없음 - 조회 범위 없음 (queryStartDay: ${queryStartDay}, queryEndDay: ${queryEndDay}, maxDayForMissed: ${maxDayForMissed})`);
         return {
           success: true,
           data: {
@@ -742,8 +758,8 @@ export class MissionCompletionService {
         where: {
           challengeId: activeChallenge.challengeId,
           day: {
-            gte: 1,
-            lte: maxDayForMissed  // 어제(currentDay - 1)까지만 조회
+            gte: queryStartDay,  // 요청한 startDate에 해당하는 일차부터
+            lte: queryEndDay     // 요청한 endDate와 어제 중 작은 일차까지
           },
           isActive: true
         },

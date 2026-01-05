@@ -113,12 +113,12 @@ export class ExamService {
       `식품 레벨 조회 - userId: ${userId}, chartID: ${targetExam.chartID}, orderCode: ${targetExam.orderCode}`,
     );
 
-    // 4. orderCode에 따라 신/구 API 호출
+    // 4. orderCode에 따라 신/구 API 호출 (userId 전달하여 캐싱)
     let data: IggLevelsResponse | null;
     if (targetExam.orderCode === IGG_OLD_EXAM_TYPE) {
-      data = await this.sibApiService.getIggLevelsOld(targetExam.chartID);
+      data = await this.sibApiService.getIggLevelsOld(targetExam.chartID, userId);
     } else {
-      data = await this.sibApiService.getIggLevels(targetExam.chartID);
+      data = await this.sibApiService.getIggLevels(targetExam.chartID, userId);
     }
 
     if (!data) {

@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
-import { HttpModule } from '@nestjs/axios';
 import { RecordsController } from './controllers/records.controller';
 import { RecordsService } from './services/records.service';
 import { RecordAccessGuard } from './guards/record-access.guard';
 import { RecordExtendedAccessGuard } from './guards/record-extended-access.guard';
 import { PointModule } from '../point/point.module';
+import { SibModule } from '../sib/sib.module';
 
 /**
  * 기록 모듈
@@ -17,7 +17,7 @@ import { PointModule } from '../point/point.module';
  * - 외부 분석실 API 연동 (알러지 검사 결과 조회)
  */
 @Module({
-  imports: [PointModule, HttpModule],
+  imports: [PointModule, SibModule],
   controllers: [RecordsController],
   providers: [RecordsService, RecordAccessGuard, RecordExtendedAccessGuard],
   exports: [RecordsService],
