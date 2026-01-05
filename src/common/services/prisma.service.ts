@@ -206,7 +206,7 @@ function createExtendedPrismaClient() {
       $allModels: {
         async update({ args, query, model }) {
           // updatedAt 컬럼이 없는 모델 제외
-          const modelsWithoutUpdatedAt = ['Consent', 'UserConsent'];
+          const modelsWithoutUpdatedAt: string[] = [];
           if (args.data && typeof args.data === 'object' && !modelsWithoutUpdatedAt.includes(model)) {
             (args.data as any).updatedAt = getNowKST();
           }
@@ -214,7 +214,7 @@ function createExtendedPrismaClient() {
         },
         async updateMany({ args, query, model }) {
           // updatedAt 컬럼이 없는 모델 제외
-          const modelsWithoutUpdatedAt = ['Consent', 'UserConsent'];
+          const modelsWithoutUpdatedAt: string[] = [];
           if (args.data && typeof args.data === 'object' && !modelsWithoutUpdatedAt.includes(model)) {
             (args.data as any).updatedAt = getNowKST();
           }
