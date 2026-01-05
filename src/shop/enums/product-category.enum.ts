@@ -35,9 +35,10 @@ export const CategoryNameMap: Record<ProductCategory, string> = {
 /**
  * 카테고리 정렬 순서
  * UI에서 카테고리를 표시할 때 사용
+ * SOLUTION, CHALLENGE는 쇼핑몰에서 제외
  */
 export const CategorySortOrder: ProductCategory[] = [
-  ProductCategory.CHALLENGE,           // 챌린지가 가장 우선
+  // ProductCategory.CHALLENGE,           // 챌린지 - 쇼핑몰 제외
   ProductCategory.HEALTH_CHECK,        // 건강검진
   ProductCategory.SUPPLEMENT,          // 영양제
   ProductCategory.OVERSEASUPPLEMENT,   // 해외직구영양제

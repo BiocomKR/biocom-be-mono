@@ -31,7 +31,7 @@ export class ProductsService {
       where: {
         id,
         status: ProductStatus.ACTIVE,
-        categoryCode: { not: ProductCategory.SOLUTION },
+        categoryCode: { notIn: [ProductCategory.SOLUTION, ProductCategory.CHALLENGE] },
       },
       include: {
         productFiles: {
@@ -72,7 +72,7 @@ export class ProductsService {
       where: {
         id,
         status: ProductStatus.ACTIVE,
-        categoryCode: { not: ProductCategory.SOLUTION },
+        categoryCode: { notIn: [ProductCategory.SOLUTION, ProductCategory.CHALLENGE] },
       },
       include: {
         productFiles: {
@@ -237,7 +237,7 @@ export class ProductsService {
       where: {
         id,
         status: ProductStatus.ACTIVE,
-        categoryCode: { not: ProductCategory.SOLUTION },
+        categoryCode: { notIn: [ProductCategory.SOLUTION, ProductCategory.CHALLENGE] },
       },
       select: { id: true, viewCount: true },
     });
@@ -312,16 +312,18 @@ export class ProductsService {
     this.logger.log('카테고리별 그룹핑된 상품 목록 조회 시작');
 
     // WHERE 조건 구성 (기존 필터 로직 사용)
+    // SOLUTION, CHALLENGE 카테고리는 쇼핑몰에서 제외
+    const excludedCategories = [ProductCategory.SOLUTION, ProductCategory.CHALLENGE];
     const where: Prisma.ProductWhereInput = {
       status: query?.status || ProductStatus.ACTIVE,
-      categoryCode: { not: ProductCategory.SOLUTION },
+      categoryCode: { notIn: excludedCategories },
     };
 
     if (query?.categoryCode) {
-      // 특정 카테고리 조회 시에도 SOLUTION은 제외
+      // 특정 카테고리 조회 시에도 제외 카테고리는 제외
       where.AND = [
         { categoryCode: query.categoryCode },
-        { categoryCode: { not: ProductCategory.SOLUTION } },
+        { categoryCode: { notIn: excludedCategories } },
       ];
       delete where.categoryCode;
     }
