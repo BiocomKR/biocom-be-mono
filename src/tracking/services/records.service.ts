@@ -17,10 +17,8 @@ import {
   CreateSleepRecordDto,
   CreateActivityRecordDto,
 } from '../dto/records/records.dto';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
-import { ExamCode } from '@/common/enums/exam-code.enum';
 import { CategoryCode } from '@/common/enums/category-code.enum';
+import { SibApiService } from '../../sib/services/sib-api.service';
 
 /**
  * 기록 서비스
@@ -36,7 +34,7 @@ export class RecordsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pointService: PointService,
-    private readonly httpService: HttpService,
+    private readonly sibApiService: SibApiService,
   ) {}
 
   /**
@@ -1294,7 +1292,7 @@ export class RecordsService {
       });
 
       // 알러지 식품 조회 (지연성 알러지 검사 결과)
-      const allergyFoods = await this.getAllergyFoods(user.mobile);
+      const allergyFoods = await this.getAllergyFoods(user.mobile, userId);
 
       return {
         success: true,
@@ -1315,88 +1313,17 @@ export class RecordsService {
   /**
    * 지연성 알러지 검사 결과 조회
    * @param mobile 휴대폰번호 (자동 복호화됨)
+   * @param userId 사용자 ID (DB 캐시 저장용)
    */
-  private async getAllergyFoods(mobile: string): Promise<Array<{ name: string; level: number }>> {
+  private async getAllergyFoods(mobile: string, userId: number): Promise<Array<{ name: string; level: number }>> {
     try {
-      this.logger.log(`지연성 알러지 검사 결과 조회 - 휴대폰: ${mobile.substring(0, 3)}****`);
+      const result = await this.sibApiService.getAllergyFoodsByMobile(mobile, userId);
 
-      // 1. chartIdByMobile API 호출
-      const chartResponse = await firstValueFrom(
-        this.httpService.get(`https://sib.codns.com:3001/api/challenge/chartIdByMobile`, {
-          params: { mobile },
-        })
-      );
-
-      const charts = chartResponse.data;
-
-      // 배열이 비어있으면 접근 제한
-      if (!Array.isArray(charts) || charts.length === 0) {
+      if (!result) {
         throw new ForbiddenException('접근 권한이 없습니다.');
       }
 
-      // 지연성알러지 검사 결과 찾기 (가장 최신 것) - 신규/구버전 모두 포함
-      const examResults = charts
-        .filter((chart: any) =>
-          (chart.orderCode === ExamCode.DELAYED_ALLERGY || chart.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY)
-          && chart.resultYN === 'Y'
-        )
-        .sort((a: any, b: any) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime());
-
-      if (examResults.length === 0) {
-        throw new ForbiddenException('접근 권한이 없습니다.');
-      }
-
-      const latestResult = examResults[0];
-
-      // 180일 경과 체크
-      const receiptDate = new Date(latestResult.receiptDate);
-      const now = getNowKST();
-      const daysDiff = Math.floor((now.getTime() - receiptDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      // 180일 체크 정책 폐지 (무제한으로 변경) 2025-11-20
-      // if (daysDiff > 180) {
-      //   throw new ForbiddenException('접근 권한이 없습니다.');
-      // }
-
-      this.logger.log(`지연성 알러지 검사 결과 발견 - chartID: ${latestResult.chartID}, orderCode: ${latestResult.orderCode}, 경과일: ${daysDiff}일`);
-
-      // 2. orderCode에 따라 신/구 API 분기 호출
-      const apiEndpoint = latestResult.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY
-        ? 'https://sib.codns.com:3001/api/report/getIggLevelOld'
-        : 'https://sib.codns.com:3001/api/report/getIggLevels';
-
-      const iggResponse = await firstValueFrom(
-        this.httpService.get(apiEndpoint, {
-          params: { chartId: latestResult.chartID },
-        })
-      );
-
-      const iggData = iggResponse.data;
-
-      if (!Array.isArray(iggData) || iggData.length === 0) {
-        this.logger.warn('IgG 검사 결과가 비어있습니다.');
-        return [];
-      }
-
-      // 데이터 변환 (level1~level5를 allergyFoods 배열로)
-      const allergyFoods: Array<{ name: string; level: number }> = [];
-      const result = iggData[0];
-
-      for (let level = 1; level <= 5; level++) {
-        const levelKey = `level${level}`;
-        const foodsStr = result[levelKey];
-
-        if (foodsStr && foodsStr !== '해당없음') {
-          const foods = foodsStr.split(',').map((f: string) => f.trim());
-          foods.forEach((food: string) => {
-            allergyFoods.push({ name: food, level });
-          });
-        }
-      }
-
-      this.logger.log(`알러지 식품 ${allergyFoods.length}개 조회 완료`);
-      return allergyFoods;
-
+      return result.foods;
     } catch (error) {
       if (error instanceof ForbiddenException) {
         throw error;

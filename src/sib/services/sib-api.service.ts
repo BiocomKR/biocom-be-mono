@@ -314,4 +314,91 @@ export class SibApiService {
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+
+  /**
+   * 전화번호로 알러지 식품 목록 조회
+   * - 지연성 알러지 검사 결과에서 level1~5 식품 추출
+   * - 신/구 API 자동 분기
+   * @param mobile 전화번호
+   * @param userId 사용자 ID (캐시 저장용, 선택)
+   * @returns 알러지 식품 배열 (없으면 null)
+   */
+  async getAllergyFoodsByMobile(
+    mobile: string,
+    userId?: number,
+  ): Promise<{ foods: Array<{ name: string; level: number }>; chartId: string; orderCode: string } | null> {
+    try {
+      this.logger.log(`알러지 식품 조회 - 휴대폰: ${mobile.substring(0, 3)}****`);
+
+      // 1. chartIdByMobile API 호출
+      const chartList = await this.getChartIdByMobile(mobile);
+
+      if (!chartList || chartList.length === 0) {
+        this.logger.log('검사 결과 없음');
+        return null;
+      }
+
+      // 2. 지연성알러지 검사 결과 찾기 (resultYN === 'Y'인 것만, 최신순)
+      const iggExams = chartList
+        .filter(
+          (exam) =>
+            IGG_EXAM_TYPES.includes(exam.orderCode as ExamType) &&
+            exam.resultYN === YesNo.Y,
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime(),
+        );
+
+      if (iggExams.length === 0) {
+        this.logger.log('지연성 알러지 검사 결과 없음');
+        return null;
+      }
+
+      const latestExam = iggExams[0];
+      this.logger.log(
+        `지연성 알러지 검사 발견 - chartID: ${latestExam.chartID}, orderCode: ${latestExam.orderCode}`,
+      );
+
+      // 3. orderCode에 따라 신/구 API 분기 호출
+      const iggData =
+        latestExam.orderCode === ExamType.IGG_OLD
+          ? await this.getIggLevelsOld(latestExam.chartID, userId)
+          : await this.getIggLevels(latestExam.chartID, userId);
+
+      if (!iggData || iggData.length === 0) {
+        this.logger.warn('IgG 검사 결과가 비어있습니다.');
+        return null;
+      }
+
+      // 4. 데이터 변환 (level1~level5를 allergyFoods 배열로)
+      const allergyFoods: Array<{ name: string; level: number }> = [];
+      const result = iggData[0];
+
+      for (let level = 1; level <= 5; level++) {
+        const levelKey = `level${level}` as keyof FoodLevelItem;
+        const foodsStr = result[levelKey];
+
+        if (foodsStr && foodsStr !== '해당없음') {
+          const foods = foodsStr.split(',').map((f: string) => f.trim());
+          foods.forEach((food: string) => {
+            if (food) {
+              allergyFoods.push({ name: food, level });
+            }
+          });
+        }
+      }
+
+      this.logger.log(`알러지 식품 ${allergyFoods.length}개 조회 완료`);
+
+      return {
+        foods: allergyFoods,
+        chartId: latestExam.chartID,
+        orderCode: latestExam.orderCode,
+      };
+    } catch (error) {
+      this.logger.error('알러지 식품 조회 실패', error);
+      throw error;
+    }
+  }
 }
