@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { DeepReportResponseDto, DeepReportContentDto } from './dto/deep-report.dto';
-import { YesNo } from '../common/enums';
+import { YesNo, UserSubscriptionStatus, UserChallengeStatus } from '../common/enums';
 import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
@@ -23,6 +23,12 @@ export class DeepReportService {
    */
   async getDeepReport(userId: number): Promise<DeepReportResponseDto> {
     this.logger.log(`[getDeepReport] 심층리포트 조회 시작 - userId: ${userId}`);
+
+    // 0. 사용자 상태 확인 (CHALLENGER, SUBSCRIBER, 또는 최근 챌린지 완료 NEWCOMER만 접근 가능)
+    const hasAccess = await this.checkDeepReportAccess(userId);
+    if (!hasAccess) {
+      throw new ForbiddenException('심층리포트는 챌린저 또는 구독자만 조회할 수 있습니다');
+    }
 
     // 1. user_charts에서 chart_id 조회
     const chartId = await this.getLatestChartId(userId);
@@ -46,9 +52,10 @@ export class DeepReportService {
       where: {
         userId,
         chartId,
-        startDate: lastMonday,
+        startDate: {
+          gte: lastMonday,
+        },
         endDate: {
-          gte: lastSunday,
           lte: lastSundayEnd,
         },
       },
@@ -70,7 +77,10 @@ export class DeepReportService {
 
     this.logger.log(`[getDeepReport] 심층리포트 조회 성공 - reportId: ${deepReport.reportId}`);
 
-    // 4. 응답 변환
+    // 4. 포인트 지급 처리 (해당 리포트에 대해 1회만 지급)
+    const pointsEarned = await this.awardPointsIfNotAwarded(userId, deepReport.reportId);
+
+    // 5. 응답 변환
     const data: DeepReportContentDto = {
       reportId: deepReport.reportId,
       provider: deepReport.provider,
@@ -79,9 +89,138 @@ export class DeepReportService {
       endDate: deepReport.endDate.toISOString().split('T')[0],
       weekNumber: deepReport.weekNumber ?? undefined,
       createdAt: deepReport.createdAt.toISOString(),
+      pointsEarned,
     };
 
     return { success: true, data };
+  }
+
+  /**
+   * 심층리포트 포인트 지급 (해당 리포트에 대해 1회만)
+   * missions 테이블의 WEEKLY_REPORT 미션 포인트를 지급
+   *
+   * @param userId 사용자 ID
+   * @param reportId 리포트 ID
+   * @returns 지급된 포인트 (이미 지급받았으면 0)
+   */
+  private async awardPointsIfNotAwarded(userId: number, reportId: string): Promise<number> {
+    // 1. WEEKLY_REPORT 미션 정보 조회
+    const mission = await this.prisma.mission.findFirst({
+      where: {
+        recordType: 'WEEKLY_REPORT',
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        points: true,
+      },
+    });
+
+    if (!mission || mission.points <= 0) {
+      this.logger.log(`[awardPoints] WEEKLY_REPORT 미션 없거나 포인트 0 - userId: ${userId}`);
+      return 0;
+    }
+
+    // 2. 해당 리포트에 대해 이미 포인트 지급했는지 확인
+    // relatedType: 'WEEKLY_REPORT', description에 reportId 포함
+    const existingPointHistory = await this.prisma.pointHistory.findFirst({
+      where: {
+        userId,
+        relatedType: 'WEEKLY_REPORT',
+        description: { contains: reportId },
+      },
+    });
+
+    if (existingPointHistory) {
+      this.logger.log(`[awardPoints] 이미 포인트 지급됨 - userId: ${userId}, reportId: ${reportId}`);
+      return 0;
+    }
+
+    // 3. 포인트 지급 (트랜잭션)
+    const pointsToAward = mission.points;
+
+    await this.prisma.$transaction(async (tx) => {
+      // 사용자 포인트 증가
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: { points: { increment: pointsToAward } },
+      });
+
+      // 포인트 히스토리 기록
+      await tx.pointHistory.create({
+        data: {
+          userId,
+          type: 'EARNED',
+          amount: pointsToAward,
+          balance: updatedUser.points,
+          description: `심층리포트 조회 (${reportId})`,
+          relatedType: 'WEEKLY_REPORT',
+          relatedId: null, // reportId는 string이므로 description에 포함
+          createdAt: getNowKST(),
+        },
+      });
+
+      this.logger.log(`[awardPoints] 포인트 지급 완료 - userId: ${userId}, points: ${pointsToAward}, reportId: ${reportId}`);
+    });
+
+    return pointsToAward;
+  }
+
+  /**
+   * 심층리포트 접근 권한 확인
+   * - CHALLENGER: 접근 가능
+   * - SUBSCRIBER: 접근 가능
+   * - NEWCOMER: 최근 7일 이내 만료된 챌린지가 있으면 접근 가능 (3주차 리포트 조회용)
+   *
+   * @param userId 사용자 ID
+   * @returns 접근 가능 여부
+   */
+  private async checkDeepReportAccess(userId: number): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { status: true },
+    });
+
+    if (!user) {
+      this.logger.warn(`[checkAccess] 사용자 없음 - userId: ${userId}`);
+      return false;
+    }
+
+    // CHALLENGER 또는 SUBSCRIBER는 바로 접근 가능
+    const allowedStatuses = [UserSubscriptionStatus.CHALLENGER, UserSubscriptionStatus.SUBSCRIBER];
+    if (allowedStatuses.includes(user.status as UserSubscriptionStatus)) {
+      this.logger.log(`[checkAccess] 접근 허용 - userId: ${userId}, status: ${user.status}`);
+      return true;
+    }
+
+    // NEWCOMER인 경우: 최근 7일 이내 만료된 챌린지가 있는지 확인
+    if (user.status === UserSubscriptionStatus.NEWCOMER) {
+      const now = getNowKST();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const recentExpiredChallenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: UserChallengeStatus.EXPIRED,
+          expiresAt: {
+            gte: sevenDaysAgo, // 7일 이내 만료
+          },
+        },
+        select: { id: true, expiresAt: true },
+      });
+
+      if (recentExpiredChallenge) {
+        this.logger.log(
+          `[checkAccess] NEWCOMER 접근 허용 (최근 챌린지 만료) - userId: ${userId}, ` +
+          `expiredAt: ${recentExpiredChallenge.expiresAt?.toISOString()}`
+        );
+        return true;
+      }
+    }
+
+    this.logger.warn(`[checkAccess] 접근 거부 - userId: ${userId}, status: ${user.status}`);
+    return false;
   }
 
   /**
