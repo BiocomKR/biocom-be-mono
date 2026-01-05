@@ -58,7 +58,7 @@ data:
   # ==========================================
   # 토스페이먼츠 결제 설정 (운영 키)
   # ==========================================
-  TOSS_PAYMENTS_CLIENT_KEY: "live_ck_0RnYX2w532qNWYYLpqXP8NeyqApQ"
+  TOSS_PAYMENTS_CLIENT_KEY: "live_ck_E92LAa5PVb5GE7X09pWJ37YmpXyJ"
 
   # ==========================================
   # Google Cloud Storage 설정
@@ -106,7 +106,7 @@ data:
   # 플레이오토 물류 API 설정
   # ==========================================
   PLAYAUTO_BASE_URL: "https://openapi.playauto.io/api"
-  PLAYAUTO_SHOP_CD: "UVP2"
+  PLAYAUTO_SHOP_CD: "ULPL"
   PLAYAUTO_SHOP_ID: "biocom@biocom.kr"
 
   # ==========================================
