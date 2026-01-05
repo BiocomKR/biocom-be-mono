@@ -10,6 +10,33 @@ export class ConsentService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * 약관 코드로 단일 약관 조회 (Public API용)
+   * @param code 약관 코드 (예: PRIVACY_POLICY, SERVICE_TERMS)
+   */
+  async getConsentByCode(code: string) {
+    this.logger.log(`약관 조회 (code: ${code})`);
+
+    const consent = await this.prisma.consent.findFirst({
+      where: {
+        code,
+        isActive: true,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        code: true,
+        title: true,
+        content: true,
+        version: true,
+        category: true,
+        isRequired: true,
+      },
+    });
+
+    return consent;
+  }
+
+  /**
    * 활성 약관 목록 조회
    * 유저에게 보여줄 현재 활성화된 약관 목록
    * @param category 카테고리 필터 (선택)
