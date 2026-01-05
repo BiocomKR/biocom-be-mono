@@ -106,7 +106,7 @@ data:
   # 플레이오토 물류 API 설정
   # ==========================================
   PLAYAUTO_BASE_URL: "https://openapi.playauto.io/api"
-  PLAYAUTO_SHOP_CD: "UVP2"
+  PLAYAUTO_SHOP_CD: "ULPL"
   PLAYAUTO_SHOP_ID: "biocom@biocom.kr"
 
   # ==========================================

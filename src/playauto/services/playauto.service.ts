@@ -223,8 +223,8 @@ export class PlayautoService {
 
       // 플레이오토 API 요청 바디
       const requestData = {
-        shop_cd: process.env.PLAYAUTO_SHOP_CD, // "UVP2"
-        shop_id: process.env.PLAYAUTO_SHOP_ID, // "biocom@biocom.kr"
+        shop_cd: process.env.PLAYAUTO_SHOP_CD, // "ULPL"
+        shop_id: process.env.PLAYAUTO_SHOP_ID, // "jinman@biocom.kr" - 공정관리팀 사용 계정
         shop_ord_no: '__AUTO__', // 플레이오토가 주문번호 생성
         ord_date: new Date(order.orderedAt).toISOString().split('T')[0], // YYYY-MM-DD
         ord_nm: order.recipientName,
