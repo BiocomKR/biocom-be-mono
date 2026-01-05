@@ -2994,6 +2994,8 @@ model IssueReport {
   createdAt  DateTime  @default(now()) @map("created_at")
   /// 첨부파일 ID 배열
   fileIds    Int[]     @default([]) @map("file_ids")
+  /// 신고 유형 (ISSUE: 불편사항, ACCOUNT_DELETION: 계정삭제요청)
+  type       String    @default("ISSUE") @db.VarChar(30)
   user       User      @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_issue_reports_user_id")
