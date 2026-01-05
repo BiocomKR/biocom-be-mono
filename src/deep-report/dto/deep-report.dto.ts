@@ -24,6 +24,9 @@ export class DeepReportContentDto {
 
   @ApiProperty({ description: '생성일시', example: '2025-12-23T10:00:00.000Z' })
   createdAt: string;
+
+  @ApiPropertyOptional({ description: '이번 조회로 지급된 포인트 (이미 지급받았으면 0)', example: 300 })
+  pointsEarned?: number;
 }
 
 /**
