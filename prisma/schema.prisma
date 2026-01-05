@@ -1101,6 +1101,8 @@ model Refund {
   rejectedAt           DateTime? @map("rejected_at")
   /// 생성일시
   createdAt            DateTime  @map("created_at")
+  /// 수정일시
+  updatedAt            DateTime? @map("updated_at")
   /// PG사 취소 거래 ID
   pgCancelId           String?   @map("pg_cancel_id") @db.VarChar(100)
   /// PG사 취소 응답 (JSON)

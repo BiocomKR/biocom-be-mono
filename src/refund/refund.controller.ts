@@ -168,4 +168,17 @@ export class RefundController {
   ) {
     return this.refundService.completeExchange(orderNumber, exchangeId, exchangeTrackingNumber);
   }
+
+  /**
+   * 관리자 주문 취소 (고객 대신 취소)
+   * Refund 레코드 생성 및 즉시 취소 처리
+   */
+  @Post('admin-cancel/:orderId')
+  async adminCancelOrder(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body('reason') reason: string,
+    @Body('adminMemo') adminMemo?: string
+  ) {
+    return this.refundService.adminCancelOrder(orderId, reason, adminMemo);
+  }
 }

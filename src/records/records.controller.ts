@@ -25,8 +25,13 @@ export class RecordsController {
    */
   @Get('dashboard')
   @ApiOperation({ summary: '기록 통계 대시보드 (경영진용)' })
-  async getDashboard() {
-    const data = await this.recordsService.getDashboard();
+  @ApiQuery({ name: 'productId', required: false, type: Number, description: '챌린지 상품 ID (필터링)' })
+  async getDashboard(
+    @Query('productId') productId?: string,
+  ) {
+    const data = await this.recordsService.getDashboard(
+      productId ? parseInt(productId, 10) : undefined,
+    );
     return {
       success: true,
       message: '기록 통계 대시보드 조회 성공',

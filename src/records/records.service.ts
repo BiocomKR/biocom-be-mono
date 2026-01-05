@@ -30,8 +30,9 @@ export class RecordsService {
 
   /**
    * 기록 통계 대시보드 (경영진용)
+   * @param productId 챌린지 상품 ID (선택) - 특정 챌린지로 필터링
    */
-  async getDashboard(): Promise<RecordsDashboardDto> {
+  async getDashboard(productId?: number): Promise<RecordsDashboardDto> {
     const now = getNowKST();
 
     // 날짜 범위 계산
@@ -64,27 +65,46 @@ export class RecordsService {
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
     const lastWeekEnd = new Date(weekStart);
 
+    // ========== productId로 필터링할 사용자 목록 ==========
+    let filterUserIds: number[] | undefined;
+    if (productId) {
+      const challengeUsers = await this.prisma.userChallenge.findMany({
+        where: { productId },
+        select: { userId: true },
+      });
+      filterUserIds = Array.from(new Set(challengeUsers.map((c: { userId: number }) => c.userId)));
+    }
+
     // ========== 리텐션 지표 ==========
     // DAU: 오늘 기록한 사용자
     const todayRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: today, lt: tomorrow } },
+      where: {
+        createdAt: { gte: today, lt: tomorrow },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
+      },
       select: { userId: true },
     });
-    const dau = new Set(todayRecords.map((r) => r.userId)).size;
+    const dau = new Set(todayRecords.map((r: { userId: number }) => r.userId)).size;
 
     // WAU: 최근 7일 기록한 사용자
     const weekRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: days7Ago, lt: tomorrow } },
+      where: {
+        createdAt: { gte: days7Ago, lt: tomorrow },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
+      },
       select: { userId: true, createdAt: true },
     });
-    const wau = new Set(weekRecords.map((r) => r.userId)).size;
+    const wau = new Set(weekRecords.map((r: { userId: number }) => r.userId)).size;
 
     // MAU: 최근 30일 기록한 사용자
     const monthRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: days30Ago, lt: tomorrow } },
+      where: {
+        createdAt: { gte: days30Ago, lt: tomorrow },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
+      },
       select: { userId: true },
     });
-    const mau = new Set(monthRecords.map((r) => r.userId)).size;
+    const mau = new Set(monthRecords.map((r: { userId: number }) => r.userId)).size;
 
     // 스티키니스 (DAU/MAU)
     const stickiness = mau > 0 ? Math.round((dau / mau) * 100) : 0;
@@ -93,11 +113,14 @@ export class RecordsService {
     const days7AgoEnd = new Date(days7Ago);
     days7AgoEnd.setDate(days7AgoEnd.getDate() + 1);
     const users7dAgo = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: days7Ago, lt: days7AgoEnd } },
+      where: {
+        createdAt: { gte: days7Ago, lt: days7AgoEnd },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
+      },
       select: { userId: true },
     });
-    const userIds7dAgo = new Set(users7dAgo.map((r) => r.userId));
-    const todayUserIds = new Set(todayRecords.map((r) => r.userId));
+    const userIds7dAgo = new Set(users7dAgo.map((r: { userId: number }) => r.userId));
+    const todayUserIds = new Set(todayRecords.map((r: { userId: number }) => r.userId));
     const retained7d = [...userIds7dAgo].filter((id) => todayUserIds.has(id)).length;
     const retention7d = userIds7dAgo.size > 0 ? Math.round((retained7d / userIds7dAgo.size) * 100) : 0;
 
@@ -105,30 +128,39 @@ export class RecordsService {
     const days30AgoEnd = new Date(days30Ago);
     days30AgoEnd.setDate(days30AgoEnd.getDate() + 1);
     const users30dAgo = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: days30Ago, lt: days30AgoEnd } },
+      where: {
+        createdAt: { gte: days30Ago, lt: days30AgoEnd },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
+      },
       select: { userId: true },
     });
-    const userIds30dAgo = new Set(users30dAgo.map((r) => r.userId));
+    const userIds30dAgo = new Set(users30dAgo.map((r: { userId: number }) => r.userId));
     const retained30d = [...userIds30dAgo].filter((id) => todayUserIds.has(id)).length;
     const retention30d = userIds30dAgo.size > 0 ? Math.round((retained30d / userIds30dAgo.size) * 100) : 0;
 
     // ========== 참여도 지표 ==========
     // 이번 주 인당 평균 기록 수
     const thisWeekRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: weekStart, lt: tomorrow } },
+      where: {
+        createdAt: { gte: weekStart, lt: tomorrow },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
+      },
       select: { userId: true, date: true },
     });
-    const thisWeekUsers = new Set(thisWeekRecords.map((r) => r.userId));
+    const thisWeekUsers = new Set(thisWeekRecords.map((r: { userId: number }) => r.userId));
     const avgRecordsPerUser = thisWeekUsers.size > 0
       ? Math.round((thisWeekRecords.length / thisWeekUsers.size) * 10) / 10
       : 0;
 
     // 연속 기록 일수 계산 (활성 챌린지 사용자 대상)
     const activeUsers = await this.prisma.userChallenge.findMany({
-      where: { status: 'ACTIVE' },
+      where: {
+        status: 'ACTIVE',
+        ...(productId && { productId }),
+      },
       select: { userId: true },
     });
-    const activeUserIds = [...new Set(activeUsers.map((u) => u.userId))];
+    const activeUserIds = Array.from(new Set(activeUsers.map((u: { userId: number }) => u.userId)));
 
     let totalStreak = 0;
     let maxStreak = 0;
@@ -144,7 +176,7 @@ export class RecordsService {
         orderBy: { date: 'desc' },
       });
 
-      const uniqueDates = [...new Set(userRecordDates.map((r) => r.date.toISOString().split('T')[0]))].sort().reverse();
+      const uniqueDates = Array.from(new Set(userRecordDates.map((r: { date: Date }) => r.date.toISOString().split('T')[0]))).sort().reverse();
 
       // 현재 연속 일수 계산
       let streak = 0;
@@ -183,7 +215,7 @@ export class RecordsService {
       },
       select: { userId: true },
     });
-    const recentActiveUserIds = new Set(recentActiveUsers.map((r) => r.userId));
+    const recentActiveUserIds = new Set(recentActiveUsers.map((r: { userId: number }) => r.userId));
     const inactive3d = activeUserIds.filter((id) => !recentActiveUserIds.has(id)).length;
 
     const recent7dUsers = await this.prisma.userRecord.findMany({
@@ -193,7 +225,7 @@ export class RecordsService {
       },
       select: { userId: true },
     });
-    const recent7dUserIds = new Set(recent7dUsers.map((r) => r.userId));
+    const recent7dUserIds = new Set(recent7dUsers.map((r: { userId: number }) => r.userId));
     const inactive7d = activeUserIds.filter((id) => !recent7dUserIds.has(id)).length;
 
     const churnRiskRate = activeUserIds.length > 0
@@ -201,25 +233,51 @@ export class RecordsService {
       : 0;
 
     // ========== 성장 지표 ==========
-    // 이번 주 신규 가입자
-    const newUsersThisWeek = await this.prisma.user.count({
-      where: { createdAt: { gte: weekStart, lt: tomorrow } },
-    });
+    // 이번 주 신규 가입자 (productId가 있으면 해당 챌린지 시작 사용자)
+    let newUsersThisWeek = 0;
+    let firstRecordConversionRate = 0;
 
-    // 신규 가입자 중 첫 기록 전환율
-    const newUserIds = await this.prisma.user.findMany({
-      where: { createdAt: { gte: weekStart, lt: tomorrow } },
-      select: { id: true },
-    });
-    const newUserIdList = newUserIds.map((u) => u.id);
-    const newUsersWithRecords = await this.prisma.userRecord.findMany({
-      where: { userId: { in: newUserIdList } },
-      select: { userId: true },
-    });
-    const newUsersRecorded = new Set(newUsersWithRecords.map((r) => r.userId)).size;
-    const firstRecordConversionRate = newUserIdList.length > 0
-      ? Math.round((newUsersRecorded / newUserIdList.length) * 100)
-      : 0;
+    if (productId) {
+      // 특정 챌린지: 이번 주 해당 챌린지 시작 사용자
+      const challengeStartedThisWeek = await this.prisma.userChallenge.findMany({
+        where: {
+          productId,
+          createdAt: { gte: weekStart, lt: tomorrow },
+        },
+        select: { userId: true },
+      });
+      newUsersThisWeek = challengeStartedThisWeek.length;
+
+      // 챌린지 시작 사용자 중 첫 기록 전환율
+      const startedUserIds = challengeStartedThisWeek.map((c: { userId: number }) => c.userId);
+      const startedUsersWithRecords = await this.prisma.userRecord.findMany({
+        where: { userId: { in: startedUserIds } },
+        select: { userId: true },
+      });
+      const startedUsersRecorded = new Set(startedUsersWithRecords.map((r: { userId: number }) => r.userId)).size;
+      firstRecordConversionRate = startedUserIds.length > 0
+        ? Math.round((startedUsersRecorded / startedUserIds.length) * 100)
+        : 0;
+    } else {
+      // 전체: 신규 가입자
+      newUsersThisWeek = await this.prisma.user.count({
+        where: { createdAt: { gte: weekStart, lt: tomorrow } },
+      });
+
+      const newUserIds = await this.prisma.user.findMany({
+        where: { createdAt: { gte: weekStart, lt: tomorrow } },
+        select: { id: true },
+      });
+      const newUserIdList = newUserIds.map((u: { id: number }) => u.id);
+      const newUsersWithRecords = await this.prisma.userRecord.findMany({
+        where: { userId: { in: newUserIdList } },
+        select: { userId: true },
+      });
+      const newUsersRecorded = new Set(newUsersWithRecords.map((r: { userId: number }) => r.userId)).size;
+      firstRecordConversionRate = newUserIdList.length > 0
+        ? Math.round((newUsersRecorded / newUserIdList.length) * 100)
+        : 0;
+    }
 
     // 전주 대비 DAU 증감률
     const lastWeekDayRecords = await this.prisma.userRecord.findMany({
@@ -228,10 +286,11 @@ export class RecordsService {
           gte: lastWeekStart,
           lt: new Date(lastWeekStart.getTime() + 24 * 60 * 60 * 1000),
         },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
       },
       select: { userId: true },
     });
-    const lastWeekDau = new Set(lastWeekDayRecords.map((r) => r.userId)).size;
+    const lastWeekDau = new Set(lastWeekDayRecords.map((r: { userId: number }) => r.userId)).size;
     const dauGrowthRate = lastWeekDau > 0
       ? Math.round(((dau - lastWeekDau) / lastWeekDau) * 100)
       : 0;
@@ -246,6 +305,7 @@ export class RecordsService {
         where: {
           recordType,
           createdAt: { gte: weekStart, lt: tomorrow },
+          ...(filterUserIds && { userId: { in: filterUserIds } }),
         },
         select: { userId: true, date: true, metadata: true },
       });
@@ -287,7 +347,10 @@ export class RecordsService {
 
     // ========== DAU 트렌드 (최근 14일) ==========
     const trendRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: days14Ago, lt: tomorrow } },
+      where: {
+        createdAt: { gte: days14Ago, lt: tomorrow },
+        ...(filterUserIds && { userId: { in: filterUserIds } }),
+      },
       select: { userId: true, createdAt: true },
     });
 
@@ -298,7 +361,7 @@ export class RecordsService {
       const nextDay = new Date(current);
       nextDay.setDate(nextDay.getDate() + 1);
 
-      const dayRecords = trendRecords.filter((r) => {
+      const dayRecords = trendRecords.filter((r: { createdAt: Date }) => {
         const recordDate = r.createdAt.toISOString().split('T')[0];
         return recordDate === dateStr;
       });
@@ -306,14 +369,14 @@ export class RecordsService {
       dauTrend.push({
         date: dateStr,
         records: dayRecords.length,
-        users: new Set(dayRecords.map((r) => r.userId)).size,
+        users: new Set(dayRecords.map((r: { userId: number }) => r.userId)).size,
       });
 
       current.setDate(current.getDate() + 1);
     }
 
     // ========== 챌린지 분석 ==========
-    const challengeAnalysis = await this.getChallengeAnalysis();
+    const challengeAnalysis = await this.getChallengeAnalysis(productId);
 
     return {
       retention: {
@@ -348,8 +411,9 @@ export class RecordsService {
 
   /**
    * 챌린지 분석 데이터
+   * @param productId 챌린지 상품 ID (선택) - 특정 챌린지로 필터링
    */
-  private async getChallengeAnalysis(): Promise<ChallengeAnalysisDto> {
+  private async getChallengeAnalysis(productId?: number): Promise<ChallengeAnalysisDto> {
     const now = getNowKST();
     const today = new Date(now);
     today.setUTCHours(0, 0, 0, 0);
@@ -357,16 +421,19 @@ export class RecordsService {
     const days30Ago = new Date(today);
     days30Ago.setDate(days30Ago.getDate() - 30);
 
-    // 활성 챌린지 상품 수 (Product 테이블에서 categoryCode='CHALLENGE')
-    const activeChallenges = await this.prisma.product.count({
-      where: { categoryCode: 'CHALLENGE', status: 'ACTIVE' },
-    });
+    // 활성 챌린지 상품 수
+    const activeChallenges = productId
+      ? 1
+      : await this.prisma.product.count({
+          where: { categoryCode: 'CHALLENGE', status: 'ACTIVE' },
+        });
 
     // 최근 30일 완료 챌린지
     const completedChallenges = await this.prisma.userChallenge.count({
       where: {
         status: 'COMPLETED',
         updatedAt: { gte: days30Ago },
+        ...(productId && { productId }),
       },
     });
 
@@ -377,18 +444,32 @@ export class RecordsService {
           { status: 'COMPLETED' },
           { status: 'ACTIVE' },
         ],
-        activatedAt: { lte: days30Ago }, // 30일 전에 시작한 것들
+        activatedAt: { lte: days30Ago },
+        ...(productId && { productId }),
       },
     });
     const completionRate = totalChallengesWithProgress > 0
       ? Math.round((completedChallenges / totalChallengesWithProgress) * 100)
       : 0;
 
+    // productId가 있으면 해당 챌린지의 userChallengeId 목록을 가져옴
+    let filterUserChallengeIds: number[] | undefined;
+    if (productId) {
+      const userChallenges = await this.prisma.userChallenge.findMany({
+        where: { productId },
+        select: { id: true },
+      });
+      filterUserChallengeIds = userChallenges.map((uc: { id: number }) => uc.id);
+    }
+
     // 일차별 기록율 (DailyProgress 기반)
     const dayRecordRates: DayRecordRateDto[] = [];
     for (let day = 1; day <= 21; day++) {
       const progressData = await this.prisma.dailyProgress.findMany({
-        where: { day },
+        where: {
+          day,
+          ...(filterUserChallengeIds && { userChallengeId: { in: filterUserChallengeIds } }),
+        },
         select: {
           trackingsTotal: true,
           trackingsCompleted: true,
@@ -397,7 +478,7 @@ export class RecordsService {
 
       const totalUsers = progressData.length;
       const recordedUsers = progressData.filter(
-        (p) => p.trackingsCompleted > 0,
+        (p: { trackingsCompleted: number }) => p.trackingsCompleted > 0,
       ).length;
       const recordRate = totalUsers > 0
         ? Math.round((recordedUsers / totalUsers) * 100)
@@ -419,7 +500,10 @@ export class RecordsService {
 
       // 해당 주차 시작일에 있던 사용자
       const startDayProgress = await this.prisma.dailyProgress.findMany({
-        where: { day: startDay },
+        where: {
+          day: startDay,
+          ...(filterUserChallengeIds && { userChallengeId: { in: filterUserChallengeIds } }),
+        },
         select: { userChallengeId: true },
       });
       const startUsers = startDayProgress.length;
@@ -429,6 +513,7 @@ export class RecordsService {
         where: {
           day: endDay,
           trackingsCompleted: { gt: 0 },
+          ...(filterUserChallengeIds && { userChallengeId: { in: filterUserChallengeIds } }),
         },
         select: { userChallengeId: true },
       });

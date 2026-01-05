@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Patch,
   Param,
@@ -188,6 +189,24 @@ export class OrdersController {
     return {
       success: true,
       message: '교환/반품이 처리되었습니다.',
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 플레이오토 전체 주문 동기화 (배치 트리거)
+   */
+  @Post('sync-playauto-all')
+  @ApiOperation({ summary: '플레이오토 전체 동기화', description: '플레이오토에서 모든 주문의 상태/송장 정보를 동기화하는 배치를 트리거합니다.' })
+  async syncAllFromPlayauto() {
+    this.logger.log('플레이오토 전체 동기화 배치 트리거 요청');
+
+    const result = await this.ordersService.syncAllFromPlayauto();
+
+    return {
+      success: result.success,
+      message: result.message,
+      data: result.data,
       timestamp: getNowKST(),
     };
   }

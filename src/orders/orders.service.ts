@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { CryptoUtil } from '../common/utils/crypto.util';
@@ -10,6 +11,7 @@ import {
   ProcessExchangeReturnDto,
 } from './dto/order-action.dto';
 import { RefundService } from '../refund/refund.service';
+import axios from 'axios';
 
 /**
  * 주문 관리 서비스
@@ -17,11 +19,17 @@ import { RefundService } from '../refund/refund.service';
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
+  private readonly biocomApiUrl: string;
+  private readonly internalApiKey: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly refundService: RefundService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.biocomApiUrl = this.configService.get<string>('BIOCOM_API_URL') || 'http://localhost:10804';
+    this.internalApiKey = this.configService.get<string>('INTERNAL_API_KEY') || 'biocom-internal-api-key-2024';
+  }
 
   /**
    * 주문 목록 조회
@@ -752,5 +760,40 @@ export class OrdersService {
       // 주문자 정보
       user: order.user,
     };
+  }
+
+  /**
+   * 플레이오토 전체 주문 동기화 (배치 트리거)
+   * biocom-api 내부 API 호출
+   */
+  async syncAllFromPlayauto(): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      const response = await axios.post(
+        `${this.biocomApiUrl}/api/internal/orders/sync-all`,
+        {},
+        {
+          headers: {
+            'x-internal-api-key': this.internalApiKey,
+            'Content-Type': 'application/json',
+          },
+          timeout: 60000,
+        },
+      );
+
+      this.logger.log(`플레이오토 전체 동기화 트리거 완료`);
+
+      return {
+        success: response.data?.success ?? false,
+        message: response.data?.message ?? '동기화가 시작되었습니다.',
+        data: response.data?.data,
+      };
+    } catch (error: any) {
+      this.logger.error(`플레이오토 전체 동기화 트리거 실패: error=${error.message}`);
+
+      return {
+        success: false,
+        message: error.response?.data?.message || '플레이오토 전체 동기화에 실패했습니다.',
+      };
+    }
   }
 }
