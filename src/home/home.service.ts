@@ -198,7 +198,7 @@ export class HomeService {
       let missionList = await this.getMissionList(userId, user.status, challenges, challengeDays);
       // NEWCOMER가 아닌 경우 진행도 업데이트 (CHALLENGER, SUBSCRIBER 모두)
       if (user.status !== UserSubscriptionStatus.NEWCOMER) {
-        missionList = await this.updateMissionProgress(userId, missionList);
+        missionList = await this.updateMissionProgress(userId, missionList, user.status);
       }
 
       // 5. 챌린지 정보 구성 (CHALLENGER만)
@@ -501,19 +501,26 @@ export class HomeService {
   private async updateMissionProgress(
     userId: number,
     missionList: MissionItemDto[],
+    userStatus: string,
   ): Promise<MissionItemDto[]> {
     // 오늘 날짜 (KST 기준)
     const today = getKoreanToday();
     const todayDate = stringToKSTDate(today);
     const tomorrowDate = stringToKSTDate(today, 24, 0, 0);
 
-    // 병렬로 조회: user_records (SUPPLEMENT 별도)
-    const [todayRecords, todaySupplementRecords] = await Promise.all([
-      // user_records: 기록 타입 (createdAt 기준) - SUPPLEMENT 제외
+    // 이번 주 월요일 계산 (WEEKLY_REPORT 조회용 - SUBSCRIBER만)
+    const now = getNowKST();
+    const dayOfWeek = now.getUTCDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const thisMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday, 0, 0, 0));
+
+    // 병렬로 조회: user_records (SUPPLEMENT, WEEKLY_REPORT 별도)
+    const [todayRecords, todaySupplementRecords, weeklyReportRecords] = await Promise.all([
+      // user_records: 기록 타입 (createdAt 기준) - SUPPLEMENT, WEEKLY_REPORT 제외
       this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY', 'DECLARATION', 'SELF_PRAISE', 'QUIZ', 'BALANCE_GAME', 'DAILY_MISSION', 'WEEKLY_REPORT', 'AFTER_SURVEY'] },
+          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY', 'DECLARATION', 'SELF_PRAISE', 'QUIZ', 'BALANCE_GAME', 'DAILY_MISSION', 'AFTER_SURVEY'] },
           createdAt: {
             gte: todayDate,
             lt: tomorrowDate,
@@ -534,6 +541,22 @@ export class HomeService {
           userId,
           recordType: 'SUPPLEMENT',
           date: todayDate,
+        },
+        select: {
+          recordType: true,
+          metadata: true,
+        },
+      }),
+      // WEEKLY_REPORT: CHALLENGER는 전체 기간, SUBSCRIBER는 이번 주 월요일부터
+      // CHALLENGER: 한 번 완료하면 영구 삭제
+      // SUBSCRIBER: 매주 월요일 부활 (새 리포트)
+      this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'WEEKLY_REPORT',
+          ...(userStatus === UserSubscriptionStatus.SUBSCRIBER
+            ? { createdAt: { gte: thisMonday } }
+            : {}), // CHALLENGER는 전체 기간 조회
         },
         select: {
           recordType: true,
@@ -564,6 +587,15 @@ export class HomeService {
       }
     }
 
+    // WEEKLY_REPORT 실행 횟수 (isCompleted = true인 레코드만)
+    for (const record of weeklyReportRecords) {
+      const isCompleted = (record.metadata as any)?.isCompleted === true;
+      if (isCompleted) {
+        const currentCount = executedMap.get('WEEKLY_REPORT') || 0;
+        executedMap.set('WEEKLY_REPORT', currentCount + 1);
+      }
+    }
+
     // recordType별 포인트 지급 횟수 계산 (metadata.pointsEarned > 0인 경우)
     const currentMap = new Map<string, number>();
 
@@ -582,6 +614,15 @@ export class HomeService {
       if (pointsEarned > 0) {
         const currentCount = currentMap.get('SUPPLEMENT') || 0;
         currentMap.set('SUPPLEMENT', currentCount + 1);
+      }
+    }
+
+    // WEEKLY_REPORT도 동일하게 처리
+    for (const record of weeklyReportRecords) {
+      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
+      if (pointsEarned > 0) {
+        const currentCount = currentMap.get('WEEKLY_REPORT') || 0;
+        currentMap.set('WEEKLY_REPORT', currentCount + 1);
       }
     }
 
