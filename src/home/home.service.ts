@@ -98,11 +98,14 @@ interface UserData {
   aiPersona: {
     id: number;
     name: string;
+    personaUrl: string | null;
     torsoUrl: string | null;
     torsoBgUrl: string | null;
     thumbnailUrl: string | null;
     chatIconUrl: string | null;
     personaAnimationUrl: string | null;
+    speechImageUrl: string | null;
+    intimacyImageUrl: string | null;
   } | null;
   healthTypeAnimal: {
     id: number;
@@ -264,11 +267,14 @@ export class HomeService {
           select: {
             id: true,
             name: true,
+            personaUrl: true,
             torsoUrl: true,
             torsoBgUrl: true,
             thumbnailUrl: true,
             chatIconUrl: true,
             personaAnimationUrl: true,
+            speechImageUrl: true,
+            intimacyImageUrl: true,
           },
         },
         healthTypeAnimal: {
@@ -398,11 +404,14 @@ export class HomeService {
     return {
       name: aiPersona.name,
       imageUrl: aiPersona.torsoUrl || '',
+      personaUrl: aiPersona.personaUrl,
       torsoUrl: aiPersona.torsoUrl,
       torsoBgUrl: aiPersona.torsoBgUrl,
       thumbnailUrl: aiPersona.thumbnailUrl,
       chatIconUrl: aiPersona.chatIconUrl,
       personaAnimationUrl: aiPersona.personaAnimationUrl,
+      speechImageUrl: aiPersona.speechImageUrl,
+      intimacyImageUrl: aiPersona.intimacyImageUrl,
     };
   }
 
