@@ -139,6 +139,7 @@ export class DeepReportService {
 
     // 3. 포인트 지급 (트랜잭션)
     const pointsToAward = mission.points;
+    const now = getNowKST();
 
     await this.prisma.$transaction(async (tx) => {
       // 사용자 포인트 증가
@@ -157,7 +158,22 @@ export class DeepReportService {
           description: `심층리포트 조회 (${reportId})`,
           relatedType: 'WEEKLY_REPORT',
           relatedId: null, // reportId는 string이므로 description에 포함
-          createdAt: getNowKST(),
+          createdAt: now,
+        },
+      });
+
+      // user_records 기록 (홈화면 미션 비활성화용)
+      await tx.userRecord.create({
+        data: {
+          userId,
+          recordType: 'WEEKLY_REPORT',
+          date: now,
+          metadata: {
+            reportId,
+            isCompleted: true,
+            pointsEarned: pointsToAward,
+          },
+          createdAt: now,
         },
       });
 
