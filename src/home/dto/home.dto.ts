@@ -40,6 +40,9 @@ export class PersonaInfoDto {
   @ApiProperty({ description: '페르소나 이미지 URL (기존 호환용, torsoUrl과 동일)', example: 'https://...' })
   imageUrl: string;
 
+  @ApiPropertyOptional({ description: '페르소나 이미지 URL (놀이터 1번 이미지)', example: 'https://...' })
+  personaUrl?: string | null;
+
   @ApiPropertyOptional({ description: '상반신 이미지 URL', example: 'https://...' })
   torsoUrl?: string | null;
 
@@ -54,6 +57,12 @@ export class PersonaInfoDto {
 
   @ApiPropertyOptional({ description: '페르소나 애니메이션 URL', example: 'https://...' })
   personaAnimationUrl?: string | null;
+
+  @ApiPropertyOptional({ description: '말투 이미지 URL', example: 'https://...' })
+  speechImageUrl?: string | null;
+
+  @ApiPropertyOptional({ description: '친밀도 이미지 URL', example: 'https://...' })
+  intimacyImageUrl?: string | null;
 }
 
 /**
