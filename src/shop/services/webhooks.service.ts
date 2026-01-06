@@ -425,7 +425,7 @@ export class WebhooksService {
       });
 
       if (!order) {
-        this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
+        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
         return;
       }
 
@@ -500,7 +500,7 @@ export class WebhooksService {
       });
 
       if (!order) {
-        this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
+        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
         return;
       }
 
@@ -559,7 +559,7 @@ export class WebhooksService {
   private async handlePaymentFailed(data: any) {
     const { orderId, failReason } = data;
 
-    this.logger.error(`❌ 결제 실패: 주문번호=${orderId}, 사유=${failReason}`);
+    this.logger.warn(`⚠️ 결제 실패: 주문번호=${orderId}, 사유=${failReason}`);
 
     await this.prisma.$transaction(async (tx) => {
       // 1. 주문 조회
@@ -568,7 +568,7 @@ export class WebhooksService {
       });
 
       if (!order) {
-        this.logger.error(`❌ 주문을 찾을 수 없음: ${orderId}`);
+        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
         return;
       }
 
