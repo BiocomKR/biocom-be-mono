@@ -1299,6 +1299,8 @@ model AiPersona {
   challengeDescription String?           @map("challenge_description")
   /// 페르소나 애니메이션 URL (기존 비디오)
   personaAnimationUrl  String?           @map("persona_animation_url") @db.VarChar(500)
+  /// 채팅 플로팅 버튼 아이콘 URL
+  chatIconUrl          String?           @map("chat_icon_url") @db.VarChar(500)
   balanceGameSteps     BalanceGameStep[]
   users                User[]
 
