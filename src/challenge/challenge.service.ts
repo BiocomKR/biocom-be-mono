@@ -72,7 +72,7 @@ export class ChallengeService {
       // categoryCode가 CHALLENGE인 상품만 조회
       const products = await this.prisma.product.findMany({
         where: {
-          status: UserChallengeStatus.ACTIVE,
+          status: ProductStatus.ACTIVE,
           categoryCode: 'CHALLENGE'
         },
         include: {
