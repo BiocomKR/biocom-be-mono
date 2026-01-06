@@ -238,10 +238,12 @@ export class PushNotificationProcessor extends WorkerHost {
       where: {
         isActive: true,
         provider: 'FCM',
-        user: { pushEnabled: true },
-        ...(filter?.marketingEnabled !== undefined && {
-          marketingEnabled: filter.marketingEnabled,
-        }),
+        user: {
+          pushEnabled: true,
+          ...(filter?.marketingEnabled !== undefined && {
+            marketingEnabled: filter.marketingEnabled,
+          }),
+        },
       },
     });
 
