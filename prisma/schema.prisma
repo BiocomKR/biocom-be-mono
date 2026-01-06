@@ -60,6 +60,10 @@ model User {
   mbti                         String?                        @db.VarChar(4)
   /// 푸시 알림 수신 동의 여부
   pushEnabled                  Boolean?                       @map("push_enabled")
+  /// 마케팅 알림 수신 동의 여부
+  marketingEnabled             Boolean                        @default(false) @map("marketing_enabled")
+  /// 야간 푸시 수신 동의 여부
+  nightPushEnabled             Boolean                        @default(true) @map("night_push_enabled")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
