@@ -15,8 +15,8 @@ import { Type } from 'class-transformer';
 export class CreateAppEventDto {
   @ApiPropertyOptional({
     description: '앱 식별자',
-    example: 'challenge',
-    default: 'challenge',
+    example: 'innerbeauty_challenge',
+    default: 'innerbeauty_challenge',
   })
   @IsOptional()
   @IsString()
