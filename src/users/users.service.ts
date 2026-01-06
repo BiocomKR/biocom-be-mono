@@ -2,8 +2,11 @@ import { Injectable, NotFoundException, ConflictException, Logger } from '@nestj
 import { PrismaService } from '../common/services/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UserAnalyticsDto } from './dto/analytics.dto';
 import * as bcrypt from 'bcrypt';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
+import { UserChallengeStatus } from '../common/enums/challenge-ticket-status.enum';
 
 /**
  * 사용자 서비스
@@ -505,5 +508,65 @@ export class UsersService {
       this.logger.error(`MBTI 업데이트 실패 - 사용자 ID: ${userId}, ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  /**
+   * GA4 Analytics용 사용자 속성 조회
+   * 홈 화면 진입 시 호출하여 user properties 세팅에 사용
+   */
+  async getAnalytics(userId: number): Promise<UserAnalyticsDto> {
+    this.logger.log(`Analytics 데이터 조회 - 사용자 ID: ${userId}`);
+
+    // 사용자 기본 정보 + 활성 챌린지 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        userChallenges: {
+          where: {
+            status: {
+              in: [UserChallengeStatus.ACTIVE, UserChallengeStatus.PENDING],
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            status: true,
+            activatedAt: true,
+            product: {
+              select: {
+                sku: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`ID ${userId}인 사용자를 찾을 수 없습니다.`);
+    }
+
+    // 챌린지 정보
+    const activeChallenge = user.userChallenges[0] || null;
+
+    // 구독 정보 별도 조회 (User 모델에 relation 없음)
+    // 최신 구독 이력 조회 (상태 무관)
+    const latestSubscription = await this.prisma.subscription.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true },
+    });
+
+    return {
+      userId: user.id,
+      userType: user.status as UserSubscriptionStatus,
+      challengeStatus: (activeChallenge?.status as UserChallengeStatus) || null,
+      challengeCode: activeChallenge?.product?.sku || null,
+      subscriptionStatus: latestSubscription?.status || 'NONE',
+      createdAt: user.createdAt.toISOString(),
+    };
   }
 }
