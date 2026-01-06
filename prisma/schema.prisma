@@ -1102,7 +1102,7 @@ model Refund {
   /// 생성일시
   createdAt            DateTime  @map("created_at")
   /// 수정일시
-  updatedAt            DateTime? @map("updated_at")
+  updatedAt            DateTime? @map("updated_at") @db.Timestamp(6)
   /// PG사 취소 거래 ID
   pgCancelId           String?   @map("pg_cancel_id") @db.VarChar(100)
   /// PG사 취소 응답 (JSON)
@@ -2291,11 +2291,11 @@ model Consent {
 model UserConsent {
   id        Int      @id @default(autoincrement())
   userId    Int      @map("user_id")
-  agreedAt  DateTime  @map("agreed_at") @db.Timestamp(6)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  agreedAt  DateTime @map("agreed_at") @db.Timestamp(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   /// 수정일시
   updatedAt DateTime? @map("updated_at") @db.Timestamp(6)
-  consentId Int       @map("consent_id")
+  consentId Int      @map("consent_id")
   isAgreed  Boolean  @map("is_agreed")
   consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
   user      User     @relation(fields: [userId], references: [id], map: "fk_user_consents_user_id")
@@ -2492,7 +2492,7 @@ model AppEvent {
   createdAt     DateTime @default(now()) @map("created_at")
   platform      String   @db.VarChar(20)
   amount        Decimal? @db.Decimal(12, 2)
-  appId         String   @default("challenge") @map("app_id") @db.VarChar(50)
+  appId         String   @default("innerbeauty_challenge") @map("app_id") @db.VarChar(50)
   eventCategory String?  @map("event_category") @db.VarChar(50)
   itemId        String?  @map("item_id") @db.VarChar(100)
   itemType      String?  @map("item_type") @db.VarChar(50)

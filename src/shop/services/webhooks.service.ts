@@ -189,7 +189,7 @@ export class WebhooksService {
     });
 
     if (!existingOrder) {
-      this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
+      this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 쇼핑몰 주문): ${orderId}`);
       return; // throw 대신 return (웹훅 재시도 방지)
     }
 
@@ -215,7 +215,7 @@ export class WebhooksService {
       });
 
       if (!order) {
-        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
+        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 쇼핑몰 주문): ${orderId}`);
         return null;
       }
 
@@ -425,7 +425,7 @@ export class WebhooksService {
       });
 
       if (!order) {
-        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
+        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 쇼핑몰 주문): ${orderId}`);
         return;
       }
 
@@ -500,7 +500,7 @@ export class WebhooksService {
       });
 
       if (!order) {
-        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
+        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 쇼핑몰 주문): ${orderId}`);
         return;
       }
 
@@ -568,7 +568,7 @@ export class WebhooksService {
       });
 
       if (!order) {
-        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 상점 데이터일 수 있음): ${orderId}`);
+        this.logger.warn(`⚠️ 주문을 찾을 수 없음 (다른 쇼핑몰 주문): ${orderId}`);
         return;
       }
 
