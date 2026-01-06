@@ -2486,7 +2486,7 @@ model AppEvent {
   createdAt     DateTime @default(now()) @map("created_at")
   platform      String   @db.VarChar(20)
   amount        Decimal? @db.Decimal(12, 2)
-  appId         String   @default("challenge") @map("app_id") @db.VarChar(50)
+  appId         String   @default("innerbeauty_challenge") @map("app_id") @db.VarChar(50)
   eventCategory String?  @map("event_category") @db.VarChar(50)
   itemId        String?  @map("item_id") @db.VarChar(100)
   itemType      String?  @map("item_type") @db.VarChar(50)
