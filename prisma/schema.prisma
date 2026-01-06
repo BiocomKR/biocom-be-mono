@@ -1077,6 +1077,8 @@ model Refund {
   rejectedAt           DateTime? @map("rejected_at")
   /// 생성일시
   createdAt            DateTime  @map("created_at")
+  /// 수정일시
+  updatedAt            DateTime? @map("updated_at") @db.Timestamp(6)
   /// PG사 취소 거래 ID
   pgCancelId           String?   @map("pg_cancel_id") @db.VarChar(100)
   /// PG사 취소 응답 (JSON)
@@ -2249,6 +2251,8 @@ model Consent {
   isActive     Boolean?      @default(false) @map("is_active")
   displayOrder Int?          @default(0) @map("display_order")
   createdAt    DateTime?     @default(now()) @map("created_at") @db.Timestamp(6)
+  /// 수정일시
+  updatedAt    DateTime?     @map("updated_at") @db.Timestamp(6)
   deletedAt    DateTime?     @map("deleted_at") @db.Timestamp(6)
   category     String        @default("SIGNUP") @db.VarChar(50)
   userConsents UserConsent[]
@@ -2265,6 +2269,8 @@ model UserConsent {
   userId    Int      @map("user_id")
   agreedAt  DateTime @map("agreed_at") @db.Timestamp(6)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  /// 수정일시
+  updatedAt DateTime? @map("updated_at") @db.Timestamp(6)
   consentId Int      @map("consent_id")
   isAgreed  Boolean  @map("is_agreed")
   consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
