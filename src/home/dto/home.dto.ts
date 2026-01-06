@@ -37,8 +37,23 @@ export class PersonaInfoDto {
   @ApiProperty({ description: '페르소나 이름', example: '철민님' })
   name: string;
 
-  @ApiProperty({ description: '페르소나 이미지 URL', example: 'https://...' })
+  @ApiProperty({ description: '페르소나 이미지 URL (기존 호환용, torsoUrl과 동일)', example: 'https://...' })
   imageUrl: string;
+
+  @ApiPropertyOptional({ description: '상반신 이미지 URL', example: 'https://...' })
+  torsoUrl?: string | null;
+
+  @ApiPropertyOptional({ description: '상반신 배경 이미지 URL (밸런스 게임용)', example: 'https://...' })
+  torsoBgUrl?: string | null;
+
+  @ApiPropertyOptional({ description: '썸네일 이미지 URL', example: 'https://...' })
+  thumbnailUrl?: string | null;
+
+  @ApiPropertyOptional({ description: '채팅 아이콘 URL', example: 'https://...' })
+  chatIconUrl?: string | null;
+
+  @ApiPropertyOptional({ description: '페르소나 애니메이션 URL', example: 'https://...' })
+  personaAnimationUrl?: string | null;
 }
 
 /**

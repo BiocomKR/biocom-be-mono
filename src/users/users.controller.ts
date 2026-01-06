@@ -27,6 +27,7 @@ import {
   UserSettingsResponseDto,
   UpdateUserSettingsDto,
 } from './dto/user-settings.dto';
+import { UserAnalyticsDto } from './dto/analytics.dto';
 import { ApiErrorResponseDto } from '../common/dto/api-response.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 
@@ -87,15 +88,43 @@ export class UsersController {
   }
 
   /**
+   * GA4 Analytics용 사용자 속성 조회
+   * 홈 화면 진입 시 호출하여 user properties 세팅에 사용
+   */
+  @Get('me/analytics')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'GA4 Analytics용 사용자 속성 조회',
+    description: '홈 화면 진입 시 GA4 user properties 세팅에 필요한 사용자 속성을 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Analytics 데이터 조회 성공',
+    type: UserAnalyticsDto,
+  })
+  async getAnalytics(@Request() req: any): Promise<ApiResponseDto> {
+    const userId = req.user.sub;
+    const analytics = await this.usersService.getAnalytics(userId);
+
+    return {
+      success: true,
+      message: 'Analytics 데이터를 조회했습니다.',
+      data: analytics,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
    * 현재 로그인한 사용자 정보 조회
    * JWT 토큰에서 사용자 ID를 추출하여 조회
    */
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
-    summary: '내 정보 조회', 
-    description: 'JWT 토큰을 통해 현재 로그인한 사용자의 정보를 조회합니다.' 
+  @ApiOperation({
+    summary: '내 정보 조회',
+    description: 'JWT 토큰을 통해 현재 로그인한 사용자의 정보를 조회합니다.'
   })
   @ApiResponse({ 
     status: 200, 

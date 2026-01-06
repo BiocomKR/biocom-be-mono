@@ -95,7 +95,15 @@ interface UserData {
   aiPersonaId: number | null;
   health_type_animal_id: number | null;
   isFirstAppEntry: boolean;
-  aiPersona: { id: number; name: string; torsoUrl: string | null } | null;
+  aiPersona: {
+    id: number;
+    name: string;
+    torsoUrl: string | null;
+    torsoBgUrl: string | null;
+    thumbnailUrl: string | null;
+    chatIconUrl: string | null;
+    personaAnimationUrl: string | null;
+  } | null;
   healthTypeAnimal: {
     id: number;
     animalName: string;
@@ -253,7 +261,15 @@ export class HomeService {
         health_type_animal_id: true,
         isFirstAppEntry: true,
         aiPersona: {
-          select: { id: true, name: true, torsoUrl: true },
+          select: {
+            id: true,
+            name: true,
+            torsoUrl: true,
+            torsoBgUrl: true,
+            thumbnailUrl: true,
+            chatIconUrl: true,
+            personaAnimationUrl: true,
+          },
         },
         healthTypeAnimal: {
           select: {
@@ -382,6 +398,11 @@ export class HomeService {
     return {
       name: aiPersona.name,
       imageUrl: aiPersona.torsoUrl || '',
+      torsoUrl: aiPersona.torsoUrl,
+      torsoBgUrl: aiPersona.torsoBgUrl,
+      thumbnailUrl: aiPersona.thumbnailUrl,
+      chatIconUrl: aiPersona.chatIconUrl,
+      personaAnimationUrl: aiPersona.personaAnimationUrl,
     };
   }
 
