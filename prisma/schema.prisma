@@ -1102,7 +1102,7 @@ model Refund {
   /// 생성일시
   createdAt            DateTime  @map("created_at")
   /// 수정일시
-  updatedAt            DateTime? @map("updated_at")
+  updatedAt            DateTime? @map("updated_at") @db.Timestamp(6)
   /// PG사 취소 거래 ID
   pgCancelId           String?   @map("pg_cancel_id") @db.VarChar(100)
   /// PG사 취소 응답 (JSON)
@@ -1299,6 +1299,8 @@ model AiPersona {
   challengeDescription String?           @map("challenge_description")
   /// 페르소나 애니메이션 URL (기존 비디오)
   personaAnimationUrl  String?           @map("persona_animation_url") @db.VarChar(500)
+  /// 채팅 플로팅 버튼 아이콘 URL
+  chatIconUrl          String?           @map("chat_icon_url") @db.VarChar(500)
   balanceGameSteps     BalanceGameStep[]
   users                User[]
 
@@ -2291,11 +2293,11 @@ model Consent {
 model UserConsent {
   id        Int      @id @default(autoincrement())
   userId    Int      @map("user_id")
-  agreedAt  DateTime  @map("agreed_at") @db.Timestamp(6)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  agreedAt  DateTime @map("agreed_at") @db.Timestamp(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   /// 수정일시
   updatedAt DateTime? @map("updated_at") @db.Timestamp(6)
-  consentId Int       @map("consent_id")
+  consentId Int      @map("consent_id")
   isAgreed  Boolean  @map("is_agreed")
   consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
   user      User     @relation(fields: [userId], references: [id], map: "fk_user_consents_user_id")
