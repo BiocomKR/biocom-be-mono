@@ -77,8 +77,8 @@ export class DeepReportService {
 
     this.logger.log(`[getDeepReport] 심층리포트 조회 성공 - reportId: ${deepReport.reportId}`);
 
-    // 4. 포인트 지급 처리 (해당 리포트에 대해 1회만 지급)
-    const pointsEarned = await this.awardPointsIfNotAwarded(userId, deepReport.reportId);
+    // 4. 포인트 지급 및 기록 처리 (해당 리포트에 대해 1회만)
+    const pointsEarned = await this.awardPointsAndRecord(userId, deepReport.reportId);
 
     // 5. 응답 변환
     const data: DeepReportContentDto = {
@@ -96,14 +96,15 @@ export class DeepReportService {
   }
 
   /**
-   * 심층리포트 포인트 지급 (해당 리포트에 대해 1회만)
-   * missions 테이블의 WEEKLY_REPORT 미션 포인트를 지급
+   * 심층리포트 포인트 지급 및 기록 (해당 리포트에 대해 1회만)
+   * - point_histories: 포인트 지급 기록
+   * - user_records: 홈화면 미션 비활성화용 기록
    *
    * @param userId 사용자 ID
    * @param reportId 리포트 ID
    * @returns 지급된 포인트 (이미 지급받았으면 0)
    */
-  private async awardPointsIfNotAwarded(userId: number, reportId: string): Promise<number> {
+  private async awardPointsAndRecord(userId: number, reportId: string): Promise<number> {
     // 1. WEEKLY_REPORT 미션 정보 조회
     const mission = await this.prisma.mission.findFirst({
       where: {
