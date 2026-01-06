@@ -83,27 +83,31 @@ export class ChallengeService {
         orderBy: { createdAt: 'desc' }
       });
 
-      const result = products
+      const challengeProducts = products
         .filter(p => this.isChallengeProduct(p))
-        .map(product => {
-          const challengeInfo = this.extractChallengeInfo(product);
-          return {
-            id: challengeInfo.id,
-            name: challengeInfo.name,
-            description: challengeInfo.description,
-            totalDays: challengeInfo.totalDays,
-            isActive: challengeInfo.isActive,
-            products: [{
-              id: product.id,
-              name: product.name,
-              price: product.price || 0,
-              imageUrl: product.images?.[0]?.imageUrl || null
-            }]
-          };
-        });
+        .map(product => ({
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          price: product.price || 0,
+          imageUrl: product.images?.[0]?.imageUrl || null,
+        }));
 
-      this.logger.log(`구매 가능한 챌린지 ${result.length}개 조회 완료`);
-      return { success: true, data: result };
+      this.logger.log(`구매 가능한 챌린지 ${challengeProducts.length}개 조회 완료`);
+
+      // 앱의 getProducts 응답 구조와 동일하게 반환
+      return {
+        success: true,
+        data: {
+          totalCount: challengeProducts.length,
+          categoryCount: 1,
+          categories: [{
+            categoryCode: 'CHALLENGE',
+            categoryName: '챌린지',
+            products: challengeProducts,
+          }],
+        },
+      };
     } catch (error) {
       this.logger.error('구매 가능한 챌린지 목록 조회 실패:', error);
       throw error;
