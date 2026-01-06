@@ -3,7 +3,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { UserQueryDto } from './dto/user-query.dto';
-import { OrderStatus, UserChallengeStatus, CouponStatus } from '../common/enums';
+import { OrderStatus, UserChallengeStatus, CouponStatus, SubscriptionStatus, UserSubscriptionStatus } from '../common/enums';
 import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
@@ -54,9 +54,23 @@ export class UsersService {
       ];
     }
 
-    // 상태 필터
+    // 상태 필터 (NEWCOMER: User.status, CHALLENGER: 활성 챌린지 보유, SUBSCRIBER: 활성 구독 보유)
     if (status) {
-      where.status = status;
+      if (status === UserSubscriptionStatus.NEWCOMER) {
+        where.status = UserSubscriptionStatus.NEWCOMER;
+      } else if (status === UserSubscriptionStatus.CHALLENGER) {
+        where.userChallenges = {
+          some: {
+            status: UserChallengeStatus.ACTIVE,
+          },
+        };
+      } else if (status === UserSubscriptionStatus.SUBSCRIBER) {
+        const subscriberIds = await this.prisma.subscription.findMany({
+          where: { status: SubscriptionStatus.ACTIVE },
+          select: { userId: true },
+        });
+        where.id = { in: subscriberIds.map((s) => s.userId) };
+      }
     }
 
     // 활성화 여부 필터

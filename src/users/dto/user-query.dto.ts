@@ -1,13 +1,7 @@
 import { IsOptional, IsInt, IsString, IsBoolean, IsEnum, Min, Max } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-
-export enum UserStatus {
-  NEWCOMER = 'NEWCOMER',
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  DORMANT = 'DORMANT',
-}
+import { UserSubscriptionStatus } from '../../common/enums';
 
 export enum UserSortBy {
   ID = 'id',
@@ -56,10 +50,10 @@ export class UserQueryDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: '회원 상태', enum: UserStatus })
+  @ApiPropertyOptional({ description: '회원 상태', enum: UserSubscriptionStatus })
   @IsOptional()
-  @IsEnum(UserStatus)
-  status?: UserStatus;
+  @IsEnum(UserSubscriptionStatus)
+  status?: UserSubscriptionStatus;
 
   @ApiPropertyOptional({ description: '활성화 여부' })
   @IsOptional()
