@@ -95,19 +95,7 @@ export class ChallengeService {
 
       this.logger.log(`구매 가능한 챌린지 ${challengeProducts.length}개 조회 완료`);
 
-      // 앱의 getProducts 응답 구조와 동일하게 반환
-      return {
-        success: true,
-        data: {
-          totalCount: challengeProducts.length,
-          categoryCount: 1,
-          categories: [{
-            categoryCode: 'CHALLENGE',
-            categoryName: '챌린지',
-            products: challengeProducts,
-          }],
-        },
-      };
+      return { success: true, data: challengeProducts };
     } catch (error) {
       this.logger.error('구매 가능한 챌린지 목록 조회 실패:', error);
       throw error;
