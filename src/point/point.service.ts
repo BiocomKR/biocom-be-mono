@@ -83,12 +83,13 @@ export class PointService {
 
   /**
    * 포인트 지급 (적립)
-   * 
+   *
    * @param userId 사용자 ID
    * @param amount 지급할 포인트
    * @param description 지급 사유
    * @param relatedType 관련 타입 (RECORD_COMPLETION, MISSION_COMPLETION 등)
    * @param relatedId 관련 ID
+   * @param recordType 기록 타입 (BEAUTY, DIET, SUPPLEMENT 등)
    */
   async awardPoints(
     userId: number,
@@ -96,6 +97,7 @@ export class PointService {
     description: string,
     relatedType?: string,
     relatedId?: number,
+    recordType?: string,
   ): Promise<number> {
     this.logger.log(`포인트 지급 - 사용자: ${userId}, 금액: ${amount}`);
 
@@ -121,6 +123,7 @@ export class PointService {
           description,
           relatedType: relatedType || 'MANUAL',
           relatedId,
+          recordType,
           createdAt: getNowKST(),
         },
       });
@@ -139,6 +142,7 @@ export class PointService {
    * @param description 지급 사유
    * @param relatedType 관련 타입
    * @param relatedId 관련 ID
+   * @param recordType 기록 타입 (BEAUTY, DIET, SUPPLEMENT 등)
    */
   async awardPointsInTransaction(
     tx: any,
@@ -147,6 +151,7 @@ export class PointService {
     description: string,
     relatedType?: string,
     relatedId?: number,
+    recordType?: string,
   ): Promise<number> {
     if (amount <= 0) {
       throw new BadRequestException('지급 금액은 0보다 커야 합니다.');
@@ -168,6 +173,7 @@ export class PointService {
         description,
         relatedType: relatedType || 'MANUAL',
         relatedId,
+        recordType,
         createdAt: getNowKST(),
       },
     });
@@ -363,12 +369,13 @@ export class PointService {
 
   /**
    * 포인트 적립
-   * 
+   *
    * @param userId 사용자 ID
    * @param amount 적립할 포인트
    * @param description 적립 사유
    * @param relatedType 관련 타입
    * @param relatedId 관련 ID
+   * @param recordType 기록 타입 (BEAUTY, DIET, SUPPLEMENT 등)
    */
   async addPoints(
     userId: number,
@@ -376,6 +383,7 @@ export class PointService {
     description: string,
     relatedType?: string,
     relatedId?: number,
+    recordType?: string,
   ): Promise<void> {
     this.logger.log(`포인트 적립 - 사용자: ${userId}, 금액: ${amount}`);
 
@@ -403,6 +411,7 @@ export class PointService {
           description,
           relatedType,
           relatedId,
+          recordType,
           createdAt: getNowKST(),
         },
       });

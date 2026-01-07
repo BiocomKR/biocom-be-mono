@@ -18,6 +18,7 @@ import {
   CreateActivityRecordDto,
 } from '../dto/records/records.dto';
 import { CategoryCode } from '@/common/enums/category-code.enum';
+import { RecordType } from '@/common/enums/record-type.enum';
 import { SibApiService } from '../../sib/services/sib-api.service';
 
 /**
@@ -948,6 +949,7 @@ export class RecordsService {
         `${recordCode} 기록 완료`,
         'RECORD_COMPLETION',
         userRecord.id,
+        recordCode,
       );
     }
 
@@ -1583,6 +1585,7 @@ export class RecordsService {
           '영양제 섭취 기록',
           'RECORD',
           null,
+          RecordType.SUPPLEMENT,
         );
 
         this.logger.log(`포인트 100점 지급 완료: userId=${userId}`);
