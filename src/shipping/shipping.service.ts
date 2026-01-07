@@ -8,6 +8,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { OrderStatus, ShippingStatus } from '../common/enums';
+import { CryptoUtil } from '../common/utils/crypto.util';
 
 @Injectable()
 export class ShippingService {
@@ -72,10 +73,10 @@ export class ShippingService {
       items: items.map(item => ({
         id: item.id,
         orderNumber: item.order.orderNumber,
-        customerName: item.order.user.name,
+        customerName: CryptoUtil.decrypt(item.order.user.name),
         customerEmail: item.order.user.email,
-        recipientName: item.order.recipientName,
-        recipientPhone: item.order.recipientPhone,
+        recipientName: CryptoUtil.decrypt(item.order.recipientName),
+        recipientPhone: CryptoUtil.decrypt(item.order.recipientPhone),
         courierCode: item.courierCode,
         courierName: item.courierName,
         trackingNumber: item.trackingNumber,

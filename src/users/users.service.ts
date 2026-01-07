@@ -46,12 +46,22 @@ export class UsersService {
     }
 
     // 검색어 필터
+    // 이름은 GCM 암호화되어 contains 검색 불가 → 별도 처리 필요
+    // 전화번호는 결정론적 암호화로 정확한 매칭만 가능
+    let nameSearchKeyword: string | null = null;
     if (search) {
-      where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { name: { contains: search, mode: 'insensitive' } },
-        { mobile: { contains: search } },
-      ];
+      const isPhoneNumber = /^[0-9-]+$/.test(search);
+      if (isPhoneNumber) {
+        // 전화번호 검색: 정확한 매칭 (Prisma 미들웨어가 암호화 처리)
+        const normalizedPhone = search.replace(/-/g, '');
+        where.mobile = normalizedPhone;
+      } else if (search.includes('@')) {
+        // 이메일 검색
+        where.email = { contains: search, mode: 'insensitive' };
+      } else {
+        // 이름 검색: 후처리 필터링 필요
+        nameSearchKeyword = search;
+      }
     }
 
     // 상태 필터 (NEWCOMER: User.status, CHALLENGER: 활성 챌린지 보유, SUBSCRIBER: 활성 구독 보유)
@@ -139,10 +149,97 @@ export class UsersService {
       orderBy = { [sortBy]: sortOrder };
     }
 
-    // 전체 개수 조회
+    // 이름 검색인 경우: 전체 조회 후 복호화 필터링 (GCM 암호화는 DB 검색 불가)
+    if (nameSearchKeyword) {
+      // 전체 사용자 조회 (필터 조건 적용, 이름 제외)
+      const allUsers = await this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          mobile: true,
+          points: true,
+          status: true,
+          role: true,
+          isActive: true,
+          birthDate: true,
+          sex: true,
+          telecom: true,
+          billingKey: true,
+          pushEnabled: true,
+          health_type_animal_id: true,
+          createdAt: true,
+          updatedAt: true,
+          deletedAt: true,
+          healthTypeAnimal: {
+            select: {
+              id: true,
+              animalName: true,
+              healthType: true,
+              typeName: true,
+            },
+          },
+          _count: {
+            select: {
+              orders: true,
+              userChallenges: true,
+              userCoupons: true,
+            },
+          },
+        },
+        orderBy,
+      });
+
+      // 복호화 후 이름 필터링
+      const filteredUsers = allUsers
+        .map(user => ({
+          ...user,
+          decryptedName: CryptoUtil.decrypt(user.name),
+        }))
+        .filter(user => user.decryptedName?.includes(nameSearchKeyword));
+
+      const total = filteredUsers.length;
+      const paginatedUsers = filteredUsers.slice(offset, offset + limit);
+
+      const userList = paginatedUsers.map(user => ({
+        id: user.id,
+        email: user.email,
+        name: user.decryptedName,
+        mobile: CryptoUtil.decryptDeterministic(user.mobile),
+        points: user.points,
+        status: user.status,
+        role: user.role,
+        isActive: user.isActive,
+        birthDate: user.birthDate,
+        sex: user.sex,
+        telecom: user.telecom,
+        hasBillingKey: !!user.billingKey,
+        pushEnabled: user.pushEnabled,
+        healthTypeAnimalId: user.health_type_animal_id,
+        healthTypeAnimalName: user.healthTypeAnimal?.animalName,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        deletedAt: user.deletedAt,
+        orderCount: user._count.orders,
+        challengeCount: user._count.userChallenges,
+        couponCount: user._count.userCoupons,
+      }));
+
+      return {
+        users: userList,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
+    // 일반 검색 (이름 검색이 아닌 경우)
     const total = await this.prisma.user.count({ where });
 
-    // 사용자 목록 조회
     const users = await this.prisma.user.findMany({
       where,
       select: {

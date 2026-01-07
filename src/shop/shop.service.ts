@@ -10,6 +10,7 @@ import { UploadService } from '../upload/upload.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { OrderStatus, ProductStatus, CategoryCode } from '../common/enums';
+import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
  * 주문 상태 전이 규칙
@@ -448,6 +449,11 @@ export class ShopService {
         shippingFee: Number(order.shippingFee),
         pointUsed: Number(order.pointUsed),
         totalAmount: Number(order.totalAmount),
+        user: order.user ? {
+          ...order.user,
+          name: CryptoUtil.decrypt(order.user.name),
+          mobile: CryptoUtil.decryptDeterministic(order.user.mobile),
+        } : null,
         items: order.items.map(item => ({
           ...item,
           productPrice: Number(item.productPrice),

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { CryptoUtil } from '../common/utils/crypto.util';
 import {
   RecordsDashboardDto,
   RecordsByTypeDto,
@@ -728,11 +729,16 @@ export class RecordsService {
 
     // 사용자 조회 조건
     const userWhere: any = {};
+    // 이름은 GCM 암호화되어 DB 검색 불가 → 후처리 필터링
+    let nameSearchKeyword: string | null = null;
     if (search) {
-      userWhere.OR = [
-        { name: { contains: search } },
-        { email: { contains: search } },
-      ];
+      if (search.includes('@')) {
+        // 이메일 검색
+        userWhere.email = { contains: search, mode: 'insensitive' };
+      } else {
+        // 이름 검색: 후처리 필터링 필요
+        nameSearchKeyword = search;
+      }
     }
 
     // 챌린지 상태 필터
@@ -742,44 +748,92 @@ export class RecordsService {
       };
     }
 
-    // 전체 사용자 수
-    const total = await this.prisma.user.count({ where: userWhere });
+    // 이름 검색인 경우: 전체 조회 후 복호화 필터링
+    let users: any[];
+    let total: number;
 
-    // 사용자 목록 조회
-    const users = await this.prisma.user.findMany({
-      where: userWhere,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        userChallenges: {
-          where: { status: { in: ['ACTIVE', 'PENDING'] } },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            status: true,
-            dailyProgress: {
-              orderBy: { day: 'desc' },
-              take: 1,
-              select: { day: true },
+    if (nameSearchKeyword) {
+      // 이름 검색: 전체 조회 후 복호화 필터링
+      const allUsers = await this.prisma.user.findMany({
+        where: userWhere,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          userChallenges: {
+            where: { status: { in: ['ACTIVE', 'PENDING'] } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              status: true,
+              dailyProgress: {
+                orderBy: { day: 'desc' },
+                take: 1,
+                select: { day: true },
+              },
             },
           },
-        },
-        userRecords: {
-          where: { createdAt: { gte: days30Ago } },
-          select: {
-            recordType: true,
-            createdAt: true,
-            date: true,
-            metadata: true,
+          userRecords: {
+            where: { createdAt: { gte: days30Ago } },
+            select: {
+              recordType: true,
+              createdAt: true,
+              date: true,
+              metadata: true,
+            },
+            orderBy: { createdAt: 'desc' },
           },
-          orderBy: { createdAt: 'desc' },
         },
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // 복호화 후 이름 필터링
+      const filteredUsers = allUsers.filter(user => {
+        const decryptedName = CryptoUtil.decrypt(user.name);
+        return decryptedName && decryptedName.includes(nameSearchKeyword);
+      });
+
+      total = filteredUsers.length;
+      users = filteredUsers.slice((page - 1) * limit, page * limit);
+    } else {
+      // 일반 조회
+      total = await this.prisma.user.count({ where: userWhere });
+
+      users = await this.prisma.user.findMany({
+        where: userWhere,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          userChallenges: {
+            where: { status: { in: ['ACTIVE', 'PENDING'] } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              status: true,
+              dailyProgress: {
+                orderBy: { day: 'desc' },
+                take: 1,
+                select: { day: true },
+              },
+            },
+          },
+          userRecords: {
+            where: { createdAt: { gte: days30Ago } },
+            select: {
+              recordType: true,
+              createdAt: true,
+              date: true,
+              metadata: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     // 사용자별 통계 계산
     const userSummaries: UserRecordSummaryDto[] = users.map((user) => {
@@ -830,7 +884,7 @@ export class RecordsService {
 
       return {
         userId: user.id,
-        nickname: user.name || '',
+        nickname: CryptoUtil.decrypt(user.name) || '',
         email: user.email || '',
         challengeStatus: challenge?.status || null,
         challengeDay: challenge?.dailyProgress[0]?.day || null,
