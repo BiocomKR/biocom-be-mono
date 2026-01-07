@@ -372,6 +372,7 @@ model PointHistory {
   description String
   relatedType String?  @map("related_type")
   relatedId   Int?     @map("related_id")
+  recordType  String?  @map("record_type") @db.VarChar(50)
   createdAt   DateTime @map("created_at")
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1432,21 +1433,23 @@ model LectureQuiz {
 /// 강의-상품 연결 테이블
 /// 각 강의에 연결된 추천 상품들
 model LectureProduct {
-  id        Int      @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   /// 강의 컨텐츠 ID
-  contentId Int      @map("content_id")
+  contentId   Int      @map("content_id")
   /// 상품 ID
-  productId Int      @map("product_id")
+  productId   Int      @map("product_id")
+  /// 상품 설명 (강의별 맞춤 설명)
+  description String?
   /// 정렬 순서
-  sortOrder Int      @default(0) @map("sort_order")
+  sortOrder   Int      @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive  Boolean  @default(true) @map("is_active")
+  isActive    Boolean  @default(true) @map("is_active")
   /// 생성일시
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt DateTime @updatedAt @map("updated_at")
-  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  content     Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([contentId, productId])
   @@index([contentId])
