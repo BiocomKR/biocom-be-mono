@@ -456,6 +456,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   get userDeepReport() { return this.prisma.userDeepReport; }
   get userAllergyReport() { return this.prisma.userAllergyReport; }
   get userMetabolicReport() { return this.prisma.userMetabolicReport; }
+  get userChatHistory() { return this.prisma.userChatHistory; }
+  get userChatDailySummary() { return this.prisma.userChatDailySummary; }
+  get userEmotionalState() { return this.prisma.userEmotionalState; }
 
   // 메서드 바인딩
   $transaction(arg: any) {

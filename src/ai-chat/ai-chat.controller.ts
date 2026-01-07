@@ -1,7 +1,9 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Query,
   UseGuards,
   Request,
   HttpStatus,
@@ -11,10 +13,16 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AiChatService } from './ai-chat.service';
-import { AiChatRequestDto, AiChatResponseDto } from './dto/ai-chat.dto';
+import {
+  AiChatRequestDto,
+  AiChatResponseDto,
+  ChatHistoryQueryDto,
+  ChatHistoryResponseDto,
+} from './dto/ai-chat.dto';
 
 /**
  * AI 챗봇 컨트롤러
@@ -82,5 +90,64 @@ export class AiChatController {
     // JWT payload에서 sub (user id) 추출
     const userId = req.user.sub;
     return this.aiChatService.chatAllergy(userId, dto);
+  }
+
+  /**
+   * 채팅 내역 조회 (역방향 페이지네이션)
+   *
+   * 처리 과정:
+   * 1. JWT에서 userId 추출
+   * 2. 역방향 페이지네이션으로 채팅 내역 조회
+   *    - page=1: 가장 최신 메시지부터 limit개
+   *    - 스크롤 위로 올릴 때 다음 페이지 호출
+   * 3. isEndOfPage가 true면 더 이상 이전 메시지 없음
+   */
+  @Get('history')
+  @ApiOperation({
+    summary: '채팅 내역 조회',
+    description: `
+채팅 내역을 역방향 페이지네이션으로 조회합니다.
+
+**페이지네이션 방식:**
+- page=1: 가장 최신 메시지 30건 (91~120번)
+- page=2: 그 이전 메시지 30건 (61~90번)
+- page=3: 그 이전 메시지 30건 (31~60번)
+- page=4: 가장 오래된 메시지 (1~30번) → isEndOfPage: true
+
+**사용 흐름:**
+1. 채팅방 진입 시 page=1 호출 (최신 메시지)
+2. 스크롤 위로 올릴 때 page=2, 3, ... 순차 호출
+3. isEndOfPage가 true이면 더 이상 호출하지 않음
+    `,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: '페이지 번호 (기본값: 1)',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: '페이지당 메시지 수 (기본값: 30, 최대: 100)',
+    example: 30,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: '채팅 내역 조회 성공',
+    type: ChatHistoryResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: '인증되지 않은 요청',
+  })
+  async getChatHistory(
+    @Request() req,
+    @Query() query: ChatHistoryQueryDto,
+  ): Promise<ChatHistoryResponseDto> {
+    const userId = req.user.sub;
+    return this.aiChatService.getChatHistory(userId, query);
   }
 }

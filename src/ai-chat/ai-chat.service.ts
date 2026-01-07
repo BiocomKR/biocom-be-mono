@@ -1,7 +1,15 @@
 import { Injectable, Logger, BadRequestException, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/services/prisma.service';
-import { AiChatRequestDto, AiAgentRequestDto, AiAgentResponseDto, AiChatResponseDto } from './dto/ai-chat.dto';
+import {
+  AiChatRequestDto,
+  AiAgentRequestDto,
+  AiAgentResponseDto,
+  AiChatResponseDto,
+  ChatHistoryQueryDto,
+  ChatHistoryResponseDto,
+  ChatMessageDto,
+} from './dto/ai-chat.dto';
 import axios, { AxiosError } from 'axios';
 
 /**
@@ -72,6 +80,161 @@ export class AiChatService {
       chartId: aiAgentResponse.chart_id,
       processingTimeMs: aiAgentResponse.processing_time_ms,
     };
+  }
+
+  /**
+   * 채팅 내역 조회 (역방향 페이지네이션)
+   *
+   * @param userId 사용자 ID (JWT에서 추출)
+   * @param query 페이지네이션 쿼리 파라미터
+   * @returns 채팅 내역 응답 DTO
+   *
+   * 페이지네이션 로직:
+   * - 총 120건일 때, page=1 → 91~120번 레코드 (최신 30건)
+   * - page=2 → 61~90번 레코드
+   * - page=3 → 31~60번 레코드
+   * - page=4 → 1~30번 레코드 → isEndOfPage: true
+   */
+  async getChatHistory(userId: number, query: ChatHistoryQueryDto): Promise<ChatHistoryResponseDto> {
+    const page = query.page || 1;
+    const limit = query.limit || 30;
+
+    this.logger.log(`[getChatHistory] 시작 - userId: ${userId}, page: ${page}, limit: ${limit}`);
+
+    // 1. 총 메시지 수 조회
+    const totalCount = await this.prisma.userChatHistory.count({
+      where: { userId },
+    });
+
+    this.logger.log(`[getChatHistory] 총 메시지 수: ${totalCount}`);
+
+    // 총 페이지 수 계산
+    const totalPage = Math.ceil(totalCount / limit);
+
+    // 메시지가 없는 경우 빈 배열 반환
+    if (totalCount === 0) {
+      return {
+        success: true,
+        data: {
+          messages: [],
+          page,
+          limit,
+          totalPage: 0,
+          isEndOfPage: true,
+        },
+      };
+    }
+
+    // 2. 역방향 페이지네이션 계산
+    // page=1이면 가장 최신 메시지부터 limit개
+    // 예: 총 120건, limit=30, page=1 → skip=90 (91~120번 조회)
+    // 예: 총 120건, limit=30, page=2 → skip=60 (61~90번 조회)
+    const skipFromEnd = (page - 1) * limit;
+    const startIndex = Math.max(0, totalCount - skipFromEnd - limit);
+    const take = Math.min(limit, totalCount - skipFromEnd);
+
+    // 더 이상 조회할 데이터가 없는 경우
+    if (take <= 0 || skipFromEnd >= totalCount) {
+      return {
+        success: true,
+        data: {
+          messages: [],
+          page,
+          limit,
+          totalPage,
+          isEndOfPage: true,
+        },
+      };
+    }
+
+    // 3. 채팅 메시지 조회 (id 기준 오름차순)
+    const chatHistories = await this.prisma.userChatHistory.findMany({
+      where: { userId },
+      orderBy: { id: 'asc' },
+      skip: startIndex,
+      take,
+      select: {
+        id: true,
+        message: true,
+        createdAt: true,
+      },
+    });
+
+    // 4. AI 페르소나 ID 목록 추출 및 이름 조회
+    const personaIds = new Set<number>();
+    for (const chat of chatHistories) {
+      const msg = chat.message as { role: string; persona_id?: number };
+      if (msg.role === 'AI' && msg.persona_id) {
+        personaIds.add(msg.persona_id);
+      }
+    }
+
+    // 페르소나 이름 맵 생성
+    const personaMap = new Map<number, string>();
+    if (personaIds.size > 0) {
+      const personas = await this.prisma.aiPersona.findMany({
+        where: { id: { in: Array.from(personaIds) } },
+        select: { id: true, name: true },
+      });
+      for (const persona of personas) {
+        personaMap.set(persona.id, persona.name);
+      }
+    }
+
+    // 5. 메시지 포맷 변환
+    const messages: ChatMessageDto[] = chatHistories.map((chat) => {
+      const msg = chat.message as { role: string; content: string; persona_id?: number };
+      const isUser = msg.role === 'USER';
+
+      // DB에 이미 KST로 저장되어 있음
+      const kstDate = chat.createdAt;
+
+      return {
+        text: msg.content,
+        isUser,
+        date: this.formatKoreanDate(kstDate),
+        time: this.formatKoreanTime(kstDate),
+        personaName: isUser ? null : (personaMap.get(msg.persona_id || 0) || null),
+      };
+    });
+
+    // 6. isEndOfPage 계산 (첫 번째 메시지에 도달했는지)
+    const isEndOfPage = startIndex === 0;
+
+    this.logger.log(`[getChatHistory] 조회 완료 - messages: ${messages.length}, isEndOfPage: ${isEndOfPage}`);
+
+    return {
+      success: true,
+      data: {
+        messages,
+        page,
+        limit,
+        totalPage,
+        isEndOfPage,
+      },
+    };
+  }
+
+  /**
+   * 한국어 날짜 포맷 (예: 2026년 1월 7일)
+   */
+  private formatKoreanDate(date: Date): string {
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth() + 1;
+    const day = date.getUTCDate();
+    return `${year}년 ${month}월 ${day}일`;
+  }
+
+  /**
+   * 한국어 시간 포맷 (예: 오전 10:46)
+   */
+  private formatKoreanTime(date: Date): string {
+    const hours = date.getUTCHours();
+    const minutes = date.getUTCMinutes();
+    const ampm = hours < 12 ? '오전' : '오후';
+    const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    return `${ampm} ${displayHours}:${displayMinutes}`;
   }
 
   /**

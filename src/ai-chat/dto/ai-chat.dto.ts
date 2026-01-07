@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsString, MaxLength, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * AI 챗봇 채팅 요청 DTO
@@ -60,4 +61,122 @@ export class AiChatResponseDto {
     example: 7365,
   })
   processingTimeMs: number;
+}
+
+/**
+ * 채팅 내역 조회 요청 DTO
+ * 역방향 페이지네이션 쿼리 파라미터
+ */
+export class ChatHistoryQueryDto {
+  @ApiPropertyOptional({
+    description: '페이지 번호 (1부터 시작, 최신 메시지부터)',
+    example: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    description: '페이지당 메시지 수',
+    example: 30,
+    default: 30,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 30;
+}
+
+/**
+ * 채팅 메시지 DTO
+ * 개별 채팅 메시지 정보
+ */
+export class ChatMessageDto {
+  @ApiProperty({
+    description: '메시지 내용',
+    example: '안녕! 오늘 뭐 먹었어?',
+  })
+  text: string;
+
+  @ApiProperty({
+    description: '사용자 메시지 여부 (true: 사용자, false: AI)',
+    example: false,
+  })
+  isUser: boolean;
+
+  @ApiProperty({
+    description: '날짜 (한국어 형식)',
+    example: '2026년 1월 7일',
+  })
+  date: string;
+
+  @ApiProperty({
+    description: '시간 (한국어 형식)',
+    example: '오전 10:46',
+  })
+  time: string;
+
+  @ApiPropertyOptional({
+    description: 'AI 페르소나 이름 (AI 메시지일 경우에만)',
+    example: '메이브',
+    nullable: true,
+  })
+  personaName: string | null;
+}
+
+/**
+ * 채팅 내역 데이터 DTO
+ */
+export class ChatHistoryDataDto {
+  @ApiProperty({
+    description: '채팅 메시지 목록',
+    type: [ChatMessageDto],
+  })
+  messages: ChatMessageDto[];
+
+  @ApiProperty({
+    description: '현재 페이지 번호',
+    example: 1,
+  })
+  page: number;
+
+  @ApiProperty({
+    description: '페이지당 메시지 수',
+    example: 30,
+  })
+  limit: number;
+
+  @ApiProperty({
+    description: '총 페이지 수',
+    example: 4,
+  })
+  totalPage: number;
+
+  @ApiProperty({
+    description: '마지막 페이지 여부 (더 이상 이전 메시지 없음)',
+    example: false,
+  })
+  isEndOfPage: boolean;
+}
+
+/**
+ * 채팅 내역 조회 응답 DTO
+ */
+export class ChatHistoryResponseDto {
+  @ApiProperty({
+    description: '성공 여부',
+    example: true,
+  })
+  success: boolean;
+
+  @ApiProperty({
+    description: '채팅 내역 데이터',
+    type: ChatHistoryDataDto,
+  })
+  data: ChatHistoryDataDto;
 }
