@@ -134,6 +134,25 @@ export class ContentService {
             metadata: true,
           },
         },
+        // 연관 상품 조회
+        lectureProducts: {
+          where: { isActive: true },
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                categoryCode: true,
+                productFiles: {
+                  where: { imageType: 'MAIN' },
+                  include: { file: true },
+                  take: 1,
+                },
+              },
+            },
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
       },
     });
 
@@ -371,5 +390,85 @@ export class ContentService {
     });
 
     this.logger.log(`컨텐츠 소프트 삭제 완료: ${id}`);
+  }
+
+  /**
+   * 연관 상품 수정
+   * @param contentId 콘텐츠 ID
+   * @param products 연결할 상품 배열 [{productId, description}] (순서대로 sortOrder 부여)
+   */
+  async updateLectureProducts(contentId: number, products: { productId: number; description?: string }[]) {
+    // 콘텐츠 존재 확인
+    const content = await this.prisma.content.findUnique({
+      where: { id: contentId },
+      select: { id: true, type: true },
+    });
+
+    if (!content) {
+      throw new NotFoundException(`컨텐츠를 찾을 수 없습니다: ${contentId}`);
+    }
+
+    // LECTURE 타입만 연관 상품 설정 가능
+    if (content.type !== 'LECTURE') {
+      throw new BadRequestException('연관 상품은 LECTURE 타입 콘텐츠에만 설정할 수 있습니다.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // 기존 연관 상품 전체 삭제
+      await tx.lectureProduct.deleteMany({
+        where: { contentId },
+      });
+
+      // 새로운 연관 상품 추가
+      if (products.length > 0) {
+        await tx.lectureProduct.createMany({
+          data: products.map((p, index) => ({
+            contentId,
+            productId: p.productId,
+            description: p.description || null,
+            sortOrder: index + 1,
+            isActive: true,
+            createdAt: getNowKST(),
+          })),
+        });
+      }
+    });
+
+    this.logger.log(`연관 상품 수정 완료: contentId=${contentId}, products=${products.map(p => p.productId).join(',')}`);
+
+    return this.getContentById(contentId);
+  }
+
+  /**
+   * 연관 상품용 상품 목록 조회 (SUPPLEMENT 카테고리만)
+   * description: 상품의 기본 설명 (강의 추가 시 기본값으로 사용)
+   */
+  async getProductsForLecture() {
+    const products = await this.prisma.product.findMany({
+      where: {
+        status: 'ACTIVE',
+        categoryCode: 'SUPPLEMENT',
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        categoryCode: true,
+        productFiles: {
+          where: { imageType: 'MAIN' },
+          include: { file: true },
+          take: 1,
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description || null,
+      categoryCode: p.categoryCode,
+      imageUrl: p.productFiles[0]?.file?.filePath || null,
+    }));
   }
 }

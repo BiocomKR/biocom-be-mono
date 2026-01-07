@@ -85,6 +85,28 @@ export class ContentController {
   }
 
   /**
+   * 연관 상품용 상품 목록 조회
+   */
+  @Get('products/for-lecture')
+  async getProductsForLecture(): Promise<ApiResponseDto<any>> {
+    this.logger.log('연관 상품용 상품 목록 조회 요청');
+
+    try {
+      const products = await this.contentService.getProductsForLecture();
+
+      return {
+        success: true,
+        message: '상품 목록이 성공적으로 조회되었습니다.',
+        data: products,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error('연관 상품용 상품 목록 조회 실패', error);
+      throw error;
+    }
+  }
+
+  /**
    * 새로운 컨텐츠 생성
    */
   @Post()
@@ -195,6 +217,33 @@ export class ContentController {
       };
     } catch (error) {
       this.logger.error(`컨텐츠 삭제 실패 - ID: ${id}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 연관 상품 수정
+   */
+  @Put(':id/products')
+  async updateLectureProducts(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { products: { productId: number; description?: string }[] },
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`연관 상품 수정 요청 - 콘텐츠 ID: ${id}, 상품: ${body.products?.map(p => p.productId).join(',')}`);
+
+    try {
+      const content = await this.contentService.updateLectureProducts(id, body.products || []);
+
+      this.logger.log(`연관 상품 수정 성공 - 콘텐츠 ID: ${id}`);
+
+      return {
+        success: true,
+        message: '연관 상품이 성공적으로 수정되었습니다.',
+        data: content,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`연관 상품 수정 실패 - 콘텐츠 ID: ${id}`, error);
       throw error;
     }
   }
