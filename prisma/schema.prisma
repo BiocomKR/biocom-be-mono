@@ -372,6 +372,7 @@ model PointHistory {
   description String
   relatedType String?  @map("related_type")
   relatedId   Int?     @map("related_id")
+  recordType  String?  @map("record_type") @db.VarChar(50)
   createdAt   DateTime @map("created_at")
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
