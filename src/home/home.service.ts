@@ -514,8 +514,8 @@ export class HomeService {
     const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     const thisMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday, 0, 0, 0));
 
-    // 병렬로 조회: user_records (SUPPLEMENT, WEEKLY_REPORT 별도)
-    const [todayRecords, todaySupplementRecords, weeklyReportRecords] = await Promise.all([
+    // 병렬로 조회: user_records (실행 횟수), point_histories (포인트 지급 횟수)
+    const [todayRecords, todaySupplementRecords, weeklyReportRecords, todayPointHistories] = await Promise.all([
       // user_records: 기록 타입 (createdAt 기준) - SUPPLEMENT, WEEKLY_REPORT 제외
       this.prisma.userRecord.findMany({
         where: {
@@ -563,6 +563,21 @@ export class HomeService {
           metadata: true,
         },
       }),
+      // point_histories: 오늘 포인트 지급 내역 (recordType별 카운트용)
+      this.prisma.pointHistory.findMany({
+        where: {
+          userId,
+          type: 'EARNED',
+          recordType: { not: null },
+          createdAt: {
+            gte: todayDate,
+            lt: tomorrowDate,
+          },
+        },
+        select: {
+          recordType: true,
+        },
+      }),
     ]);
 
     // recordType별 실행 횟수 계산 (isCompleted = true인 레코드만)
@@ -596,33 +611,14 @@ export class HomeService {
       }
     }
 
-    // recordType별 포인트 지급 횟수 계산 (metadata.pointsEarned > 0인 경우)
+    // recordType별 포인트 지급 횟수 계산 (point_histories에서 조회)
     const currentMap = new Map<string, number>();
 
-    // user_records에서 포인트 지급 횟수 (metadata.pointsEarned로 확인)
-    for (const record of todayRecords) {
-      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
-      if (pointsEarned > 0) {
-        const currentCount = currentMap.get(record.recordType) || 0;
-        currentMap.set(record.recordType, currentCount + 1);
-      }
-    }
-
-    // SUPPLEMENT도 동일하게 처리
-    for (const record of todaySupplementRecords) {
-      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
-      if (pointsEarned > 0) {
-        const currentCount = currentMap.get('SUPPLEMENT') || 0;
-        currentMap.set('SUPPLEMENT', currentCount + 1);
-      }
-    }
-
-    // WEEKLY_REPORT도 동일하게 처리
-    for (const record of weeklyReportRecords) {
-      const pointsEarned = (record.metadata as any)?.pointsEarned || 0;
-      if (pointsEarned > 0) {
-        const currentCount = currentMap.get('WEEKLY_REPORT') || 0;
-        currentMap.set('WEEKLY_REPORT', currentCount + 1);
+    // point_histories에서 포인트 지급 횟수 카운트
+    for (const history of todayPointHistories) {
+      if (history.recordType) {
+        const currentCount = currentMap.get(history.recordType) || 0;
+        currentMap.set(history.recordType, currentCount + 1);
       }
     }
 
