@@ -64,6 +64,8 @@ model User {
   marketingEnabled             Boolean                        @default(false) @map("marketing_enabled")
   /// 야간 푸시 수신 동의 여부
   nightPushEnabled             Boolean                        @default(true) @map("night_push_enabled")
+  /// 테스터 여부 (통계/기록에서 제외)
+  isTester                     Boolean                        @default(false) @map("is_tester")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
@@ -2039,10 +2041,6 @@ model PushToken {
   failureCount     Int                   @default(0) @map("failure_count")
   /// 총 성공 횟수
   successCount     Int                   @default(0) @map("success_count")
-  /// 마케팅 알림 수신 동의
-  marketingEnabled Boolean               @default(false) @map("marketing_enabled")
-  /// 야간 푸시 수신 동의
-  nightPushEnabled Boolean               @default(true) @map("night_push_enabled")
   /// User Agent
   userAgent        String?               @map("user_agent") @db.VarChar(500)
   /// IP 주소
