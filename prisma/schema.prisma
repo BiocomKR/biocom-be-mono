@@ -64,6 +64,8 @@ model User {
   marketingEnabled             Boolean                        @default(false) @map("marketing_enabled")
   /// 야간 푸시 수신 동의 여부
   nightPushEnabled             Boolean                        @default(true) @map("night_push_enabled")
+  /// 테스터 여부 (통계/기록에서 제외)
+  isTester                     Boolean                        @default(false) @map("is_tester")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
@@ -1433,21 +1435,23 @@ model LectureQuiz {
 /// 강의-상품 연결 테이블
 /// 각 강의에 연결된 추천 상품들
 model LectureProduct {
-  id        Int      @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   /// 강의 컨텐츠 ID
-  contentId Int      @map("content_id")
+  contentId   Int      @map("content_id")
   /// 상품 ID
-  productId Int      @map("product_id")
+  productId   Int      @map("product_id")
+  /// 상품 설명 (강의별 맞춤 설명)
+  description String?
   /// 정렬 순서
-  sortOrder Int      @default(0) @map("sort_order")
+  sortOrder   Int      @default(0) @map("sort_order")
   /// 활성화 여부
-  isActive  Boolean  @default(true) @map("is_active")
+  isActive    Boolean  @default(true) @map("is_active")
   /// 생성일시
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt DateTime @updatedAt @map("updated_at")
-  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  content     Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([contentId, productId])
   @@index([contentId])
@@ -2037,10 +2041,6 @@ model PushToken {
   failureCount     Int                   @default(0) @map("failure_count")
   /// 총 성공 횟수
   successCount     Int                   @default(0) @map("success_count")
-  /// 마케팅 알림 수신 동의
-  marketingEnabled Boolean               @default(false) @map("marketing_enabled")
-  /// 야간 푸시 수신 동의
-  nightPushEnabled Boolean               @default(true) @map("night_push_enabled")
   /// User Agent
   userAgent        String?               @map("user_agent") @db.VarChar(500)
   /// IP 주소
@@ -3100,6 +3100,18 @@ enum MenuCode {
   REFUNDS
   PUSH
   OPERATORS
+}
+
+/// RAG용 도메인 지식 임베딩 테이블
+model DomainKnowledgeEmbedding {
+  id        Int       @id @default(autoincrement())
+  content   String
+  metadata  Json?
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime? @default(now()) @map("created_at")
+  updatedAt DateTime? @map("updated_at")
+
+  @@map("domain_knowledge_embeddings")
 }
 
 /// IAP 플랫폼 Enum
