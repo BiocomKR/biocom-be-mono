@@ -81,7 +81,7 @@ export class ShopController {
   }
 
   /**
-   * 상품 이미지 업로드 (MAIN 타입)
+   * 상품 이미지 업로드 (MAIN/CONTENT 타입)
    */
   @Post('products/:id/images')
   @ApiConsumes('multipart/form-data')
@@ -90,8 +90,9 @@ export class ShopController {
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],
     @Body('deleteFileIds') deleteFileIds?: string,
+    @Body('imageType') imageType?: string,
   ) {
-    return this.shopService.uploadProductImages(id, files, deleteFileIds);
+    return this.shopService.uploadProductImages(id, files, deleteFileIds, imageType);
   }
 
   /**

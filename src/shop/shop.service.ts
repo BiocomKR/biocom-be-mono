@@ -298,12 +298,13 @@ export class ShopService {
   }
 
   /**
-   * 상품 이미지 업로드 (MAIN 타입)
+   * 상품 이미지 업로드 (MAIN/CONTENT 타입)
    */
   async uploadProductImages(
     productId: number,
     files?: Express.Multer.File[],
-    deleteFileIdsJson?: string
+    deleteFileIdsJson?: string,
+    imageType: string = 'MAIN'
   ) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -367,18 +368,18 @@ export class ShopService {
         this.logger.log(`상품 이미지 관계 삭제: 상품 ID ${productId}, ProductFile IDs ${deleteProductFileIds.join(', ')}`);
       }
 
-      // 새 파일 추가 (MAIN 타입으로)
+      // 새 파일 추가 (imageType에 따라 MAIN 또는 CONTENT)
       if (newFileIds.length > 0) {
         await tx.productFile.createMany({
           data: newFileIds.map((fileId, index) => ({
             productId,
             fileId,
-            imageType: 'MAIN',
+            imageType: imageType || 'MAIN',
             sortOrder: maxSortOrder + 1 + index,
             createdAt: getNowKST(),
           })),
         });
-        this.logger.log(`상품 이미지 추가: 상품 ID ${productId}, ${newFileIds.length}개 파일`);
+        this.logger.log(`상품 이미지 추가: 상품 ID ${productId}, 타입 ${imageType}, ${newFileIds.length}개 파일`);
       }
     });
 
