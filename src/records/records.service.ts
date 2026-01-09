@@ -14,6 +14,8 @@ import {
   RecordTypeStatsDto,
   UserRecordStatsListDto,
   UserRecordSummaryDto,
+  RecordRowListDto,
+  RecordRowItemDto,
 } from './dto/records-dashboard.dto';
 import {
   UserRecordsQueryDto,
@@ -32,7 +34,8 @@ export class RecordsService {
   /**
    * 기록 통계 대시보드 (경영진용)
    */
-  async getDashboard(): Promise<RecordsDashboardDto> {
+  async getDashboard(excludeTesters: boolean = false): Promise<RecordsDashboardDto> {
+    const testerCondition = excludeTesters ? { isTester: false } : {};
     const now = getNowKST();
 
     // 날짜 범위 계산
@@ -68,21 +71,30 @@ export class RecordsService {
     // ========== 리텐션 지표 ==========
     // DAU: 오늘 기록한 사용자
     const todayRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: today, lt: tomorrow } },
+      where: {
+        createdAt: { gte: today, lt: tomorrow },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
+      },
       select: { userId: true },
     });
     const dau = new Set(todayRecords.map((r) => r.userId)).size;
 
     // WAU: 최근 7일 기록한 사용자
     const weekRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: days7Ago, lt: tomorrow } },
+      where: {
+        createdAt: { gte: days7Ago, lt: tomorrow },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
+      },
       select: { userId: true, createdAt: true },
     });
     const wau = new Set(weekRecords.map((r) => r.userId)).size;
 
     // MAU: 최근 30일 기록한 사용자
     const monthRecords = await this.prisma.userRecord.findMany({
-      where: { createdAt: { gte: days30Ago, lt: tomorrow } },
+      where: {
+        createdAt: { gte: days30Ago, lt: tomorrow },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
+      },
       select: { userId: true },
     });
     const mau = new Set(monthRecords.map((r) => r.userId)).size;
@@ -204,12 +216,18 @@ export class RecordsService {
     // ========== 성장 지표 ==========
     // 이번 주 신규 가입자
     const newUsersThisWeek = await this.prisma.user.count({
-      where: { createdAt: { gte: weekStart, lt: tomorrow } },
+      where: {
+        createdAt: { gte: weekStart, lt: tomorrow },
+        ...testerCondition,
+      },
     });
 
     // 신규 가입자 중 첫 기록 전환율
     const newUserIds = await this.prisma.user.findMany({
-      where: { createdAt: { gte: weekStart, lt: tomorrow } },
+      where: {
+        createdAt: { gte: weekStart, lt: tomorrow },
+        ...testerCondition,
+      },
       select: { id: true },
     });
     const newUserIdList = newUserIds.map((u) => u.id);
@@ -591,7 +609,7 @@ export class RecordsService {
   /**
    * 기록통계 내역 (운영용)
    */
-  async getRecordsStats(): Promise<RecordsStatsDto> {
+  async getRecordsStats(excludeTesters: boolean = false): Promise<RecordsStatsDto> {
     const now = getNowKST();
 
     // 날짜 범위 계산
@@ -618,6 +636,7 @@ export class RecordsService {
 
     // 전체 기록 조회
     const rawRecords = await this.prisma.userRecord.findMany({
+      where: excludeTesters ? { user: { isTester: false } } : {},
       select: {
         recordType: true,
         userId: true,
@@ -709,6 +728,7 @@ export class RecordsService {
     limit: number = 20,
     search?: string,
     challengeStatus?: string,
+    excludeTesters: boolean = false,
   ): Promise<UserRecordStatsListDto> {
     const now = getNowKST();
     const today = new Date(now);
@@ -729,6 +749,9 @@ export class RecordsService {
 
     // 사용자 조회 조건
     const userWhere: any = {};
+    if (excludeTesters) {
+      userWhere.isTester = false;
+    }
     // 이름은 GCM 암호화되어 DB 검색 불가 → 후처리 필터링
     let nameSearchKeyword: string | null = null;
     if (search) {
@@ -902,6 +925,108 @@ export class RecordsService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * 기록 Row 목록 조회 (단순 조회)
+   */
+  async getRecordRowList(
+    page: number = 1,
+    limit: number = 10,
+    recordType?: string,
+    startDate?: string,
+    endDate?: string,
+    search?: string,
+    excludeTesters: boolean = false,
+  ): Promise<RecordRowListDto> {
+    // 날짜 조건
+    const dateWhere: any = {};
+    if (startDate) {
+      dateWhere.gte = new Date(startDate);
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setDate(end.getDate() + 1);
+      dateWhere.lt = end;
+    }
+
+    // 기본 where 조건
+    const where: any = {};
+    if (Object.keys(dateWhere).length > 0) {
+      where.date = dateWhere;
+    }
+    if (recordType) {
+      where.recordType = recordType;
+    }
+    if (excludeTesters) {
+      where.user = { isTester: false };
+    }
+
+    // 검색 조건 (이메일)
+    let filterUserIds: number[] | undefined;
+    if (search) {
+      if (search.includes('@')) {
+        // 이메일 검색
+        const users = await this.prisma.user.findMany({
+          where: { email: { contains: search, mode: 'insensitive' } },
+          select: { id: true },
+        });
+        filterUserIds = users.map((u: { id: number }) => u.id);
+        if (filterUserIds.length === 0) {
+          return { records: [], total: 0, page, limit, totalPages: 0 };
+        }
+        where.userId = { in: filterUserIds };
+      } else {
+        // 이름 검색: 전체 조회 후 후처리 필터링 필요
+        // 이름은 암호화되어 있어 DB 검색 불가
+      }
+    }
+
+    // 기록 조회
+    const [records, total] = await Promise.all([
+      this.prisma.userRecord.findMany({
+        where,
+        include: {
+          user: {
+            select: { id: true, name: true, email: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.userRecord.count({ where }),
+    ]);
+
+    // 이름 검색인 경우 후처리 필터링
+    let filteredRecords = records;
+    if (search && !search.includes('@')) {
+      filteredRecords = records.filter((r: any) => {
+        const decryptedName = CryptoUtil.decrypt(r.user.name);
+        return decryptedName && decryptedName.includes(search);
+      });
+    }
+
+    // DTO 변환
+    const recordItems: RecordRowItemDto[] = filteredRecords.map((r: any) => ({
+      id: r.id,
+      userId: r.userId,
+      userName: CryptoUtil.decrypt(r.user.name) || '',
+      userEmail: r.user.email || '',
+      recordType: r.recordType,
+      recordTypeLabel: RECORD_TYPE_LABELS[r.recordType as RecordType] || r.recordType,
+      date: r.date ? r.date.toISOString().split('T')[0] : r.createdAt.toISOString().split('T')[0],
+      metadata: r.metadata,
+      createdAt: r.createdAt.toISOString(),
+    }));
+
+    return {
+      records: recordItems,
+      total: search && !search.includes('@') ? filteredRecords.length : total,
+      page,
+      limit,
+      totalPages: Math.ceil((search && !search.includes('@') ? filteredRecords.length : total) / limit),
     };
   }
 }

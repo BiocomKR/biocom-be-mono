@@ -332,4 +332,124 @@ export class PointService {
     }
     return phone;
   }
+
+  /**
+   * 유저별 포인트 통계 조회 (엑셀 다운로드용)
+   */
+  async getUserPointStats(params: {
+    startDate?: string;
+    endDate?: string;
+    startUserId?: number;
+    endUserId?: number;
+  }) {
+    const { startDate, endDate, startUserId, endUserId } = params;
+
+    const where: any = {
+      type: { in: ['EARN', 'EARNED'] },
+    };
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    if (startUserId !== undefined || endUserId !== undefined) {
+      where.userId = {};
+      if (startUserId !== undefined) where.userId.gte = startUserId;
+      if (endUserId !== undefined) where.userId.lte = endUserId;
+    }
+
+    // 전체 포인트 내역 조회
+    const allHistory = await this.prisma.pointHistory.findMany({
+      where,
+      include: {
+        user: { select: { id: true, name: true, mobile: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // DIET 초과지급 계산 (하루 3회 초과분)
+    const dietByUserDate: Record<string, number> = {};
+    const dietExcess: Record<number, number> = {};
+
+    for (const item of allHistory) {
+      if (item.description === 'DIET 기록 완료') {
+        const dateKey = `${item.userId}_${item.createdAt.toISOString().split('T')[0]}`;
+        dietByUserDate[dateKey] = (dietByUserDate[dateKey] || 0) + 1;
+      }
+    }
+
+    for (const [key, count] of Object.entries(dietByUserDate)) {
+      if (count > 3) {
+        const userId = parseInt(key.split('_')[0]);
+        const excess = (count - 3) * 100;
+        dietExcess[userId] = (dietExcess[userId] || 0) + excess;
+      }
+    }
+
+    // 유저별 집계
+    const userStats: Record<
+      number,
+      { name: string; mobile: string; total: number; excess: number }
+    > = {};
+
+    for (const item of allHistory) {
+      if (!userStats[item.userId]) {
+        userStats[item.userId] = {
+          name: item.user?.name ? CryptoUtil.decrypt(item.user.name) : '-',
+          mobile: item.user?.mobile
+            ? this.formatPhoneNumber(CryptoUtil.decryptDeterministic(item.user.mobile))
+            : '-',
+          total: 0,
+          excess: dietExcess[item.userId] || 0,
+        };
+      }
+      userStats[item.userId].total += item.amount;
+    }
+
+    // 일별 집계
+    const dailyStats: Record<string, Record<number, number>> = {};
+
+    for (const item of allHistory) {
+      const date = item.createdAt.toISOString().split('T')[0];
+      if (!dailyStats[date]) dailyStats[date] = {};
+      dailyStats[date][item.userId] = (dailyStats[date][item.userId] || 0) + item.amount;
+    }
+
+    // 첫 날짜에서 DIET 초과분 차감
+    const dates = Object.keys(dailyStats).sort();
+    if (dates.length > 0) {
+      const firstDate = dates[0];
+      for (const [userId, excess] of Object.entries(dietExcess)) {
+        const uid = parseInt(userId);
+        if (dailyStats[firstDate]?.[uid]) {
+          dailyStats[firstDate][uid] -= excess;
+        }
+      }
+    }
+
+    const totalDietExcess = Object.values(dietExcess).reduce((a, b) => a + b, 0);
+    const totalEarned = Object.values(userStats).reduce((sum, u) => sum + u.total, 0);
+    const adjustedTotal = totalEarned - totalDietExcess;
+
+    return {
+      userStats,
+      dailyStats,
+      dates,
+      summary: {
+        userCount: Object.keys(userStats).length,
+        totalDays: dates.length,
+        totalEarned,
+        totalDietExcess,
+        adjustedTotal,
+      },
+    };
+  }
 }

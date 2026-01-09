@@ -19,8 +19,11 @@ export class DashboardController {
    * 대시보드 요약
    */
   @Get('summary')
-    async getSummary() {
-    return this.dashboardService.getSummary();
+  async getSummary(
+    @Query('excludeTesters') excludeTesters?: string,
+  ) {
+    const exclude = excludeTesters === 'true';
+    return this.dashboardService.getSummary(exclude);
   }
 
   /**
@@ -87,13 +90,16 @@ export class DashboardController {
    * 고객 통계
    */
   @Get('customers')
-        async getCustomerStatistics(
+  async getCustomerStatistics(
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
+    const exclude = excludeTesters === 'true';
     return this.dashboardService.getCustomerStatistics({
       startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined
+      endDate: endDate ? new Date(endDate) : undefined,
+      excludeTesters: exclude,
     });
   }
 

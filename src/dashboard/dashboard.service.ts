@@ -12,7 +12,8 @@ export class DashboardService {
   /**
    * 대시보드 요약
    */
-  async getSummary() {
+  async getSummary(excludeTesters: boolean = false) {
+    const testerCondition = excludeTesters ? { isTester: false } : {};
     const today = getNowKST();
     today.setUTCHours(0, 0, 0, 0);
     
@@ -54,7 +55,8 @@ export class DashboardService {
         createdAt: {
           gte: today,
           lt: tomorrow
-        }
+        },
+        ...testerCondition,
       }
     });
 
@@ -64,7 +66,8 @@ export class DashboardService {
         createdAt: {
           gte: thisMonth,
           lt: nextMonth
-        }
+        },
+        ...testerCondition,
       }
     });
 
@@ -93,7 +96,8 @@ export class DashboardService {
           gte: today,
           lt: tomorrow
         },
-        userId: { not: null }
+        userId: { not: null },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
       }
     });
 
@@ -105,7 +109,8 @@ export class DashboardService {
           gte: thisMonth,
           lt: nextMonth
         },
-        userId: { not: null }
+        userId: { not: null },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
       }
     });
 
@@ -418,8 +423,10 @@ export class DashboardService {
   async getCustomerStatistics(params: {
     startDate?: Date;
     endDate?: Date;
+    excludeTesters?: boolean;
   }) {
-    const { startDate, endDate } = params;
+    const { startDate, endDate, excludeTesters } = params;
+    const testerCondition = excludeTesters ? { isTester: false } : {};
 
     // 기본값: 최근 30일
     const end = endDate || getNowKST();
@@ -431,7 +438,8 @@ export class DashboardService {
         createdAt: {
           gte: start,
           lte: end
-        }
+        },
+        ...testerCondition,
       }
     });
 
@@ -442,7 +450,8 @@ export class DashboardService {
         paidAt: {
           gte: start,
           lte: end
-        }
+        },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
       },
       select: {
         userId: true
@@ -458,7 +467,8 @@ export class DashboardService {
         paidAt: {
           gte: start,
           lte: end
-        }
+        },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
       },
       _count: true,
       having: {
@@ -478,7 +488,8 @@ export class DashboardService {
         paidAt: {
           gte: start,
           lte: end
-        }
+        },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
       },
       _sum: {
         totalAmount: true

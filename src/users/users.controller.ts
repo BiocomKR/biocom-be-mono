@@ -42,10 +42,12 @@ export class UsersController {
   async searchUsers(
     @Query('keyword') keyword: string,
     @Query('limit') limit?: number,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    this.logger.log(`회원 검색 - 키워드: ${keyword}`);
+    const exclude = excludeTesters === 'true';
+    this.logger.log(`회원 검색 - 키워드: ${keyword}, 테스터 제외: ${exclude}`);
 
-    const users = await this.usersService.searchUsers(keyword, limit || 20);
+    const users = await this.usersService.searchUsers(keyword, limit || 20, exclude);
 
     return {
       success: true,
@@ -61,10 +63,13 @@ export class UsersController {
   @Get('stats')
   @ApiOperation({ summary: '회원 통계 조회' })
   @ApiResponse({ status: 200, type: UserStatsResponseDto })
-  async getStats(): Promise<UserStatsResponseDto> {
-    this.logger.log('회원 통계 조회');
+  async getStats(
+    @Query('excludeTesters') excludeTesters?: string,
+  ): Promise<UserStatsResponseDto> {
+    const exclude = excludeTesters === 'true';
+    this.logger.log(`회원 통계 조회 - 테스터 제외: ${exclude}`);
 
-    const stats = await this.usersService.getStats();
+    const stats = await this.usersService.getStats(exclude);
 
     return {
       success: true,
