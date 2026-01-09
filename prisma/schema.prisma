@@ -3102,18 +3102,6 @@ enum MenuCode {
   OPERATORS
 }
 
-/// RAG용 도메인 지식 임베딩 테이블
-model DomainKnowledgeEmbedding {
-  id        Int       @id @default(autoincrement())
-  content   String
-  metadata  Json?
-  embedding Unsupported("vector(1536)")
-  createdAt DateTime? @default(now()) @map("created_at")
-  updatedAt DateTime? @map("updated_at")
-
-  @@map("domain_knowledge_embeddings")
-}
-
 /// IAP 플랫폼 Enum
 enum IAPPlatform {
   APPLE
