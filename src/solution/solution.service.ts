@@ -15,6 +15,10 @@ import {
   SupplementSolutionResponseDto,
   AnimalLineupDto,
 } from './dto/solution.dto';
+import {
+  classifyIngredients,
+  getGlutenLevel,
+} from './utils/ingredient-mapper.util';
 
 /**
  * 맞춤 솔루션 서비스
@@ -90,10 +94,9 @@ export class SolutionService {
     const animal = this.mapAnimal(healthTypeAnimal);
 
     // 4. SIB 음식물 과민증 검사 결과 조회
-    let foodLevelResult: FoodLevelItem | null = null;
-    if (user.mobile) {
-      foodLevelResult = await this.getFoodLevelResult(userId, user.mobile);
-    }
+    const sibResult = user.mobile
+      ? await this.getFoodLevelResult(userId, user.mobile)
+      : null;
 
     // metadata에서 intakeGuide 추출
     const metadata = healthTypeAnimal.metadata as {
@@ -110,10 +113,10 @@ export class SolutionService {
     // 5. 영양제 추천 목록 - FORMULA를 맨 앞에, SUPPLEMENT는 뒤에
     const supplementFormula = metadata?.intakeGuide?.supplement?.formula;
     const formulaProducts = healthTypeAnimal.recommendedProducts.filter(
-      (rp) => rp.type === 'FORMULA',
+      (rp: { type: string }) => rp.type === 'FORMULA',
     );
     const supplementProducts = healthTypeAnimal.recommendedProducts.filter(
-      (rp) => rp.type === 'SUPPLEMENT',
+      (rp: { type: string }) => rp.type === 'SUPPLEMENT',
     );
     const supplements = this.mapSupplements(
       [...formulaProducts, ...supplementProducts],
@@ -122,8 +125,8 @@ export class SolutionService {
 
     // 6. 식단 추천 목록 (type = 'DIET') - SIB 결과 포함
     const diets = this.mapDiets(
-      healthTypeAnimal.recommendedProducts.filter((rp) => rp.type === 'DIET'),
-      foodLevelResult,
+      healthTypeAnimal.recommendedProducts.filter((rp: { type: string }) => rp.type === 'DIET'),
+      sibResult,
     );
 
     // 7. 라인업 목록 조회
@@ -145,7 +148,7 @@ export class SolutionService {
     const conditionalProducts = await this.getConditionalProducts(
       userId,
       healthTypeAnimal.id,
-      foodLevelResult,
+      sibResult,
     );
 
     return {
@@ -217,10 +220,9 @@ export class SolutionService {
     const animal = this.mapAnimal(healthTypeAnimal);
 
     // 4. SIB 음식물 과민증 검사 결과 조회
-    let foodLevelResult: FoodLevelItem | null = null;
-    if (user.mobile) {
-      foodLevelResult = await this.getFoodLevelResult(userId, user.mobile);
-    }
+    const sibResult = user.mobile
+      ? await this.getFoodLevelResult(userId, user.mobile)
+      : null;
 
     // 5. metadata에서 추출
     const metadata = healthTypeAnimal.metadata as {
@@ -237,7 +239,7 @@ export class SolutionService {
     // 6. 식단 추천 목록
     const diets = this.mapDiets(
       healthTypeAnimal.recommendedProducts,
-      foodLevelResult,
+      sibResult,
     );
 
     // 7. 라인업 목록 조회 (동물별 설명 포함)
@@ -326,10 +328,9 @@ export class SolutionService {
     const animal = this.mapAnimal(healthTypeAnimal);
 
     // 4. SIB 음식물 과민증 검사 결과 조회 (조건부 추천용)
-    let foodLevelResult: FoodLevelItem | null = null;
-    if (user.mobile) {
-      foodLevelResult = await this.getFoodLevelResult(userId, user.mobile);
-    }
+    const sibResult = user.mobile
+      ? await this.getFoodLevelResult(userId, user.mobile)
+      : null;
 
     // 5. metadata에서 추출
     const metadata = healthTypeAnimal.metadata as {
@@ -341,10 +342,10 @@ export class SolutionService {
     // 6. 영양제 추천 목록
     const supplementFormula = metadata?.intakeGuide?.supplement?.formula;
     const formulaProducts = healthTypeAnimal.recommendedProducts.filter(
-      (rp) => rp.type === 'FORMULA',
+      (rp: { type: string }) => rp.type === 'FORMULA',
     );
     const supplementProducts = healthTypeAnimal.recommendedProducts.filter(
-      (rp) => rp.type === 'SUPPLEMENT',
+      (rp: { type: string }) => rp.type === 'SUPPLEMENT',
     );
     const supplements = this.mapSupplements(
       [...formulaProducts, ...supplementProducts],
@@ -355,7 +356,7 @@ export class SolutionService {
     const conditionalProducts = await this.getConditionalProducts(
       userId,
       healthTypeAnimal.id,
-      foodLevelResult,
+      sibResult,
     );
 
     return {
@@ -476,7 +477,7 @@ export class SolutionService {
    */
   private mapDiets(
     recommendedProducts: any[],
-    foodLevelResult: FoodLevelItem | null,
+    sibResult: { data: FoodLevelItem; orderCode: string } | null,
   ): DietProductDto[] {
     const diets: DietProductDto[] = recommendedProducts.map((rp) => {
       const product = rp.product;
@@ -486,14 +487,15 @@ export class SolutionService {
       const metadata = product.metadata as { ingredients?: string[] } | null;
       const ingredients = metadata?.ingredients || [];
 
-      // SIB 결과로 레벨 분류
+      // SIB 결과로 레벨 분류 (새 매핑 유틸 사용)
       let ingredientLevels: IngredientLevelDto | undefined;
       let isEdible = true; // 기본값: 먹을 수 있음
 
-      if (foodLevelResult && ingredients.length > 0) {
-        ingredientLevels = this.classifyIngredientsByLevel(
+      if (sibResult && ingredients.length > 0) {
+        ingredientLevels = classifyIngredients(
           ingredients,
-          foodLevelResult,
+          sibResult.data,
+          sibResult.orderCode,
         );
         // 4,5단계 식재료가 하나라도 있으면 먹을 수 없음
         isEdible = ingredientLevels.caution.length === 0;
@@ -539,13 +541,19 @@ export class SolutionService {
       };
     });
 
-    // 가나다순 정렬 (먹을 수 있는 것 먼저, 그 다음 가나다순)
+    // 4~5단계(caution) 식재료 개수 기준 오름차순 정렬
+    // - 0개인 메뉴가 최상단
+    // - 1개 포함된 메뉴가 그 다음
+    // - 개수가 같으면 가나다순
     return diets.sort((a, b) => {
-      // 먹을 수 있는 것 먼저
-      if (a.isEdible !== b.isEdible) {
-        return a.isEdible ? -1 : 1;
+      const aCautionCount = a.ingredientLevels?.caution?.length || 0;
+      const bCautionCount = b.ingredientLevels?.caution?.length || 0;
+
+      // 4~5단계 식재료 개수 오름차순
+      if (aCautionCount !== bCautionCount) {
+        return aCautionCount - bCautionCount;
       }
-      // 가나다순
+      // 개수가 같으면 가나다순
       return a.name.localeCompare(b.name, 'ko');
     });
   }
@@ -578,12 +586,12 @@ export class SolutionService {
    * - DB 캐싱 활용 (SIB 장애 시에도 캐시 데이터 반환)
    * @param userId 사용자 ID (캐시 저장용)
    * @param mobile 전화번호
-   * @returns 레벨별 음식 목록 또는 null
+   * @returns 레벨별 음식 목록 및 검사 타입, 또는 null
    */
   private async getFoodLevelResult(
     userId: number,
     mobile: string,
-  ): Promise<FoodLevelItem | null> {
+  ): Promise<{ data: FoodLevelItem; orderCode: string } | null> {
     try {
       // 1. 전화번호로 차트 목록 조회
       const chartList = await this.sibApiService.getChartIdByMobile(mobile);
@@ -627,94 +635,15 @@ export class SolutionService {
         return null;
       }
 
-      // 첫 번째 결과 반환 (일반적으로 하나)
-      return iggLevels[0];
+      // 첫 번째 결과와 orderCode 함께 반환
+      return {
+        data: iggLevels[0],
+        orderCode: targetExam.orderCode,
+      };
     } catch (error) {
       this.logger.error(`SIB 검사 결과 조회 실패 (mobile: ${mobile}):`, error);
       return null;
     }
-  }
-
-  /**
-   * 식재료를 SIB 레벨별로 분류
-   * - safe: 1-3단계 (안전)
-   * - caution: 4-5단계 (주의)
-   *
-   * @param ingredients 상품 식재료 목록
-   * @param foodLevelResult SIB 검사 결과
-   * @returns 레벨별 분류된 식재료
-   */
-  private classifyIngredientsByLevel(
-    ingredients: string[],
-    foodLevelResult: FoodLevelItem,
-  ): IngredientLevelDto {
-    // SIB 결과에서 레벨별 식재료 파싱 (쉼표 구분)
-    const safeFoods = new Set<string>();
-    const cautionFoods = new Set<string>();
-
-    // 1-3단계: 안전
-    [foodLevelResult.level1, foodLevelResult.level2, foodLevelResult.level3]
-      .filter((level) => level && level !== '해당없음')
-      .forEach((level) => {
-        level.split(',').forEach((food) => {
-          const trimmed = food.trim();
-          if (trimmed) safeFoods.add(trimmed);
-        });
-      });
-
-    // 4-5단계: 주의
-    [foodLevelResult.level4, foodLevelResult.level5]
-      .filter((level) => level && level !== '해당없음')
-      .forEach((level) => {
-        level.split(',').forEach((food) => {
-          const trimmed = food.trim();
-          if (trimmed) cautionFoods.add(trimmed);
-        });
-      });
-
-    // 상품 식재료와 매칭
-    const safe: string[] = [];
-    const caution: string[] = [];
-
-    for (const ingredient of ingredients) {
-      // 정확히 일치하거나 포함 관계 체크
-      const normalizedIngredient = ingredient.trim();
-
-      // 주의 식품 매칭 (4-5단계 우선)
-      const isCaution = [...cautionFoods].some(
-        (food) =>
-          food === normalizedIngredient ||
-          food.includes(normalizedIngredient) ||
-          normalizedIngredient.includes(food),
-      );
-
-      if (isCaution) {
-        caution.push(normalizedIngredient);
-        continue;
-      }
-
-      // 안전 식품 매칭 (1-3단계)
-      const isSafe = [...safeFoods].some(
-        (food) =>
-          food === normalizedIngredient ||
-          food.includes(normalizedIngredient) ||
-          normalizedIngredient.includes(food),
-      );
-
-      if (isSafe) {
-        safe.push(normalizedIngredient);
-      }
-    }
-
-    // caution 배열 정렬: 문자열 길이 오름차순, 길이가 같으면 가나다순
-    caution.sort((a, b) => {
-      if (a.length !== b.length) {
-        return a.length - b.length;
-      }
-      return a.localeCompare(b, 'ko');
-    });
-
-    return { safe, caution };
   }
 
   /**
@@ -725,7 +654,7 @@ export class SolutionService {
   private async getConditionalProducts(
     userId: number,
     healthTypeAnimalId: number,
-    foodLevelResult: FoodLevelItem | null,
+    sibResult: { data: FoodLevelItem; orderCode: string } | null,
   ): Promise<ConditionalProductDto[]> {
     // 1. CONDITIONAL 타입 제품 조회
     const conditionalProducts = await this.prisma.healthTypeAnimalProduct.findMany({
@@ -758,7 +687,7 @@ export class SolutionService {
       where: { categoryCode: 'SLEEP' },
       select: { id: true },
     });
-    const sleepQuestionIds = sleepQuestions.map(q => q.id);
+    const sleepQuestionIds = sleepQuestions.map((q: { id: number }) => q.id);
 
     let sleepScore = 0;
     if (sleepQuestionIds.length > 0) {
@@ -775,26 +704,16 @@ export class SolutionService {
       });
 
       sleepScore = sleepAnswers.reduce(
-        (sum: number, answer) => sum + (answer.surveyOption?.score || 0),
+        (sum: number, answer: { surveyOption?: { score: number } | null }) =>
+          sum + (answer.surveyOption?.score || 0),
         0,
       );
     }
 
-    // 3. 글루텐 과민 레벨 확인 (SIB 결과에서)
-    let glutenLevel = 0;
-    if (foodLevelResult) {
-      // level4, level5에 글루텐이 포함되어 있는지 확인
-      const level4Foods = foodLevelResult.level4?.split(',').map(f => f.trim()) || [];
-      const level5Foods = foodLevelResult.level5?.split(',').map(f => f.trim()) || [];
-
-      const glutenKeywords = ['글루텐', '밀', '밀가루', '글루텐(밀)', '밀(글루텐)'];
-
-      if (level5Foods.some(food => glutenKeywords.some(keyword => food.includes(keyword)))) {
-        glutenLevel = 5;
-      } else if (level4Foods.some(food => glutenKeywords.some(keyword => food.includes(keyword)))) {
-        glutenLevel = 4;
-      }
-    }
+    // 3. 글루텐 과민 레벨 확인 (새 매핑 유틸 사용)
+    const glutenLevel = sibResult
+      ? getGlutenLevel(sibResult.data, sibResult.orderCode)
+      : 0;
 
     // 4. 조건부 추천 매핑
     const result: ConditionalProductDto[] = [];
