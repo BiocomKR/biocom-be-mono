@@ -41,7 +41,7 @@ export class DeepReportService {
       },
     });
 
-    // 2. 사용자의 전체 심층리포트 조회 (오래된순 - 1주차부터)
+    // 2. 사용자의 전체 심층리포트 조회 (최신순)
     const reports = await this.prisma.userDeepReport.findMany({
       where: { userId },
       select: {
@@ -51,7 +51,7 @@ export class DeepReportService {
         createdAt: true,
         startDate: true,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     // 3. 응답 변환
