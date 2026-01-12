@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Delete,
   Patch,
@@ -176,6 +177,66 @@ export class UsersController {
     return {
       success: true,
       message: result.message,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 챌린지 활성화 (NEWCOMER → CHALLENGER)
+   */
+  @Post(':id/challenge/activate')
+  @ApiOperation({ summary: '챌린지 활성화 (NEWCOMER → CHALLENGER)' })
+  async activateChallenge(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { startDate: string; endDate: string },
+  ) {
+    this.logger.log(`챌린지 활성화 - userId: ${id}`);
+
+    const result = await this.usersService.activateChallenge(id, body);
+
+    return {
+      success: true,
+      message: '챌린지가 활성화되었습니다.',
+      data: result,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 챌린지 일정 수정
+   */
+  @Patch(':id/challenge/schedule')
+  @ApiOperation({ summary: '챌린지 일정 수정' })
+  async updateChallengeSchedule(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { startDate: string; endDate: string },
+  ) {
+    this.logger.log(`챌린지 일정 수정 - userId: ${id}`);
+
+    const result = await this.usersService.updateChallengeSchedule(id, body);
+
+    return {
+      success: true,
+      message: '챌린지 일정이 수정되었습니다.',
+      data: result,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 활성 챌린지 조회
+   */
+  @Get(':id/challenge')
+  @ApiOperation({ summary: '활성 챌린지 조회' })
+  async getActiveChallenge(@Param('id', ParseIntPipe) id: number) {
+    this.logger.log(`활성 챌린지 조회 - userId: ${id}`);
+
+    const challenge = await this.usersService.getActiveChallenge(id);
+
+    return {
+      success: true,
+      message: challenge ? '활성 챌린지가 조회되었습니다.' : '활성 챌린지가 없습니다.',
+      data: challenge,
       timestamp: getNowKST(),
     };
   }

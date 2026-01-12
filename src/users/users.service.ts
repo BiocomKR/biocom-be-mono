@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { UserQueryDto } from './dto/user-query.dto';
-import { OrderStatus, UserChallengeStatus, CouponStatus, SubscriptionStatus, UserSubscriptionStatus } from '../common/enums';
+import { OrderStatus, UserChallengeStatus, CouponStatus, SubscriptionStatus, UserSubscriptionStatus, ChallengeTicketStatus } from '../common/enums';
 import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
@@ -869,5 +869,247 @@ export class UsersService {
       return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`;
     }
     return phone;
+  }
+
+  /**
+   * NEWCOMER → CHALLENGER 챌린지 활성화
+   * - 챌린지 티켓 생성
+   * - UserChallenge 생성
+   * - 유저 상태 변경
+   */
+  async activateChallenge(
+    userId: number,
+    data: { startDate: string; endDate: string },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`ID ${userId}인 사용자를 찾을 수 없습니다.`);
+    }
+
+    if (user.status !== UserSubscriptionStatus.NEWCOMER) {
+      throw new BadRequestException('NEWCOMER 상태의 사용자만 챌린지를 활성화할 수 있습니다.');
+    }
+
+    // 기존 ACTIVE 챌린지 확인
+    const existingActive = await this.prisma.userChallenge.findFirst({
+      where: { userId, status: UserChallengeStatus.ACTIVE },
+    });
+
+    if (existingActive) {
+      throw new BadRequestException('이미 활성화된 챌린지가 있습니다.');
+    }
+
+    // 이너뷰티 챌린지 상품 조회
+    const product = await this.prisma.product.findFirst({
+      where: {
+        name: '이너뷰티 챌린지',
+        categoryCode: 'CHALLENGE',
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('이너뷰티 챌린지 상품을 찾을 수 없습니다.');
+    }
+
+    // 날짜 파싱
+    const activatedAt = new Date(data.startDate);
+    activatedAt.setUTCHours(0, 0, 0, 0);
+    const expiresAt = new Date(data.endDate);
+    expiresAt.setUTCHours(23, 59, 59, 999);
+
+    const now = getNowKST();
+
+    // 종료일이 과거인지 확인 (만료된 챌린지)
+    const isExpired = expiresAt < now;
+    const challengeStatus = isExpired ? UserChallengeStatus.EXPIRED : UserChallengeStatus.ACTIVE;
+    const userStatus = isExpired ? UserSubscriptionStatus.NEWCOMER : UserSubscriptionStatus.CHALLENGER;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. 챌린지 티켓 생성
+      const ticket = await tx.challengeTicket.create({
+        data: {
+          userId,
+          productId: product.id,
+          ticketType: 'QUICK_START',
+          status: ChallengeTicketStatus.ACTIVATED,
+          purchaseDate: now,
+          createdAt: now,
+        },
+      });
+
+      // 2. UserChallenge 생성
+      const userChallenge = await tx.userChallenge.create({
+        data: {
+          userId,
+          productId: product.id,
+          ticketId: ticket.id,
+          activatedAt,
+          expiresAt,
+          purchasedAt: now,
+          status: challengeStatus,
+          createdAt: now,
+          isFirstEntry: !isExpired, // 만료된 챌린지는 첫 진입 아님
+          isFirstChallengeEnd: isExpired, // 만료된 챌린지는 종료 후 첫 방문 플래그
+          startDateSetAt: now,
+        },
+      });
+
+      // 3. 유저 상태 업데이트
+      await tx.user.update({
+        where: { id: userId },
+        data: { status: userStatus },
+      });
+
+      return { ticket, userChallenge };
+    });
+
+    this.logger.log(`챌린지 활성화 완료 - userId: ${userId}, challengeId: ${result.userChallenge.id}`);
+
+    return {
+      challengeId: result.userChallenge.id,
+      ticketId: result.ticket.id,
+      startDate: activatedAt,
+      endDate: expiresAt,
+    };
+  }
+
+  /**
+   * 챌린지 일정 수정
+   * - CHALLENGER: ACTIVE 챌린지 수정
+   * - NEWCOMER: 직전 챌린지 (EXPIRED/COMPLETED) 수정 + 상태 재계산
+   */
+  async updateChallengeSchedule(
+    userId: number,
+    data: { startDate: string; endDate: string },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`ID ${userId}인 사용자를 찾을 수 없습니다.`);
+    }
+
+    // 날짜 파싱
+    const activatedAt = new Date(data.startDate);
+    activatedAt.setUTCHours(0, 0, 0, 0);
+    const expiresAt = new Date(data.endDate);
+    expiresAt.setUTCHours(23, 59, 59, 999);
+
+    const now = getNowKST();
+
+    // 종료일 기준 상태 결정
+    const isExpired = expiresAt < now;
+    const newChallengeStatus = isExpired ? UserChallengeStatus.EXPIRED : UserChallengeStatus.ACTIVE;
+    const newUserStatus = isExpired ? UserSubscriptionStatus.NEWCOMER : UserSubscriptionStatus.CHALLENGER;
+
+    // 챌린지 조회: ACTIVE 우선, 없으면 최근 EXPIRED/COMPLETED
+    let challenge = await this.prisma.userChallenge.findFirst({
+      where: { userId, status: UserChallengeStatus.ACTIVE },
+    });
+
+    if (!challenge) {
+      // NEWCOMER인 경우 직전 챌린지 조회
+      challenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: { in: [UserChallengeStatus.EXPIRED, UserChallengeStatus.COMPLETED] },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    if (!challenge) {
+      throw new BadRequestException('수정할 챌린지가 없습니다.');
+    }
+
+    // 트랜잭션으로 챌린지 + 유저 상태 동시 업데이트
+    const [updated] = await this.prisma.$transaction([
+      // 챌린지 일정 및 상태 업데이트
+      this.prisma.userChallenge.update({
+        where: { id: challenge.id },
+        data: {
+          activatedAt,
+          expiresAt,
+          status: newChallengeStatus,
+          isFirstEntry: !isExpired, // 활성화되면 첫 진입 플래그 설정
+          isFirstChallengeEnd: isExpired, // 만료되면 종료 후 첫 방문 플래그 설정
+        },
+      }),
+      // 유저 상태 업데이트
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { status: newUserStatus },
+      }),
+    ]);
+
+    this.logger.log(
+      `챌린지 일정 수정 완료 - userId: ${userId}, challengeId: ${challenge.id}, ` +
+      `challengeStatus: ${newChallengeStatus}, userStatus: ${newUserStatus}`,
+    );
+
+    return {
+      challengeId: updated.id,
+      startDate: activatedAt,
+      endDate: expiresAt,
+      challengeStatus: newChallengeStatus,
+      userStatus: newUserStatus,
+    };
+  }
+
+  /**
+   * 사용자의 챌린지 조회
+   * - ACTIVE 우선
+   * - 없으면 최근 EXPIRED/COMPLETED (직전 챌린지)
+   */
+  async getActiveChallenge(userId: number) {
+    // ACTIVE 챌린지 우선 조회
+    let challenge = await this.prisma.userChallenge.findFirst({
+      where: { userId, status: UserChallengeStatus.ACTIVE },
+      include: {
+        product: {
+          select: { name: true },
+        },
+      },
+    });
+
+    // ACTIVE 없으면 직전 챌린지 (EXPIRED/COMPLETED) 조회
+    if (!challenge) {
+      challenge = await this.prisma.userChallenge.findFirst({
+        where: {
+          userId,
+          status: { in: [UserChallengeStatus.EXPIRED, UserChallengeStatus.COMPLETED] },
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          product: {
+            select: { name: true },
+          },
+        },
+      });
+    }
+
+    if (!challenge) {
+      return null;
+    }
+
+    // 날짜를 YYYY-MM-DD 형식 문자열로 반환 (UTC 기준)
+    const formatDate = (date: Date | null) => {
+      if (!date) return null;
+      return date.toISOString().split('T')[0];
+    };
+
+    return {
+      id: challenge.id,
+      productName: challenge.product.name,
+      startDate: formatDate(challenge.activatedAt),
+      endDate: formatDate(challenge.expiresAt),
+      totalPoints: challenge.totalPoints,
+      status: challenge.status,
+    };
   }
 }
