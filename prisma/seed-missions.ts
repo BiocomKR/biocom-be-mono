@@ -15,30 +15,125 @@ const prisma = new PrismaClient();
 /**
  * 미션 노출 정책 정의서 기준:
  *
- * | 항목명              | 노출 시기                | 뉴커머 | 챌린저     | 구독자     |
- * |---------------------|-------------------------|--------|------------|------------|
- * | 뷰티 종합 점수       | 매일                    | X      | 매일 1회   | 매일 1회   |
- * | 자기 선언문          | 챌린지 1~10일차         | X      | 최초 1회   | X          |
- * | 나 칭찬하기          | 챌린지 11~20일차 (선행조건: 자기 선언문) | X | 최초 1회 | X |
- * | 식단 기록하기        | 매일                    | X      | 매일 9회   | 매일 9회   |
- * | 영양제 기록          | 매일                    | X      | 매일 10회  | 매일 10회  |
- * | 공복 시간 기록       | 매일                    | X      | 매일 1회   | 매일 1회   |
- * | 수면 시간 기록       | 매일                    | X      | 매일 1회   | 매일 1회   |
- * | 영상 강의(+퀴즈)     | 챌린지 기간 (1~21일)    | X      | 매일 1회   | X          |
- * | 활동 기록            | 매일                    | X      | 매일 10회  | 매일 10회  |
- * | 1일 1미션            | 챌린지 기간 (1~21일)    | X      | 매일 1회   | X          |
- * | 밸런스 게임          | 챌린지 기간 (1~21일)    | X      | 매일 1회   | X          |
- * | 심층리포트           | 주 1회 (첫주 제외: 8~21일) | X    | 매주 1회   | 매주 1회 (종료 후 1주일) |
- * | 애프터 문진          | 챌린지 21일차~          | X      | X          | 종료 후 1주일 |
+ * | 순위 | 그룹 | 항목명              | 노출 시기                | 포인트 | 완료 시 처리 |
+ * |------|------|---------------------|-------------------------|--------|-------------|
+ * | 1순위 | A   | 자기 선언문          | 1~10일차               | 1,000P | 즉시 삭제   |
+ * | 1순위 | A   | 사후문진             | 22~28일차              | 3,000P | 즉시 삭제   |
+ * | 1순위 | A   | 나 칭찬하기          | 11~20일차 (선행: 자기선언문) | 1,000P | 즉시 삭제 |
+ * | 2순위 | A   | 심층리포트           | 8일~ (주 1회)          | 300P   | 매주 부활   |
+ * | 3순위 | B   | 뷰티 종합 점수       | 상시                    | 100P   | 상시 노출   |
+ * | 4순위 | B   | 식단 기록하기        | 상시                    | 100P   | 상시 노출   |
+ * | 5순위 | B   | 영양제 기록          | 상시                    | 100P   | 상시 노출   |
+ * | 6순위 | B   | 공복 시간 기록       | 상시                    | 100P   | 상시 노출   |
+ * | 7순위 | B   | 강의퀴즈             | 상시                    | 300P   | 상시 노출   |
+ * | 8순위 | B   | 밸런스 게임          | 상시                    | 100P   | 상시 노출   |
+ * | 9순위 | B   | 수면 시간 기록       | 상시                    | 100P   | 상시 노출   |
+ * | 10순위| B   | 1일 1미션            | 상시                    | 100P   | 상시 노출   |
+ * | 11순위| B   | 활동 기록            | 상시                    | 100P   | 상시 노출   |
+ *
+ * sortOrder 규칙:
+ * - 1순위 A그룹 (ONCE 미션): 1~3 (자기선언문, 사후문진, 나칭찬하기 - 기간 내 최상단)
+ * - 2순위 A그룹 (심층리포트): 10
+ * - 3~11순위 B그룹: 20~28
  */
 const missionsData = [
-  // ===== DAILY (매일) - 챌린저 & 구독자 모두 =====
+  // ===== 1순위 A그룹: ONCE 미션 (기간 내 최상단, 완료 시 즉시 삭제) =====
+  {
+    name: '자기 선언문',
+    description: '챌린지 시작을 위한 자기 선언문을 작성해주세요',
+    points: 1000,
+    requireUpload: false,
+    sortOrder: 1, // 1순위 A그룹
+    isActive: true,
+    category: 'EVENT',
+    type: 'MISSION',
+    recordType: 'DECLARATION',
+    dailyLimit: 1,
+    specificDay: 1,
+    totalDays: 1,
+    uploadType: null,
+    // 노출 정책: 1~10일차, 챌린저만, 최초 1회
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'ONCE',
+    visibleFromDay: 1,
+    visibleToDay: 10,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
+  },
+  {
+    name: '애프터 문진',
+    description: '챌린지 완료 후 최종 문진을 작성해주세요',
+    points: 3000, // 정책: 3,000P
+    requireUpload: false,
+    sortOrder: 2, // 1순위 A그룹
+    isActive: true,
+    category: 'EVENT',
+    type: 'MISSION',
+    recordType: 'AFTER_SURVEY',
+    dailyLimit: 1,
+    specificDay: 22,
+    totalDays: 1,
+    uploadType: null,
+    // 노출 정책: 22~28일차 (정책 기준)
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'ONCE',
+    visibleFromDay: 22,
+    visibleToDay: 28,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: { daysAfterChallengeEnd: 7 }, // 종료 후 7일까지
+  },
+  {
+    name: '나 칭찬하기',
+    description: '10일차를 맞아 자신을 칭찬해주세요',
+    points: 1000,
+    requireUpload: false,
+    sortOrder: 3, // 1순위 A그룹
+    isActive: true,
+    category: 'EVENT',
+    type: 'MISSION',
+    recordType: 'SELF_PRAISE',
+    dailyLimit: 1,
+    specificDay: 10,
+    totalDays: 1,
+    uploadType: null,
+    // 노출 정책: 11~20일차, 챌린저만, 자기 선언문 완료 후에만
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'ONCE',
+    visibleFromDay: 11,
+    visibleToDay: 20,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: { prerequisiteRecordType: 'DECLARATION' }, // 자기 선언문 완료 조건
+  },
+  // ===== 2순위 A그룹: 심층리포트 =====
+  {
+    name: '심층리포트',
+    description: '주간 심층리포트를 확인해주세요',
+    points: 300, // 정책: 300P
+    requireUpload: false,
+    sortOrder: 10, // 2순위 A그룹
+    isActive: true,
+    category: 'WEEKLY',
+    type: 'MISSION',
+    recordType: 'WEEKLY_REPORT',
+    dailyLimit: 1,
+    specificDay: null, // 8, 15, 22일차에 노출 (첫주 제외)
+    totalDays: 3,
+    uploadType: null,
+    // 노출 정책: 첫주 제외 매주 1회 (8일차부터), 챌린저/구독자
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'WEEKLY',
+    visibleFromDay: 8, // 첫주(1~7일) 제외
+    visibleToDay: null, // 구독자는 챌린지 종료 후에도 1주일 더
+    prerequisiteMissionId: null,
+    visibleAfterSettings: { daysAfterChallengeEnd: 7 }, // 종료 후 7일까지
+  },
+  // ===== 3~11순위 B그룹: 상시 노출 =====
   {
     name: '뷰티 종합 점수',
     description: '오늘의 뷰티 종합 점수를 확인해주세요',
     points: 100,
     requireUpload: false,
-    sortOrder: 1,
+    sortOrder: 20, // 3순위 B그룹
     isActive: true,
     category: 'DAILY',
     type: 'MISSION',
@@ -50,7 +145,7 @@ const missionsData = [
     // 노출 정책: 매일, 챌린저/구독자
     allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
     frequency: 'DAILY',
-    visibleFromDay: null, // 챌린지 기간 무관 (매일)
+    visibleFromDay: null,
     visibleToDay: null,
     prerequisiteMissionId: null,
     visibleAfterSettings: null,
@@ -60,7 +155,7 @@ const missionsData = [
     description: '식단을 기록해주세요 (하루 9번 기록시 완료)',
     points: 100,
     requireUpload: false,
-    sortOrder: 2,
+    sortOrder: 21, // 4순위 B그룹
     isActive: true,
     category: 'DAILY',
     type: 'RECORD',
@@ -83,7 +178,7 @@ const missionsData = [
     description: '영양제 복용을 기록해주세요',
     points: 100,
     requireUpload: false,
-    sortOrder: 3,
+    sortOrder: 22, // 5순위 B그룹
     isActive: true,
     category: 'DAILY',
     type: 'RECORD',
@@ -106,7 +201,7 @@ const missionsData = [
     description: '공복 시작 시간과 종료 시간을 기록해주세요',
     points: 100,
     requireUpload: false,
-    sortOrder: 4,
+    sortOrder: 23, // 6순위 B그룹
     isActive: true,
     category: 'DAILY',
     type: 'RECORD',
@@ -124,57 +219,11 @@ const missionsData = [
     visibleAfterSettings: null,
   },
   {
-    name: '수면 시간 기록',
-    description: '취침 시간과 기상 시간을 기록해주세요',
-    points: 100,
-    requireUpload: false,
-    sortOrder: 5,
-    isActive: true,
-    category: 'DAILY',
-    type: 'RECORD',
-    recordType: 'SLEEP',
-    dailyLimit: 1,
-    specificDay: null,
-    totalDays: 21,
-    uploadType: null,
-    // 노출 정책: 매일, 챌린저/구독자
-    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
-    frequency: 'DAILY',
-    visibleFromDay: null,
-    visibleToDay: null,
-    prerequisiteMissionId: null,
-    visibleAfterSettings: null,
-  },
-  {
-    name: '활동 기록',
-    description: '오늘의 활동을 기록해주세요',
-    points: 100,
-    requireUpload: false,
-    sortOrder: 7,
-    isActive: true,
-    category: 'DAILY',
-    type: 'RECORD',
-    recordType: 'ACTIVITY',
-    dailyLimit: 10,
-    specificDay: null,
-    totalDays: 21,
-    uploadType: null,
-    // 노출 정책: 매일, 챌린저/구독자, 포인트는 max 1회까지만
-    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
-    frequency: 'DAILY',
-    maxPointsPerDay: 1,
-    visibleFromDay: null,
-    visibleToDay: null,
-    prerequisiteMissionId: null,
-    visibleAfterSettings: null,
-  },
-  // ===== CHALLENGER ONLY (챌린지 기간에만) =====
-  {
     name: '영상 강의(+퀴즈)',
     description: '오늘의 건강 영상을 시청하고 퀴즈를 풀어주세요',
-    points: 200,
+    points: 300, // 정책: 300P
     requireUpload: false,
-    sortOrder: 6,
+    sortOrder: 24, // 7순위 B그룹
     isActive: true,
     category: 'DAILY',
     type: 'MISSION',
@@ -192,11 +241,55 @@ const missionsData = [
     visibleAfterSettings: null,
   },
   {
+    name: '밸런스 게임',
+    description: '오늘의 밸런스 게임에 참여해주세요',
+    points: 100,
+    requireUpload: false,
+    sortOrder: 25, // 8순위 B그룹
+    isActive: true,
+    category: 'DAILY',
+    type: 'MISSION',
+    recordType: 'BALANCE_GAME',
+    dailyLimit: 1,
+    specificDay: null,
+    totalDays: 21,
+    uploadType: null,
+    // 노출 정책: 챌린지 기간(1~21일), 챌린저만
+    allowedUserTypes: ['CHALLENGER'],
+    frequency: 'DAILY',
+    visibleFromDay: 1,
+    visibleToDay: 21,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
+  },
+  {
+    name: '수면 시간 기록',
+    description: '취침 시간과 기상 시간을 기록해주세요',
+    points: 100,
+    requireUpload: false,
+    sortOrder: 26, // 9순위 B그룹
+    isActive: true,
+    category: 'DAILY',
+    type: 'RECORD',
+    recordType: 'SLEEP',
+    dailyLimit: 1,
+    specificDay: null,
+    totalDays: 21,
+    uploadType: null,
+    // 노출 정책: 매일, 챌린저/구독자
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
+    frequency: 'DAILY',
+    visibleFromDay: null,
+    visibleToDay: null,
+    prerequisiteMissionId: null,
+    visibleAfterSettings: null,
+  },
+  {
     name: '1일 1미션',
     description: '오늘의 특별 미션을 수행해주세요',
     points: 100,
     requireUpload: true,
-    sortOrder: 10,
+    sortOrder: 27, // 10순위 B그룹
     isActive: true,
     category: 'SPECIAL',
     type: 'MISSION',
@@ -214,116 +307,27 @@ const missionsData = [
     visibleAfterSettings: null,
   },
   {
-    name: '밸런스 게임',
-    description: '오늘의 밸런스 게임에 참여해주세요',
+    name: '활동 기록',
+    description: '오늘의 활동을 기록해주세요',
     points: 100,
     requireUpload: false,
-    sortOrder: 9,
+    sortOrder: 28, // 11순위 B그룹
     isActive: true,
     category: 'DAILY',
-    type: 'MISSION',
-    recordType: 'BALANCE_GAME',
-    dailyLimit: 1,
+    type: 'RECORD',
+    recordType: 'ACTIVITY',
+    dailyLimit: 10,
     specificDay: null,
     totalDays: 21,
     uploadType: null,
-    // 노출 정책: 챌린지 기간(1~21일), 챌린저만
-    allowedUserTypes: ['CHALLENGER'],
+    // 노출 정책: 매일, 챌린저/구독자, 포인트는 max 1회까지만
+    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
     frequency: 'DAILY',
-    visibleFromDay: 1,
-    visibleToDay: 21,
-    prerequisiteMissionId: null,
-    visibleAfterSettings: null,
-  },
-  // ===== WEEKLY (주 1회) =====
-  {
-    name: '심층리포트',
-    description: '주간 심층리포트를 확인해주세요',
-    points: 500,
-    requireUpload: false,
-    sortOrder: 50,
-    isActive: true,
-    category: 'WEEKLY',
-    type: 'MISSION',
-    recordType: 'WEEKLY_REPORT',
-    dailyLimit: 1,
-    specificDay: null, // 8, 15, 22일차에 노출 (첫주 제외)
-    totalDays: 3,
-    uploadType: null,
-    // 노출 정책: 첫주 제외 매주 1회 (8일차부터), 챌린저/구독자
-    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
-    frequency: 'WEEKLY',
-    visibleFromDay: 8, // 첫주(1~7일) 제외
-    visibleToDay: null, // 구독자는 챌린지 종료 후에도 1주일 더
-    prerequisiteMissionId: null,
-    visibleAfterSettings: { daysAfterChallengeEnd: 7 }, // 종료 후 7일까지
-  },
-  // ===== EVENT (특정 일차) =====
-  {
-    name: '자기 선언문',
-    description: '챌린지 시작을 위한 자기 선언문을 작성해주세요',
-    points: 1000,
-    requireUpload: false,
-    sortOrder: 100,
-    isActive: true,
-    category: 'EVENT',
-    type: 'MISSION',
-    recordType: 'DECLARATION',
-    dailyLimit: 1,
-    specificDay: 1,
-    totalDays: 1,
-    uploadType: null,
-    // 노출 정책: 1~10일차, 챌린저만, 최초 1회
-    allowedUserTypes: ['CHALLENGER'],
-    frequency: 'ONCE',
-    visibleFromDay: 1,
-    visibleToDay: 10,
-    prerequisiteMissionId: null,
-    visibleAfterSettings: null,
-  },
-  {
-    name: '나 칭찬하기',
-    description: '10일차를 맞아 자신을 칭찬해주세요',
-    points: 1000,
-    requireUpload: false,
-    sortOrder: 101,
-    isActive: true,
-    category: 'EVENT',
-    type: 'MISSION',
-    recordType: 'SELF_PRAISE',
-    dailyLimit: 1,
-    specificDay: 10,
-    totalDays: 1,
-    uploadType: null,
-    // 노출 정책: 11~20일차, 챌린저만, 자기 선언문 완료 후에만
-    allowedUserTypes: ['CHALLENGER'],
-    frequency: 'ONCE',
-    visibleFromDay: 11,
-    visibleToDay: 20,
-    prerequisiteMissionId: null, // seed 실행 후 업데이트 필요 (DECLARATION mission ID)
-    visibleAfterSettings: { prerequisiteRecordType: 'DECLARATION' }, // 자기 선언문 완료 조건
-  },
-  {
-    name: '애프터 문진',
-    description: '챌린지 완료 후 최종 문진을 작성해주세요',
-    points: 1000,
-    requireUpload: false,
-    sortOrder: 102,
-    isActive: true,
-    category: 'EVENT',
-    type: 'MISSION',
-    recordType: 'AFTER_SURVEY',
-    dailyLimit: 1,
-    specificDay: 21,
-    totalDays: 1,
-    uploadType: null,
-    // 노출 정책: 21일차 이후, 구독자만 (챌린지 종료 후 1주일)
-    allowedUserTypes: ['CHALLENGER', 'SUBSCRIBER'],
-    frequency: 'ONCE',
-    visibleFromDay: 21,
+    maxPointsPerDay: 1,
+    visibleFromDay: null,
     visibleToDay: null,
     prerequisiteMissionId: null,
-    visibleAfterSettings: { daysAfterChallengeEnd: 7 }, // 종료 후 7일까지
+    visibleAfterSettings: null,
   },
 ];
 

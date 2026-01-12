@@ -93,8 +93,13 @@ export class ProductsService {
       this.checkUserPurchased(id, userId),
     ]);
 
-    // 이미지 URL 배열 생성
-    const imageUrls = product.productFiles.map(pf => pf.file.filePath);
+    // 이미지 타입별로 분리 (MAIN: 대표 이미지, CONTENT: 상세 설명 이미지)
+    const mainImages = product.productFiles
+      .filter(pf => pf.imageType === 'MAIN')
+      .map(pf => pf.file.filePath);
+    const descriptionImages = product.productFiles
+      .filter(pf => pf.imageType === 'CONTENT')
+      .map(pf => pf.file.filePath);
 
     return {
       id: product.id,
@@ -106,7 +111,8 @@ export class ProductsService {
       setItems: product.setItems,
       status: product.status,
       viewCount: product.viewCount,
-      imageUrl: imageUrls,
+      imageUrl: mainImages,
+      descriptionImages,
       originalPrice: convertDecimalToNumber(product.originalPrice),
       price: convertDecimalToNumber(product.price),
       reviewSummary: reviewStats,

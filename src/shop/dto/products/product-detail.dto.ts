@@ -75,8 +75,11 @@ export class ProductDetailDto {
   @ApiProperty({ description: '조회수', example: 0 })
   viewCount: number;
 
-  @ApiProperty({ description: '상품 이미지 URL 배열', type: [String], example: ['https://cdn.imweb.me/thumbnail/20250430/d37b234c0db50.png'] })
+  @ApiProperty({ description: '상품 이미지 URL 배열 (MAIN 타입)', type: [String], example: ['https://cdn.imweb.me/thumbnail/20250430/d37b234c0db50.png'] })
   imageUrl: string[];
+
+  @ApiProperty({ description: '상품 상세 설명 이미지 URL 배열 (CONTENT 타입)', type: [String], example: [] })
+  descriptionImages: string[];
 
   @ApiPropertyOptional({ description: '정가', example: 30000 })
   originalPrice?: number;
