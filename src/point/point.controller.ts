@@ -35,8 +35,10 @@ export class PointController {
     @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    this.logger.log(`[백오피스] 전체 포인트 내역 조회 - page: ${page}, limit: ${limit}, type: ${type}, relatedType: ${relatedType}, search: ${search}`);
+    const exclude = excludeTesters !== 'false'; // 기본값 true
+    this.logger.log(`[백오피스] 전체 포인트 내역 조회 - page: ${page}, limit: ${limit}, type: ${type}, relatedType: ${relatedType}, search: ${search}, excludeTesters: ${exclude}`);
 
     const result = await this.pointService.getAllHistory({
       page,
@@ -46,6 +48,7 @@ export class PointController {
       search,
       startDate,
       endDate,
+      excludeTesters: exclude,
     });
 
     return result;
