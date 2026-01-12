@@ -261,7 +261,11 @@ export class SubscriptionService {
             name: true,
             description: true,
             price: true,
-            images: true,
+            productFiles: {
+              include: {
+                file: true
+              }
+            },
           },
         },
       },

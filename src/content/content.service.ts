@@ -230,7 +230,11 @@ export class ContentService {
           include: {
             product: {
               include: {
-                images: true
+                productFiles: {
+                  include: {
+                    file: true
+                  }
+                }
               }
             }
           },
