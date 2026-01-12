@@ -290,7 +290,8 @@ export class HomeService {
           },
         },
         userChallenges: {
-          where: { status: { in: [UserChallengeStatus.ACTIVE, UserChallengeStatus.PENDING, UserChallengeStatus.COMPLETED] } },
+          // EXPIRED도 포함 (챌린지 종료 후 사후문진 등 처리를 위해)
+          where: { status: { in: [UserChallengeStatus.ACTIVE, UserChallengeStatus.PENDING, UserChallengeStatus.COMPLETED, UserChallengeStatus.EXPIRED] } },
           orderBy: { createdAt: 'desc' },
           take: 3,
           select: {
@@ -417,14 +418,19 @@ export class HomeService {
 
   /**
    * 챌린지 상태별 분류
+   * - completed: COMPLETED 또는 EXPIRED 상태 (둘 다 "종료된 챌린지")
    */
   private getChallengesByStatus(userChallenges: UserChallengeData[]): ChallengesByStatus {
+    // COMPLETED 또는 EXPIRED 상태를 "종료된 챌린지"로 처리
+    const isEnded = (status: string) =>
+      status === UserChallengeStatus.COMPLETED || status === UserChallengeStatus.EXPIRED;
+
     return {
       active: userChallenges.find((uc) => uc.status === UserChallengeStatus.ACTIVE),
       pending: userChallenges.find((uc) => uc.status === UserChallengeStatus.PENDING),
-      completed: userChallenges.find((uc) => uc.status === UserChallengeStatus.COMPLETED),
+      completed: userChallenges.find((uc) => isEnded(uc.status)),
       firstVisitAfterEnd: userChallenges.find(
-        (uc) => uc.status === UserChallengeStatus.COMPLETED && uc.isFirstChallengeEnd,
+        (uc) => isEnded(uc.status) && uc.isFirstChallengeEnd,
       ),
     };
   }
