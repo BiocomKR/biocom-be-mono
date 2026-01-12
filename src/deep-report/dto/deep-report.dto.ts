@@ -1,6 +1,34 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
+ * 심층리포트 목록 아이템 DTO
+ */
+export class DeepReportListItemDto {
+  @ApiProperty({ description: '리포트 ID (DB PK)', example: 1 })
+  id: number;
+
+  @ApiProperty({ description: '제목 (N주차 심층 리포트)', example: '3주차 심층 리포트' })
+  title: string;
+
+  @ApiProperty({ description: '읽음 여부', example: false })
+  isRead: boolean;
+
+  @ApiProperty({ description: '생성일 (YYYY.MM.DD)', example: '2026.01.12' })
+  createdAt: string;
+}
+
+/**
+ * 심층리포트 목록 응답 DTO
+ */
+export class DeepReportListResponseDto {
+  @ApiProperty({ description: '성공 여부', example: true })
+  success: boolean;
+
+  @ApiProperty({ description: '심층리포트 목록', type: [DeepReportListItemDto] })
+  data: DeepReportListItemDto[];
+}
+
+/**
  * 심층리포트 콘텐츠 DTO
  */
 export class DeepReportContentDto {

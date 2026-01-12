@@ -1,6 +1,6 @@
-import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { DeepReportResponseDto, DeepReportContentDto } from './dto/deep-report.dto';
+import { DeepReportResponseDto, DeepReportContentDto, DeepReportListResponseDto, DeepReportListItemDto } from './dto/deep-report.dto';
 import { YesNo, UserSubscriptionStatus, UserChallengeStatus } from '../common/enums';
 import { getNowKST } from '../common/utils/kst-date.util';
 
@@ -15,13 +15,137 @@ export class DeepReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * 심층리포트 조회
+   * 심층리포트 목록 조회
+   * 사용자의 전체 심층리포트 목록을 최신순으로 조회
+   *
+   * @param userId 사용자 ID
+   * @returns 심층리포트 목록 응답 DTO
+   */
+  async getDeepReportList(userId: number): Promise<DeepReportListResponseDto> {
+    this.logger.log(`[getDeepReportList] 심층리포트 목록 조회 시작 - userId: ${userId}`);
+
+    // 0. 사용자 상태 확인
+    const hasAccess = await this.checkDeepReportAccess(userId);
+    if (!hasAccess) {
+      throw new ForbiddenException('심층리포트는 챌린저 또는 구독자만 조회할 수 있습니다');
+    }
+
+    // 1. 현재 ACTIVE 챌린지의 activated_at 조회 (N주차 계산용)
+    const activeChallenge = await this.prisma.userChallenge.findFirst({
+      where: {
+        userId,
+        status: UserChallengeStatus.ACTIVE,
+      },
+      select: {
+        activatedAt: true,
+      },
+    });
+
+    // 2. 사용자의 전체 심층리포트 조회 (오래된순 - 1주차부터)
+    const reports = await this.prisma.userDeepReport.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        weekNumber: true,
+        isRead: true,
+        createdAt: true,
+        startDate: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // 3. 응답 변환
+    const data: DeepReportListItemDto[] = reports.map((report) => {
+      // N주차 계산: activatedAt 기준으로 startDate와 비교하여 계산 (DB weekNumber 무시)
+      let weekNum: number | null = null;
+      if (activeChallenge?.activatedAt) {
+        weekNum = this.calculateWeekNumber(activeChallenge.activatedAt, report.startDate);
+      }
+
+      return {
+        id: report.id,
+        title: weekNum ? `${weekNum}주차 심층 리포트` : '심층 리포트',
+        isRead: report.isRead,
+        createdAt: this.formatDateKST(report.createdAt),
+      };
+    });
+
+    this.logger.log(`[getDeepReportList] 조회 완료 - 총 ${data.length}개`);
+
+    return { success: true, data };
+  }
+
+  /**
+   * 심층리포트 상세 조회
+   * ID로 특정 심층리포트를 조회하고 읽음 처리
+   *
+   * @param userId 사용자 ID
+   * @param reportDbId 리포트 DB ID (PK)
+   * @returns 심층리포트 응답 DTO
+   */
+  async getDeepReportById(userId: number, reportDbId: number): Promise<DeepReportResponseDto> {
+    this.logger.log(`[getDeepReportById] 심층리포트 상세 조회 - userId: ${userId}, reportDbId: ${reportDbId}`);
+
+    // 0. 사용자 상태 확인
+    const hasAccess = await this.checkDeepReportAccess(userId);
+    if (!hasAccess) {
+      throw new ForbiddenException('심층리포트는 챌린저 또는 구독자만 조회할 수 있습니다');
+    }
+
+    // 1. 리포트 조회 (본인 것만)
+    const deepReport = await this.prisma.userDeepReport.findFirst({
+      where: {
+        id: reportDbId,
+        userId, // 본인 리포트만 조회 가능
+      },
+      select: {
+        id: true,
+        reportId: true,
+        provider: true,
+        content: true,
+        startDate: true,
+        endDate: true,
+        weekNumber: true,
+        createdAt: true,
+        isRead: true,
+      },
+    });
+
+    if (!deepReport) {
+      throw new NotFoundException('심층리포트를 찾을 수 없습니다');
+    }
+
+    // 2. 읽음 처리 (isRead가 false인 경우에만)
+    if (!deepReport.isRead) {
+      await this.markAsRead(reportDbId);
+    }
+
+    // 3. 포인트 지급 및 기록 처리 (해당 리포트에 대해 1회만)
+    const pointsEarned = await this.awardPointsAndRecord(userId, deepReport.reportId);
+
+    // 4. 응답 변환
+    const data: DeepReportContentDto = {
+      reportId: deepReport.reportId,
+      provider: deepReport.provider,
+      content: deepReport.content,
+      startDate: deepReport.startDate.toISOString().split('T')[0],
+      endDate: deepReport.endDate.toISOString().split('T')[0],
+      weekNumber: deepReport.weekNumber ?? undefined,
+      createdAt: deepReport.createdAt.toISOString(),
+      pointsEarned,
+    };
+
+    return { success: true, data };
+  }
+
+  /**
+   * 지난주 심층리포트 조회
    * 지난주 월요일~일요일 범위의 심층리포트를 조회
    *
    * @param userId 사용자 ID
    * @returns 심층리포트 응답 DTO
    */
-  async getDeepReport(userId: number): Promise<DeepReportResponseDto> {
+  async getLastWeekDeepReport(userId: number): Promise<DeepReportResponseDto> {
     this.logger.log(`[getDeepReport] 심층리포트 조회 시작 - userId: ${userId}`);
 
     // 0. 사용자 상태 확인 (CHALLENGER, SUBSCRIBER, 또는 최근 챌린지 완료 NEWCOMER만 접근 가능)
@@ -60,6 +184,7 @@ export class DeepReportService {
         },
       },
       select: {
+        id: true,
         reportId: true,
         provider: true,
         content: true,
@@ -67,6 +192,7 @@ export class DeepReportService {
         endDate: true,
         weekNumber: true,
         createdAt: true,
+        isRead: true,
       },
     });
 
@@ -77,7 +203,12 @@ export class DeepReportService {
 
     this.logger.log(`[getDeepReport] 심층리포트 조회 성공 - reportId: ${deepReport.reportId}`);
 
-    // 4. 포인트 지급 및 기록 처리 (해당 리포트에 대해 1회만)
+    // 4. 읽음 처리 (isRead가 false인 경우에만)
+    if (!deepReport.isRead) {
+      await this.markAsRead(deepReport.id);
+    }
+
+    // 5. 포인트 지급 및 기록 처리 (해당 리포트에 대해 1회만)
     const pointsEarned = await this.awardPointsAndRecord(userId, deepReport.reportId);
 
     // 5. 응답 변환
@@ -295,5 +426,44 @@ export class DeepReportService {
     const lastSunday = new Date(Date.UTC(year, month - 1, lastSundayDate, 0, 0, 0));
 
     return { lastMonday, lastSunday };
+  }
+
+  /**
+   * 심층리포트 읽음 처리
+   * @param reportDbId 리포트 DB ID (PK)
+   */
+  private async markAsRead(reportDbId: number): Promise<void> {
+    await this.prisma.userDeepReport.update({
+      where: { id: reportDbId },
+      data: { isRead: true },
+    });
+    this.logger.log(`[markAsRead] 읽음 처리 완료 - reportDbId: ${reportDbId}`);
+  }
+
+  /**
+   * 챌린지 시작일 기준 주차 계산
+   * @param activatedAt 챌린지 시작일 (항상 월요일)
+   * @param reportCreatedAt 리포트 생성일
+   * @returns 주차 번호 (1주차, 2주차, ...)
+   */
+  private calculateWeekNumber(activatedAt: Date, reportCreatedAt: Date): number {
+    // 두 날짜 간의 차이를 일 단위로 계산
+    const diffTime = reportCreatedAt.getTime() - activatedAt.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    // 주차 계산 (0~6일 = 1주차, 7~13일 = 2주차, ...)
+    return Math.floor(diffDays / 7) + 1;
+  }
+
+  /**
+   * 날짜를 YYYY.MM.DD 형식으로 변환 (KST 기준)
+   * @param date Date 객체
+   * @returns YYYY.MM.DD 형식 문자열
+   */
+  private formatDateKST(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}.${month}.${day}`;
   }
 }
