@@ -184,12 +184,22 @@ export class BalanceGameService {
   async completeBalanceGame(
     userId: number,
     gameId: number,
-    _selectedOptions: Array<{ step: number; option: number }>
+    selectedOptions: Array<{ step: number; option: number }>
   ): Promise<BalanceGameCompleteResponseDto> {
     this.logger.log(`사용자 ${userId}가 게임 ${gameId} 완료`);
 
     const today = getNowKST();
     today.setUTCHours(0, 0, 0, 0); // 00:00:00으로 설정
+
+    // 사용자의 AI 페르소나 ID 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { aiPersonaId: true }
+    });
+
+    if (!user || !user.aiPersonaId) {
+      throw new NotFoundException('사용자에게 지정된 AI 페르소나가 없습니다');
+    }
 
     // 이 게임을 한 번이라도 완료했는지 확인 (최초 완료 여부 체크용)
     const existingHistory = await this.prisma.userBalanceGameHistory.findFirst({
@@ -201,11 +211,19 @@ export class BalanceGameService {
 
     const isFirstCompletion = !existingHistory;
 
-    // 보상 정보 찾기
+    // selectedOptions의 마지막 항목에서 RESULT 스텝의 stepNumber 추출
+    const lastSelectedOption = selectedOptions?.[selectedOptions.length - 1];
+    if (!lastSelectedOption) {
+      throw new NotFoundException('선택 옵션 정보가 없습니다');
+    }
+
+    // 보상 정보 찾기 - 마지막 stepNumber와 aiPersonaId로 정확한 RESULT 스텝 조회
     const resultStep = await this.prisma.balanceGameStep.findFirst({
       where: {
         gameId,
+        stepNumber: lastSelectedOption.step,
         stepType: 'RESULT',
+        aiPersonaId: user.aiPersonaId,
         isActive: true
       },
       include: {
@@ -216,6 +234,8 @@ export class BalanceGameService {
         }
       }
     });
+
+    this.logger.log(`RESULT 스텝 조회 - gameId: ${gameId}, stepNumber: ${lastSelectedOption.step}, aiPersonaId: ${user.aiPersonaId}, couponId: ${resultStep?.couponId}`);
 
     let earnedCoupon = null;
 
