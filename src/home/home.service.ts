@@ -740,12 +740,12 @@ export class HomeService {
       });
     }
 
-    // 챌린지 이력이 있는 뉴커머 (과거 챌린지 완료했으나 현재 진행 중인 챌린지 없음)
+    // 챌린지 이력이 있는 뉴커머 (과거 챌린지 완료/만료했으나 현재 진행 중인 챌린지 없음)
+    // PENDING 여부와 상관없이 COMPLETED/EXPIRED가 있으면 true
     const hasCompletedChallengeHistory =
       user.status === UserSubscriptionStatus.NEWCOMER &&
       !!challenges.completed &&
-      !challenges.active &&
-      !challenges.pending;
+      !challenges.active;
 
     return {
       isFirstVisitAsNewcomer,

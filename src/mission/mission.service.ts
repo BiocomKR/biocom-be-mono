@@ -101,9 +101,46 @@ export class MissionService {
 
     const { userId, userStatus, currentDay, daysAfterChallengeEnd, userChallengeId } = context;
 
-    // 뉴커머: 전체 미션 목록을 disabled 상태로 반환
+    // 뉴커머 처리
     if (userStatus === UserSubscriptionStatus.NEWCOMER) {
-      this.logger.log('뉴커머 - 전체 미션 목록 (disabled)');
+      // [3단계] 챌린지 종료 후 일주일 이내 (22~28일): A그룹만 노출, B그룹은 리스트에서 제외
+      // A그룹: AFTER_SURVEY(애프터문진), WEEKLY_REPORT(심층리포트)
+      if (daysAfterChallengeEnd !== undefined && daysAfterChallengeEnd <= 7) {
+        this.logger.log(`뉴커머 + 챌린지 종료 후 ${daysAfterChallengeEnd}일 - A그룹만 노출`);
+        const aGroupRecordTypes = ['AFTER_SURVEY', 'WEEKLY_REPORT'];
+        const aGroupMissions = await this.prisma.mission.findMany({
+          where: {
+            isActive: true,
+            recordType: { in: aGroupRecordTypes },
+          },
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            points: true,
+            dailyLimit: true,
+            maxPointsPerDay: true,
+            recordType: true,
+            sortOrder: true,
+          },
+        });
+
+        return aGroupMissions.map((m) => ({
+          id: m.id,
+          title: m.name,
+          description: m.description || '',
+          point: m.points,
+          max: m.maxPointsPerDay ?? m.dailyLimit,
+          current: 0,
+          executed: 0,
+          recordType: m.recordType,
+          sortOrder: m.sortOrder,
+        }));
+      }
+
+      // [4단계] 29일차 이후 또는 챌린지 이력 없는 뉴커머: 전체 미션 목록 (목업)
+      this.logger.log('뉴커머 - 전체 미션 목록 (목업)');
       const allMissions = await this.prisma.mission.findMany({
         where: { isActive: true },
         orderBy: { sortOrder: 'asc' },
@@ -130,7 +167,6 @@ export class MissionService {
         executed: 0,
         recordType: m.recordType,
         sortOrder: m.sortOrder,
-        disabled: true, // 뉴커머는 모든 미션 비활성화
       }));
     }
 

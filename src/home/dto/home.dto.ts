@@ -165,9 +165,6 @@ export class MissionItemDto {
 
   @ApiProperty({ description: '정렬순서', example: 1 })
   sortOrder: number;
-
-  @ApiPropertyOptional({ description: '비활성화 여부 (뉴커머)', example: false })
-  disabled?: boolean;
 }
 
 /**
