@@ -76,8 +76,10 @@ export class ChallengeService {
           categoryCode: 'CHALLENGE'
         },
         include: {
-          images: {
-            orderBy: { sortOrder: 'asc' }
+          productFiles: {
+            where: { imageType: 'MAIN' },
+            take: 1,
+            include: { file: true }
           }
         },
         orderBy: { createdAt: 'desc' }
@@ -90,7 +92,7 @@ export class ChallengeService {
           name: product.name,
           description: product.description,
           price: product.price || 0,
-          imageUrl: product.images?.[0]?.imageUrl || null,
+          imageUrl: product.productFiles?.[0]?.file?.filePath || null,
         }));
 
       this.logger.log(`구매 가능한 챌린지 ${challengeProducts.length}개 조회 완료`);
