@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * [DEPRECATED] product_images → files + product_files 마이그레이션 스크립트
  *
@@ -16,7 +17,6 @@ console.log('⚠️ 이 스크립트는 더 이상 사용되지 않습니다. Pr
 process.exit(0);
 
 /* eslint-disable */
-// @ts-nocheck - ProductImage 모델 삭제로 인해 타입 에러 무시
 
 import { PrismaClient } from '@prisma/client';
 import { Storage } from '@google-cloud/storage';
