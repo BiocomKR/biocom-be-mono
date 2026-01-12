@@ -851,14 +851,24 @@ export class RecordsService {
 
   /**
    * 활동 기록 구현 (중복 허용, 1일 1회 포인트)
+   * 포인트 지급 여부는 point_histories 테이블에서 확인 (동시 요청 중복 지급 방지)
    */
   private async createActivityRecordImpl(tx: any, userId: number, date: string, metadata: any) {
-    // 포인트 지급 여부 확인 (해당 날짜에 첫 번째 기록인지)
-    const existingActivityRecord = await tx.userRecord.findFirst({
-      where: { userId, recordType: 'ACTIVITY', date: new Date(date) },
+    // 당일 활동 포인트 이미 받았는지 확인 (point_histories 테이블에서 직접 확인)
+    // DB의 created_at은 KST 기준으로 저장됨
+    const existingPointHistory = await tx.pointHistory.findFirst({
+      where: {
+        userId,
+        recordType: RecordType.ACTIVITY,
+        createdAt: {
+          gte: new Date(`${date} 00:00:00`),
+          lte: new Date(`${date} 23:59:59.999`),
+        },
+      },
     });
 
-    const pointsToAward = existingActivityRecord ? 0 : 100;
+    // 포인트 지급 여부 (당일 point_histories에 ACTIVITY 기록이 없으면 첫 번째)
+    const pointsToAward = existingPointHistory ? 0 : 100;
 
     this.logger.log(`활동 기록 저장 - 사용자: ${userId}, 날짜: ${date}, 운동: ${metadata.activityType?.name}, 포인트: ${pointsToAward}점`);
 
@@ -1463,7 +1473,7 @@ export class RecordsService {
 
       this.logger.log(`영양제 섭취 기록 저장 시작: userId=${userId}, date=${today}`);
 
-      // 1. 당일 영양제 기록 중 imageUrl이 있는지 조회 (사진 필수 검증용)
+      // 1. 당일 영양제 기록 중 imageUrl이 있는지 조회 (사진 필수 검증용) - 트랜잭션 밖에서 검증
       const existingRecordWithImage = await this.prisma.userRecord.findFirst({
         where: {
           userId,
@@ -1487,115 +1497,116 @@ export class RecordsService {
         );
       }
 
-      // 3. 당일 포인트 이미 받았는지 확인 (point_histories 테이블에서 직접 확인)
-      // KST 기준 오늘 00:00:00 ~ 내일 00:00:00 범위
-      const todayStart = new Date(today + 'T00:00:00+09:00');
-      const todayEnd = new Date(today + 'T00:00:00+09:00');
-      todayEnd.setDate(todayEnd.getDate() + 1);
-
-      const existingPointHistory = await this.prisma.pointHistory.findFirst({
-        where: {
-          userId,
-          description: '영양제 섭취 기록',
-          createdAt: {
-            gte: todayStart,
-            lt: todayEnd,
-          },
-        },
-      });
-
-      // 포인트 지급 여부 (당일 포인트를 아직 안 받았으면 true)
-      const isFirstRecordOfDay = !existingPointHistory;
-
-      this.logger.log(
-        `당일 포인트 지급 여부: ${isFirstRecordOfDay ? '지급 예정' : '이미 지급됨'} (point_histories 확인)`,
-      );
-
-      // 3-1. 활성 챌린지 조회 (userChallengeId 업데이트용)
-      const activeChallenge = await this.prisma.userChallenge.findFirst({
-        where: {
-          userId,
-          status: 'ACTIVE',
-        },
-      });
-
-      // 3. RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
-      const updatePromises = data.map(async (item: any, index: number) => {
-        const { productId, morning, afternoon, evening } = item;
-
-        // 해당 productId의 기록 조회
-        const record = await this.prisma.userRecord.findFirst({
+      // 3. 트랜잭션 안에서 포인트 조회 및 지급 처리 (동시 요청 중복 지급 방지)
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 당일 영양제 포인트 이미 받았는지 확인 (point_histories 테이블에서 직접 확인)
+        // DB의 created_at은 KST 기준으로 저장됨
+        const existingPointHistory = await tx.pointHistory.findFirst({
           where: {
             userId,
-            recordType: 'SUPPLEMENT',
-            date: dateObj,
-            metadata: {
-              path: ['productId'],
-              equals: productId,
+            recordType: RecordType.SUPPLEMENT,
+            createdAt: {
+              gte: new Date(`${today} 00:00:00`),
+              lte: new Date(`${today} 23:59:59.999`),
             },
           },
         });
 
-        if (!record) {
-          this.logger.warn(
-            `영양제 기록을 찾을 수 없습니다: userId=${userId}, date=${today}, productId=${productId}`,
-          );
-          return null;
-        }
+        // 포인트 지급 여부 (당일 point_histories에 SUPPLEMENT 기록이 없으면 첫 번째)
+        const isFirstRecordOfDay = !existingPointHistory;
 
-        // 4. metadata 업데이트 (기존 metadata 유지하면서 업데이트)
-        const existingMetadata = (record.metadata as any) || {};
-        const updatedMetadata: any = {
-          ...existingMetadata, // 기존 metadata 유지 (imageUrl 등)
-          productId,
-          morning,
-          afternoon,
-          evening,
-          isCompleted: true, // 기록 완료 표식 (홈 미션목록 완료 판단용)
-        };
-
-        // 새 imageUrl이 있으면 덮어쓰기 (없으면 기존 imageUrl 유지)
-        if (imageUrl) {
-          updatedMetadata.imageUrl = imageUrl;
-        }
-
-        // 당일 최초 기록이고 첫 번째 아이템인 경우 pointsEarned 추가
-        if (isFirstRecordOfDay && index === 0) {
-          updatedMetadata.pointsEarned = 100;
-        }
-
-        // 레코드 업데이트 (userChallengeId도 함께 업데이트)
-        return this.prisma.userRecord.update({
-          where: { id: record.id },
-          data: {
-            metadata: updatedMetadata,
-            userChallengeId: activeChallenge?.id || null,
-            updatedAt: getNowKST(),
-          },
-        });
-      });
-
-      await Promise.all(updatePromises);
-
-      // 5. 당일 최초 기록이면 포인트 100점 지급
-      if (isFirstRecordOfDay) {
-        await this.pointService.addPoints(
-          userId,
-          100,
-          '영양제 섭취 기록',
-          'RECORD',
-          null,
-          RecordType.SUPPLEMENT,
+        this.logger.log(
+          `당일 포인트 지급 여부: ${isFirstRecordOfDay ? '지급 예정' : '이미 지급됨'} (point_histories 확인, today=${today})`,
         );
 
-        this.logger.log(`포인트 100점 지급 완료: userId=${userId}`);
-      }
+        // 활성 챌린지 조회 (userChallengeId 업데이트용)
+        const activeChallenge = await tx.userChallenge.findFirst({
+          where: {
+            userId,
+            status: 'ACTIVE',
+          },
+        });
+
+        // RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
+        for (let index = 0; index < data.length; index++) {
+          const item = data[index];
+          const { productId, morning, afternoon, evening } = item;
+
+          // 해당 productId의 기록 조회
+          const record = await tx.userRecord.findFirst({
+            where: {
+              userId,
+              recordType: 'SUPPLEMENT',
+              date: dateObj,
+              metadata: {
+                path: ['productId'],
+                equals: productId,
+              },
+            },
+          });
+
+          if (!record) {
+            this.logger.warn(
+              `영양제 기록을 찾을 수 없습니다: userId=${userId}, date=${today}, productId=${productId}`,
+            );
+            continue;
+          }
+
+          // metadata 업데이트 (기존 metadata 유지하면서 업데이트)
+          const existingMetadata = (record.metadata as any) || {};
+          const updatedMetadata: any = {
+            ...existingMetadata, // 기존 metadata 유지 (imageUrl 등)
+            productId,
+            morning,
+            afternoon,
+            evening,
+            isCompleted: true, // 기록 완료 표식 (홈 미션목록 완료 판단용)
+          };
+
+          // 새 imageUrl이 있으면 덮어쓰기 (없으면 기존 imageUrl 유지)
+          if (imageUrl) {
+            updatedMetadata.imageUrl = imageUrl;
+          }
+
+          // 당일 최초 기록이고 첫 번째 아이템인 경우 pointsEarned 추가
+          if (isFirstRecordOfDay && index === 0) {
+            updatedMetadata.pointsEarned = 100;
+          }
+
+          // 레코드 업데이트 (userChallengeId도 함께 업데이트)
+          await tx.userRecord.update({
+            where: { id: record.id },
+            data: {
+              metadata: updatedMetadata,
+              userChallengeId: activeChallenge?.id || null,
+              updatedAt: getNowKST(),
+            },
+          });
+        }
+
+        // 당일 최초 기록이면 포인트 100점 지급 (트랜잭션 안에서 처리)
+        if (isFirstRecordOfDay) {
+          await this.pointService.awardPointsInTransaction(
+            tx,
+            userId,
+            100,
+            '영양제 섭취 기록',
+            'RECORD',
+            undefined,
+            RecordType.SUPPLEMENT,
+          );
+
+          this.logger.log(`포인트 100점 지급 완료: userId=${userId}`);
+        }
+
+        return { isFirstRecordOfDay };
+      });
 
       this.logger.log(`영양제 섭취 기록 저장 완료: ${data.length}개 업데이트`);
 
       return {
         message: '영양제 섭취 기록이 저장되었습니다.',
-        pointsEarned: isFirstRecordOfDay ? 100 : 0,
+        pointsEarned: result.isFirstRecordOfDay ? 100 : 0,
       };
     } catch (error) {
       this.logger.error('영양제 섭취 기록 저장 실패', error);

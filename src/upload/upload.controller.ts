@@ -1,20 +1,21 @@
-import { 
-  Controller, 
-  Post, 
-  Get, 
+import {
+  Controller,
+  Post,
+  Get,
   Delete,
   Param,
   Query,
-  Req, 
-  UseInterceptors, 
+  Req,
+  UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   ParseIntPipe,
   HttpStatus,
   Logger,
   BadRequestException,
   UseGuards
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { 
   ApiTags, 
   ApiOperation, 
@@ -117,6 +118,93 @@ export class UploadController {
       success: true,
       message: '이미지가 성공적으로 업로드되었습니다.',
       data: uploadedFile,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 다중 이미지 파일 업로드
+   */
+  @Post('images')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FilesInterceptor('files', 10)) // 최대 10개 파일
+  @ApiOperation({
+    summary: '다중 이미지 파일 업로드',
+    description: '여러 이미지 파일을 한 번에 업로드합니다. 최대 10개까지 가능합니다.'
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: '업로드할 이미지 파일들 (최대 10개)',
+        },
+      },
+      required: ['files'],
+    },
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: '파일 업로드 성공',
+    type: ApiResponseDto
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: '잘못된 파일 형식 또는 크기'
+  })
+  @ApiQueryDecorator({
+    name: 'relatedType',
+    required: true,
+    description: '연관된 활동 타입 (DIET, DAILY_MISSION, SUPPLEMENT, ACTIVITY, QUIZ, REVIEW, QNA, PROFILE)',
+    example: 'DIET'
+  })
+  async uploadImages(
+    @Req() req: any,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Query('relatedType') relatedType: string
+  ): Promise<ApiResponseDto<FileUploadResponseDto[]>> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('파일이 업로드되지 않았습니다.');
+    }
+
+    if (!relatedType) {
+      throw new BadRequestException('연관된 활동 타입(relatedType)을 지정해주세요.');
+    }
+
+    this.logger.log(`다중 이미지 업로드 요청 - 사용자: ${req.user.sub}, 파일 수: ${files.length}, 타입: ${relatedType}`);
+
+    // 각 파일을 순차적으로 업로드
+    const uploadedFiles: FileUploadResponseDto[] = [];
+
+    for (const file of files) {
+      try {
+        const uploadedFile = await this.uploadService.uploadImage(
+          req.user.sub,
+          file,
+          relatedType
+        );
+        uploadedFiles.push(uploadedFile);
+      } catch (error) {
+        this.logger.error(`파일 업로드 실패 - 파일: ${file.originalname}, 에러: ${error.message}`);
+        // 실패한 파일은 건너뛰고 계속 진행
+      }
+    }
+
+    if (uploadedFiles.length === 0) {
+      throw new BadRequestException('모든 파일 업로드에 실패했습니다.');
+    }
+
+    return {
+      success: true,
+      message: `${uploadedFiles.length}개의 이미지가 성공적으로 업로드되었습니다.`,
+      data: uploadedFiles,
       timestamp: getNowKST(),
     };
   }

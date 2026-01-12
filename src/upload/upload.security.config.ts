@@ -31,7 +31,7 @@ export const UploadSecurityConfig = {
     maxFileNameLength: 255,
     maxFieldNameSize: 100,
     maxFieldSize: 1024 * 1024, // 1MB
-    maxFiles: 1 // 한 번에 하나의 파일만
+    maxFiles: 10 // 한 번에 최대 10개 파일
   },
 
   // 매직 바이트 시그니처 (파일의 실제 타입 검증용)
