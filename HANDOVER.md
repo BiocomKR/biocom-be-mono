@@ -54,14 +54,13 @@
    - 작업 일지 없이 작업하면 형님한테 욕먹음
 
 ### 핵심 성과
-1. **GCP 자동 배포 시스템 완료**
-   - `./infra-gcp/scripts/01-deploy-infrastructure.sh` (인프라 구축)
-   - `./infra-gcp/scripts/02-deploy-app.sh` (앱 배포)
-   - Terraform + GKE 완전 자동화
-   - 수동 개입 0%
+1. **GitHub Actions CI/CD 구축 완료**
+   - development push → 개발서버 자동 배포
+   - main push → 운영서버 자동 배포
+   - 수동 스크립트(`02-deploy-app.sh`) 사용 금지
 
 2. **주요 구성**
-   - GKE 클러스터: biocom-cluster-dev
+   - GKE 클러스터: biocom-cluster-dev (개발), biocom-cluster-prod (운영)
    - Cloud SQL PostgreSQL (Private IP)
    - Global Load Balancer + SSL
    - Artifact Registry 이미지 관리
@@ -202,8 +201,8 @@
 │   ├── ingress.yaml               # 로드밸런서 설정
 │   └── service.yaml               # 네트워크 설정
 └── scripts/
-    ├── 01-deploy-infrastructure.sh # 인프라 구축 (완성본)
-    └── 02-deploy-app.sh           # 앱 배포 (완성본)
+    └── 01-deploy-infrastructure.sh # 인프라 구축 (완성본)
+    # 02-deploy-app.sh는 GitHub Actions CI/CD로 대체됨
 
 /infrastructure/                    # AWS 인프라 (더이상 사용하지 않음)
 /CLAUDE.md                         # AI 가이드라인
@@ -614,20 +613,14 @@ const product = await prisma.product.findUnique({
 const imageUrl = product.productFiles?.[0]?.file?.filePath;
 ```
 
-**잘못된 방법 (절대 사용 금지):**
-```typescript
-// ❌ product.images 사용 금지 - ProductImage 테이블은 다른 용도임
-const thumbnail = product.images?.[0]?.imageUrl;  // 잘못됨!
-```
-
 ### 테이블 구조
 - `File`: 파일 원본 정보 (filePath, mimeType 등)
-- `ProductFile`: Product ↔ File 연결 테이블 (imageType: MAIN, DETAIL 등)
-- `ProductImage`: **사용하지 않음** (legacy 또는 다른 용도)
+- `ProductFile`: Product ↔ File 연결 테이블 (imageType: MAIN, CONTENT 등)
+- ~~`ProductImage`~~: **삭제됨** (2026-01-12) - ProductFile로 완전 대체
 
 ### 신규 상품 이미지 등록 시
 1. `File` 테이블에 파일 정보 등록
-2. `ProductFile` 테이블에 연결 정보 등록 (imageType: 'MAIN')
+2. `ProductFile` 테이블에 연결 정보 등록 (imageType: 'MAIN' 또는 'CONTENT')
 
 **예시:**
 ```typescript
