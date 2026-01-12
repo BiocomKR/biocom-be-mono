@@ -412,6 +412,7 @@ model Mission {
   visibleToDay          Int?               @map("visible_to_day")
   visibleAfterSettings  Json?              @map("visible_after_settings")
   dailyTimeLimitMinutes Int?               @map("daily_time_limit_minutes")
+  targetProductIds      Int[]              @default([]) @map("target_product_ids")
   challengeMissions     ChallengeMission[]
   dailyMissions         DailyMission[]
   missionQuizzes        MissionQuiz[]
