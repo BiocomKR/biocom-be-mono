@@ -2083,6 +2083,18 @@ model PushNotificationSchedule {
   /// 타겟팅 쿼리 조건 (JSON)
   /// 예: { "marketingEnabled": true, "userIds": [1,2,3], "platforms": ["IOS", "ANDROID"] }
   targetQuery        Json?                      @map("target_query")
+  /// 조건 타입 (CHALLENGE_DAY, NO_ACCESS_HOURS 등)
+  conditionType      String?                    @map("condition_type") @db.VarChar(50)
+  /// 조건 파라미터 (JSON: { day: 7 }, { hours: 24 } 등)
+  conditionParams    Json?                      @map("condition_params")
+  /// 랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)
+  landingType        String?                    @map("landing_type") @db.VarChar(50)
+  /// 랜딩 파라미터 (JSON: { day: 7 }, { missionType: 'FOOD' } 등)
+  landingParams      Json?                      @map("landing_params")
+  /// 페르소나별 메시지 (JSON: { default: {...}, STELLA: {...}, ... })
+  personaMessages    Json?                      @map("persona_messages")
+  /// 발신자 타입 (BIOCOM | PERSONA)
+  senderType         String?                    @map("sender_type") @db.VarChar(20)
   /// 반복 발송 시작일 (RECURRING 타입일 때 유효 기간 시작)
   startDate          DateTime?                  @map("start_date")
   /// 반복 발송 종료일 (RECURRING 타입일 때 유효 기간 종료)
@@ -2109,6 +2121,7 @@ model PushNotificationSchedule {
   @@index([scheduleType])
   @@index([nextExecutionAt])
   @@index([startDate, endDate])
+  @@index([conditionType])
   @@map("push_notification_schedules")
 }
 
@@ -2687,44 +2700,6 @@ model PushSegmentCondition {
   @@index([isActive])
   @@index([sortOrder])
   @@map("push_segment_conditions")
-}
-
-/// 푸시 발송 규칙 테이블
-/// 조건 기반 개인화 푸시 발송 규칙 정의
-model PushRule {
-  /// 고유 ID
-  id              Int       @id @default(autoincrement())
-  /// 푸시 식별 코드 (이벤트 수집용, 유니크)
-  pushCode        String    @unique @map("push_code") @db.VarChar(100)
-  /// 규칙 이름 (어드민용)
-  name            String    @db.VarChar(100)
-  /// 설명
-  description     String?   @db.VarChar(500)
-  /// 조건 타입 (CHALLENGE_DAY, NO_ACCESS_HOURS 등)
-  conditionType   String    @map("condition_type") @db.VarChar(50)
-  /// 조건 파라미터 (JSON: { day: 7 }, { hours: 24 } 등)
-  conditionParams Json      @default("{}") @map("condition_params")
-  /// 랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)
-  landingType     String    @map("landing_type") @db.VarChar(50)
-  /// 랜딩 파라미터 (JSON: { day: 7 }, { missionType: 'FOOD' } 등)
-  landingParams   Json?     @map("landing_params")
-  /// 페르소나별 메시지 (JSON: { default: {...}, STELLA: {...}, ... })
-  messages        Json
-  /// 발송 시점 (AT_07, AT_18, ON_24H_ELAPSED 등)
-  sendTime        String    @map("send_time") @db.VarChar(50)
-  /// 발신자 타입 (BIOCOM | PERSONA)
-  senderType      String    @default("PERSONA") @map("sender_type") @db.VarChar(20)
-  /// 활성화 여부
-  isActive        Boolean   @default(true) @map("is_active")
-  /// 생성일시
-  createdAt       DateTime  @default(now()) @map("created_at")
-  /// 수정일시
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  @@index([conditionType])
-  @@index([sendTime])
-  @@index([isActive])
-  @@map("push_rules")
 }
 
 /// 앱 버전 관리 테이블
