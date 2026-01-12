@@ -388,6 +388,8 @@ model Mission {
   id                    Int                @id @default(autoincrement())
   name                  String
   description           String?
+  /// 배너 타이틀 (강의용)
+  bannerTitle           String?            @map("banner_title") @db.VarChar(200)
   points                Int
   requireUpload         Boolean            @default(false) @map("require_upload")
   sortOrder             Int                @map("sort_order")
@@ -1569,6 +1571,8 @@ model UserBalanceGameHistory {
 /// 할인 쿠폰 정보 관리
 model Coupon {
   id                Int                      @id @default(autoincrement())
+  /// 쿠폰 식별 코드 (이벤트 수집용, nullable + unique)
+  code              String?                  @unique @db.VarChar(50)
   /// 쿠폰명
   name              String                   @db.VarChar(200)
   /// 쿠폰 설명
@@ -2073,6 +2077,8 @@ model PushToken {
 model PushNotificationSchedule {
   /// 고유 ID
   id                 Int                        @id @default(autoincrement())
+  /// 푸시 식별 코드 (이벤트 수집용, nullable + unique)
+  pushCode           String?                    @unique @map("push_code") @db.VarChar(50)
   /// 스케줄 이름
   name               String                     @db.VarChar(100)
   /// 스케줄 설명
