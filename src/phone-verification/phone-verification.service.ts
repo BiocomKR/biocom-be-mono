@@ -26,18 +26,29 @@ import {
  * - KCP 본인인증을 우회하여 고정 OTP로 인증 가능
  * - 회원가입/로그인은 정상 API 흐름을 탐
  */
-const TEST_ACCOUNT = {
-  /** 테스트 휴대폰 번호 */
-  MOBILE: '01005190519',
-  /** 고정 OTP (만료 없음) */
-  OTP: '250519',
-  /** 테스트용 거래번호 */
-  CERT_NUMBER: 'TEST_CERT_APP_REVIEW_250519',
-  /** 테스트용 CI */
-  CI: 'TEST_CI_APP_REVIEW_01005190519',
-  /** 테스트용 DI */
-  DI: 'TEST_DI_APP_REVIEW_01005190519',
-} as const;
+const TEST_ACCOUNTS = [
+  {
+    /** 기존 테스트 계정 */
+    MOBILE: '01005190519',
+    OTP: '250519',
+    CERT_NUMBER: 'TEST_CERT_APP_REVIEW_250519',
+    CI: 'TEST_CI_APP_REVIEW_01005190519',
+    DI: 'TEST_DI_APP_REVIEW_01005190519',
+  },
+  {
+    /** 신규 앱 심사용 계정 */
+    MOBILE: '01001120112',
+    OTP: '250519',
+    CERT_NUMBER: 'TEST_CERT_APP_REVIEW_01120112',
+    CI: 'TEST_CI_APP_REVIEW_01001120112',
+    DI: 'TEST_DI_APP_REVIEW_01001120112',
+  },
+] as const;
+
+/** 테스트 계정 조회 헬퍼 */
+function getTestAccount(mobile: string) {
+  return TEST_ACCOUNTS.find((acc) => acc.MOBILE === mobile);
+}
 
 /**
  * 본인인증 단계 enum
@@ -92,17 +103,18 @@ export class PhoneVerificationService {
     this.logger.log(`🚀 본인인증 요청 시작 - 이름: ${dto.userName}`);
 
     // 테스트 계정: KCP 호출 없이 바로 성공 처리
-    if (dto.mobile === TEST_ACCOUNT.MOBILE) {
+    const testAccount = getTestAccount(dto.mobile);
+    if (testAccount) {
       this.logger.log(`📱 테스트 계정 감지: ${dto.mobile}`);
 
       // 기존 테스트 로그 삭제 (중복 방지)
       await this.prisma.phoneVerificationLog.deleteMany({
-        where: { certNumber: TEST_ACCOUNT.CERT_NUMBER },
+        where: { certNumber: testAccount.CERT_NUMBER },
       });
 
       // 테스트용 로그 저장
       await this.saveLog({
-        certNumber: TEST_ACCOUNT.CERT_NUMBER,
+        certNumber: testAccount.CERT_NUMBER,
         orderId: 'TEST_ORDER_APP_REVIEW',
         mobile: dto.mobile,
         userName: dto.userName,
@@ -115,7 +127,7 @@ export class PhoneVerificationService {
       this.logger.log(`✅ 테스트 계정 본인인증 요청 완료`);
 
       return {
-        certNumber: TEST_ACCOUNT.CERT_NUMBER,
+        certNumber: testAccount.CERT_NUMBER,
         message: 'SMS가 발송되었습니다. 인증번호를 확인해주세요.',
       };
     }
@@ -256,15 +268,16 @@ export class PhoneVerificationService {
     this.logger.log(`  - telecom: ${log.telecom}`);
 
     // 테스트 계정: KCP 호출 없이 바로 성공 처리
-    if (log.mobile === TEST_ACCOUNT.MOBILE && dto.otpNumber === TEST_ACCOUNT.OTP) {
+    const testAccount = getTestAccount(log.mobile);
+    if (testAccount && dto.otpNumber === testAccount.OTP) {
       this.logger.log(`📱 테스트 계정 OTP 검증: ${log.mobile}`);
 
       // DB 업데이트 (CI/DI 저장)
       await this.prisma.phoneVerificationLog.update({
         where: { id: log.id },
         data: {
-          ci: TEST_ACCOUNT.CI,
-          di: TEST_ACCOUNT.DI,
+          ci: testAccount.CI,
+          di: testAccount.DI,
           step: VerificationStep.VERIFIED,
           verificationStatus: VerificationStatus.COMPLETED,
           updatedAt: getNowKST(),
@@ -275,8 +288,8 @@ export class PhoneVerificationService {
 
       return {
         success: true,
-        ci: TEST_ACCOUNT.CI,
-        di: TEST_ACCOUNT.DI,
+        ci: testAccount.CI,
+        di: testAccount.DI,
         message: '본인인증이 완료되었습니다.',
       };
     }
