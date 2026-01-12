@@ -76,10 +76,10 @@ export class OrdersService {
                 select: {
                   id: true,
                   name: true,
-                  images: {
+                  productFiles: {
                     where: { imageType: 'MAIN' },
                     take: 1,
-                    select: { imageUrl: true },
+                    select: { file: { select: { filePath: true } } },
                   },
                 },
               },
@@ -133,10 +133,10 @@ export class OrdersService {
                 name: true,
                 price: true,
                 sku: true,
-                images: {
+                productFiles: {
                   where: { imageType: 'MAIN' },
                   take: 1,
-                  select: { imageUrl: true },
+                  select: { file: { select: { filePath: true } } },
                 },
               },
             },
@@ -611,7 +611,7 @@ export class OrdersService {
           ? {
               id: item.product.id,
               name: item.product.name,
-              imageUrl: item.product.images?.[0]?.imageUrl || null,
+              imageUrl: item.product.productFiles?.[0]?.file?.filePath || null,
             }
           : null,
       })),

@@ -414,11 +414,15 @@ export class UsersService {
                     id: true,
                     name: true,
                     price: true,
-                    images: {
+                    productFiles: {
                       where: { imageType: 'MAIN' },
                       take: 1,
                       select: {
-                        imageUrl: true,
+                        file: {
+                          select: {
+                            filePath: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -466,7 +470,7 @@ export class UsersService {
         id: item.product.id,
         name: item.product.name,
         price: Number(item.product.price),
-        thumbnailUrl: item.product.images?.[0]?.imageUrl || null,
+        thumbnailUrl: item.product.productFiles?.[0]?.file?.filePath || null,
       },
       subtotal: Number(item.product.price) * item.quantity,
       stockAvailable: item.stockAvailable,

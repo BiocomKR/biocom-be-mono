@@ -131,11 +131,11 @@ export class CartService {
               name: true,
               price: true,
               status: true,
-              images: {
+              productFiles: {
                 where: { imageType: 'MAIN' },
                 take: 1,
                 select: {
-                  imageUrl: true,
+                  file: { select: { filePath: true } },
                 },
               },
             },
@@ -157,7 +157,7 @@ export class CartService {
         name: item.product.name,
         price: Number(item.product.price),
         status: item.product.status,
-        imageUrl: item.product.images[0]?.imageUrl || null,
+        imageUrl: item.product.productFiles?.[0]?.file?.filePath || null,
       },
       quantity: item.quantity,
       subtotal: Number(item.product.price) * item.quantity,
@@ -204,11 +204,11 @@ export class CartService {
                 price: true,
                 status: true,
                 maxOrderQty: true,
-                images: {
+                productFiles: {
                   where: { imageType: 'MAIN' },
                   take: 1,
                   select: {
-                    imageUrl: true,
+                    file: { select: { filePath: true } },
                   },
                 },
               },
@@ -238,7 +238,7 @@ export class CartService {
         price: Number(item.product.price),
         status: item.product.status,
         maxOrderQty: item.product.maxOrderQty,
-        imageUrl: item.product.images[0]?.imageUrl || null,
+        imageUrl: item.product.productFiles?.[0]?.file?.filePath || null,
       },
       quantity: item.quantity,
       subtotal: Number(item.product.price) * item.quantity,
