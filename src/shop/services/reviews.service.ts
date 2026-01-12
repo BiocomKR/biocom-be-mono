@@ -22,6 +22,7 @@ import {
 } from '../dto/reviews/review.dto';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { OrderStatus } from '../../common/enums';
 
 @Injectable()
 export class ReviewsService {
@@ -46,14 +47,21 @@ export class ReviewsService {
       throw new NotFoundException('상품을 찾을 수 없습니다');
     }
 
-    // 구매 이력 확인 (배송완료/구매확정된 주문만)
+    // 구매 이력 확인 (결제 완료 이후 상태만 - PENDING_PAYMENT, CANCELLED, PAYMENT_FAILED 제외)
     const purchaseHistory = await this.prisma.orderItem.findFirst({
       where: {
         productId: dto.productId,
         order: {
           userId,
           status: {
-            in: ['DELIVERED', 'COMPLETED']
+            in: [
+              OrderStatus.PAID,
+              OrderStatus.PREPARING,
+              OrderStatus.SHIPPED,
+              OrderStatus.DELIVERED,
+              OrderStatus.CANCEL_REQUESTED,
+              OrderStatus.COMPLETED
+            ]
           }
         }
       }
