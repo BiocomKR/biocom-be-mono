@@ -39,7 +39,7 @@ export class DeepReportController {
    * 데이터가 없으면 data: null 반환
    * /last-week 추후에 붙일 path
    */
-  @Get('reports')
+  @Get('report')
   @ApiOperation({
     summary: '지난주 심층리포트 조회',
     description: '지난주(월~일) 범위의 심층리포트를 조회합니다. 데이터가 없으면 data: null을 반환합니다.',
