@@ -237,8 +237,8 @@ export class ExcelService {
         worksheet.views = [{ state: 'frozen', ySplit: 1 }];
       }
 
-      // 테두리 스타일 적용
-      worksheet.eachRow((row) => {
+      // 테두리 스타일 및 숫자 서식 적용
+      worksheet.eachRow((row, rowNumber) => {
         row.eachCell((cell) => {
           cell.border = {
             top: { style: 'thin' },
@@ -246,6 +246,10 @@ export class ExcelService {
             bottom: { style: 'thin' },
             right: { style: 'thin' },
           };
+          // 숫자 셀에 컴마 서식 적용 (헤더 제외)
+          if (rowNumber > 1 && typeof cell.value === 'number') {
+            cell.numFmt = '#,##0';
+          }
         });
       });
     }

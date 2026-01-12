@@ -131,6 +131,7 @@ export class UsersController {
       status?: string;
       isActive?: boolean;
       points?: number;
+      isTester?: boolean;
     },
   ) {
     this.logger.log(`회원 정보 수정 - ID: ${id}`);

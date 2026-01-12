@@ -212,7 +212,7 @@ export class UsersService {
         id: user.id,
         email: user.email,
         name: user.decryptedName,
-        mobile: CryptoUtil.decryptDeterministic(user.mobile),
+        mobile: user.mobile,
         points: user.points,
         status: user.status,
         role: user.role,
@@ -287,12 +287,12 @@ export class UsersService {
       take: limit,
     });
 
-    // 응답 형식 변환 (이름/휴대폰 복호화)
+    // 응답 형식 변환 (Prisma Extension에서 자동 복호화됨)
     const userList = users.map(user => ({
       id: user.id,
       email: user.email,
-      name: CryptoUtil.decrypt(user.name),
-      mobile: CryptoUtil.decryptDeterministic(user.mobile),
+      name: user.name,
+      mobile: user.mobile,
       points: user.points,
       status: user.status,
       role: user.role,
@@ -338,6 +338,7 @@ export class UsersService {
         status: true,
         role: true,
         isActive: true,
+        isTester: true,
         birthDate: true,
         sex: true,
         telecom: true,
@@ -482,12 +483,13 @@ export class UsersService {
     return {
       id: user.id,
       email: user.email,
-      name: CryptoUtil.decrypt(user.name),
-      mobile: CryptoUtil.decryptDeterministic(user.mobile),
+      name: user.name,
+      mobile: user.mobile,
       points: user.points,
       status: user.status,
       role: user.role,
       isActive: user.isActive,
+      isTester: user.isTester,
       birthDate: user.birthDate,
       sex: user.sex,
       telecom: user.telecom,
@@ -655,6 +657,7 @@ export class UsersService {
     status?: string;
     isActive?: boolean;
     points?: number;
+    isTester?: boolean;
   }) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id },
@@ -804,8 +807,8 @@ export class UsersService {
       for (const user of users) {
         results.push({
           id: user.id,
-          name: CryptoUtil.decrypt(user.name),
-          mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
+          name: user.name,
+          mobile: this.formatPhoneNumber(user.mobile),
           status: user.status,
           pushEnabled: user.pushEnabled,
           hasPushToken: user._count.pushTokens > 0,
@@ -838,12 +841,11 @@ export class UsersService {
       });
 
       for (const user of users) {
-        const decryptedName = CryptoUtil.decrypt(user.name);
-        if (decryptedName && decryptedName.includes(searchKeyword)) {
+        if (user.name && user.name.includes(searchKeyword)) {
           results.push({
             id: user.id,
-            name: decryptedName,
-            mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
+            name: user.name,
+            mobile: this.formatPhoneNumber(user.mobile),
             status: user.status,
             pushEnabled: user.pushEnabled,
             hasPushToken: user._count.pushTokens > 0,

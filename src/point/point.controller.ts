@@ -65,7 +65,7 @@ export class PointController {
   }
 
   /**
-   * 유저별 포인트 통계 엑셀 다운로드 (요약 + 일별)
+   * 유저별 포인트 통계 엑셀 다운로드 (개요 + 일별포인트 + 유저별합계)
    */
   @Get('stats/excel')
   async downloadStatsExcel(
@@ -84,44 +84,55 @@ export class PointController {
       endUserId: endUserId ? parseInt(endUserId) : undefined,
     });
 
-    // 유저별 통계 시트 데이터
-    const userStatsData = Object.entries(stats.userStats)
-      .sort(([a], [b]) => parseInt(a) - parseInt(b))
-      .map(([userId, data]) => ({
-        userId: parseInt(userId),
-        name: data.name,
-        mobile: data.mobile,
-        earnedPoints: data.total,
-        excessPoints: data.excess,
-        adjustedPoints: data.total - data.excess,
-        note: data.excess > 0 ? `초과지급 -${data.excess}` : '',
-      }));
-
-    // 일별 통계 시트 데이터
-    const dailyStatsData: Record<string, any>[] = [];
     const userIds = Object.keys(stats.userStats)
       .map((id) => parseInt(id))
       .sort((a, b) => a - b);
 
+    const totalDays = stats.dates.length;
+    const maxPointsPerDay = 1300;
+    // 1인당 최대 획득 포인트 = 1300 + (일수 * 1300)
+    const maxPointsPerChallenge = 1300 + (totalDays * maxPointsPerDay);
+    const totalUsers = userIds.length;
+    const maxPossiblePoints = maxPointsPerChallenge * totalUsers;
+    const { totalEarned, totalDietExcess, adjustedTotal } = stats.summary;
+    // 포인트 지급률 = (총 지급 포인트 - 초과 지급 포인트) / 최대 지급 포인트
+    const paymentRate = maxPossiblePoints > 0 ? (((totalEarned - totalDietExcess) / maxPossiblePoints) * 100).toFixed(2) : '0';
+
+    // 1. 개요 시트 데이터 (요약 + 빈 행 + 일별 총액)
+    const overviewData: { item: string; value: number | string }[] = [
+      { item: '1인당 최대 획득 포인트', value: maxPointsPerChallenge },
+      { item: `${totalUsers}인 최대 획득 포인트`, value: maxPossiblePoints },
+      { item: '실 지급 포인트', value: totalEarned },
+      { item: '초과 지급 포인트', value: totalDietExcess },
+      { item: '포인트 지급률 (%)', value: parseFloat(paymentRate) },
+      { item: '', value: '' }, // 빈 행
+      { item: '일자', value: '총 지급 포인트' }, // 헤더
+    ];
+    // 일별 총액 추가
+    for (const date of stats.dates) {
+      let dayTotal = 0;
+      for (const userId of userIds) {
+        dayTotal += stats.dailyStats[date]?.[userId] || 0;
+      }
+      overviewData.push({ item: date.substring(5), value: dayTotal });
+    }
+
+    // 2. 일별포인트 시트 데이터
+    const dailyStatsData: Record<string, any>[] = [];
     for (const userId of userIds) {
       const userData = stats.userStats[userId];
-      const row: Record<string, any> = {
-        userId,
-        name: userData.name,
-      };
-
+      const row: Record<string, any> = { odUserId: userId, odName: userData.name };
       let total = 0;
       for (const date of stats.dates) {
         const points = stats.dailyStats[date]?.[userId] || 0;
         row[date] = points;
         total += points;
       }
-      row.total = total;
+      row.odTotal = total;
       dailyStatsData.push(row);
     }
-
-    // 일별 합계 행
-    const totalRow: Record<string, any> = { userId: '', name: '합계' };
+    // 합계 행
+    const totalRow: Record<string, any> = { odUserId: '', odName: '합계' };
     let grandTotal = 0;
     for (const date of stats.dates) {
       let dayTotal = 0;
@@ -131,62 +142,59 @@ export class PointController {
       totalRow[date] = dayTotal;
       grandTotal += dayTotal;
     }
-    totalRow.total = grandTotal;
+    totalRow.odTotal = grandTotal;
     dailyStatsData.push(totalRow);
 
-    // 일별 시트 컬럼 동적 생성
+    // 3. 유저별합계 시트 데이터
+    const userStatsData = userIds.map((userId) => {
+      const data = stats.userStats[userId];
+      return {
+        userId,
+        name: data.name,
+        earnedPoints: data.total,
+        note: data.excess > 0 ? `초과지급 -${data.excess}` : '',
+      };
+    });
+    userStatsData.push({ userId: '' as any, name: '합계', earnedPoints: totalEarned, note: '' });
+
+    // 일별 컬럼 동적 생성
     const dailyColumns = [
-      { header: 'user_id', key: 'userId', width: 10 },
-      { header: '이름', key: 'name', width: 12 },
+      { header: 'user_id', key: 'odUserId', width: 10 },
+      { header: '이름', key: 'odName', width: 12 },
       ...stats.dates.map((date) => ({
-        header: date.substring(5), // MM-DD
+        header: date.substring(5),
         key: date,
         width: 10,
-        formatter: (value: number) => (value > 0 ? value.toLocaleString() : '-'),
+        formatter: (v: number) => (v > 0 ? v.toLocaleString() : '-'),
       })),
-      {
-        header: '합계',
-        key: 'total',
-        width: 12,
-        formatter: (value: number) => value.toLocaleString(),
-      },
+      { header: '합계', key: 'odTotal', width: 12, formatter: (v: number) => v.toLocaleString() },
     ];
 
     await this.excelService.downloadMultiSheetExcel(res, {
       fileName: `포인트통계_${dayjs().format('YYYYMMDD_HHmmss')}`,
       sheets: [
         {
-          sheetName: '유저별 통계',
+          sheetName: '개요',
+          data: overviewData,
+          columns: [
+            { header: '항목', key: 'item', width: 25 },
+            { header: '값', key: 'value', width: 20 },
+          ],
+        },
+        {
+          sheetName: '일별포인트',
+          data: dailyStatsData,
+          columns: dailyColumns,
+        },
+        {
+          sheetName: '유저별합계',
           data: userStatsData,
           columns: [
             { header: 'user_id', key: 'userId', width: 10 },
             { header: '이름', key: 'name', width: 12 },
-            { header: '휴대폰', key: 'mobile', width: 15 },
-            {
-              header: '획득 포인트',
-              key: 'earnedPoints',
-              width: 12,
-              formatter: (v: number) => v.toLocaleString(),
-            },
-            {
-              header: '초과 지급',
-              key: 'excessPoints',
-              width: 12,
-              formatter: (v: number) => (v > 0 ? v.toLocaleString() : '-'),
-            },
-            {
-              header: '정산 포인트',
-              key: 'adjustedPoints',
-              width: 12,
-              formatter: (v: number) => v.toLocaleString(),
-            },
-            { header: '비고', key: 'note', width: 15 },
+            { header: '획득 포인트', key: 'earnedPoints', width: 15, formatter: (v: number) => v.toLocaleString() },
+            { header: '비고', key: 'note', width: 20 },
           ],
-        },
-        {
-          sheetName: '일별 통계',
-          data: dailyStatsData,
-          columns: dailyColumns,
         },
       ],
     });

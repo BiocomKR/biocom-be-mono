@@ -66,7 +66,8 @@
     "sharp": "^0.34.3",
     "uuid": "^11.1.0",
     "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^4.7.1"
+    "winston-daily-rotate-file": "^4.7.1",
+    "xlsx-chart": "^0.4.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.7",

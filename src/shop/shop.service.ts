@@ -452,8 +452,6 @@ export class ShopService {
         totalAmount: Number(order.totalAmount),
         user: order.user ? {
           ...order.user,
-          name: CryptoUtil.decrypt(order.user.name),
-          mobile: CryptoUtil.decryptDeterministic(order.user.mobile),
         } : null,
         items: order.items.map(item => ({
           ...item,
