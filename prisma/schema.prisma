@@ -2037,6 +2037,8 @@ model PushToken {
   token         String                @db.VarChar(255)
   /// 메타데이터 (선택적 부가 정보)
   metadata      Json?
+  /// 앱 번들 ID (dev/prod 구분: com.biocom.challenge / com.biocom.challenge.dev)
+  bundleId      String?               @map("bundle_id") @db.VarChar(100)
   logs          PushNotificationLog[]
   user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2200,22 +2202,28 @@ model PushNotificationLog {
   /// 알림 클릭한 시간
   clickedAt    DateTime?                 @map("clicked_at")
   /// 캠페인 ID
-  campaignId   Int?                      @map("campaign_id")
+  campaignId    Int?                      @map("campaign_id")
   /// 테스트 발송 여부 (기본값: false)
-  isTest       Boolean                   @map("is_test")
-  created_at   DateTime?
-  image_url    String?                   @db.VarChar(500)
-  message_id   String?                   @db.VarChar(255)
-  campaign     PushNotificationCampaign? @relation(fields: [campaignId], references: [id])
-  pushToken    PushToken?                @relation(fields: [pushTokenId], references: [id])
-  user         User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isTest        Boolean                   @map("is_test")
+  created_at    DateTime?
+  image_url     String?                   @db.VarChar(500)
+  message_id    String?                   @db.VarChar(255)
+  /// 푸시 규칙 코드 (중복 방지용)
+  pushCode      String?                   @map("push_code") @db.VarChar(100)
+  /// 예약 발송 날짜 (중복 방지용, KST 기준)
+  scheduledDate DateTime?                 @map("scheduled_date") @db.Date
+  campaign      PushNotificationCampaign? @relation(fields: [campaignId], references: [id])
+  pushToken     PushToken?                @relation(fields: [pushTokenId], references: [id])
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([campaignId, userId, pushTokenId])
+  @@unique([userId, pushCode, scheduledDate], map: "idx_push_logs_idempotent")
   @@index([campaignId])
   @@index([pushTokenId])
   @@index([type])
   @@index([success])
   @@index([isTest])
+  @@index([pushCode])
   @@index([userId], map: "idx_push_notification_logs_user_id")
   @@map("push_notification_logs")
 }
@@ -2679,6 +2687,44 @@ model PushSegmentCondition {
   @@index([isActive])
   @@index([sortOrder])
   @@map("push_segment_conditions")
+}
+
+/// 푸시 발송 규칙 테이블
+/// 조건 기반 개인화 푸시 발송 규칙 정의
+model PushRule {
+  /// 고유 ID
+  id              Int       @id @default(autoincrement())
+  /// 푸시 식별 코드 (이벤트 수집용, 유니크)
+  pushCode        String    @unique @map("push_code") @db.VarChar(100)
+  /// 규칙 이름 (어드민용)
+  name            String    @db.VarChar(100)
+  /// 설명
+  description     String?   @db.VarChar(500)
+  /// 조건 타입 (CHALLENGE_DAY, NO_ACCESS_HOURS 등)
+  conditionType   String    @map("condition_type") @db.VarChar(50)
+  /// 조건 파라미터 (JSON: { day: 7 }, { hours: 24 } 등)
+  conditionParams Json      @default("{}") @map("condition_params")
+  /// 랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)
+  landingType     String    @map("landing_type") @db.VarChar(50)
+  /// 랜딩 파라미터 (JSON: { day: 7 }, { missionType: 'FOOD' } 등)
+  landingParams   Json?     @map("landing_params")
+  /// 페르소나별 메시지 (JSON: { default: {...}, STELLA: {...}, ... })
+  messages        Json
+  /// 발송 시점 (AT_07, AT_18, ON_24H_ELAPSED 등)
+  sendTime        String    @map("send_time") @db.VarChar(50)
+  /// 발신자 타입 (BIOCOM | PERSONA)
+  senderType      String    @default("PERSONA") @map("sender_type") @db.VarChar(20)
+  /// 활성화 여부
+  isActive        Boolean   @default(true) @map("is_active")
+  /// 생성일시
+  createdAt       DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([conditionType])
+  @@index([sendTime])
+  @@index([isActive])
+  @@map("push_rules")
 }
 
 /// 앱 버전 관리 테이블
