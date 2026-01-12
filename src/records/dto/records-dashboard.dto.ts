@@ -328,3 +328,55 @@ export class UserRecordStatsListDto {
   @ApiProperty({ description: '전체 페이지 수' })
   totalPages: number;
 }
+
+/**
+ * 기록 Row 아이템 (단순 조회용)
+ */
+export class RecordRowItemDto {
+  @ApiProperty({ description: '기록 ID' })
+  id: number;
+
+  @ApiProperty({ description: '사용자 ID' })
+  userId: number;
+
+  @ApiProperty({ description: '사용자 이름' })
+  userName: string;
+
+  @ApiProperty({ description: '사용자 이메일' })
+  userEmail: string;
+
+  @ApiProperty({ description: '기록 유형' })
+  recordType: string;
+
+  @ApiProperty({ description: '기록 유형 라벨' })
+  recordTypeLabel: string;
+
+  @ApiProperty({ description: '기록 날짜' })
+  date: string;
+
+  @ApiProperty({ description: '메타데이터' })
+  metadata: any;
+
+  @ApiProperty({ description: '생성일' })
+  createdAt: string;
+}
+
+/**
+ * 기록 Row 목록 응답
+ */
+export class RecordRowListDto {
+  @ApiProperty({ description: '기록 목록', type: [RecordRowItemDto] })
+  records: RecordRowItemDto[];
+
+  @ApiProperty({ description: '전체 수' })
+  total: number;
+
+  @ApiProperty({ description: '페이지' })
+  page: number;
+
+  @ApiProperty({ description: '페이지당 수' })
+  limit: number;
+
+  @ApiProperty({ description: '전체 페이지 수' })
+  totalPages: number;
+}

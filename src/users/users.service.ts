@@ -33,6 +33,7 @@ export class UsersService {
       sex,
       ageGroup,
       hasBillingKey,
+      excludeTesters = false,
     } = query;
 
     const offset = (page - 1) * limit;
@@ -139,6 +140,11 @@ export class UsersService {
       }
     }
 
+    // 테스터 제외 필터
+    if (excludeTesters) {
+      where.isTester = false;
+    }
+
     // 정렬 설정
     let orderBy: any;
     if (sortBy === 'orderCount') {
@@ -206,7 +212,7 @@ export class UsersService {
         id: user.id,
         email: user.email,
         name: user.decryptedName,
-        mobile: CryptoUtil.decryptDeterministic(user.mobile),
+        mobile: user.mobile,
         points: user.points,
         status: user.status,
         role: user.role,
@@ -281,12 +287,12 @@ export class UsersService {
       take: limit,
     });
 
-    // 응답 형식 변환 (이름/휴대폰 복호화)
+    // 응답 형식 변환 (Prisma Extension에서 자동 복호화됨)
     const userList = users.map(user => ({
       id: user.id,
       email: user.email,
-      name: CryptoUtil.decrypt(user.name),
-      mobile: CryptoUtil.decryptDeterministic(user.mobile),
+      name: user.name,
+      mobile: user.mobile,
       points: user.points,
       status: user.status,
       role: user.role,
@@ -332,6 +338,7 @@ export class UsersService {
         status: true,
         role: true,
         isActive: true,
+        isTester: true,
         birthDate: true,
         sex: true,
         telecom: true,
@@ -408,11 +415,15 @@ export class UsersService {
                     id: true,
                     name: true,
                     price: true,
-                    images: {
+                    productFiles: {
                       where: { imageType: 'MAIN' },
                       take: 1,
                       select: {
-                        imageUrl: true,
+                        file: {
+                          select: {
+                            filePath: true,
+                          },
+                        },
                       },
                     },
                   },
@@ -460,7 +471,7 @@ export class UsersService {
         id: item.product.id,
         name: item.product.name,
         price: Number(item.product.price),
-        thumbnailUrl: item.product.images?.[0]?.imageUrl || null,
+        thumbnailUrl: item.product.productFiles?.[0]?.file?.filePath || null,
       },
       subtotal: Number(item.product.price) * item.quantity,
       stockAvailable: item.stockAvailable,
@@ -472,12 +483,13 @@ export class UsersService {
     return {
       id: user.id,
       email: user.email,
-      name: CryptoUtil.decrypt(user.name),
-      mobile: CryptoUtil.decryptDeterministic(user.mobile),
+      name: user.name,
+      mobile: user.mobile,
       points: user.points,
       status: user.status,
       role: user.role,
       isActive: user.isActive,
+      isTester: user.isTester,
       birthDate: user.birthDate,
       sex: user.sex,
       telecom: user.telecom,
@@ -526,7 +538,7 @@ export class UsersService {
   /**
    * 사용자 통계 조회
    */
-  async getStats() {
+  async getStats(excludeTesters: boolean = false) {
     const now = getNowKST();
     const todayStart = new Date(now.getTime());
     todayStart.setUTCHours(0, 0, 0, 0);
@@ -536,6 +548,9 @@ export class UsersService {
 
     const monthStart = new Date(now);
     monthStart.setMonth(monthStart.getMonth() - 1);
+
+    // 테스터 제외 조건
+    const testerCondition = excludeTesters ? { isTester: false } : {};
 
     const [
       totalUsers,
@@ -547,16 +562,16 @@ export class UsersService {
       newUsersThisMonth,
       usersByStatus,
     ] = await Promise.all([
-      this.prisma.user.count({ where: { deletedAt: null } }),
-      this.prisma.user.count({ where: { deletedAt: null, isActive: true } }),
-      this.prisma.user.count({ where: { deletedAt: null, isActive: false } }),
-      this.prisma.user.count({ where: { deletedAt: { not: null } } }),
-      this.prisma.user.count({ where: { createdAt: { gte: todayStart } } }),
-      this.prisma.user.count({ where: { createdAt: { gte: weekStart } } }),
-      this.prisma.user.count({ where: { createdAt: { gte: monthStart } } }),
+      this.prisma.user.count({ where: { deletedAt: null, ...testerCondition } }),
+      this.prisma.user.count({ where: { deletedAt: null, isActive: true, ...testerCondition } }),
+      this.prisma.user.count({ where: { deletedAt: null, isActive: false, ...testerCondition } }),
+      this.prisma.user.count({ where: { deletedAt: { not: null }, ...testerCondition } }),
+      this.prisma.user.count({ where: { createdAt: { gte: todayStart }, ...testerCondition } }),
+      this.prisma.user.count({ where: { createdAt: { gte: weekStart }, ...testerCondition } }),
+      this.prisma.user.count({ where: { createdAt: { gte: monthStart }, ...testerCondition } }),
       this.prisma.user.groupBy({
         by: ['status'],
-        where: { deletedAt: null },
+        where: { deletedAt: null, ...testerCondition },
         _count: true,
       }),
     ]);
@@ -642,6 +657,7 @@ export class UsersService {
     status?: string;
     isActive?: boolean;
     points?: number;
+    isTester?: boolean;
   }) {
     const existingUser = await this.prisma.user.findUnique({
       where: { id },
@@ -746,13 +762,16 @@ export class UsersService {
    * - 전화번호: 결정론적 암호화로 정확히 매칭
    * - 이름: 모든 사용자를 가져와서 복호화 후 필터링 (GCM 암호화는 검색 불가)
    */
-  async searchUsers(keyword: string, limit: number = 20) {
+  async searchUsers(keyword: string, limit: number = 20, excludeTesters: boolean = false) {
     if (!keyword || keyword.trim().length < 1) {
       return [];
     }
 
     const searchKeyword = keyword.trim();
     const results: any[] = [];
+
+    // 테스터 제외 조건
+    const testerCondition = excludeTesters ? { isTester: false } : {};
 
     // 전화번호 형식인지 확인 (숫자만 있거나 010으로 시작하는 경우)
     const isPhoneNumber = /^[0-9-]+$/.test(searchKeyword);
@@ -766,6 +785,7 @@ export class UsersService {
         where: {
           mobile: normalizedPhone,
           deletedAt: null,
+          ...testerCondition,
         },
         select: {
           id: true,
@@ -787,8 +807,8 @@ export class UsersService {
       for (const user of users) {
         results.push({
           id: user.id,
-          name: CryptoUtil.decrypt(user.name),
-          mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
+          name: user.name,
+          mobile: this.formatPhoneNumber(user.mobile),
           status: user.status,
           pushEnabled: user.pushEnabled,
           hasPushToken: user._count.pushTokens > 0,
@@ -800,6 +820,7 @@ export class UsersService {
       const users = await this.prisma.user.findMany({
         where: {
           deletedAt: null,
+          ...testerCondition,
         },
         select: {
           id: true,
@@ -820,12 +841,11 @@ export class UsersService {
       });
 
       for (const user of users) {
-        const decryptedName = CryptoUtil.decrypt(user.name);
-        if (decryptedName && decryptedName.includes(searchKeyword)) {
+        if (user.name && user.name.includes(searchKeyword)) {
           results.push({
             id: user.id,
-            name: decryptedName,
-            mobile: this.formatPhoneNumber(CryptoUtil.decryptDeterministic(user.mobile)),
+            name: user.name,
+            mobile: this.formatPhoneNumber(user.mobile),
             status: user.status,
             pushEnabled: user.pushEnabled,
             hasPushToken: user._count.pushTokens > 0,

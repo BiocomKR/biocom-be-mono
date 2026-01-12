@@ -279,10 +279,61 @@ export class MissionService {
         }
       }
 
+      // 허용된 필드만 추출 (스키마에 없는 필드 제거)
+      const {
+        name,
+        description,
+        points,
+        requireUpload,
+        sortOrder,
+        category,
+        type,
+        recordType,
+        dailyLimit,
+        dailyTimeLimitMinutes,
+        specificDay,
+        totalDays,
+        uploadType,
+        isActive,
+        visibleFromDay,
+        visibleToDay,
+        recordableFromDay,
+        recordableToDay,
+        visibleAfterSettings,
+        allowedUserTypes,
+        recordableUserTypes,
+        prerequisiteMissionId,
+        maxPointsPerDay,
+        frequency,
+      } = data;
+
       const mission = await this.prisma.mission.update({
         where: { id },
         data: {
-          ...data,
+          name,
+          description,
+          points,
+          requireUpload,
+          sortOrder,
+          category,
+          type,
+          recordType,
+          dailyLimit,
+          dailyTimeLimitMinutes,
+          specificDay,
+          totalDays,
+          uploadType,
+          isActive,
+          visibleFromDay,
+          visibleToDay,
+          recordableFromDay,
+          recordableToDay,
+          visibleAfterSettings,
+          allowedUserTypes,
+          recordableUserTypes,
+          prerequisiteMissionId,
+          maxPointsPerDay,
+          frequency,
           updatedAt: getNowKST()
         }
       });

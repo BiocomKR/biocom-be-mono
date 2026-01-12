@@ -108,4 +108,10 @@ export class UserQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   hasBillingKey?: boolean;
+
+  @ApiPropertyOptional({ description: '테스터 제외 여부', default: false })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  excludeTesters?: boolean = false;
 }
