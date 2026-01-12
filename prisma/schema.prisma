@@ -10,19 +10,19 @@ datasource db {
 /// 탈퇴 회원 정보 테이블
 /// 개인정보보호법 준수를 위해 탈퇴 회원 정보를 별도 보관
 model WithdrawnUser {
-  id           Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   /// 원본 사용자 ID (추적용)
-  userId       Int       @map("user_id")
+  userId      Int      @map("user_id")
   /// 이름 (암호화된 상태로 이관)
-  name         String
+  name        String
   /// 휴대폰 번호 (암호화된 상태로 이관)
-  mobile       String
+  mobile      String
   /// 탈퇴 사유 (선택)
-  reason       String?
+  reason      String?
   /// 탈퇴 일시
-  withdrawnAt  DateTime  @map("withdrawn_at")
+  withdrawnAt DateTime @map("withdrawn_at")
   /// 생성 일시
-  createdAt    DateTime  @default(now()) @map("created_at")
+  createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([withdrawnAt])
@@ -780,7 +780,6 @@ model Product {
   orderItems                   OrderItem[]
   feedback                     ProductFeedback[]
   productFiles                 ProductFile[]
-  images                       ProductImage[]
   lineup                       ProductLineup?                 @relation(fields: [lineupId], references: [id])
   recentlyViewed               RecentlyViewed[]
   supplementNutrients          SupplementNutrient[]
@@ -794,28 +793,6 @@ model Product {
   @@index([categoryCode, status])
   @@index([lineupId])
   @@map("products")
-}
-
-/// 상품 이미지 테이블
-/// 상품 이미지 관리
-model ProductImage {
-  id        Int      @id @default(autoincrement())
-  /// 상품 ID
-  productId Int      @map("product_id")
-  /// 이미지 전체 URL
-  imageUrl  String   @map("image_url") @db.VarChar(500)
-  /// 이미지 타입 (MAIN: 대표, SUB: 추가, DETAIL: 상세)
-  imageType String   @default("SUB") @map("image_type") @db.VarChar(20)
-  /// 정렬 순서
-  sortOrder Int      @default(0) @map("sort_order")
-  /// 대체 텍스트
-  altText   String?  @map("alt_text") @db.VarChar(200)
-  /// 생성일시
-  createdAt DateTime @map("created_at")
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@index([productId, sortOrder])
-  @@map("product_images")
 }
 
 /// 상품 파일 관계 테이블
@@ -2017,51 +1994,51 @@ model Subscription {
 /// 모든 푸시 서비스(FCM, OneSignal, APNs 등)의 토큰 관리
 model PushToken {
   /// 고유 ID
-  id               Int                   @id @default(autoincrement())
+  id            Int                   @id @default(autoincrement())
   /// 유저 ID
-  userId           Int                   @map("user_id")
+  userId        Int                   @map("user_id")
   /// 푸시 서비스 제공자 (FCM, ONESIGNAL, APNS 등)
-  provider         String                @db.VarChar(20)
+  provider      String                @db.VarChar(20)
   /// 디바이스 고유 ID
-  deviceId         String?               @map("device_id") @db.VarChar(255)
+  deviceId      String?               @map("device_id") @db.VarChar(255)
   /// 플랫폼 (ios, android, web)
-  platform         String?               @db.VarChar(20)
+  platform      String?               @db.VarChar(20)
   /// 디바이스 모델명
-  deviceModel      String?               @map("device_model") @db.VarChar(100)
+  deviceModel   String?               @map("device_model") @db.VarChar(100)
   /// OS 버전
-  osVersion        String?               @map("os_version") @db.VarChar(50)
+  osVersion     String?               @map("os_version") @db.VarChar(50)
   /// 앱 버전
-  appVersion       String?               @map("app_version") @db.VarChar(50)
+  appVersion    String?               @map("app_version") @db.VarChar(50)
   /// 활성화 여부
-  isActive         Boolean               @default(true) @map("is_active")
+  isActive      Boolean               @default(true) @map("is_active")
   /// 토큰 무효화 시간
-  invalidatedAt    DateTime?             @map("invalidated_at")
+  invalidatedAt DateTime?             @map("invalidated_at")
   /// 무효화 이유
-  invalidReason    String?               @map("invalid_reason") @db.VarChar(100)
+  invalidReason String?               @map("invalid_reason") @db.VarChar(100)
   /// 마지막 사용 시간 (발송 성공)
-  lastUsedAt       DateTime?             @map("last_used_at")
+  lastUsedAt    DateTime?             @map("last_used_at")
   /// 마지막 실패 시간
-  lastFailedAt     DateTime?             @map("last_failed_at")
+  lastFailedAt  DateTime?             @map("last_failed_at")
   /// 연속 실패 횟수
-  failureCount     Int                   @default(0) @map("failure_count")
+  failureCount  Int                   @default(0) @map("failure_count")
   /// 총 성공 횟수
-  successCount     Int                   @default(0) @map("success_count")
+  successCount  Int                   @default(0) @map("success_count")
   /// User Agent
-  userAgent        String?               @map("user_agent") @db.VarChar(500)
+  userAgent     String?               @map("user_agent") @db.VarChar(500)
   /// IP 주소
-  ipAddress        String?               @map("ip_address") @db.VarChar(45)
+  ipAddress     String?               @map("ip_address") @db.VarChar(45)
   /// 타임존
-  timezone         String?               @default("Asia/Seoul") @db.VarChar(50)
+  timezone      String?               @default("Asia/Seoul") @db.VarChar(50)
   /// 생성일시
-  createdAt        DateTime              @default(now()) @map("created_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt        DateTime?             @updatedAt @map("updated_at")
+  updatedAt     DateTime?             @updatedAt @map("updated_at")
   /// 푸시 토큰 (필수)
-  token            String                @db.VarChar(255)
+  token         String                @db.VarChar(255)
   /// 메타데이터 (선택적 부가 정보)
-  metadata         Json?
-  logs             PushNotificationLog[]
-  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metadata      Json?
+  logs          PushNotificationLog[]
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deviceId, provider])
   @@index([userId])
@@ -2303,16 +2280,16 @@ model Consent {
 
 /// 사용자 약관 동의 내역
 model UserConsent {
-  id        Int      @id @default(autoincrement())
-  userId    Int      @map("user_id")
-  agreedAt  DateTime @map("agreed_at") @db.Timestamp(6)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  agreedAt  DateTime  @map("agreed_at") @db.Timestamp(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   /// 수정일시
   updatedAt DateTime? @map("updated_at") @db.Timestamp(6)
-  consentId Int      @map("consent_id")
-  isAgreed  Boolean  @map("is_agreed")
-  consent   Consent  @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
-  user      User     @relation(fields: [userId], references: [id], map: "fk_user_consents_user_id")
+  consentId Int       @map("consent_id")
+  isAgreed  Boolean   @map("is_agreed")
+  consent   Consent   @relation(fields: [consentId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_consents_consent_id")
+  user      User      @relation(fields: [userId], references: [id], map: "fk_user_consents_user_id")
 
   @@unique([userId, consentId], map: "user_consents_user_id_consent_id_unique")
   @@index([userId], map: "idx_user_consents_user_id")
@@ -3042,7 +3019,6 @@ model ProductLineup {
   @@map("product_lineups")
 }
 
-
 model ingredient_order_templates {
   id               Int      @id @default(autoincrement())
   template_key     String   @unique @db.VarChar(50)
@@ -3112,12 +3088,12 @@ enum MenuCode {
 
 /// RAG용 도메인 지식 임베딩 테이블
 model DomainKnowledgeEmbedding {
-  id        Int       @id @default(autoincrement())
+  id        Int                         @id @default(autoincrement())
   content   String
   metadata  Json?
   embedding Unsupported("vector(1536)")
-  createdAt DateTime? @default(now()) @map("created_at")
-  updatedAt DateTime? @map("updated_at")
+  createdAt DateTime?                   @default(now()) @map("created_at")
+  updatedAt DateTime?                   @map("updated_at")
 
   @@map("domain_knowledge_embeddings")
 }
