@@ -19,7 +19,7 @@ export class DeepReportController {
    * 심층리포트 목록 조회
    * 사용자의 전체 심층리포트 목록을 최신순으로 조회
    */
-  @Get('reports')
+  @Get('reports/v2')
   @ApiOperation({
     summary: '심층리포트 목록 조회',
     description: '사용자의 전체 심층리포트 목록을 최신순으로 조회합니다. N주차는 챌린지 시작일 기준으로 계산됩니다.',
@@ -37,8 +37,9 @@ export class DeepReportController {
    * 지난주 심층리포트 조회
    * 지난주(월~일) 범위의 심층리포트를 조회
    * 데이터가 없으면 data: null 반환
+   * /last-week 추후에 붙일 path
    */
-  @Get('reports/last-week')
+  @Get('reports')
   @ApiOperation({
     summary: '지난주 심층리포트 조회',
     description: '지난주(월~일) 범위의 심층리포트를 조회합니다. 데이터가 없으면 data: null을 반환합니다.',
@@ -56,7 +57,7 @@ export class DeepReportController {
    * 심층리포트 상세 조회
    * ID로 특정 심층리포트를 조회 (읽음 처리 포함)
    */
-  @Get('reports/:id')
+  @Get('reports/v2/:id')
   @ApiOperation({
     summary: '심층리포트 상세 조회',
     description: 'ID로 특정 심층리포트를 조회합니다. 조회 시 읽음 처리됩니다.',
