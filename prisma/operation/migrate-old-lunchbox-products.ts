@@ -95,14 +95,14 @@ async function main() {
   console.log('\n📝 Step 2: 참조 테이블의 product_id 교체');
 
   for (const mapping of PRODUCT_MAPPING) {
-    // product_images
-    const imgResult = await prisma.productImage.updateMany({
-      where: { productId: mapping.oldId },
-      data: { productId: mapping.newId },
-    });
-    if (imgResult.count > 0) {
-      console.log(`  ✅ product_images: ${mapping.oldId} → ${mapping.newId} (${imgResult.count}건)`);
-    }
+    // product_images (ProductImage 모델 삭제됨 - ProductFile로 대체)
+    // const imgResult = await prisma.productImage.updateMany({
+    //   where: { productId: mapping.oldId },
+    //   data: { productId: mapping.newId },
+    // });
+    // if (imgResult.count > 0) {
+    //   console.log(`  ✅ product_images: ${mapping.oldId} → ${mapping.newId} (${imgResult.count}건)`);
+    // }
 
     // product_files
     const fileResult = await prisma.productFile.updateMany({
@@ -148,9 +148,10 @@ async function main() {
   console.log(`  삭제 대상 ID: ${mappedOldIds.join(', ')}`);
 
   // 먼저 관련 데이터 삭제 (FK 제약) - 이미 이동했지만 혹시 남아있을 수 있음
-  await prisma.productImage.deleteMany({
-    where: { productId: { in: mappedOldIds } },
-  });
+  // ProductImage 모델 삭제됨 - ProductFile로 대체
+  // await prisma.productImage.deleteMany({
+  //   where: { productId: { in: mappedOldIds } },
+  // });
   await prisma.productFile.deleteMany({
     where: { productId: { in: mappedOldIds } },
   });

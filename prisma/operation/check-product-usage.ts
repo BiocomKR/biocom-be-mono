@@ -43,9 +43,9 @@ async function main() {
   const pfile = await prisma.productFile.count({ where: { productId } });
   if (pfile > 0) console.log(`ProductFile: ${pfile}건`);
 
-  // ProductImage
-  const pimg = await prisma.productImage.count({ where: { productId } });
-  if (pimg > 0) console.log(`ProductImage: ${pimg}건`);
+  // ProductImage (모델 삭제됨 - ProductFile로 대체)
+  // const pimg = await prisma.productImage.count({ where: { productId } });
+  // if (pimg > 0) console.log(`ProductImage: ${pimg}건`);
 
   // Subscription
   const sub = await prisma.subscription.count({ where: { productId } });

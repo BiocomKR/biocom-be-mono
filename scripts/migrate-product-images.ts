@@ -1,5 +1,8 @@
 /**
- * product_images → files + product_files 마이그레이션 스크립트
+ * [DEPRECATED] product_images → files + product_files 마이그레이션 스크립트
+ *
+ * ProductImage 모델이 삭제되어 이 스크립트는 더 이상 사용되지 않습니다.
+ * 마이그레이션이 이미 완료되었습니다.
  *
  * 1. imweb URL에서 파일 다운로드
  * 2. GCS 버킷에 업로드 (products/{hash}.{ext} 형태)
@@ -8,6 +11,12 @@
  *
  * 실행: npx ts-node scripts/migrate-product-images.ts
  */
+
+console.log('⚠️ 이 스크립트는 더 이상 사용되지 않습니다. ProductImage 모델이 삭제되었습니다.');
+process.exit(0);
+
+/* eslint-disable */
+// @ts-nocheck - ProductImage 모델 삭제로 인해 타입 에러 무시
 
 import { PrismaClient } from '@prisma/client';
 import { Storage } from '@google-cloud/storage';

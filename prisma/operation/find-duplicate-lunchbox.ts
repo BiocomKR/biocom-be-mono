@@ -102,13 +102,14 @@ async function main() {
     const orderItems = await prisma.orderItem.count({ where: { productId: { in: oldIds } } });
     const cartItems = await prisma.cartItem.count({ where: { productId: { in: oldIds } } });
     const animalProducts = await prisma.healthTypeAnimalProduct.count({ where: { productId: { in: oldIds } } });
-    const productImages = await prisma.productImage.count({ where: { productId: { in: oldIds } } });
+    // ProductImage 모델 삭제됨 - ProductFile로 대체
+    // const productImages = await prisma.productImage.count({ where: { productId: { in: oldIds } } });
     const productFiles = await prisma.productFile.count({ where: { productId: { in: oldIds } } });
 
     console.log(`\n   order_items: ${orderItems}건`);
     console.log(`   cart_items: ${cartItems}건`);
     console.log(`   health_type_animal_products: ${animalProducts}건`);
-    console.log(`   product_images: ${productImages}건`);
+    // console.log(`   product_images: ${productImages}건`);
     console.log(`   product_files: ${productFiles}건`);
 
     if (orderItems > 0 || cartItems > 0 || animalProducts > 0) {

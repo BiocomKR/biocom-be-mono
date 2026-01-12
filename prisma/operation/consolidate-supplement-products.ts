@@ -52,15 +52,15 @@ async function main() {
       console.log(`  ✅ cart_items: ${cartItemsUpdated.count}건 이전`);
     }
 
-    // 4. product_images 이전 (기존 keepId 이미지 삭제 후 이전)
-    await prisma.productImage.deleteMany({ where: { productId: pair.keepId } });
-    const imagesUpdated = await prisma.productImage.updateMany({
-      where: { productId: pair.deleteId },
-      data: { productId: pair.keepId },
-    });
-    if (imagesUpdated.count > 0) {
-      console.log(`  ✅ product_images: ${imagesUpdated.count}건 이전`);
-    }
+    // 4. product_images 이전 (ProductImage 모델 삭제됨 - ProductFile로 대체)
+    // await prisma.productImage.deleteMany({ where: { productId: pair.keepId } });
+    // const imagesUpdated = await prisma.productImage.updateMany({
+    //   where: { productId: pair.deleteId },
+    //   data: { productId: pair.keepId },
+    // });
+    // if (imagesUpdated.count > 0) {
+    //   console.log(`  ✅ product_images: ${imagesUpdated.count}건 이전`);
+    // }
 
     // 5. supplement_nutrients 이전 (기존 keepId 영양정보 삭제 후 이전)
     await prisma.supplementNutrient.deleteMany({ where: { productId: pair.keepId } });

@@ -62,12 +62,13 @@ async function main() {
     }
   }
 
-  // 4. product_images
-  console.log('\n=== 4. product_images ===');
-  const productImages = await prisma.productImage.findMany({
-    where: { productId: { in: OLD_IDS } },
-  });
-  console.log(`  총 ${productImages.length}건`);
+  // 4. product_images (ProductImage 모델 삭제됨 - ProductFile로 대체)
+  // console.log('\n=== 4. product_images ===');
+  // const productImages = await prisma.productImage.findMany({
+  //   where: { productId: { in: OLD_IDS } },
+  // });
+  // console.log(`  총 ${productImages.length}건`);
+  const productImages = { length: 0 }; // 호환성 유지
 
   // 5. product_files
   console.log('\n=== 5. product_files ===');
