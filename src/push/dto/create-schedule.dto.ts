@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength, IsArray, IsInt } from 'class-validator';
 import { PushScheduleType, PushCategory } from '../enums';
 
 /**
@@ -110,4 +110,79 @@ export class CreateScheduleDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: '테스트 모드 여부 (true면 testUserIds에게만 발송)',
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isTest?: boolean;
+
+  @ApiPropertyOptional({
+    description: '테스트 대상 유저 ID 배열',
+    example: [1, 2, 3],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  testUserIds?: number[];
+
+  // =====================================================
+  // 조건 기반 발송 필드
+  // =====================================================
+
+  @ApiPropertyOptional({
+    description: '조건 타입 (CHALLENGE_DAY, NO_ACCESS_HOURS 등)',
+    example: 'CHALLENGE_DAY',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  conditionType?: string;
+
+  @ApiPropertyOptional({
+    description: '조건 파라미터 (JSON)',
+    example: { day: 7 },
+  })
+  @IsOptional()
+  @IsObject()
+  conditionParams?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: '랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)',
+    example: 'LECTURE',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  landingType?: string;
+
+  @ApiPropertyOptional({
+    description: '랜딩 파라미터 (JSON)',
+    example: { day: 7 },
+  })
+  @IsOptional()
+  @IsObject()
+  landingParams?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: '페르소나별 메시지 (JSON)',
+    example: {
+      default: { title: '알림', body: '메시지 본문' },
+      STELLA: { title: '스텔라 알림', body: '스텔라 본문' },
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  personaMessages?: Record<string, { title: string; body: string }>;
+
+  @ApiPropertyOptional({
+    description: '발신자 타입 (BIOCOM | PERSONA)',
+    example: 'PERSONA',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  senderType?: string;
 }
