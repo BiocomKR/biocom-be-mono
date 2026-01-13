@@ -2101,6 +2101,10 @@ model PushNotificationSchedule {
   endDate            DateTime?                  @map("end_date")
   /// 활성화 여부
   isActive           Boolean                    @default(true) @map("is_active")
+  /// 테스트 모드 여부 (true면 testUserIds에게만 발송)
+  isTest             Boolean                    @default(true) @map("is_test")
+  /// 테스트 대상 유저 ID 배열 (빈 배열이면 발송 안 함)
+  testUserIds        Int[]                      @default([]) @map("test_user_ids")
   /// 마지막 실행 시간
   lastExecutedAt     DateTime?                  @map("last_executed_at")
   /// 다음 실행 예정 시간
@@ -2122,6 +2126,7 @@ model PushNotificationSchedule {
   @@index([nextExecutionAt])
   @@index([startDate, endDate])
   @@index([conditionType])
+  @@index([isTest])
   @@map("push_notification_schedules")
 }
 
