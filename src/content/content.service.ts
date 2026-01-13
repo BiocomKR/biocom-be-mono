@@ -223,13 +223,12 @@ export class ContentService {
     const points = data.points ? Number(data.points) : 0;
     const challengeId = data.challengeId ? Number(data.challengeId) : null;
 
-    // 파일 업로드 먼저 처리 (트랜잭션 외부)
-    const fileIds: number[] = [];
+    // 파일 업로드 먼저 처리 (트랜잭션 외부, 병렬 처리)
+    let fileIds: number[] = [];
     if (files && files.length > 0) {
-      for (const file of files) {
-        const fileId = await this.uploadAndSaveFile(file);
-        fileIds.push(fileId);
-      }
+      fileIds = await Promise.all(
+        files.map(file => this.uploadAndSaveFile(file))
+      );
     }
 
     const content = await this.prisma.$transaction(async (tx) => {
@@ -314,13 +313,12 @@ export class ContentService {
       }
     }
 
-    // 새 파일 업로드 처리 (트랜잭션 외부)
-    const newFileIds: number[] = [];
+    // 새 파일 업로드 처리 (트랜잭션 외부, 병렬 처리)
+    let newFileIds: number[] = [];
     if (files && files.length > 0) {
-      for (const file of files) {
-        const fileId = await this.uploadAndSaveFile(file);
-        newFileIds.push(fileId);
-      }
+      newFileIds = await Promise.all(
+        files.map(file => this.uploadAndSaveFile(file))
+      );
     }
 
     // 기존 파일의 최대 sortOrder 구하기

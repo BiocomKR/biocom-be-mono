@@ -342,13 +342,12 @@ export class ShopService {
       fileIdsToDelete = productFilesToDelete.map(pf => pf.fileId);
     }
 
-    // 새 파일 업로드 (트랜잭션 외부)
-    const newFileIds: number[] = [];
+    // 새 파일 업로드 (트랜잭션 외부, 병렬 처리)
+    let newFileIds: number[] = [];
     if (files && files.length > 0) {
-      for (const file of files) {
-        const fileId = await this.uploadAndSaveFile(file);
-        newFileIds.push(fileId);
-      }
+      newFileIds = await Promise.all(
+        files.map(file => this.uploadAndSaveFile(file))
+      );
     }
 
     // 기존 파일의 최대 sortOrder 구하기
