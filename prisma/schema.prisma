@@ -66,6 +66,8 @@ model User {
   nightPushEnabled             Boolean                        @default(true) @map("night_push_enabled")
   /// 테스터 여부 (통계/기록에서 제외)
   isTester                     Boolean                        @default(false) @map("is_tester")
+  /// 마지막 접속 시간 (미접속 조건 푸시용)
+  lastSeenAt                   DateTime?                      @map("last_seen_at")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
