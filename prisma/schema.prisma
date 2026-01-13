@@ -101,6 +101,7 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
+  notificationInbox            NotificationInbox[]
 
   @@map("users")
 }
@@ -2244,6 +2245,41 @@ model PushNotificationLog {
   @@index([pushCode])
   @@index([userId], map: "idx_push_notification_logs_user_id")
   @@map("push_notification_logs")
+}
+
+/// 알림함 테이블
+/// 앱 내에서 유저가 받은 푸시 알림 목록을 저장 (인앱 알림함)
+model NotificationInbox {
+  /// 고유 ID
+  id          Int       @id @default(autoincrement())
+  /// 유저 ID
+  userId      Int       @map("user_id")
+  /// 제목
+  title       String    @db.VarChar(200)
+  /// 본문
+  body        String    @db.Text
+  /// 이미지 URL
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
+  /// 푸시 타입 (REMIND, MARKETING 등)
+  type        String?   @db.VarChar(50)
+  /// 추가 데이터 (랜딩 정보 등)
+  data        Json?
+  /// 읽음 여부
+  isRead      Boolean   @default(false) @map("is_read")
+  /// 읽은 시간
+  readAt      DateTime? @map("read_at")
+  /// 삭제 여부 (soft delete)
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  /// 삭제 시간
+  deletedAt   DateTime? @map("deleted_at")
+  /// 생성일시
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, isDeleted])
+  @@index([userId, createdAt])
+  @@map("notification_inbox")
 }
 
 model SupplementNutrient {
