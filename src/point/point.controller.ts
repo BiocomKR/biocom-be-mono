@@ -6,6 +6,7 @@ import { PointService } from './point.service';
 import { ExcelService } from '../common/services/excel.service';
 import { getNowKST } from '../common/utils/kst-date.util';
 import * as dayjs from 'dayjs';
+import * as ExcelJS from 'exceljs';
 
 /**
  * 백오피스 포인트 관리 컨트롤러
@@ -69,6 +70,7 @@ export class PointController {
 
   /**
    * 유저별 포인트 통계 엑셀 다운로드 (개요 + 일별포인트 + 유저별합계)
+   * 개요 시트에 엑셀 수식 포함
    */
   @Get('stats/excel')
   async downloadStatsExcel(
@@ -92,115 +94,165 @@ export class PointController {
       .sort((a, b) => a - b);
 
     const totalDays = stats.dates.length;
-    const maxPointsPerDay = 1300;
-    // 1인당 최대 획득 포인트 = 1300 + (일수 * 1300)
-    const maxPointsPerChallenge = 1300 + (totalDays * maxPointsPerDay);
     const totalUsers = userIds.length;
-    const maxPossiblePoints = maxPointsPerChallenge * totalUsers;
-    const { totalEarned, totalDietExcess, adjustedTotal } = stats.summary;
-    // 포인트 지급률 = (총 지급 포인트 - 초과 지급 포인트) / 최대 지급 포인트
-    const paymentRate = maxPossiblePoints > 0 ? (((totalEarned - totalDietExcess) / maxPossiblePoints) * 100).toFixed(2) : '0';
+    const { totalDietExcess, totalEarned } = stats.summary;
 
-    // 1. 개요 시트 데이터 (요약 + 빈 행 + 일별 총액)
-    const overviewData: { item: string; value: number | string }[] = [
-      { item: '1인당 최대 획득 포인트', value: maxPointsPerChallenge },
-      { item: `${totalUsers}인 최대 획득 포인트`, value: maxPossiblePoints },
-      { item: '실 지급 포인트', value: totalEarned },
-      { item: '초과 지급 포인트', value: totalDietExcess },
-      { item: '포인트 지급률 (%)', value: parseFloat(paymentRate) },
-      { item: '', value: '' }, // 빈 행
-      { item: '일자', value: '총 지급 포인트' }, // 헤더
+    // 워크북 생성
+    const workbook = new ExcelJS.Workbook();
+
+    // ========== 1. 개요 시트 (수식 포함) ==========
+    const overviewSheet = workbook.addWorksheet('개요');
+    overviewSheet.columns = [
+      { header: '항목', key: 'item', width: 25 },
+      { header: '값', key: 'value', width: 20 },
     ];
+
+    // 일별 총액 시작 행 (8행부터)
+    const dailyStartRow = 8;
+    const dailyEndRow = dailyStartRow + totalDays - 1;
+
+    // 데이터 행 추가
+    overviewSheet.addRow({ item: '1인당 최대 획득 포인트', value: null }); // 행2
+    overviewSheet.addRow({ item: `${totalUsers}인 최대 획득 포인트`, value: null }); // 행3
+    overviewSheet.addRow({ item: '실 지급 포인트', value: null }); // 행4
+    overviewSheet.addRow({ item: '초과 지급 포인트', value: totalDietExcess }); // 행5 (하드코딩)
+    overviewSheet.addRow({ item: '포인트 지급률 (%)', value: null }); // 행6
+    overviewSheet.addRow({ item: '', value: '' }); // 빈 행7
+    overviewSheet.addRow({ item: '일자', value: '총 지급 포인트' }); // 헤더 행8
+
     // 일별 총액 추가
     for (const date of stats.dates) {
       let dayTotal = 0;
       for (const userId of userIds) {
         dayTotal += stats.dailyStats[date]?.[userId] || 0;
       }
-      overviewData.push({ item: date.substring(5), value: dayTotal });
+      overviewSheet.addRow({ item: date.substring(5), value: dayTotal });
     }
 
-    // 2. 일별포인트 시트 데이터
-    const dailyStatsData: Record<string, any>[] = [];
+    // 수식 적용
+    // B2: 1인당 최대 획득 포인트 = 1300 + 1300 * 날짜수
+    overviewSheet.getCell('B2').value = { formula: `1300+1300*${totalDays}` };
+    // B3: N인 최대 획득 포인트 = B2 * 인원수
+    overviewSheet.getCell('B3').value = { formula: `B2*${totalUsers}` };
+    // B4: 실 지급 포인트 = 일별 총액 합계 (B9:B끝)
+    overviewSheet.getCell('B4').value = { formula: `SUM(B${dailyStartRow + 1}:B${dailyEndRow + 1})` };
+    // B5: 초과 지급 포인트 (하드코딩)
+    // B6: 포인트 지급률 = (실 지급 - 초과 지급) / 최대 획득 * 100
+    overviewSheet.getCell('B6').value = { formula: `(B4-B5)/B3*100` };
+
+    // 숫자 서식 적용
+    overviewSheet.getCell('B2').numFmt = '₩#,##0';
+    overviewSheet.getCell('B3').numFmt = '₩#,##0';
+    overviewSheet.getCell('B4').numFmt = '₩#,##0';
+    overviewSheet.getCell('B5').numFmt = '₩#,##0';
+    overviewSheet.getCell('B6').numFmt = '0.00"%"';
+    for (let i = dailyStartRow + 1; i <= dailyEndRow + 1; i++) {
+      overviewSheet.getCell(`B${i}`).numFmt = '₩#,##0';
+    }
+
+    // 헤더 스타일
+    const headerRow = overviewSheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+    // ========== 2. 일별포인트 시트 ==========
+    const dailySheet = workbook.addWorksheet('일별포인트');
+    const dailyColumns = [
+      { header: 'user_id', key: 'odUserId', width: 10 },
+      { header: '이름', key: 'odName', width: 12 },
+      ...stats.dates.map((date) => ({ header: date.substring(5), key: date, width: 10 })),
+      { header: '합계', key: 'odTotal', width: 12 },
+    ];
+    dailySheet.columns = dailyColumns;
+
+    // 데이터 추가
     for (const userId of userIds) {
       const userData = stats.userStats[userId];
       const row: Record<string, any> = { odUserId: userId, odName: userData.name };
       let total = 0;
       for (const date of stats.dates) {
         const points = stats.dailyStats[date]?.[userId] || 0;
-        row[date] = points;
+        row[date] = points || '-';
         total += points;
       }
       row.odTotal = total;
-      dailyStatsData.push(row);
+      dailySheet.addRow(row);
     }
+
     // 합계 행
-    const totalRow: Record<string, any> = { odUserId: '', odName: '합계' };
+    const totalRowData: Record<string, any> = { odUserId: '', odName: '합계' };
     let grandTotal = 0;
     for (const date of stats.dates) {
       let dayTotal = 0;
       for (const userId of userIds) {
         dayTotal += stats.dailyStats[date]?.[userId] || 0;
       }
-      totalRow[date] = dayTotal;
+      totalRowData[date] = dayTotal;
       grandTotal += dayTotal;
     }
-    totalRow.odTotal = grandTotal;
-    dailyStatsData.push(totalRow);
+    totalRowData.odTotal = grandTotal;
+    dailySheet.addRow(totalRowData);
 
-    // 3. 유저별합계 시트 데이터
-    const userStatsData = userIds.map((userId) => {
+    // 숫자 서식 (0은 '-')
+    dailySheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        row.eachCell((cell, colNumber) => {
+          if (colNumber > 2 && typeof cell.value === 'number') {
+            cell.numFmt = '#,##0';
+          }
+        });
+      }
+    });
+
+    // 헤더 스타일
+    const dailyHeaderRow = dailySheet.getRow(1);
+    dailyHeaderRow.font = { bold: true };
+    dailyHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+    dailySheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // ========== 3. 유저별합계 시트 ==========
+    const userSheet = workbook.addWorksheet('유저별합계');
+    userSheet.columns = [
+      { header: 'user_id', key: 'userId', width: 10 },
+      { header: '이름', key: 'name', width: 12 },
+      { header: '획득 포인트', key: 'earnedPoints', width: 15 },
+      { header: '비고', key: 'note', width: 20 },
+    ];
+
+    for (const userId of userIds) {
       const data = stats.userStats[userId];
-      return {
+      userSheet.addRow({
         userId,
         name: data.name,
         earnedPoints: data.total,
-        note: data.excess > 0 ? `초과지급 -${data.excess}` : '',
-      };
-    });
-    userStatsData.push({ userId: '' as any, name: '합계', earnedPoints: totalEarned, note: '' });
+        note: data.excess > 0 ? `초과지급 -${data.excess.toLocaleString()}` : '',
+      });
+    }
+    // 합계 행
+    userSheet.addRow({ userId: '', name: '합계', earnedPoints: totalEarned, note: '' });
 
-    // 일별 컬럼 동적 생성
-    const dailyColumns = [
-      { header: 'user_id', key: 'odUserId', width: 10 },
-      { header: '이름', key: 'odName', width: 12 },
-      ...stats.dates.map((date) => ({
-        header: date.substring(5),
-        key: date,
-        width: 10,
-        formatter: (v: number) => (v > 0 ? v.toLocaleString() : '-'),
-      })),
-      { header: '합계', key: 'odTotal', width: 12, formatter: (v: number) => v.toLocaleString() },
-    ];
-
-    await this.excelService.downloadMultiSheetExcel(res, {
-      fileName: `포인트통계_${dayjs().format('YYYYMMDD_HHmmss')}`,
-      sheets: [
-        {
-          sheetName: '개요',
-          data: overviewData,
-          columns: [
-            { header: '항목', key: 'item', width: 25 },
-            { header: '값', key: 'value', width: 20 },
-          ],
-        },
-        {
-          sheetName: '일별포인트',
-          data: dailyStatsData,
-          columns: dailyColumns,
-        },
-        {
-          sheetName: '유저별합계',
-          data: userStatsData,
-          columns: [
-            { header: 'user_id', key: 'userId', width: 10 },
-            { header: '이름', key: 'name', width: 12 },
-            { header: '획득 포인트', key: 'earnedPoints', width: 15, formatter: (v: number) => v.toLocaleString() },
-            { header: '비고', key: 'note', width: 20 },
-          ],
-        },
-      ],
+    // 숫자 서식
+    userSheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const cell = row.getCell(3);
+        if (typeof cell.value === 'number') {
+          cell.numFmt = '#,##0';
+        }
+      }
     });
+
+    // 헤더 스타일
+    const userHeaderRow = userSheet.getRow(1);
+    userHeaderRow.font = { bold: true };
+    userHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+    userSheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // 응답 전송
+    const fileName = `포인트통계_${dayjs().format('YYYYMMDD_HHmmss')}`;
+    const encodedFileName = encodeURIComponent(fileName);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFileName}.xlsx`);
+    await workbook.xlsx.write(res);
   }
 
   /**
