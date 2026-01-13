@@ -11,10 +11,13 @@ import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
 import { PushSegmentService } from './services/push-segment.service';
 import { PushTemplateService } from './services/push-template.service';
+import { ConditionEvaluatorService } from './services/condition-evaluator.service';
+import { DryRunService } from './services/dry-run.service';
 import { PushCampaignController } from './push-campaign.controller';
 import { PushNotificationController } from './push-notification.controller';
 import { PushScheduleController } from './push-schedule.controller';
 import { PushPersonalizedController } from './push-personalized.controller';
+import { PushDryRunController } from './push-dry-run.controller';
 import { PrismaService } from '../common/services/prisma.service';
 
 /**
@@ -37,6 +40,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushNotificationController,
     PushScheduleController,
     PushPersonalizedController,
+    PushDryRunController,
   ],
   providers: [
     // 푸시 Provider DI 토큰 설정 (FCM → OneSignal 등 교체 용이)
@@ -53,6 +57,8 @@ import { PrismaService } from '../common/services/prisma.service';
     PushSchedulerService,
     PushSegmentService,
     PushTemplateService,
+    ConditionEvaluatorService,
+    DryRunService,
     PrismaService,
   ],
   exports: [

@@ -26,6 +26,12 @@ export enum ChallengeTicketStatus {
  */
 export enum UserChallengeStatus {
   /**
+   * 대기 중
+   * - 챌린지가 생성되었지만 아직 시작되지 않은 상태
+   */
+  PENDING = 'PENDING',
+
+  /**
    * 진행 중
    * - 챌린지가 활성화되어 진행 중인 상태
    */

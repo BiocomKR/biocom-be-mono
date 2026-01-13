@@ -61,6 +61,8 @@ import { AppConfigModule } from './app-config/app-config.module';
 import { RecordsModule } from './records/records.module';
 import { SolutionController } from './solution/solution.controller';
 import { SolutionService } from './solution/solution.service';
+import { CouponController } from './coupon/coupon.controller';
+import { CouponService } from './coupon/coupon.service';
 
 /**
  * 애플리케이션 루트 모듈
@@ -128,6 +130,7 @@ import { SolutionService } from './solution/solution.service';
     OrdersController,
     IssueController,
     SolutionController,
+    CouponController,
   ],
   providers: [
     UsersService,
@@ -146,6 +149,7 @@ import { SolutionService } from './solution/solution.service';
     OrdersService,
     IssueService,
     SolutionService,
+    CouponService,
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,

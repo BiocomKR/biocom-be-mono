@@ -2108,6 +2108,10 @@ model PushNotificationSchedule {
   isTest             Boolean                    @default(true) @map("is_test")
   /// 테스트 대상 유저 ID 배열 (빈 배열이면 발송 안 함)
   testUserIds        Int[]                      @default([]) @map("test_user_ids")
+  /// 푸시 그룹 (중복 발송 방지용, 그룹당 1개만 발송)
+  pushGroup          String                     @default("MISSION") @map("push_group") @db.VarChar(20)
+  /// 우선순위 (높을수록 우선, 같은 그룹 내 선정 기준)
+  priority           Int                        @default(500)
   /// 마지막 실행 시간
   lastExecutedAt     DateTime?                  @map("last_executed_at")
   /// 다음 실행 예정 시간
@@ -2130,6 +2134,8 @@ model PushNotificationSchedule {
   @@index([startDate, endDate])
   @@index([conditionType])
   @@index([isTest])
+  @@index([pushGroup])
+  @@index([pushGroup, priority])
   @@map("push_notification_schedules")
 }
 

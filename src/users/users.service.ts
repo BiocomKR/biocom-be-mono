@@ -186,6 +186,13 @@ export class UsersService {
               typeName: true,
             },
           },
+          userRecords: {
+            select: {
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
           _count: {
             select: {
               orders: true,
@@ -230,6 +237,7 @@ export class UsersService {
         orderCount: user._count.orders,
         challengeCount: user._count.userChallenges,
         couponCount: user._count.userCoupons,
+        lastRecordDate: user.userRecords[0]?.createdAt || null,
       }));
 
       return {
@@ -274,6 +282,13 @@ export class UsersService {
             typeName: true,
           },
         },
+        userRecords: {
+          select: {
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
         _count: {
           select: {
             orders: true,
@@ -310,6 +325,7 @@ export class UsersService {
       orderCount: user._count.orders,
       challengeCount: user._count.userChallenges,
       couponCount: user._count.userCoupons,
+      lastRecordDate: user.userRecords[0]?.createdAt || null,
     }));
 
     return {

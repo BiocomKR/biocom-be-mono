@@ -11,6 +11,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PushNotificationService } from './services/push-notification.service';
 import { PushTemplateService } from './services/push-template.service';
+import { ConditionEvaluatorService } from './services/condition-evaluator.service';
 import { PrismaService } from '../common/services/prisma.service';
 import { SendPushToUserDto } from './dto/send-push-to-user.dto';
 import { SendPushToUsersDto } from './dto/send-push-to-users.dto';
@@ -31,6 +32,7 @@ export class PushNotificationController {
   constructor(
     private readonly pushNotificationService: PushNotificationService,
     private readonly templateService: PushTemplateService,
+    private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -221,5 +223,89 @@ export class PushNotificationController {
     @Query('isTest') isTest?: boolean,
   ) {
     return await this.pushNotificationService.getPushStats(startDate, endDate, isTest);
+  }
+
+  /**
+   * 조건 미리보기 - 대상 유저 수 조회 (발송 없이)
+   */
+  @Post('condition/preview')
+  async previewCondition(
+    @Body() dto: { conditionType: string; conditionParams: Record<string, any> },
+  ) {
+    const result = await this.conditionEvaluator.previewCondition(
+      dto.conditionType,
+      dto.conditionParams,
+    );
+
+    return {
+      success: true,
+      data: result,
+    };
+  }
+
+  /**
+   * 조건 기반 테스터 발송 - isTester=true인 유저에게만 푸시 발송
+   * MQ에 발송 요청을 추가하고 jobIds를 반환 (비동기 처리)
+   */
+  @Post('condition/send-to-testers')
+  async sendToTesters(
+    @Body() dto: {
+      conditionType: string;
+      conditionParams: Record<string, any>;
+      title: string;
+      body: string;
+      imageUrl?: string;
+      data?: Record<string, any>;
+    },
+  ) {
+    // 조건에 맞는 테스터만 조회
+    const testerIds = await this.conditionEvaluator.evaluateConditionTestersOnly(
+      dto.conditionType,
+      dto.conditionParams,
+    );
+
+    if (testerIds.length === 0) {
+      return {
+        success: false,
+        message: '조건에 맞는 테스터가 없습니다',
+        data: { targetCount: 0, jobIds: [] },
+      };
+    }
+
+    // 템플릿 치환
+    const titles = await this.templateService.substituteForUsers(dto.title, testerIds);
+    const bodies = await this.templateService.substituteForUsers(dto.body, testerIds);
+
+    // 개별 발송 (MQ에 요청 추가)
+    const jobIds: string[] = [];
+
+    for (const userId of testerIds) {
+      const title = titles.get(userId) || dto.title;
+      const body = bodies.get(userId) || dto.body;
+
+      const result = await this.pushNotificationService.sendToUser(
+        userId,
+        {
+          title,
+          body,
+          imageUrl: dto.imageUrl,
+          data: dto.data,
+        },
+        true, // isTest = true
+      );
+
+      if (result.jobId) {
+        jobIds.push(result.jobId);
+      }
+    }
+
+    return {
+      success: true,
+      message: `${testerIds.length}명의 테스터에게 푸시 발송 요청이 접수되었습니다`,
+      data: {
+        targetCount: testerIds.length,
+        jobIds,
+      },
+    };
   }
 }
