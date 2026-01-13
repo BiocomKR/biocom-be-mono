@@ -54,8 +54,9 @@ export class CartService {
           include: {
             product: {
               include: {
-                images: {
+                productFiles: {
                   where: { imageType: 'MAIN' },
+                  include: { file: true },
                   take: 1,
                 },
               },
@@ -114,8 +115,9 @@ export class CartService {
     const product = await this.prisma.product.findUnique({
       where: { id: dto.productId },
       include: {
-        images: {
+        productFiles: {
           where: { imageType: 'MAIN' },
+          include: { file: true },
           take: 1,
         },
       },
@@ -169,8 +171,9 @@ export class CartService {
         include: {
           product: {
             include: {
-              images: {
+              productFiles: {
                 where: { imageType: 'MAIN' },
+                include: { file: true },
                 take: 1,
               },
             },
@@ -196,8 +199,9 @@ export class CartService {
       include: {
         product: {
           include: {
-            images: {
+            productFiles: {
               where: { imageType: 'MAIN' },
+              include: { file: true },
               take: 1,
             },
           },
@@ -249,8 +253,9 @@ export class CartService {
       include: {
         product: {
           include: {
-            images: {
+            productFiles: {
               where: { imageType: 'MAIN' },
+              include: { file: true },
               take: 1,
             },
           },
