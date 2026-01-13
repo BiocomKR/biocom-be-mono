@@ -37,7 +37,11 @@ export class TimeoutInterceptor implements NestInterceptor {
     // 엔드포인트별 타임아웃 설정
     let timeoutDuration = this.defaultTimeout;
     
-    if (request.path.includes('/upload') || request.path.includes('/images')) {
+    // 파일 업로드 관련 요청은 5분 타임아웃
+    const contentType = request.headers['content-type'] || '';
+    const isMultipart = contentType.includes('multipart/form-data');
+
+    if (request.path.includes('/upload') || request.path.includes('/images') || isMultipart) {
       timeoutDuration = this.uploadTimeout;
     } else if (request.path.includes('/export') || request.path.includes('/report')) {
       // 리포트 생성 등 시간이 오래 걸리는 작업
