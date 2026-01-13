@@ -147,10 +147,14 @@ export class UsersService {
 
     // 정렬 설정
     let orderBy: any;
+    const isLastRecordDateSort = sortBy === 'lastRecordDate';
     if (sortBy === 'orderCount') {
       orderBy = { orders: { _count: sortOrder } };
     } else if (sortBy === 'challengeCount') {
       orderBy = { userChallenges: { _count: sortOrder } };
+    } else if (isLastRecordDateSort) {
+      // lastRecordDate 정렬은 후처리로 수행
+      orderBy = { createdAt: 'desc' }; // 기본 정렬
     } else {
       orderBy = { [sortBy]: sortOrder };
     }
@@ -254,6 +258,7 @@ export class UsersService {
     // 일반 검색 (이름 검색이 아닌 경우)
     const total = await this.prisma.user.count({ where });
 
+    // lastRecordDate 정렬 시 전체 조회 후 후처리 필요
     const users = await this.prisma.user.findMany({
       where,
       select: {
@@ -298,12 +303,12 @@ export class UsersService {
         },
       },
       orderBy,
-      skip: offset,
-      take: limit,
+      // lastRecordDate 정렬 시 전체 조회
+      ...(isLastRecordDateSort ? {} : { skip: offset, take: limit }),
     });
 
     // 응답 형식 변환 (Prisma Extension에서 자동 복호화됨)
-    const userList = users.map(user => ({
+    let userList = users.map(user => ({
       id: user.id,
       email: user.email,
       name: user.name,
@@ -327,6 +332,18 @@ export class UsersService {
       couponCount: user._count.userCoupons,
       lastRecordDate: user.userRecords[0]?.createdAt || null,
     }));
+
+    // lastRecordDate 정렬 후 페이지네이션
+    if (isLastRecordDateSort) {
+      userList.sort((a, b) => {
+        if (!a.lastRecordDate && !b.lastRecordDate) return 0;
+        if (!a.lastRecordDate) return sortOrder === 'asc' ? -1 : 1;
+        if (!b.lastRecordDate) return sortOrder === 'asc' ? 1 : -1;
+        const comparison = new Date(a.lastRecordDate).getTime() - new Date(b.lastRecordDate).getTime();
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+      userList = userList.slice(offset, offset + limit);
+    }
 
     return {
       users: userList,

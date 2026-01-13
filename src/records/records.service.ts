@@ -883,9 +883,9 @@ export class RecordsService {
         byType[type] = weekRecords.filter((r) => r.recordType === type).length;
       }
 
-      // 최근 기록일
+      // 최근 기록일시
       const lastRecordDate = validRecords.length > 0
-        ? validRecords[0].date?.toISOString().split('T')[0] || validRecords[0].createdAt.toISOString().split('T')[0]
+        ? validRecords[0].createdAt.toISOString()
         : null;
 
       // 연속 기록 일수 계산
