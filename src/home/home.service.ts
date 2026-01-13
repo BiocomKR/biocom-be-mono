@@ -202,7 +202,7 @@ export class HomeService {
       }
 
       // 5. 챌린지 정보 구성 (CHALLENGER만)
-      const challengeInfo = await this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
+      const challengeInfo = this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
 
       // 6. 첫 방문 플래그 처리
       const firstVisitFlags = this.handleFirstVisitFlags(userId, user, reportInfo, challenges, challengeDays.currentDay);
@@ -647,30 +647,19 @@ export class HomeService {
   /**
    * 챌린지 정보 DTO 생성 (CHALLENGER만)
    */
-  private async buildChallengeInfo(
+  private buildChallengeInfo(
     userStatus: string,
     activeChallenge?: UserChallengeData,
     currentDay?: number,
-  ): Promise<ChallengeInfoDto | null> {
+  ): ChallengeInfoDto | null {
     if (userStatus !== UserSubscriptionStatus.CHALLENGER || !activeChallenge || !currentDay) {
       return null;
     }
 
-    const totalMissions = activeChallenge.product.challengeMissions.length;
-
-    // user_records에서 완료된 미션 개수 조회
-    const completedMissions = await this.prisma.userRecord.count({
-      where: {
-        userId: activeChallenge.id, // userChallengeId가 아님, 아래에서 수정
-        userChallengeId: activeChallenge.id,
-        metadata: {
-          path: ['isCompleted'],
-          equals: true
-        }
-      }
-    });
-
-    const challengePercent = totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0;
+    // 챌린지 총 일수 (21일)
+    const CHALLENGE_TOTAL_DAYS = 21;
+    // 진행률: 현재 일차 / 총 일수 * 100 (최대 100%)
+    const challengePercent = Math.min(100, Math.round((currentDay / CHALLENGE_TOTAL_DAYS) * 100));
 
     return {
       challengeCode: activeChallenge.product.sku,
