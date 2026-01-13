@@ -88,6 +88,17 @@ export class DashboardService {
     // 재고 부족 상품 (InventoryCache 테이블 없음 - TODO: 재고 관리 기능 구현 시 활성화)
     const lowStockCount = 0;
 
+    // 테스터 제외 시 테스터가 아닌 userId 목록 조회
+    // (groupBy에서는 relation 필터링이 안 되므로 별도 조회 필요)
+    let nonTesterUserIds: number[] | undefined;
+    if (excludeTesters) {
+      const nonTesters = await this.prisma.user.findMany({
+        where: { isTester: false },
+        select: { id: true }
+      });
+      nonTesterUserIds = nonTesters.map(u => u.id);
+    }
+
     // 앱 지표: DAU (오늘 활성 사용자)
     const dauResult = await this.prisma.appEvent.groupBy({
       by: ['userId'],
@@ -97,7 +108,7 @@ export class DashboardService {
           lt: tomorrow
         },
         userId: { not: null },
-        ...(excludeTesters ? { user: { isTester: false } } : {}),
+        ...(excludeTesters && nonTesterUserIds ? { userId: { in: nonTesterUserIds } } : {}),
       }
     });
 
@@ -110,7 +121,7 @@ export class DashboardService {
           lt: nextMonth
         },
         userId: { not: null },
-        ...(excludeTesters ? { user: { isTester: false } } : {}),
+        ...(excludeTesters && nonTesterUserIds ? { userId: { in: nonTesterUserIds } } : {}),
       }
     });
 
@@ -432,6 +443,17 @@ export class DashboardService {
     const end = endDate || getNowKST();
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+    // 테스터 제외 시 테스터가 아닌 userId 목록 조회
+    // (groupBy에서는 relation 필터링이 안 되므로 별도 조회 필요)
+    let nonTesterUserIds: number[] | undefined;
+    if (excludeTesters) {
+      const nonTesters = await this.prisma.user.findMany({
+        where: { isTester: false },
+        select: { id: true }
+      });
+      nonTesterUserIds = nonTesters.map(u => u.id);
+    }
+
     // 신규 고객
     const newCustomers = await this.prisma.user.count({
       where: {
@@ -451,7 +473,7 @@ export class DashboardService {
           gte: start,
           lte: end
         },
-        ...(excludeTesters ? { user: { isTester: false } } : {}),
+        ...(excludeTesters && nonTesterUserIds ? { userId: { in: nonTesterUserIds } } : {}),
       },
       select: {
         userId: true
@@ -468,7 +490,7 @@ export class DashboardService {
           gte: start,
           lte: end
         },
-        ...(excludeTesters ? { user: { isTester: false } } : {}),
+        ...(excludeTesters && nonTesterUserIds ? { userId: { in: nonTesterUserIds } } : {}),
       },
       _count: true,
       having: {
@@ -489,7 +511,7 @@ export class DashboardService {
           gte: start,
           lte: end
         },
-        ...(excludeTesters ? { user: { isTester: false } } : {}),
+        ...(excludeTesters && nonTesterUserIds ? { userId: { in: nonTesterUserIds } } : {}),
       },
       _sum: {
         totalAmount: true
