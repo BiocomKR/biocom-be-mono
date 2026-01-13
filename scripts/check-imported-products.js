@@ -13,7 +13,11 @@ async function checkImportedProducts() {
       },
       include: {
         options: true,
-        images: true
+        productFiles: {
+          where: { imageType: 'MAIN' },
+          include: { file: true },
+          take: 1,
+        },
       },
       orderBy: {
         createdAt: 'desc'
@@ -38,8 +42,8 @@ async function checkImportedProducts() {
         });
       }
 
-      if (product.images && product.images.length > 0) {
-        console.log(`   - 이미지: ${product.images[0].imageUrl.substring(0, 50)}...`);
+      if (product.productFiles && product.productFiles.length > 0) {
+        console.log(`   - 이미지: ${product.productFiles[0].file?.filePath?.substring(0, 50) || 'N/A'}...`);
       }
 
       console.log(`   - 등록일: ${product.createdAt.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`);
