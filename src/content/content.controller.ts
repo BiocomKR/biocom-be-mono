@@ -110,7 +110,7 @@ export class ContentController {
    * 새로운 컨텐츠 생성
    */
   @Post()
-  @UseInterceptors(FilesInterceptor('files', 10))
+  @UseInterceptors(FilesInterceptor('files'))
   async createContent(
     @Body() createDto: {
       title: string;
@@ -167,7 +167,7 @@ export class ContentController {
    * 컨텐츠 수정
    */
   @Put(':id')
-  @UseInterceptors(FilesInterceptor('files', 10))
+  @UseInterceptors(FilesInterceptor('files'))
   async updateContent(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: Partial<{

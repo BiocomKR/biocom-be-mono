@@ -85,7 +85,7 @@ export class ShopController {
    */
   @Post('products/:id/images')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FilesInterceptor('files', 10))
+  @UseInterceptors(FilesInterceptor('files'))
   async uploadProductImages(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFiles() files: Express.Multer.File[],
