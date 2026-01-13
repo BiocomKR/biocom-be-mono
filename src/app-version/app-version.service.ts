@@ -49,7 +49,7 @@ export class AppVersionService {
 
     return {
       needsUpdate,
-      forceUpdate: latestVersion.isForceUpdate,
+      forceUpdate: needsUpdate && latestVersion.isForceUpdate,
       latestVersion: latestVersion.version,
       storeUrl: latestVersion.storeUrl,
       maintenance: latestVersion.isMaintenanceMode,
