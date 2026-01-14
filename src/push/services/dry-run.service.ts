@@ -33,13 +33,15 @@ export class DryRunService {
   async execute(
     dto: DryRunRequestDto,
   ): Promise<DryRunMockResponseDto | DryRunRealUserResponseDto | DryRunRealScheduleResponseDto> {
-    this.logger.log(`🔍 [DryRun] 실행: mode=${dto.mode}`);
+    this.logger.log(`🔍 [DryRun] 실행: mode=${dto.mode}, activeOnly=${dto.activeOnly ?? false}`);
+
+    const activeOnly = dto.activeOnly ?? false;
 
     if (dto.mode === DryRunMode.MOCK) {
-      return this.executeMockMode(dto.mockUserState);
+      return this.executeMockMode(dto.mockUserState, activeOnly);
     } else {
       if (dto.userId) {
-        return this.executeRealUserMode(dto.userId);
+        return this.executeRealUserMode(dto.userId, activeOnly);
       } else if (dto.scheduleId) {
         return this.executeRealScheduleMode(dto.scheduleId, dto.limit || 100);
       } else {
@@ -51,15 +53,15 @@ export class DryRunService {
   /**
    * Mock 모드 - 가상 유저 상태로 시뮬레이션
    */
-  private async executeMockMode(mockUserState?: MockUserStateDto): Promise<DryRunMockResponseDto> {
+  private async executeMockMode(mockUserState?: MockUserStateDto, activeOnly: boolean = false): Promise<DryRunMockResponseDto> {
     if (!mockUserState) {
       throw new BadRequestException('Mock 모드에서는 mockUserState가 필요합니다');
     }
 
     this.logger.log(`🎭 [DryRun/Mock] 가상 상태: ${JSON.stringify(mockUserState)}`);
 
-    // 활성 스케줄 목록 조회
-    const schedules = await this.getActiveConditionSchedules();
+    // 스케줄 목록 조회
+    const schedules = await this.getConditionSchedules(activeOnly);
 
     // 각 스케줄에 대해 mock 상태가 조건을 만족하는지 평가
     const matchedSchedules: MatchedScheduleDto[] = [];
@@ -80,6 +82,7 @@ export class DryRunService {
           priority: schedule.priority,
           conditionType: schedule.conditionType!,
           conditionParams: schedule.conditionParams as Record<string, any>,
+          isActive: schedule.isActive,
         });
       }
     }
@@ -102,8 +105,8 @@ export class DryRunService {
   /**
    * Real 모드 - 특정 유저의 실제 상태로 시뮬레이션
    */
-  private async executeRealUserMode(userId: number): Promise<DryRunRealUserResponseDto> {
-    this.logger.log(`👤 [DryRun/Real] userId=${userId}`);
+  private async executeRealUserMode(userId: number, activeOnly: boolean = false): Promise<DryRunRealUserResponseDto> {
+    this.logger.log(`👤 [DryRun/Real] userId=${userId}, activeOnly=${activeOnly}`);
 
     // 유저 정보 및 상태 조회
     const user = await this.prisma.user.findUnique({
@@ -124,8 +127,8 @@ export class DryRunService {
     const userForState = { ...user, challenges: user.userChallenges };
     const userState = await this.buildUserState(userId, userForState);
 
-    // 활성 스케줄 목록 조회
-    const schedules = await this.getActiveConditionSchedules();
+    // 스케줄 목록 조회
+    const schedules = await this.getConditionSchedules(activeOnly);
 
     // 각 스케줄에 대해 유저가 조건을 만족하는지 평가
     const matchedSchedules: MatchedScheduleDto[] = [];
@@ -146,6 +149,7 @@ export class DryRunService {
           priority: schedule.priority,
           conditionType: schedule.conditionType!,
           conditionParams: schedule.conditionParams as Record<string, any>,
+          isActive: schedule.isActive,
         });
       }
     }
@@ -226,13 +230,14 @@ export class DryRunService {
   }
 
   /**
-   * 활성 조건 기반 스케줄 조회
+   * 조건 기반 스케줄 조회
+   * @param activeOnly true면 활성 스케줄만, false면 전체
    */
-  private async getActiveConditionSchedules() {
+  private async getConditionSchedules(activeOnly: boolean = false) {
     return this.prisma.pushNotificationSchedule.findMany({
       where: {
-        isActive: true,
         conditionType: { not: null },
+        ...(activeOnly ? { isActive: true } : {}),
       },
       select: {
         id: true,
@@ -242,6 +247,7 @@ export class DryRunService {
         conditionParams: true,
         pushGroup: true,
         priority: true,
+        isActive: true,
       },
     });
   }
@@ -354,6 +360,17 @@ export class DryRunService {
 
       case 'CART_HAS_ITEMS':
         return mockState.cartHasItems === true;
+
+      case 'ONBOARDING_STATE':
+        return mockState.onboardingState === params.state;
+
+      case 'CHALLENGE_START_OFFSET_DAYS': {
+        const offsetDays = params.offsetDays ?? params.days;
+        return mockState.challengeStartOffsetDays === offsetDays;
+      }
+
+      case 'REPORT_STATE':
+        return mockState.reportState === params.state;
 
       default:
         return false;

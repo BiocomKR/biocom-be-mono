@@ -66,6 +66,21 @@ export class MockUserStateDto {
   @ApiPropertyOptional({ description: '장바구니 아이템 존재 여부' })
   @IsOptional()
   cartHasItems?: boolean;
+
+  @ApiPropertyOptional({ description: '온보딩 상태', example: 'TYPE_SURVEY_INCOMPLETE' })
+  @IsOptional()
+  @IsString()
+  onboardingState?: string;
+
+  @ApiPropertyOptional({ description: '챌린지 시작까지 남은 일수 (음수: 과거)', example: -1 })
+  @IsOptional()
+  @IsInt()
+  challengeStartOffsetDays?: number;
+
+  @ApiPropertyOptional({ description: '리포트 상태', example: 'UNREAD' })
+  @IsOptional()
+  @IsString()
+  reportState?: string;
 }
 
 /**
@@ -96,6 +111,10 @@ export class DryRunRequestDto {
   @IsOptional()
   @IsInt()
   limit?: number;
+
+  @ApiPropertyOptional({ description: '활성 스케줄만 조회 (기본: false = 전체)', default: false })
+  @IsOptional()
+  activeOnly?: boolean;
 }
 
 /**
@@ -122,6 +141,9 @@ export class MatchedScheduleDto {
 
   @ApiPropertyOptional()
   conditionParams?: Record<string, any>;
+
+  @ApiProperty({ description: '스케줄 활성화 여부' })
+  isActive: boolean;
 }
 
 /**

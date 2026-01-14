@@ -9,17 +9,24 @@ import {
   Body,
   UseGuards,
   ParseIntPipe,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CouponService } from './coupon.service';
+import { UploadService } from '../upload/upload.service';
 
 @ApiTags('쿠폰 관리')
 @ApiBearerAuth()
 @Controller('coupons')
 @UseGuards(JwtAuthGuard)
 export class CouponController {
-  constructor(private readonly couponService: CouponService) {}
+  constructor(
+    private readonly couponService: CouponService,
+    private readonly uploadService: UploadService,
+  ) {}
 
   /**
    * 쿠폰 목록 조회
@@ -45,6 +52,20 @@ export class CouponController {
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 10,
     });
+  }
+
+  /**
+   * 쿠폰 이미지 업로드
+   */
+  @Post('upload-image')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadCouponImage(@UploadedFile() file: Express.Multer.File) {
+    const result = await this.uploadService.uploadProductImage(file);
+    return {
+      imageUrl: result.filePath,
+      fileId: result.id,
+    };
   }
 
   /**

@@ -256,6 +256,7 @@ export class CouponService {
       productIds,
       validHours,
       isActive,
+      imageUrl,
     } = dto;
 
     // 코드 중복 체크
@@ -283,6 +284,7 @@ export class CouponService {
         productId,
         validHours: validHours || 48,
         isActive: isActive ?? true,
+        imageUrl,
         createdAt: now,
       },
     });
@@ -325,6 +327,7 @@ export class CouponService {
       productIds,
       validHours,
       isActive,
+      imageUrl,
     } = dto;
 
     // 코드 중복 체크 (자기 자신 제외)
@@ -351,6 +354,7 @@ export class CouponService {
         productId,
         validHours,
         isActive,
+        imageUrl,
       },
     });
 

@@ -63,6 +63,8 @@ import { SolutionController } from './solution/solution.controller';
 import { SolutionService } from './solution/solution.service';
 import { CouponController } from './coupon/coupon.controller';
 import { CouponService } from './coupon/coupon.service';
+import { PersonaModule } from './master/persona.module';
+import { AnimalModule } from './master/animal.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -112,6 +114,8 @@ import { CouponService } from './coupon/coupon.service';
     UtilsModule,      // 유틸리티 모듈 (이미지 변환 등)
     AppConfigModule,  // 앱 설정 관리 모듈
     RecordsModule,    // 기록 통계 모듈
+    PersonaModule,    // 페르소나 관리 모듈
+    AnimalModule,     // 동물 관리 모듈
   ],
   controllers: [
     UsersController,

@@ -54,6 +54,44 @@ biocom-mq (메시지 큐 워커)
 | OrderStatus enum | `src/common/enums/order-status.enum.ts` | biocom-api ↔ biocom-bo-api |
 | PaymentStatus enum | `src/common/enums/payment-status.enum.ts` | biocom-api ↔ biocom-bo-api |
 | ProductStatus enum | `src/common/enums/` | biocom-api ↔ biocom-bo-api |
+| **ConditionEvaluator** | `src/push/services/condition-evaluator.service.ts` | **biocom-api ↔ biocom-bo-api** |
+
+### ⚠️ ConditionEvaluator 동기화 주의사항
+
+**왜 양쪽에 있나?**
+- biocom-api: K8s CronJob 배치 실행 (실제 푸시 발송)
+- biocom-bo-api: dry-run API, 관리자 수동 테스트
+
+**동기화 시점:**
+- 새 조건 타입 추가 시
+- 기존 조건 로직 변경 시
+- 파라미터 구조 변경 시
+
+**동기화 방법:**
+```bash
+# 1. biocom-api에서 변경 후
+diff biocom-api/src/push/services/condition-evaluator.service.ts \
+     biocom-bo-api/src/push/services/condition-evaluator.service.ts
+
+# 2. 핵심 로직만 복사 (import 경로는 프로젝트마다 다름)
+# - evaluateCondition() 메서드
+# - 각 evaluate* private 메서드들
+```
+
+**차이점 (복사 시 주의):**
+| 항목 | biocom-api | biocom-bo-api |
+|------|------------|---------------|
+| import 경로 | `../../common/enums` | `../../common/enums/challenge-ticket-status.enum` |
+| 발송 방식 | QueueService (MQ) | 직접 발송 (for loop) |
+| 테스트 모드 | isTest, testUserIds 지원 | 미지원 |
+
+**현재 지원 조건 (12개):**
+- CHALLENGE_DAY, CHALLENGE_STATUS, NO_ACCESS_HOURS
+- INCOMPLETE_COUNT, INCOMPLETE_TYPES, COMPLETION_RATE
+- ONBOARDING_STATE (TYPE_SURVEY_INCOMPLETE, SOLUTION_VIEWED_START_NOT_SET)
+- CHALLENGE_START_OFFSET_DAYS (offsetDays 파라미터)
+- REPORT_STATE (UNREAD, ALL_READ)
+- POINTS, COUPON_EXPIRING_HOURS, CART_HAS_ITEMS
 
 ### 스키마/Enum 변경 시 주의사항
 1. **한 프로젝트에서만 변경하면 다른 프로젝트 빌드 실패**
