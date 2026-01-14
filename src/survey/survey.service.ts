@@ -1272,14 +1272,21 @@ export class SurveyService {
       },
     });
 
-    if (!userChallenge) {
-      throw new NotFoundException('활성화된 챌린지가 없습니다.');
+    let productId: number;
+
+    if (userChallenge) {
+      productId = userChallenge.productId;
+    } else {
+      // 활성 챌린지가 없으면 기본 챌린지 상품에서 조회
+      this.logger.log(`사용자 ${userId}의 활성 챌린지 없음 - 기본 챌린지 상품 조회`);
+      const defaultProduct = await this.findDefaultChallengeProduct();
+      productId = defaultProduct.id;
     }
 
     // 2. 해당 상품의 설문 조회 (Survey.type으로 필터링)
     const challengeSurvey = await this.prisma.challengeSurvey.findFirst({
       where: {
-        productId: userChallenge.productId,
+        productId,
         isActive: true,
         survey: {
           type: type,
@@ -1299,6 +1306,36 @@ export class SurveyService {
     this.logger.log(`사용자 ${userId}의 챌린지 설문 ID: ${challengeSurvey.id} (surveyId: ${challengeSurvey.surveyId}, type: ${type})`);
 
     return challengeSurvey.id;
+  }
+
+  /**
+   * 기본 챌린지 상품 조회
+   * ChallengeSurvey가 연결된 가장 첫 번째 상품 반환
+   *
+   * TODO: 추후 challenge, survey, mission 관계 재정비 후 ChallengeSurvey 테이블을 안 쓸 수도 있음
+   * 그때 이 로직도 함께 수정 필요
+   */
+  private async findDefaultChallengeProduct(): Promise<{ id: number }> {
+    // ChallengeSurvey가 연결된 상품 중 가장 오래된(id가 작은) 상품 조회
+    const challengeSurvey = await this.prisma.challengeSurvey.findFirst({
+      where: {
+        isActive: true,
+      },
+      orderBy: {
+        productId: 'asc',
+      },
+      select: {
+        productId: true,
+      },
+    });
+
+    if (!challengeSurvey) {
+      throw new NotFoundException('설문이 연결된 챌린지 상품이 없습니다.');
+    }
+
+    this.logger.log(`기본 챌린지 상품 조회 완료 - productId: ${challengeSurvey.productId}`);
+
+    return { id: challengeSurvey.productId };
   }
 
   /**
