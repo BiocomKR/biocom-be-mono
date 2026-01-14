@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { PointRelatedType } from '../common/enums';
 
 /**
  * 포인트 관리 서비스
@@ -25,7 +26,7 @@ export class PointService {
     userId: number,
     amount: number,
     description: string,
-    relatedType?: string,
+    relatedType?: PointRelatedType,
     relatedId?: number,
   ): Promise<void> {
     this.logger.log(`포인트 차감 - 사용자: ${userId}, 금액: ${amount}`);
@@ -95,7 +96,7 @@ export class PointService {
     userId: number,
     amount: number,
     description: string,
-    relatedType?: string,
+    relatedType?: PointRelatedType,
     relatedId?: number,
     recordType?: string,
   ): Promise<number> {
@@ -121,7 +122,7 @@ export class PointService {
           amount: amount,
           balance: user.points,
           description,
-          relatedType: relatedType || 'MANUAL',
+          relatedType: relatedType || PointRelatedType.MANUAL,
           relatedId,
           recordType,
           createdAt: getNowKST(),
@@ -149,7 +150,7 @@ export class PointService {
     userId: number,
     amount: number,
     description: string,
-    relatedType?: string,
+    relatedType?: PointRelatedType,
     relatedId?: number,
     recordType?: string,
   ): Promise<number> {
@@ -171,7 +172,7 @@ export class PointService {
         amount: amount,
         balance: user.points,
         description,
-        relatedType: relatedType || 'MANUAL',
+        relatedType: relatedType || PointRelatedType.MANUAL,
         relatedId,
         recordType,
         createdAt: getNowKST(),
@@ -231,7 +232,7 @@ export class PointService {
           amount: -amount, // 차감은 음수로 기록
           balance: updatedUser.points, // 실제 잔액
           description: `아임웹으로 포인트 이관`,
-          relatedType: 'IMWEB_TRANSFER',
+          relatedType: PointRelatedType.IMWEB_TRANSFER,
           createdAt: getNowKST(),
         },
       });
@@ -278,7 +279,7 @@ export class PointService {
           amount: amount, // 적립은 양수로 기록
           balance: updatedUser.points, // 실제 잔액
           description: `아임웹에서 포인트 가져오기`,
-          relatedType: 'IMWEB_TRANSFER',
+          relatedType: PointRelatedType.IMWEB_TRANSFER,
           createdAt: getNowKST(),
         },
       });
@@ -381,7 +382,7 @@ export class PointService {
     userId: number,
     amount: number,
     description: string,
-    relatedType?: string,
+    relatedType?: PointRelatedType,
     relatedId?: number,
     recordType?: string,
   ): Promise<void> {

@@ -6,7 +6,7 @@ import {
   ForbiddenException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { ReviewStatus } from '../../common/enums';
+import { ReviewStatus, PointRelatedType } from '../../common/enums';
 import {
   CreateReviewDto,
   UpdateReviewDto,
@@ -155,7 +155,7 @@ export class ReviewsService {
             amount: rewardAmount,
             balance: updatedUser.points,
             description: `리뷰 작성 적립금 (상품: ${product.name})`,
-            relatedType: 'REVIEW',
+            relatedType: PointRelatedType.REVIEW,
             relatedId: review.id,
             createdAt: getNowKST()
           }

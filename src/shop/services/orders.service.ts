@@ -19,7 +19,7 @@ import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 import { getNowKST } from '../../common/utils/kst-date.util';
-import { OrderStatus, ProductStatus, PaymentStatus, ShippingStatus, UserCouponStatus, ExchangeReturnStatus } from '../../common/enums';
+import { OrderStatus, ProductStatus, PaymentStatus, ShippingStatus, UserCouponStatus, ExchangeReturnStatus, PointRelatedType } from '../../common/enums';
 
 @Injectable()
 export class OrdersService {
@@ -364,7 +364,7 @@ export class OrdersService {
             amount: -pointUsed,
             balance: updatedUser.points,
             description: `주문 사용 (${orderNumber})`,
-            relatedType: 'ORDER',
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: getNowKST(),
           },
@@ -654,7 +654,7 @@ export class OrdersService {
             amount: pointUsed,
             balance: updatedUser.points,
             description: `주문 취소 환불 (${order.orderNumber})`,
-            relatedType: 'ORDER',
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: now,
           },
@@ -756,7 +756,7 @@ export class OrdersService {
           userId,
           pointAmount,
           `구매 확정 포인트 (${order.orderNumber})`,
-          'ORDER',
+          PointRelatedType.ORDER,
           order.id
         );
       }

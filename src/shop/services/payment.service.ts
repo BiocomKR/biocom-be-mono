@@ -19,7 +19,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { getNowKST, parseISO8601ToKST } from '../../common/utils/kst-date.util';
-import { OrderStatus, PaymentStatus, PgProvider } from '../../common/enums';
+import { OrderStatus, PaymentStatus, PgProvider, PointRelatedType } from '../../common/enums';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 
 @Injectable()
@@ -252,7 +252,7 @@ export class PaymentService {
             amount: earnedPoints,
             balance: updatedUser.points,
             description: `구매 적립 10% (${order.orderNumber})`,
-            relatedType: 'ORDER',
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: getNowKST(),
           },
@@ -433,7 +433,7 @@ export class PaymentService {
                 amount: convertDecimalToNumber(order.pointUsed) || 0,
                 balance: updatedUser.points,
                 description: `주문 취소 환불 (${order.orderNumber})`,
-                relatedType: 'ORDER',
+                relatedType: PointRelatedType.ORDER,
                 relatedId: order.id,
                 createdAt: getNowKST(),
               }
@@ -443,7 +443,7 @@ export class PaymentService {
           // 적립 포인트 회수 (PURCHASE_REWARD로 적립된 포인트)
           const earnedPointHistory = await tx.pointHistory.findFirst({
             where: {
-              relatedType: 'ORDER',
+              relatedType: PointRelatedType.ORDER,
               relatedId: order.id,
               type: 'PURCHASE_REWARD',
             },
@@ -471,7 +471,7 @@ export class PaymentService {
                   amount: -pointsToDeduct,
                   balance: updatedUser.points,
                   description: `구매 적립 회수 (${order.orderNumber})`,
-                  relatedType: 'ORDER',
+                  relatedType: PointRelatedType.ORDER,
                   relatedId: order.id,
                   createdAt: getNowKST(),
                 },

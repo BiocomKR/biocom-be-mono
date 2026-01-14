@@ -4,6 +4,7 @@ import { PointService } from '../point/point.service';
 import { CompleteQuizDto } from './dto/quiz-completion.dto';
 import { Logger } from '@nestjs/common';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { PointRelatedType } from '../common/enums';
 
 /**
  * 퀴즈 완료 서비스
@@ -181,7 +182,7 @@ export class QuizCompletionService {
             userId,
             pointsEarned,
             `퀴즈 정답: ${quiz.question}`,
-            'QUIZ',
+            PointRelatedType.QUIZ,
             quiz.id
           );
         }
@@ -275,7 +276,7 @@ export class QuizCompletionService {
           amount: pointsEarned,
           balance: user.points,
           description: `퀴즈 정답: ${quizTitle}`,
-          relatedType: 'QUIZ',
+          relatedType: PointRelatedType.QUIZ,
           relatedId: activeChallenge.id,
           createdAt: getNowKST()
         }
@@ -540,7 +541,7 @@ export class QuizCompletionService {
             userId,
             pointsEarned,
             `강의 퀴즈 완료: ${linkedContent.title}`,
-            'QUIZ',
+            PointRelatedType.QUIZ,
             quizId
           );
         }

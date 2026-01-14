@@ -1,7 +1,7 @@
 import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { DeepReportResponseDto, DeepReportContentDto, DeepReportListResponseDto, DeepReportListItemDto } from './dto/deep-report.dto';
-import { YesNo, UserSubscriptionStatus, UserChallengeStatus } from '../common/enums';
+import { YesNo, UserSubscriptionStatus, UserChallengeStatus, PointRelatedType } from '../common/enums';
 import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
@@ -255,11 +255,11 @@ export class DeepReportService {
     }
 
     // 2. 해당 리포트에 대해 이미 포인트 지급했는지 확인
-    // relatedType: 'WEEKLY_REPORT', description에 reportId 포함
+    // relatedType: PointRelatedType.WEEKLY_REPORT, description에 reportId 포함
     const existingPointHistory = await this.prisma.pointHistory.findFirst({
       where: {
         userId,
-        relatedType: 'WEEKLY_REPORT',
+        relatedType: PointRelatedType.WEEKLY_REPORT,
         description: { contains: reportId },
       },
     });
@@ -288,7 +288,7 @@ export class DeepReportService {
           amount: pointsToAward,
           balance: updatedUser.points,
           description: `심층리포트 조회 (${reportId})`,
-          relatedType: 'WEEKLY_REPORT',
+          relatedType: PointRelatedType.WEEKLY_REPORT,
           relatedId: null, // reportId는 string이므로 description에 포함
           createdAt: now,
         },
