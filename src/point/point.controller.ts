@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam, 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PointService } from './point.service';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { PointRelatedType } from '../common/enums';
 
 /**
  * 포인트 관리 컨트롤러
@@ -160,7 +161,7 @@ export class PointController {
     @Body() body: {
       amount: number;
       description: string;
-      relatedType?: string;
+      relatedType?: PointRelatedType;
       relatedId?: number;
     }
   ) {

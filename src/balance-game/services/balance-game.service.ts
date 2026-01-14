@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST, calculateChallengeDay } from '../../common/utils/kst-date.util';
-import { UserChallengeStatus } from '../../common/enums';
+import { UserChallengeStatus, PointRelatedType } from '../../common/enums';
 import {
   TodayBalanceGameResponseDto,
   BalanceGameStepResponseDto,
@@ -314,7 +314,7 @@ export class BalanceGameService {
           const existingPointHistory = await tx.pointHistory.findFirst({
             where: {
               userId,
-              relatedType: 'BALANCE_GAME',
+              relatedType: PointRelatedType.BALANCE_GAME,
               relatedId: gameId,
               createdAt: {
                 gte: todayStart,
@@ -340,7 +340,7 @@ export class BalanceGameService {
                 amount: pointsToAward,
                 balance: updatedUser.points,
                 description: `밸런스게임 완료 (${currentDay}일차)`,
-                relatedType: 'BALANCE_GAME',
+                relatedType: PointRelatedType.BALANCE_GAME,
                 relatedId: gameId,
                 createdAt: getNowKST()
               }

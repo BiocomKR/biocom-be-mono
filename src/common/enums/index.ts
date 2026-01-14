@@ -25,3 +25,4 @@ export * from './survey-type.enum';
 export * from './health-category.enum';
 export * from './category-code.enum';
 export * from './app-bundle-id.enum';
+export * from './point-related-type.enum';

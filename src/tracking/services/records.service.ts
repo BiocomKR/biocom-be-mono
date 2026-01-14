@@ -19,6 +19,7 @@ import {
 } from '../dto/records/records.dto';
 import { CategoryCode } from '@/common/enums/category-code.enum';
 import { RecordType } from '@/common/enums/record-type.enum';
+import { PointRelatedType } from '@/common/enums';
 import { SibApiService } from '../../sib/services/sib-api.service';
 
 /**
@@ -957,7 +958,7 @@ export class RecordsService {
         userId,
         pointsToAward,
         `${recordCode} 기록 완료`,
-        'RECORD_COMPLETION',
+        PointRelatedType.RECORD_COMPLETION,
         userRecord.id,
         recordCode,
       );
@@ -1591,7 +1592,7 @@ export class RecordsService {
             userId,
             100,
             '영양제 섭취 기록',
-            'RECORD',
+            PointRelatedType.RECORD_COMPLETION,
             undefined,
             RecordType.SUPPLEMENT,
           );

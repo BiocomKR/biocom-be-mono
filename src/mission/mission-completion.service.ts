@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserChallengeStatus } from '../common/enums';
+import { UserChallengeStatus, PointRelatedType } from '../common/enums';
 import { PointService } from '../point/point.service';
 import { CompleteMissionDto } from './dto/mission-completion.dto';
 import { Logger } from '@nestjs/common';
@@ -334,7 +334,7 @@ export class MissionCompletionService {
             userId,
             pointsEarned,
             `미션 완료: ${mission.name} (${attemptNumber}/${dailyLimit})`,
-            'CHALLENGE_MISSION',
+            PointRelatedType.CHALLENGE_MISSION,
             challengeMission.id,
           );
 

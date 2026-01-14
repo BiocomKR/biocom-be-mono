@@ -1,9 +1,10 @@
 import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserChallengeStatus, SurveyOptionType, SurveyType, HealthCategory, HEALTH_CATEGORY_PRIORITY } from '../common/enums';
+import { UserChallengeStatus, SurveyOptionType, SurveyType, HealthCategory, HEALTH_CATEGORY_PRIORITY, PointRelatedType } from '../common/enums';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
 import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption } from '@prisma/client';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { PointService } from '../point/point.service';
 
 /**
  * 설문 서비스
@@ -15,6 +16,7 @@ export class SurveyService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly pointService: PointService,
   ) {}
 
   // ==================== 사용자용 설문 답변 및 결과 API ====================
@@ -524,7 +526,7 @@ export class SurveyService {
       });
 
       // 🔥 챌린지 연동 로직 추가
-      await this.processChallengeIntegration(tx, userId, surveyId);
+      await this.processChallengeIntegration(tx, userId, surveyId, type);
 
       // 결과 분석 (트랜잭션 클라이언트 전달)
       return await this.analyzeSurveyResult(userId, type, tx);
@@ -652,52 +654,121 @@ export class SurveyService {
   /**
    * 챌린지 연동 처리 (Product 기반)
    * 설문 완료 시 활성 챌린지가 있으면 포인트 적립 및 진행상황 업데이트
+   * 사후 문진(AFTER) 완료 시 3,000P 지급
    */
   private async processChallengeIntegration(
     tx: Prisma.TransactionClient,
     userId: number,
-    productIdOrSurveyId: number
+    surveyId: number,
+    surveyType: SurveyType
   ): Promise<void> {
     try {
-      // 1️⃣ 활성 챌린지 조회
-      const activeChallenge = await tx.userChallenge.findFirst({
+      // 1️⃣ 챌린지 조회 (사후문진은 COMPLETED/EXPIRED 상태에서도 가능)
+      const userChallenge = await tx.userChallenge.findFirst({
         where: {
           userId,
-          status: UserChallengeStatus.ACTIVE
+          status: surveyType === SurveyType.AFTER
+            ? { in: [UserChallengeStatus.ACTIVE, UserChallengeStatus.COMPLETED, UserChallengeStatus.EXPIRED] }
+            : UserChallengeStatus.ACTIVE
         },
-        include: { product: true }
+        include: { product: true },
+        orderBy: { createdAt: 'desc' }
       });
 
-      if (!activeChallenge) {
-        this.logger.log(`설문 완료 - 활성 챌린지 없음 (사용자: ${userId})`);
+      if (!userChallenge) {
+        this.logger.log(`설문 완료 - 챌린지 없음 (사용자: ${userId})`);
         return;
       }
 
-      // 2️⃣ 특정 설문이 오늘의 챌린지 설문인지 확인
       const today = getNowKST();
       const todayStr = today.toISOString().split('T')[0];
-      // activatedAt 기준으로 현재 챌린지 일차 계산
-      const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+      const currentDay = calculateChallengeDay(userChallenge.activatedAt);
 
+      // 2️⃣ 사후 문진(AFTER)인 경우 포인트 지급 (challengeSurvey 조회 불필요)
+      if (surveyType === SurveyType.AFTER) {
+        // 이미 사후 문진 포인트를 받았는지 확인
+        const existingRecord = await tx.userRecord.findFirst({
+          where: {
+            userId,
+            userChallengeId: userChallenge.id,
+            recordType: 'AFTER_SURVEY'
+          }
+        });
+
+        if (existingRecord) {
+          this.logger.log(`사후 문진 이미 완료됨 - 사용자: ${userId}`);
+          return;
+        }
+
+        // AFTER_SURVEY 미션 정보 조회
+        const afterSurveyMission = await tx.mission.findFirst({
+          where: {
+            recordType: 'AFTER_SURVEY',
+            isActive: true
+          },
+          select: { id: true, points: true, name: true }
+        });
+
+        const pointsEarned = afterSurveyMission?.points || 3000; // 기본값 3000P
+
+        // user_records에 AFTER_SURVEY 기록 생성
+        const userRecord = await tx.userRecord.create({
+          data: {
+            userId,
+            userChallengeId: userChallenge.id,
+            recordType: 'AFTER_SURVEY',
+            date: new Date(todayStr),
+            metadata: {
+              surveyId,
+              isCompleted: true,
+              pointsEarned,
+              day: currentDay
+            },
+            createdAt: getNowKST()
+          }
+        });
+
+        // 포인트 지급
+        await this.pointService.awardPointsInTransaction(
+          tx,
+          userId,
+          pointsEarned,
+          `사후 문진 완료`,
+          PointRelatedType.AFTER_SURVEY,
+          userRecord.id,
+          'AFTER_SURVEY'
+        );
+
+        // userChallenge 총 포인트 업데이트
+        await tx.userChallenge.update({
+          where: { id: userChallenge.id },
+          data: { totalPoints: { increment: pointsEarned } }
+        });
+
+        this.logger.log(`사후 문진 포인트 지급 완료 - 사용자: ${userId}, 포인트: ${pointsEarned}P`);
+        return;
+      }
+
+      // 3️⃣ 사전 문진(BEFORE)인 경우 기존 로직 유지
       const todaySurvey = await tx.challengeSurvey.findFirst({
         where: {
-          productId: activeChallenge.productId,
+          productId: userChallenge.productId,
           day: currentDay,
-          surveyId: productIdOrSurveyId,  // 완료한 설문이 오늘의 설문과 일치하는지 확인
+          surveyId,
           isActive: true
         },
         include: { survey: true }
       });
 
       if (!todaySurvey) {
-        this.logger.log(`설문 완료 - 완료한 설문(${productIdOrSurveyId})이 오늘(${currentDay}일차) 챌린지 설문이 아님`);
+        this.logger.log(`설문 완료 - 완료한 설문(${surveyId})이 오늘(${currentDay}일차) 챌린지 설문이 아님`);
         return;
       }
 
-      // 3️⃣ DailyProgress 조회/생성
+      // 4️⃣ DailyProgress 조회/생성
       let dailyProgress = await tx.dailyProgress.findFirst({
         where: {
-          userChallengeId: activeChallenge.id,
+          userChallengeId: userChallenge.id,
           day: currentDay
         }
       });
@@ -706,7 +777,7 @@ export class SurveyService {
         const now = getNowKST();
         dailyProgress = await tx.dailyProgress.create({
           data: {
-            userChallengeId: activeChallenge.id,
+            userChallengeId: userChallenge.id,
             day: currentDay,
             date: new Date(todayStr),
             createdAt: now,
@@ -715,11 +786,11 @@ export class SurveyService {
         });
       }
 
-      // 4️⃣ DailyProgress 업데이트 (설문 완료 횟수만 증가, 포인트 지급 없음)
+      // 5️⃣ DailyProgress 업데이트
       await tx.dailyProgress.update({
         where: {
           userChallengeId_day: {
-            userChallengeId: activeChallenge.id,
+            userChallengeId: userChallenge.id,
             day: currentDay
           }
         },
@@ -728,7 +799,7 @@ export class SurveyService {
         }
       });
 
-      this.logger.log(`설문 완료 챌린지 연동 성공 - 사용자: ${userId}, 설문: ${todaySurvey.survey.name}`);
+      this.logger.log(`설문 완료 챌린지 연동 성공 - 사용자: ${userId}, 설문: ${todaySurvey.survey.name}, 타입: ${surveyType}`);
 
     } catch (error) {
       this.logger.error('설문 완료 챌린지 연동 실패:', error);
