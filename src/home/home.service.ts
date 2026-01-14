@@ -815,9 +815,11 @@ export class HomeService {
       // 퀴즈 상태 계산
       const quizStatus = await this.getQuizStatusForLecture(context.userId, contentInfo?.id, currentDay);
 
+      // 기획: 제목 = bannerTitle (강의별 배너 문구), 문구 = "Day XX"
+      const dayString = String(currentDay || 1).padStart(2, '0');
       return {
-        title: contentInfo?.title || '오늘의 강의',
-        description: `Day ${currentDay || 1}`,
+        title: contentInfo?.bannerTitle || contentInfo?.title || '오늘의 강의',
+        description: `Day ${dayString}`,
         imageUrl: bannerImageUrl,
         linkType: HomeBannerLinkType.INTERNAL,
         contentType: HomeBannerContentType.LECTURE,
@@ -890,7 +892,7 @@ export class HomeService {
    * @param currentDay 챌린지 현재 일차
    * @returns 해당 일차 강의 또는 fallback 강의
    */
-  private async getLectureByDay(currentDay?: number): Promise<{ id: number; title: string; type: string } | null> {
+  private async getLectureByDay(currentDay?: number): Promise<{ id: number; title: string; bannerTitle: string | null; type: string } | null> {
     // n일차 → day_number n인 강의 반환
     if (currentDay) {
       const lecture = await this.prisma.content.findFirst({
@@ -899,7 +901,7 @@ export class HomeService {
           dayNumber: currentDay,
           isActive: true,
         },
-        select: { id: true, title: true, type: true },
+        select: { id: true, title: true, bannerTitle: true, type: true },
       });
 
       if (lecture) {
@@ -914,7 +916,7 @@ export class HomeService {
             isActive: true,
           },
           orderBy: { dayNumber: 'desc' },
-          select: { id: true, title: true, type: true },
+          select: { id: true, title: true, bannerTitle: true, type: true },
         });
 
         if (lastLecture) {
@@ -930,7 +932,7 @@ export class HomeService {
         isActive: true,
       },
       orderBy: { sortOrder: 'asc' },
-      select: { id: true, title: true, type: true },
+      select: { id: true, title: true, bannerTitle: true, type: true },
     });
   }
 
