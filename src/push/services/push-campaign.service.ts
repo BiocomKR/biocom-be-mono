@@ -101,15 +101,32 @@ export class PushCampaignService {
       }
 
       // ---------------------------------------------------------------
+      // Step 0.5: 테스트 모드 체크
+      // - isTest=true면 testUserIds에게만 발송
+      // - testUserIds가 비어있으면 발송 스킵
+      // ---------------------------------------------------------------
+      if (schedule.isTest) {
+        if (!schedule.testUserIds || schedule.testUserIds.length === 0) {
+          this.logger.warn(`⚠️ [PushCampaignService] 테스트 모드지만 testUserIds가 비어있음: scheduleId=${schedule.id}`);
+          return { success: false, message: '테스트 모드이지만 테스트 대상 유저가 없습니다', campaignId: null };
+        }
+        this.logger.log(`🧪 [PushCampaignService] 테스트 모드: ${schedule.testUserIds.length}명에게만 발송`);
+      }
+
+      // ---------------------------------------------------------------
       // Step 1: 대상 유저 조회
       // - schedule.targetQuery에 정의된 조건으로 유저 필터링
-      // - 현재는 userId 배열만 반환
-      //
-      // TODO [AI 개발자]: 여기서 characterId도 함께 조회하도록 수정 필요
-      // 예: [{ userId: 1, characterId: 2 }, { userId: 3, characterId: 1 }]
+      // - 테스트 모드면 testUserIds로 제한
       // ---------------------------------------------------------------
       const targetQuery = schedule.targetQuery || {};
-      const targetUsers = await this.getTargetUsers(targetQuery);
+      let targetUsers = await this.getTargetUsers(targetQuery);
+
+      // 테스트 모드면 testUserIds와 교집합
+      if (schedule.isTest && schedule.testUserIds?.length > 0) {
+        const testUserSet = new Set(schedule.testUserIds);
+        targetUsers = targetUsers.filter((userId) => testUserSet.has(userId));
+        this.logger.log(`🧪 [PushCampaignService] 테스트 대상으로 필터링: ${targetUsers.length}명`);
+      }
 
       // ---------------------------------------------------------------
       // Step 2: 캠페인 레코드 생성 (상태: PENDING)
@@ -164,7 +181,7 @@ export class PushCampaignService {
           },
         },
         PushNotificationType.SYSTEM,
-        false, // isTest = false (실제 발송)
+        schedule.isTest ?? false, // 테스트 모드 여부
       );
 
       this.logger.log(

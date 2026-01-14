@@ -66,6 +66,8 @@ model User {
   nightPushEnabled             Boolean                        @default(true) @map("night_push_enabled")
   /// 테스터 여부 (통계/기록에서 제외)
   isTester                     Boolean                        @default(false) @map("is_tester")
+  /// 마지막 접속 시간 (미접속 조건 푸시용)
+  lastSeenAt                   DateTime?                      @map("last_seen_at")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
@@ -101,6 +103,7 @@ model User {
   aiPersona                    AiPersona?                     @relation(fields: [aiPersonaId], references: [id], map: "users_character_id_fkey")
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
+  notificationInbox            NotificationInbox[]
 
   @@map("users")
 }
@@ -175,6 +178,8 @@ model Content {
   createdAt       DateTime         @map("created_at")
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   challengeId     Int?             @map("challenge_id")
+  /// 홈 배너 타이틀 (LECTURE용, 예: "10살 어려지는 식단 비법")
+  bannerTitle     String?          @map("banner_title") @db.VarChar(200)
   contentFiles    ContentFile[]
   challenge       Product?         @relation("ChallengeContents", fields: [challengeId], references: [id])
   lectureProducts LectureProduct[]
@@ -388,8 +393,6 @@ model Mission {
   id                    Int                @id @default(autoincrement())
   name                  String
   description           String?
-  /// 배너 타이틀 (강의용)
-  bannerTitle           String?            @map("banner_title") @db.VarChar(200)
   points                Int
   requireUpload         Boolean            @default(false) @map("require_upload")
   sortOrder             Int                @map("sort_order")
@@ -2072,9 +2075,9 @@ model PushNotificationSchedule {
   cronExpression     String?                    @map("cron_expression") @db.VarChar(50)
   /// 단발성 예약 시간 (ONCE 타입일 때 사용)
   oneTimeScheduledAt DateTime?                  @map("one_time_scheduled_at")
-  /// 제목
+  /// 제목 (목록 표시용, 실제 발송 시에는 personaMessages 사용)
   title              String                     @db.VarChar(100)
-  /// 본문 템플릿
+  /// 본문 템플릿 (목록 표시용, 실제 발송 시에는 personaMessages 사용)
   bodyTemplate       String                     @map("body_template")
   /// 이미지 URL
   imageUrl           String?                    @map("image_url") @db.VarChar(500)
@@ -2089,11 +2092,13 @@ model PushNotificationSchedule {
   conditionParams    Json?                      @map("condition_params")
   /// 랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)
   landingType        String?                    @map("landing_type") @db.VarChar(50)
-  /// 랜딩 파라미터 (JSON: { day: 7 }, { missionType: 'FOOD' } 등)
+  /// 랜딩 파라미터 (day만 사용: { day: 7 })
   landingParams      Json?                      @map("landing_params")
-  /// 페르소나별 메시지 (JSON: { default: {...}, STELLA: {...}, ... })
+  /// 페르소나별 메시지 (실제 발송에 사용)
+  /// BIOCOM: { default: { title, body } }
+  /// PERSONA: { STELLA: { title, body }, MAEVE: {...}, HAZEL: {...}, IAN: {...}, THEO: {...}, HENRY: {...} }
   personaMessages    Json?                      @map("persona_messages")
-  /// 발신자 타입 (BIOCOM | PERSONA)
+  /// 발신자 타입 (BIOCOM: default 메시지 사용, PERSONA: 유저 페르소나별 메시지 사용)
   senderType         String?                    @map("sender_type") @db.VarChar(20)
   /// 반복 발송 시작일 (RECURRING 타입일 때 유효 기간 시작)
   startDate          DateTime?                  @map("start_date")
@@ -2101,6 +2106,14 @@ model PushNotificationSchedule {
   endDate            DateTime?                  @map("end_date")
   /// 활성화 여부
   isActive           Boolean                    @default(true) @map("is_active")
+  /// 테스트 모드 여부 (true면 testUserIds에게만 발송)
+  isTest             Boolean                    @default(true) @map("is_test")
+  /// 테스트 대상 유저 ID 배열 (빈 배열이면 발송 안 함)
+  testUserIds        Int[]                      @default([]) @map("test_user_ids")
+  /// 푸시 그룹 (중복 발송 방지용, 그룹당 1개만 발송)
+  pushGroup          String                     @default("MISSION") @map("push_group") @db.VarChar(20)
+  /// 우선순위 (높을수록 우선, 같은 그룹 내 선정 기준)
+  priority           Int                        @default(500)
   /// 마지막 실행 시간
   lastExecutedAt     DateTime?                  @map("last_executed_at")
   /// 다음 실행 예정 시간
@@ -2122,6 +2135,9 @@ model PushNotificationSchedule {
   @@index([nextExecutionAt])
   @@index([startDate, endDate])
   @@index([conditionType])
+  @@index([isTest])
+  @@index([pushGroup])
+  @@index([pushGroup, priority])
   @@map("push_notification_schedules")
 }
 
@@ -2239,6 +2255,41 @@ model PushNotificationLog {
   @@index([pushCode])
   @@index([userId], map: "idx_push_notification_logs_user_id")
   @@map("push_notification_logs")
+}
+
+/// 알림함 테이블
+/// 앱 내에서 유저가 받은 푸시 알림 목록을 저장 (인앱 알림함)
+model NotificationInbox {
+  /// 고유 ID
+  id          Int       @id @default(autoincrement())
+  /// 유저 ID
+  userId      Int       @map("user_id")
+  /// 제목
+  title       String    @db.VarChar(200)
+  /// 본문
+  body        String    @db.Text
+  /// 이미지 URL
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
+  /// 푸시 타입 (REMIND, MARKETING 등)
+  type        String?   @db.VarChar(50)
+  /// 추가 데이터 (랜딩 정보 등)
+  data        Json?
+  /// 읽음 여부
+  isRead      Boolean   @default(false) @map("is_read")
+  /// 읽은 시간
+  readAt      DateTime? @map("read_at")
+  /// 삭제 여부 (soft delete)
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  /// 삭제 시간
+  deletedAt   DateTime? @map("deleted_at")
+  /// 생성일시
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, isDeleted])
+  @@index([userId, createdAt])
+  @@map("notification_inbox")
 }
 
 model SupplementNutrient {
