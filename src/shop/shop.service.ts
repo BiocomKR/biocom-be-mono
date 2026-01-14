@@ -299,12 +299,16 @@ export class ShopService {
 
   /**
    * 상품 이미지 업로드 (MAIN/CONTENT 타입)
+   * @param reorderJson - 기존 이미지 순서 변경 정보 (JSON 배열: [{id: ProductFile.id, sortOrder: number}])
+   * @param newFileSortOrdersJson - 새 파일 순서 정보 (JSON 배열: [sortOrder1, sortOrder2, ...], files 순서와 1:1 매칭)
    */
   async uploadProductImages(
     productId: number,
     files?: Express.Multer.File[],
     deleteFileIdsJson?: string,
-    imageType: string = 'MAIN'
+    imageType: string = 'MAIN',
+    reorderJson?: string,
+    newFileSortOrdersJson?: string
   ) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
@@ -326,6 +330,26 @@ export class ShopService {
         deleteProductFileIds = JSON.parse(deleteFileIdsJson);
       } catch {
         this.logger.warn(`deleteFileIds 파싱 실패: ${deleteFileIdsJson}`);
+      }
+    }
+
+    // 순서 변경 정보 파싱 (ProductFile.id와 새 sortOrder 배열)
+    let reorderData: { id: number; sortOrder: number }[] = [];
+    if (reorderJson) {
+      try {
+        reorderData = JSON.parse(reorderJson);
+      } catch {
+        this.logger.warn(`reorder 파싱 실패: ${reorderJson}`);
+      }
+    }
+
+    // 새 파일 순서 정보 파싱 (files 배열과 1:1 매칭)
+    let newFileSortOrders: number[] = [];
+    if (newFileSortOrdersJson) {
+      try {
+        newFileSortOrders = JSON.parse(newFileSortOrdersJson);
+      } catch {
+        this.logger.warn(`newFileSortOrders 파싱 실패: ${newFileSortOrdersJson}`);
       }
     }
 
@@ -367,14 +391,31 @@ export class ShopService {
         this.logger.log(`상품 이미지 관계 삭제: 상품 ID ${productId}, ProductFile IDs ${deleteProductFileIds.join(', ')}`);
       }
 
+      // 기존 이미지 순서 변경
+      if (reorderData.length > 0) {
+        for (const item of reorderData) {
+          await tx.productFile.update({
+            where: { id: item.id },
+            data: { sortOrder: item.sortOrder },
+          });
+        }
+        this.logger.log(`상품 이미지 순서 변경: 상품 ID ${productId}, ${reorderData.length}개 이미지`);
+      }
+
       // 새 파일 추가 (imageType에 따라 MAIN 또는 CONTENT)
       if (newFileIds.length > 0) {
+        // 새 파일 순서가 지정된 경우 해당 순서 사용, 없으면 기존 순서 다음부터
+        const useCustomSortOrder = newFileSortOrders.length === newFileIds.length;
+        const fallbackStartOrder = reorderData.length > 0
+          ? Math.max(...reorderData.map(r => r.sortOrder)) + 1
+          : maxSortOrder + 1;
+
         await tx.productFile.createMany({
           data: newFileIds.map((fileId, index) => ({
             productId,
             fileId,
             imageType: imageType || 'MAIN',
-            sortOrder: maxSortOrder + 1 + index,
+            sortOrder: useCustomSortOrder ? newFileSortOrders[index] : fallbackStartOrder + index,
             createdAt: getNowKST(),
           })),
         });

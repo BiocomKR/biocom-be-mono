@@ -206,7 +206,7 @@ function createExtendedPrismaClient() {
       $allModels: {
         async update({ args, query, model }) {
           // updatedAt 컬럼이 없는 모델 제외
-          const modelsWithoutUpdatedAt: string[] = [];
+          const modelsWithoutUpdatedAt: string[] = ['ProductFile', 'ContentFile'];
           if (args.data && typeof args.data === 'object' && !modelsWithoutUpdatedAt.includes(model)) {
             (args.data as any).updatedAt = getNowKST();
           }
@@ -214,7 +214,7 @@ function createExtendedPrismaClient() {
         },
         async updateMany({ args, query, model }) {
           // updatedAt 컬럼이 없는 모델 제외
-          const modelsWithoutUpdatedAt: string[] = [];
+          const modelsWithoutUpdatedAt: string[] = ['ProductFile', 'ContentFile'];
           if (args.data && typeof args.data === 'object' && !modelsWithoutUpdatedAt.includes(model)) {
             (args.data as any).updatedAt = getNowKST();
           }
@@ -422,6 +422,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 사용자 차트 테이블
   get userChart() { return this.prisma.userChart; }
+  get userDeepReport() { return this.prisma.userDeepReport; }
 
   // 영양제 루틴 테이블
   get userSupplementRoutine() { return this.prisma.userSupplementRoutine; }

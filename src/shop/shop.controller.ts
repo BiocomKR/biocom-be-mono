@@ -82,6 +82,8 @@ export class ShopController {
 
   /**
    * 상품 이미지 업로드 (MAIN/CONTENT 타입)
+   * @param reorder - 기존 이미지 순서 변경 정보 (JSON 배열: [{id: ProductFile.id, sortOrder: number}])
+   * @param newFileSortOrders - 새 파일 순서 정보 (JSON 배열: [sortOrder1, sortOrder2, ...], files 순서와 1:1 매칭)
    */
   @Post('products/:id/images')
   @ApiConsumes('multipart/form-data')
@@ -91,8 +93,10 @@ export class ShopController {
     @UploadedFiles() files: Express.Multer.File[],
     @Body('deleteFileIds') deleteFileIds?: string,
     @Body('imageType') imageType?: string,
+    @Body('reorder') reorder?: string,
+    @Body('newFileSortOrders') newFileSortOrders?: string,
   ) {
-    return this.shopService.uploadProductImages(id, files, deleteFileIds, imageType);
+    return this.shopService.uploadProductImages(id, files, deleteFileIds, imageType, reorder, newFileSortOrders);
   }
 
   /**
