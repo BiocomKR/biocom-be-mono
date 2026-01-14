@@ -58,17 +58,139 @@ export class SurveyController {
     private readonly prisma: PrismaService,
   ) {}
 
+  // ==================== 내 설문 엔드포인트 (type 기반) ====================
+
+  /**
+   * 내 활성 챌린지 설문 질문 조회
+   * 로그인한 사용자의 활성 챌린지에서 자동으로 surveyId를 찾아 질문을 반환
+   */
+  @Get('my/questions')
+  @ApiOperation({
+    summary: '[앱용] 내 챌린지 설문 질문 조회',
+    description: `현재 로그인한 사용자의 활성 챌린지에 연결된 설문 질문을 조회합니다.
+
+**특징:**
+- challengeSurveyId를 알 필요 없이 자동으로 활성 챌린지의 설문을 찾습니다
+- type 파라미터로 사전설문(BEFORE) / 사후설문(AFTER) 구분
+- 푸시 알림 등으로 바로 진입해도 정상 동작합니다
+
+**응답 데이터:**
+- 질문 목록 (category 순서: 염증 → 대사밸런스 → 장건강 → 면역과민반응)
+- 각 질문에 options 배열 포함 (id, text, score)`,
+  })
+  @ApiQuery({
+    name: 'type',
+    required: true,
+    enum: ['BEFORE', 'AFTER'],
+    description: '설문 타입 (BEFORE: 사전설문, AFTER: 사후설문)',
+    example: 'BEFORE',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: '설문 질문 목록이 성공적으로 조회되었습니다.',
+    type: [SurveyQuestionResponseDto],
+  })
+  async getMyQuestions(
+    @Req() req: Request,
+    @Query('type') type: SurveyType,
+  ): Promise<ApiResponseDto<SurveyQuestionResponseDto[]>> {
+    this.logger.log(`내 설문 질문 조회 요청 - 사용자: ${req.user.sub}, 타입: ${type}`);
+
+    try {
+      const questions = await this.surveyService.findMyQuestions(req.user.sub, type);
+
+      this.logger.log(`내 설문 질문 조회 성공 - 총 ${questions.length}개`);
+
+      return {
+        success: true,
+        message: '설문 질문이 성공적으로 조회되었습니다.',
+        data: questions,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`내 설문 질문 조회 실패 - 사용자: ${req.user.sub}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 내 활성 챌린지 설문 완료
+   * 로그인한 사용자의 활성 챌린지에서 자동으로 surveyId를 찾아 설문 제출
+   */
+  @Post('my/complete')
+  @ApiOperation({
+    summary: '[앱용] 내 챌린지 설문 완료',
+    description: `현재 로그인한 사용자의 활성 챌린지에 설문 답변을 제출합니다.
+
+**특징:**
+- challengeSurveyId를 알 필요 없이 자동으로 활성 챌린지의 설문을 찾습니다
+- 푸시 알림 등으로 바로 진입해도 정상 동작합니다
+
+**Request Body:**
+\`\`\`json
+{
+  "type": "BEFORE",
+  "answers": [
+    { "questionId": 1, "optionId": 3 },
+    { "questionId": 2, "optionId": 4 },
+    ...
+  ]
+}
+\`\`\`
+
+**주의사항:**
+- 같은 type으로 재제출 시 기존 답변이 덮어쓰기 됩니다
+- 모든 질문에 답변해야 합니다 (25개)`,
+  })
+  @ApiBody({
+    type: CompleteSurveyDto,
+    description: '설문 타입(BEFORE/AFTER)과 답변 목록',
+  })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: '설문이 성공적으로 완료되었습니다.',
+  })
+  async completeMySurvey(
+    @Req() req: Request,
+    @Body() completeSurveyDto: CompleteSurveyDto,
+  ): Promise<ApiResponseDto<any>> {
+    this.logger.log(`내 설문 완료 요청 - 사용자: ${req.user.sub}, 타입: ${completeSurveyDto.type}`);
+
+    try {
+      const result = await this.surveyService.completeMySurvey(
+        req.user.sub,
+        completeSurveyDto.type,
+        completeSurveyDto.answers,
+      );
+
+      this.logger.log(`내 설문 완료 성공 - 사용자: ${req.user.sub}, 동물: ${result.animalCharacter || '미배정'}`);
+
+      return {
+        success: true,
+        message: '설문이 성공적으로 완료되었습니다.',
+        data: result,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      this.logger.error(`내 설문 완료 실패 - 사용자: ${req.user.sub}`, error);
+      throw error;
+    }
+  }
+
   // ==================== 설문 질문 관련 엔드포인트 ====================
 
   /**
-   * 챌린지 설문 질문 조회 (권장)
+   * 챌린지 설문 질문 조회
+   *
+   * @deprecated GET /surveys/my/questions 사용을 권장합니다.
+   * challengeSurveyId를 알아야 하는 번거로움이 있어 새 엔드포인트로 대체 예정입니다.
    *
    * @param challengeSurveyId 챌린지_설문 매핑 ID (challenge_surveys.id)
    * @returns 설문 질문 목록 (선택지 포함)
    */
   @Get(':challengeSurveyId/questions')
   @ApiOperation({
-    summary: '[권장] 챌린지 설문 질문 조회',
+    summary: '[Deprecated] 챌린지 설문 질문 조회 - GET /surveys/my/questions 사용 권장',
     description: `설문 질문 목록을 조회합니다. 각 질문에는 5개의 선택지(옵션)가 포함되어 있습니다.
 
 **사용 방법:**
@@ -198,11 +320,14 @@ export class SurveyController {
   // ==================== 설문 완료 및 비교 엔드포인트 ====================
 
   /**
-   * 챌린지 설문 완료 (권장)
+   * 챌린지 설문 완료
+   *
+   * @deprecated POST /surveys/my/complete 사용을 권장합니다.
+   * challengeSurveyId를 알아야 하는 번거로움이 있어 새 엔드포인트로 대체 예정입니다.
    */
   @Post(':challengeSurveyId/complete')
   @ApiOperation({
-    summary: '[권장] 챌린지 설문 완료',
+    summary: '[Deprecated] 챌린지 설문 완료 - POST /surveys/my/complete 사용 권장',
     description: `설문 답변을 제출하고 분석 결과를 받습니다.
 
 **사용 방법:**
