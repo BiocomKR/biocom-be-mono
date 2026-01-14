@@ -178,6 +178,8 @@ model Content {
   createdAt       DateTime         @map("created_at")
   updatedAt       DateTime?        @updatedAt @map("updated_at")
   challengeId     Int?             @map("challenge_id")
+  /// 홈 배너 타이틀 (LECTURE용, 예: "10살 어려지는 식단 비법")
+  bannerTitle     String?          @map("banner_title") @db.VarChar(200)
   contentFiles    ContentFile[]
   challenge       Product?         @relation("ChallengeContents", fields: [challengeId], references: [id])
   lectureProducts LectureProduct[]
@@ -391,8 +393,6 @@ model Mission {
   id                    Int                @id @default(autoincrement())
   name                  String
   description           String?
-  /// 배너 타이틀 (강의용)
-  bannerTitle           String?            @map("banner_title") @db.VarChar(200)
   points                Int
   requireUpload         Boolean            @default(false) @map("require_upload")
   sortOrder             Int                @map("sort_order")
@@ -2075,9 +2075,9 @@ model PushNotificationSchedule {
   cronExpression     String?                    @map("cron_expression") @db.VarChar(50)
   /// 단발성 예약 시간 (ONCE 타입일 때 사용)
   oneTimeScheduledAt DateTime?                  @map("one_time_scheduled_at")
-  /// 제목
+  /// 제목 (목록 표시용, 실제 발송 시에는 personaMessages 사용)
   title              String                     @db.VarChar(100)
-  /// 본문 템플릿
+  /// 본문 템플릿 (목록 표시용, 실제 발송 시에는 personaMessages 사용)
   bodyTemplate       String                     @map("body_template")
   /// 이미지 URL
   imageUrl           String?                    @map("image_url") @db.VarChar(500)
@@ -2092,11 +2092,13 @@ model PushNotificationSchedule {
   conditionParams    Json?                      @map("condition_params")
   /// 랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)
   landingType        String?                    @map("landing_type") @db.VarChar(50)
-  /// 랜딩 파라미터 (JSON: { day: 7 }, { missionType: 'FOOD' } 등)
+  /// 랜딩 파라미터 (day만 사용: { day: 7 })
   landingParams      Json?                      @map("landing_params")
-  /// 페르소나별 메시지 (JSON: { default: {...}, STELLA: {...}, ... })
+  /// 페르소나별 메시지 (실제 발송에 사용)
+  /// BIOCOM: { default: { title, body } }
+  /// PERSONA: { STELLA: { title, body }, MAEVE: {...}, HAZEL: {...}, IAN: {...}, THEO: {...}, HENRY: {...} }
   personaMessages    Json?                      @map("persona_messages")
-  /// 발신자 타입 (BIOCOM | PERSONA)
+  /// 발신자 타입 (BIOCOM: default 메시지 사용, PERSONA: 유저 페르소나별 메시지 사용)
   senderType         String?                    @map("sender_type") @db.VarChar(20)
   /// 반복 발송 시작일 (RECURRING 타입일 때 유효 기간 시작)
   startDate          DateTime?                  @map("start_date")

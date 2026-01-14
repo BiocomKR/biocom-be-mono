@@ -208,6 +208,7 @@ export class ContentService {
       sortOrder?: number | string;
       points?: number | string;
       challengeId?: number | string;
+      bannerTitle?: string;
     },
     files?: Express.Multer.File[],
   ) {
@@ -243,6 +244,7 @@ export class ContentService {
           sortOrder,
           points,
           challengeId,
+          bannerTitle: data.bannerTitle || null,
           createdAt: getNowKST(),
         },
       });
@@ -280,6 +282,7 @@ export class ContentService {
       sortOrder: number | string;
       points: number | string;
       challengeId: number | string;
+      bannerTitle: string;
       deleteFileIds: string; // JSON 문자열 "[1,2,3]" 형태
     }>,
     files?: Express.Multer.File[],
@@ -302,6 +305,7 @@ export class ContentService {
     if (data.sortOrder !== undefined) updateData.sortOrder = Number(data.sortOrder);
     if (data.points !== undefined) updateData.points = Number(data.points);
     if (data.challengeId !== undefined) updateData.challengeId = data.challengeId ? Number(data.challengeId) : null;
+    if (data.bannerTitle !== undefined) updateData.bannerTitle = data.bannerTitle || null;
 
     // 삭제할 파일 ID 파싱
     let deleteFileIds: number[] = [];
