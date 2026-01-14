@@ -7,12 +7,12 @@ import { CommonModule } from '../common/common.module';
 /**
  * 설문 모듈
  * 설문 관리와 관련된 모든 컴포넌트를 관리하는 모듈
- * 
+ *
  * 포함 컴포넌트:
  * - SurveyController: 설문 관련 HTTP 요청 처리
  * - SurveyService: 설문 비즈니스 로직 처리
  * - PrismaService: 데이터베이스 연결 및 쿼리 처리
- * 
+ *
  * 관리하는 엔티티:
  * - SurveyQuestion: 설문 질문
  * - SurveyOption: 설문 선택지
