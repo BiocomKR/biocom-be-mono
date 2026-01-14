@@ -68,6 +68,8 @@ model User {
   isTester                     Boolean                        @default(false) @map("is_tester")
   /// 마지막 접속 시간 (미접속 조건 푸시용)
   lastSeenAt                   DateTime?                      @map("last_seen_at")
+  /// 솔루션 확인 시간 (솔루션 페이지 진입 시 기록)
+  solutionSeenAt               DateTime?                      @map("solution_seen_at")
   cart                         Cart?
   challengeTickets             ChallengeTicket[]
   iapReceipts                  IAPReceipt[]
@@ -1573,6 +1575,8 @@ model Coupon {
   validHours        Int                      @default(48) @map("valid_hours")
   /// 활성화 여부
   isActive          Boolean                  @default(true) @map("is_active")
+  /// 쿠폰 이미지 URL
+  imageUrl          String?                  @map("image_url")
   /// 생성일시
   createdAt         DateTime                 @map("created_at")
   /// 수정일시
