@@ -221,7 +221,7 @@ export class SurveyService {
   }
 
   /**
-   * 설문 결과 분석
+   * 설문 결과 분석 (타입별 분기)
    */
   async analyzeSurveyResult(
     userId: number,
@@ -235,12 +235,36 @@ export class SurveyService {
     sleepScore?: number;
     recommendMetaDream?: boolean;
   }> {
+    // 사전설문: 동물 할당 + 영양제 루틴 생성
+    if (type === SurveyType.BEFORE) {
+      return this.analyzePreSurveyResult(userId, tx);
+    }
+    // 사후설문: 점수 계산만
+    return this.analyzePostSurveyResult(userId, tx);
+  }
+
+  /**
+   * 사전설문 결과 분석
+   * - 카테고리별 점수 계산
+   * - 건강유형 동물 할당
+   * - 영양제 루틴 생성
+   */
+  private async analyzePreSurveyResult(
+    userId: number,
+    tx?: Prisma.TransactionClient
+  ): Promise<{
+    categoryScores: Record<string, number>;
+    totalScore: number;
+    dominantCategory: string | null;
+    animalCharacter?: string;
+    sleepScore?: number;
+    recommendMetaDream?: boolean;
+  }> {
     const prismaClient = tx || this.prisma;
 
     // 트랜잭션 내부에서 답변 조회
-    const where: Prisma.SurveyAnswerWhereInput = { userId, type };
     const answers = await prismaClient.surveyAnswer.findMany({
-      where,
+      where: { userId, type: SurveyType.BEFORE },
       include: {
         surveyQuestion: true,
         surveyOption: true,
@@ -253,7 +277,7 @@ export class SurveyService {
     });
 
     if (answers.length === 0) {
-      throw new NotFoundException(`${type === SurveyType.BEFORE ? '사전' : '사후'} 설문 답변이 없습니다.`);
+      throw new NotFoundException('사전 설문 답변이 없습니다.');
     }
 
     // 카테고리별 점수 계산
@@ -288,9 +312,8 @@ export class SurveyService {
       }
     }
 
-    // 동물 캐릭터 매칭
+    // 동물 캐릭터 매칭 및 영양제 루틴 생성
     let animalCharacter: string | undefined;
-    let healthTypeAnimalId: number | undefined;
 
     if (dominantCategory) {
       const healthTypeAnimal = await prismaClient.healthTypeAnimal.findUnique({
@@ -299,7 +322,7 @@ export class SurveyService {
 
       if (healthTypeAnimal) {
         animalCharacter = healthTypeAnimal.animalName;
-        healthTypeAnimalId = healthTypeAnimal.id;
+        const healthTypeAnimalId = healthTypeAnimal.id;
 
         // 1. users 테이블의 health_type_animal_id에 동물id 업데이트
         await prismaClient.user.update({
@@ -309,7 +332,7 @@ export class SurveyService {
           },
         });
 
-        this.logger.log(`사용자 ${userId}에게 동물 ${animalCharacter} (ID: ${healthTypeAnimalId}) 할당 완료`);
+        this.logger.log(`[사전설문] 사용자 ${userId}에게 동물 ${animalCharacter} (ID: ${healthTypeAnimalId}) 할당 완료`);
 
         // 2. health_type_animal_products 테이블에서 동물id로 조회
         const animalProducts = await prismaClient.healthTypeAnimalProduct.findMany({
@@ -318,21 +341,21 @@ export class SurveyService {
             isActive: true,
           },
           orderBy: {
-            displayOrder: 'asc', // 1, 2, 3 순서대로
+            displayOrder: 'asc',
           },
         });
 
-        this.logger.log(`동물 ${animalCharacter}의 맞춤 영양제 ${animalProducts.length}개 조회 완료`);
+        this.logger.log(`[사전설문] 동물 ${animalCharacter}의 맞춤 영양제 ${animalProducts.length}개 조회 완료`);
 
         // 3. userSupplementRoutine 테이블에 기본 영양제 3종 insert
         if (animalProducts.length > 0) {
           const now = getNowKST();
 
-          // 기존 영양제 루틴 삭제 (중복 방지)
+          // 기존 기본 영양제 루틴 삭제 (중복 방지)
           await prismaClient.userSupplementRoutine.deleteMany({
             where: {
               userId,
-              isDefault: true, // 기본 영양제만 삭제
+              isDefault: true,
             },
           });
 
@@ -341,27 +364,25 @@ export class SurveyService {
             data: animalProducts.map((product, index) => ({
               userId,
               productId: product.productId,
-              isDefault: true, // 기본 영양제 표시
-              displayOrder: index + 1, // 1, 2, 3
+              isDefault: true,
+              displayOrder: index + 1,
               isActive: true,
               createdAt: now,
             })),
+            skipDuplicates: true,
           });
 
-          this.logger.log(`사용자 ${userId}의 영양제 루틴 ${animalProducts.length}개 생성 완료`);
+          this.logger.log(`[사전설문] 사용자 ${userId}의 영양제 루틴 ${animalProducts.length}개 생성 완료`);
         }
       }
     }
 
-    // 수면 문제 점수 (점수가 높을수록 수면 문제가 많음)
-    // 5문항 × 최대 20점 = 100점 만점
+    // 수면 문제 점수
     const sleepScore = categoryScores[HealthCategory.SLEEP] || 0;
-
-    // 수면 문제 점수가 60점 이상이면 메타드림 추천 (수면 문제가 심함)
     const recommendMetaDream = sleepScore >= 60;
 
     if (recommendMetaDream) {
-      this.logger.log(`사용자 ${userId} 수면 문제 점수 ${sleepScore}점 - 메타드림 추천`);
+      this.logger.log(`[사전설문] 사용자 ${userId} 수면 문제 점수 ${sleepScore}점 - 메타드림 추천`);
     }
 
     return {
@@ -369,6 +390,89 @@ export class SurveyService {
       totalScore,
       dominantCategory,
       animalCharacter,
+      sleepScore,
+      recommendMetaDream,
+    };
+  }
+
+  /**
+   * 사후설문 결과 분석
+   * - 카테고리별 점수 계산만 수행
+   * - 동물 할당 및 영양제 루틴 생성 없음
+   */
+  private async analyzePostSurveyResult(
+    userId: number,
+    tx?: Prisma.TransactionClient
+  ): Promise<{
+    categoryScores: Record<string, number>;
+    totalScore: number;
+    dominantCategory: string | null;
+    animalCharacter?: string;
+    sleepScore?: number;
+    recommendMetaDream?: boolean;
+  }> {
+    const prismaClient = tx || this.prisma;
+
+    // 트랜잭션 내부에서 답변 조회
+    const answers = await prismaClient.surveyAnswer.findMany({
+      where: { userId, type: SurveyType.AFTER },
+      include: {
+        surveyQuestion: true,
+        surveyOption: true,
+      },
+      orderBy: {
+        surveyQuestion: {
+          sortOrder: 'asc',
+        },
+      },
+    });
+
+    if (answers.length === 0) {
+      throw new NotFoundException('사후 설문 답변이 없습니다.');
+    }
+
+    // 카테고리별 점수 계산
+    const categoryScores: Record<string, number> = {};
+    let totalScore = 0;
+
+    for (const answer of answers) {
+      const category = answer.surveyQuestion.categoryCode;
+      const score = answer.surveyOption.score;
+
+      categoryScores[category] = (categoryScores[category] || 0) + score;
+      totalScore += score;
+    }
+
+    // health_type_animals 테이블에 있는 유효한 건강 타입만 조회
+    const validHealthTypes = await prismaClient.healthTypeAnimal.findMany({
+      select: { healthType: true },
+    });
+    const validTypesSet = new Set(validHealthTypes.map((t) => t.healthType));
+
+    // 최고 점수 카테고리 찾기 (유효한 건강 타입만 대상)
+    let dominantCategory: string | null = null;
+    let maxScore = 0;
+
+    for (const [category, score] of Object.entries(categoryScores)) {
+      if (!validTypesSet.has(category)) continue;
+
+      if (score > maxScore) {
+        maxScore = score;
+        dominantCategory = category;
+      }
+    }
+
+    // 수면 문제 점수
+    const sleepScore = categoryScores[HealthCategory.SLEEP] || 0;
+    const recommendMetaDream = sleepScore >= 60;
+
+    this.logger.log(`[사후설문] 사용자 ${userId} 점수 계산 완료 - 총점: ${totalScore}, 최고카테고리: ${dominantCategory}`);
+
+    return {
+      categoryScores,
+      totalScore,
+      dominantCategory,
+      // 사후설문에서는 동물 캐릭터 반환하지 않음 (기존 동물 유지)
       sleepScore,
       recommendMetaDream,
     };
@@ -1146,6 +1250,138 @@ export class SurveyService {
     }
 
     return results;
+  }
+
+  /**
+   * 사용자의 활성 챌린지 기반 설문 ID 조회
+   * @param userId 사용자 ID
+   * @param type 설문 타입 (BEFORE/AFTER) - Survey.type으로 필터링
+   * @returns challengeSurveyId (challenge_surveys 테이블의 PK)
+   */
+  async findMySurveyId(userId: number, type: SurveyType): Promise<number> {
+    this.logger.log(`사용자 ${userId}의 활성 챌린지 설문 ID 조회 - 타입: ${type}`);
+
+    // 1. 사용자의 활성 챌린지 조회
+    const userChallenge = await this.prisma.userChallenge.findFirst({
+      where: {
+        userId,
+        status: UserChallengeStatus.ACTIVE,
+      },
+      select: {
+        productId: true,
+      },
+    });
+
+    let productId: number;
+
+    if (userChallenge) {
+      productId = userChallenge.productId;
+    } else {
+      // 활성 챌린지가 없으면 기본 챌린지 상품에서 조회
+      this.logger.log(`사용자 ${userId}의 활성 챌린지 없음 - 기본 챌린지 상품 조회`);
+      const defaultProduct = await this.findDefaultChallengeProduct();
+      productId = defaultProduct.id;
+    }
+
+    // 2. 해당 상품의 설문 조회 (Survey.type으로 필터링)
+    const challengeSurvey = await this.prisma.challengeSurvey.findFirst({
+      where: {
+        productId,
+        isActive: true,
+        survey: {
+          type: type,
+          isActive: true,
+        },
+      },
+      select: {
+        id: true,
+        surveyId: true,
+      },
+    });
+
+    if (!challengeSurvey) {
+      throw new NotFoundException(`${type === SurveyType.BEFORE ? '사전' : '사후'}설문이 연결되어 있지 않습니다.`);
+    }
+
+    this.logger.log(`사용자 ${userId}의 챌린지 설문 ID: ${challengeSurvey.id} (surveyId: ${challengeSurvey.surveyId}, type: ${type})`);
+
+    return challengeSurvey.id;
+  }
+
+  /**
+   * 기본 챌린지 상품 조회
+   * ChallengeSurvey가 연결된 가장 첫 번째 상품 반환
+   *
+   * TODO: 추후 challenge, survey, mission 관계 재정비 후 ChallengeSurvey 테이블을 안 쓸 수도 있음
+   * 그때 이 로직도 함께 수정 필요
+   */
+  private async findDefaultChallengeProduct(): Promise<{ id: number }> {
+    // ChallengeSurvey가 연결된 상품 중 가장 오래된(id가 작은) 상품 조회
+    const challengeSurvey = await this.prisma.challengeSurvey.findFirst({
+      where: {
+        isActive: true,
+      },
+      orderBy: {
+        productId: 'asc',
+      },
+      select: {
+        productId: true,
+      },
+    });
+
+    if (!challengeSurvey) {
+      throw new NotFoundException('설문이 연결된 챌린지 상품이 없습니다.');
+    }
+
+    this.logger.log(`기본 챌린지 상품 조회 완료 - productId: ${challengeSurvey.productId}`);
+
+    return { id: challengeSurvey.productId };
+  }
+
+  /**
+   * 사용자의 활성 챌린지 기반 설문 질문 조회
+   * @param userId 사용자 ID
+   * @param type 설문 타입 (BEFORE/AFTER)
+   * @returns 설문 질문 목록
+   */
+  async findMyQuestions(userId: number, type: SurveyType) {
+    const challengeSurveyId = await this.findMySurveyId(userId, type);
+
+    const challengeSurvey = await this.prisma.challengeSurvey.findUnique({
+      where: { id: challengeSurveyId },
+      select: { surveyId: true },
+    });
+
+    if (!challengeSurvey) {
+      throw new NotFoundException('챌린지 설문 매핑을 찾을 수 없습니다.');
+    }
+
+    return await this.findQuestions(challengeSurvey.surveyId);
+  }
+
+  /**
+   * 사용자의 활성 챌린지 기반 설문 완료
+   * @param userId 사용자 ID
+   * @param type 설문 타입 (BEFORE/AFTER)
+   * @param answers 답변 목록
+   */
+  async completeMySurvey(
+    userId: number,
+    type: SurveyType,
+    answers: Array<{ questionId: number; optionId: number }>,
+  ) {
+    const challengeSurveyId = await this.findMySurveyId(userId, type);
+
+    const challengeSurvey = await this.prisma.challengeSurvey.findUnique({
+      where: { id: challengeSurveyId },
+      select: { surveyId: true },
+    });
+
+    if (!challengeSurvey) {
+      throw new NotFoundException('챌린지 설문 매핑을 찾을 수 없습니다.');
+    }
+
+    return await this.completeSurveyById(userId, challengeSurvey.surveyId, type, answers);
   }
 
   /**
