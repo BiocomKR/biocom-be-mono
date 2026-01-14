@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
-import { UserChallengeStatus, YesNo } from '../common/enums';
+import { UserChallengeStatus, YesNo, RecordType } from '../common/enums';
 import {
   HomeResponseDto,
   AnimalTypeDto,

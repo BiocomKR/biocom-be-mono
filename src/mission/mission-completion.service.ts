@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserChallengeStatus, PointRelatedType } from '../common/enums';
+import { UserChallengeStatus, PointRelatedType, RecordType } from '../common/enums';
 import { PointService } from '../point/point.service';
 import { CompleteMissionDto } from './dto/mission-completion.dto';
 import { Logger } from '@nestjs/common';
@@ -249,7 +249,7 @@ export class MissionCompletionService {
 
         // DAILY_MISSION이면 daily_missions 테이블에서 상세 정보 조회
         let dailyMissionData = dailyMission;
-        if (mission.recordType === 'DAILY_MISSION' && !dailyMissionData) {
+        if (mission.recordType === RecordType.DAILY_MISSION && !dailyMissionData) {
           dailyMissionData = await tx.dailyMission.findFirst({
             where: {
               missionId: mission.id,
