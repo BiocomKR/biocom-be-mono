@@ -1149,26 +1149,6 @@ export class SurveyService {
     }));
   }
 
-  /**
-   * 설문 질문 단건 조회
-   */
-  async findOneQuestion(id: number) {
-    this.logger.log(`설문 질문 단건 조회 - ID: ${id}`);
-
-    const question = await this.prisma.surveyQuestion.findUnique({
-      where: {
-        id,
-        isActive: true,
-      },
-    });
-
-    if (!question) {
-      throw new NotFoundException(`설문 질문 ID ${id}를 찾을 수 없습니다.`);
-    }
-
-    return question;
-  }
-
   // ==================== 테스트용 메서드 ====================
 
   /**
@@ -1382,33 +1362,5 @@ export class SurveyService {
     }
 
     return await this.completeSurveyById(userId, challengeSurvey.surveyId, type, answers);
-  }
-
-  /**
-   * 질문별 답변 조회
-   */
-  async findAnswersByQuestion(questionId: number, type?: SurveyType) {
-    this.logger.log(`질문별 답변 조회 - 질문ID: ${questionId}, 타입: ${type || '전체'}`);
-
-    const answers = await this.prisma.surveyAnswer.findMany({
-      where: {
-        surveyQuestionId: questionId,
-        ...(type && { type }),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        surveyQuestion: true,
-        surveyOption: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return answers;
   }
 }

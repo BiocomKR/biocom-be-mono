@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { CommonModule } from '../common/common.module';
-import { QuizMasterService } from './quiz-master.service';
 import { QuizCompletionController } from './quiz-completion.controller';
 import { QuizCompletionService } from './quiz-completion.service';
 import { PointModule } from '../point/point.module';
@@ -12,7 +11,7 @@ import { PointModule } from '../point/point.module';
 @Module({
   imports: [CommonModule, PointModule],
   controllers: [QuizCompletionController],
-  providers: [QuizMasterService, QuizCompletionService],
-  exports: [QuizMasterService, QuizCompletionService],
+  providers: [QuizCompletionService],
+  exports: [QuizCompletionService],
 })
 export class QuizModule {}
