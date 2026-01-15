@@ -549,6 +549,96 @@ biocom-mq (메시지 큐 워커)
 | OrderStatus enum | `src/common/enums/order-status.enum.ts` | biocom-api ↔ biocom-bo-api |
 | PaymentStatus enum | `src/common/enums/payment-status.enum.ts` | biocom-api ↔ biocom-bo-api |
 | ProductStatus enum | `src/common/enums/` | biocom-api ↔ biocom-bo-api |
+| **ConditionEvaluator** | `src/push/services/condition-evaluator.service.ts` | **biocom-api ↔ biocom-bo-api** |
+
+### ⚠️ ConditionEvaluator 동기화 주의사항
+
+**왜 양쪽에 있나?**
+- biocom-api: K8s CronJob 배치 실행 (실제 푸시 발송)
+- biocom-bo-api: dry-run API, 관리자 수동 테스트
+
+**동기화 시점:**
+- 새 조건 타입 추가 시
+- 기존 조건 로직 변경 시
+- 파라미터 구조 변경 시
+
+**동기화 방법:**
+```bash
+# 1. biocom-api에서 변경 후
+diff biocom-api/src/push/services/condition-evaluator.service.ts \
+     biocom-bo-api/src/push/services/condition-evaluator.service.ts
+
+# 2. 핵심 로직만 복사 (import 경로는 프로젝트마다 다름)
+# - evaluateCondition() 메서드
+# - 각 evaluate* private 메서드들
+```
+
+**차이점 (복사 시 주의):**
+| 항목 | biocom-api | biocom-bo-api |
+|------|------------|---------------|
+| import 경로 | `../../common/enums` | `../../common/enums/challenge-ticket-status.enum` |
+| 발송 방식 | QueueService (MQ) | 직접 발송 (for loop) |
+| 테스트 모드 | isTest + User.isTester 필터링 | 미지원 |
+
+**현재 지원 조건 (12개):**
+- CHALLENGE_DAY, CHALLENGE_STATUS, NO_ACCESS_HOURS
+- INCOMPLETE_COUNT, INCOMPLETE_TYPES, COMPLETION_RATE
+- ONBOARDING_STATE (TYPE_SURVEY_INCOMPLETE, SOLUTION_VIEWED_START_NOT_SET)
+- CHALLENGE_START_OFFSET_DAYS (offsetDays 파라미터)
+- REPORT_STATE (UNREAD, ALL_READ)
+- POINTS, COUPON_EXPIRING_HOURS, CART_HAS_ITEMS
+
+### pushGroup/priority 기반 중복발송 방지 (2026-01-13 구현)
+
+**기능:**
+- 같은 시간대에 같은 pushGroup의 스케줄이 여러 개 매칭되면, priority가 가장 높은 것만 발송
+- 그룹별로 최고 우선순위 스케줄만 선택하여 사용자당 그룹별 1개 푸시만 발송
+
+**구현 위치:**
+- `push-scheduler.service.ts` → `filterByPushGroupPriority()` 메서드
+- 테스트: `push-scheduler.service.spec.ts` (8개 테스트 케이스)
+
+**동작 예시:**
+```typescript
+// 같은 시간에 매칭된 스케줄들
+[
+  { pushGroup: 'MISSION', priority: 100 },  // 제외
+  { pushGroup: 'MISSION', priority: 300 },  // ✅ 선택 (그룹 내 최고)
+  { pushGroup: 'REMIND', priority: 500 },   // ✅ 선택 (다른 그룹)
+]
+// 결과: MISSION 그룹에서 priority 300인 것 + REMIND 그룹에서 500인 것
+```
+
+**DB 필드:**
+- `push_notification_schedules.push_group`: 푸시 그룹명 (NEWCOMER, MISSION, REMIND 등)
+- `push_notification_schedules.priority`: 우선순위 숫자 (높을수록 우선)
+
+### 푸시 테스트 API (2026-01-13 추가)
+
+**엔드포인트:**
+- `POST /push/test/trigger-scheduler` - 스케줄러 수동 트리거
+- `POST /push/test/evaluate-condition` - 조건 평가 테스트
+- `GET /push/test/condition-types` - 지원 조건 타입 목록
+
+**파일:** `src/push/controllers/push-test.controller.ts`
+
+### Jest 단위 테스트 (2026-01-13 작성)
+
+**테스트 파일:**
+- `fcm.provider.spec.ts` - FCM 재시도 로직 테스트 (8개)
+- `condition-evaluator.service.spec.ts` - 조건 평가 테스트 (15개)
+- `push-scheduler.service.spec.ts` - 스케줄러 필터링 테스트 (8개)
+
+**실행:** `npm test -- --testPathPattern=push`
+
+### NEWCOMER 스케줄 데이터 (2026-01-13 검증)
+
+DB에 시딩된 NEWCOMER 5개 조건:
+1. 유형검사 미완료 (ONBOARDING_STATE: TYPE_SURVEY_INCOMPLETE)
+2. 솔루션 확인 후 시작일 미설정 (ONBOARDING_STATE: SOLUTION_VIEWED_START_NOT_SET)
+3. 시작일 설정 후 시작 전 (CHALLENGE_START_OFFSET_DAYS: {offsetDays: -1})
+4. 챌린지 시작일 당일 (CHALLENGE_START_OFFSET_DAYS: {offsetDays: 0})
+5. 챌린지 1일차 (CHALLENGE_DAY: {day: 1})
 
 ### 스키마 변경 시 주의사항
 1. 한 프로젝트에서만 변경하면 다른 프로젝트 빌드 실패

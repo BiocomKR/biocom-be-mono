@@ -19,6 +19,7 @@ import {
   classifyIngredients,
   getGlutenLevel,
 } from './utils/ingredient-mapper.util';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 맞춤 솔루션 서비스
@@ -35,6 +36,7 @@ export class SolutionService {
 
   /**
    * 맞춤 솔루션 전체 데이터 조회
+   * @deprecated v2 API (getDietSolution, getSupplementSolution) 사용 권장. 앱에서 호출 안 함.
    * @param userId 사용자 ID
    * @returns 맞춤 솔루션 응답 데이터
    */
@@ -258,6 +260,12 @@ export class SolutionService {
           ],
         }
       : undefined;
+
+    // 9. solutionSeenAt 갱신 (솔루션 조회 시점 기록)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { solutionSeenAt: getNowKST() },
+    });
 
     return {
       animal,

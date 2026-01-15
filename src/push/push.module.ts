@@ -9,9 +9,11 @@ import { PushTopicService } from './services/push-topic.service';
 // import { PushScheduleService } from './services/push-schedule.service'; // @deprecated - push-scheduler.service.ts로 통합됨
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
+import { ConditionEvaluatorService } from './services/condition-evaluator.service';
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
 import { PushTopicController } from './controllers/push-topic.controller';
+import { PushTestController } from './controllers/push-test.controller';
 import { PrismaService } from '../common/services/prisma.service';
 
 /**
@@ -31,6 +33,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTokenController,
     PushNotificationController,
     PushTopicController,
+    PushTestController,
   ],
   providers: [
     // 푸시 Provider DI 토큰 설정 (FCM → OneSignal 등 교체 용이)
@@ -45,6 +48,7 @@ import { PrismaService } from '../common/services/prisma.service';
     // PushScheduleService, // @deprecated - push-scheduler.service.ts로 통합됨
     PushCampaignService,
     PushSchedulerService,
+    ConditionEvaluatorService,
     PrismaService,
   ],
   exports: [
@@ -55,6 +59,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTopicService,
     // PushScheduleService, // @deprecated - push-scheduler.service.ts로 통합됨
     PushCampaignService,
+    ConditionEvaluatorService,
   ],
 })
 export class PushModule {}

@@ -553,13 +553,14 @@ async function main() {
       messages.default = maeveMsg;
 
       // 각 페르소나별 메시지 (메이브와 다른 경우만)
+      // 키는 AiPersona.name과 동일한 한글 사용
       const personas = [
-        { key: 'STELLA', value: row.스텔라 },
-        { key: 'MAEVE', value: row.메이브 },
-        { key: 'HAZEL', value: row.헤이즐 },
-        { key: 'IAN', value: row.이안 },
-        { key: 'THEO', value: row.테오 },
-        { key: 'HENRY', value: row.헨리 },
+        { key: '스텔라', value: row.스텔라 },
+        { key: '메이브', value: row.메이브 },
+        { key: '헤이즐', value: row.헤이즐 },
+        { key: '이안', value: row.이안 },
+        { key: '테오', value: row.테오 },
+        { key: '헨리', value: row.헨리 },
       ];
 
       for (const persona of personas) {
