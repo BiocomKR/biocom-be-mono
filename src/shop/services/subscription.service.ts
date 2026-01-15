@@ -11,6 +11,7 @@ import { RegisterBillingDto } from '../dto/subscription/register-billing.dto';
 import { CreateSubscriptionDto } from '../dto/subscription/create-subscription.dto';
 import { SubscriptionStatus } from '../../common/enums';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { transformProductWithImages } from '../../common/utils/product-image.util';
 
 /**
  * 구독 관리 서비스
@@ -274,10 +275,16 @@ export class SubscriptionService {
       },
     });
 
+    // productFiles -> images 변환
+    const transformedSubscriptions = subscriptions.map(sub => ({
+      ...sub,
+      product: transformProductWithImages(sub.product),
+    }));
+
     return {
       success: true,
       hasBillingKey: !!user?.billingKey,
-      data: subscriptions,
+      data: transformedSubscriptions,
     };
   }
 
