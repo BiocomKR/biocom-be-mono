@@ -196,8 +196,11 @@ export class HomeService {
 
       // 4. 미션 목록 조회 및 진행도 업데이트
       let missionList = await this.getMissionList(userId, user.status, challenges, challengeDays);
-      // NEWCOMER가 아닌 경우 진행도 업데이트 (CHALLENGER, SUBSCRIBER 모두)
-      if (user.status !== UserSubscriptionStatus.NEWCOMER) {
+      // 진행도 업데이트 조건:
+      // - CHALLENGER, SUBSCRIBER: 항상
+      // - NEWCOMER: 완료된 챌린지가 있는 경우 (사후문진, 심층리포트 진행도 표시)
+      const shouldUpdateProgress = user.status !== UserSubscriptionStatus.NEWCOMER || !!challenges.completed;
+      if (shouldUpdateProgress) {
         missionList = await this.updateMissionProgress(userId, missionList, user.status);
       }
 
@@ -212,6 +215,7 @@ export class HomeService {
 
       // 8. 사후문진 완료 여부 및 종료 후 일주일 이내 여부
       const { hasAfterSurvey, isWithinOneWeekAfterEnd } = await this.getAfterChallengeStatus(
+        userId,
         challenges.completed,
         challengeDays.daysAfterChallengeEnd,
       );
@@ -521,12 +525,12 @@ export class HomeService {
     const thisMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday, 0, 0, 0));
 
     // 병렬로 조회: user_records (실행 횟수), point_histories (포인트 지급 횟수)
-    const [todayRecords, todaySupplementRecords, weeklyReportRecords, todayPointHistories] = await Promise.all([
-      // user_records: 기록 타입 (createdAt 기준) - SUPPLEMENT, WEEKLY_REPORT 제외
+    const [todayRecords, todaySupplementRecords, weeklyReportRecords, afterSurveyRecords, todayPointHistories, afterSurveyPointHistories] = await Promise.all([
+      // user_records: 기록 타입 (createdAt 기준) - SUPPLEMENT, WEEKLY_REPORT, AFTER_SURVEY 제외
       this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY', 'DECLARATION', 'SELF_PRAISE', 'QUIZ', 'BALANCE_GAME', 'DAILY_MISSION', 'AFTER_SURVEY'] },
+          recordType: { in: ['BEAUTY', 'DIET', 'FASTING', 'SLEEP', 'ACTIVITY', 'DECLARATION', 'SELF_PRAISE', 'QUIZ', 'BALANCE_GAME', 'DAILY_MISSION'] },
           createdAt: {
             gte: todayDate,
             lt: tomorrowDate,
@@ -569,16 +573,39 @@ export class HomeService {
           metadata: true,
         },
       }),
-      // point_histories: 오늘 포인트 지급 내역 (recordType별 카운트용)
+      // AFTER_SURVEY: 전체 기간 조회 (챌린지 종료 후 1회만 작성)
+      this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          recordType: 'AFTER_SURVEY',
+        },
+        select: {
+          recordType: true,
+          metadata: true,
+        },
+      }),
+      // point_histories: 오늘 포인트 지급 내역 (recordType별 카운트용) - AFTER_SURVEY 제외
       this.prisma.pointHistory.findMany({
         where: {
           userId,
           type: 'EARNED',
-          recordType: { not: null },
+          recordType: { not: 'AFTER_SURVEY' },
+          NOT: { recordType: null },
           createdAt: {
             gte: todayDate,
             lt: tomorrowDate,
           },
+        },
+        select: {
+          recordType: true,
+        },
+      }),
+      // AFTER_SURVEY point_histories: 전체 기간 조회
+      this.prisma.pointHistory.findMany({
+        where: {
+          userId,
+          type: 'EARNED',
+          recordType: 'AFTER_SURVEY',
         },
         select: {
           recordType: true,
@@ -617,11 +644,28 @@ export class HomeService {
       }
     }
 
+    // AFTER_SURVEY 실행 횟수 (isCompleted = true인 레코드만) - 전체 기간
+    for (const record of afterSurveyRecords) {
+      const isCompleted = (record.metadata as any)?.isCompleted === true;
+      if (isCompleted) {
+        const currentCount = executedMap.get('AFTER_SURVEY') || 0;
+        executedMap.set('AFTER_SURVEY', currentCount + 1);
+      }
+    }
+
     // recordType별 포인트 지급 횟수 계산 (point_histories에서 조회)
     const currentMap = new Map<string, number>();
 
     // point_histories에서 포인트 지급 횟수 카운트
     for (const history of todayPointHistories) {
+      if (history.recordType) {
+        const currentCount = currentMap.get(history.recordType) || 0;
+        currentMap.set(history.recordType, currentCount + 1);
+      }
+    }
+
+    // AFTER_SURVEY 포인트 지급 횟수 (전체 기간)
+    for (const history of afterSurveyPointHistories) {
       if (history.recordType) {
         const currentCount = currentMap.get(history.recordType) || 0;
         currentMap.set(history.recordType, currentCount + 1);
@@ -861,6 +905,7 @@ export class HomeService {
    * 사후문진 완료 여부 및 종료 후 일주일 이내 여부 조회
    */
   private async getAfterChallengeStatus(
+    userId: number,
     completedChallenge: UserChallengeData | undefined,
     daysAfterChallengeEnd: number | undefined,
   ): Promise<{ hasAfterSurvey: boolean; isWithinOneWeekAfterEnd: boolean }> {
@@ -869,10 +914,14 @@ export class HomeService {
       return { hasAfterSurvey: false, isWithinOneWeekAfterEnd: false };
     }
 
-    // 사후문진 완료 여부 확인
+    // 사후문진 완료 여부 확인 (userChallengeId 또는 userId 기반)
+    // 기존 데이터는 userChallengeId가 null일 수 있으므로 userId로도 조회
     const afterSurveyAnswer = await this.prisma.surveyAnswer.findFirst({
       where: {
-        userChallengeId: completedChallenge.id,
+        OR: [
+          { userChallengeId: completedChallenge.id },
+          { userId, userChallengeId: null },
+        ],
         type: SurveyType.AFTER,
       },
       select: { id: true },
