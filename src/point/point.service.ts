@@ -520,6 +520,7 @@ export class PointService {
       userStats,
       dailyStats,
       dates,
+      allHistory, // Raw 데이터 시트용
       summary: {
         userCount: Object.keys(userStats).length,
         totalDays: dates.length,

@@ -71,7 +71,7 @@ export class PointController {
   }
 
   /**
-   * 유저별 포인트 통계 엑셀 다운로드 (개요 + 일별포인트 + 유저별합계)
+   * 유저별 포인트 통계 엑셀 다운로드 (개요 + 일별포인트 + 유저별합계 + Raw 데이터)
    * 개요 시트에 엑셀 수식 포함
    */
   @Get('stats/excel')
@@ -81,14 +81,17 @@ export class PointController {
     @Query('endDate') endDate?: string,
     @Query('startUserId') startUserId?: string,
     @Query('endUserId') endUserId?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    this.logger.log(`[백오피스] 포인트 통계 엑셀 다운로드 - startDate: ${startDate}, endDate: ${endDate}`);
+    const exclude = excludeTesters !== 'false'; // 기본값 true
+    this.logger.log(`[백오피스] 포인트 통계 엑셀 다운로드 - startDate: ${startDate}, endDate: ${endDate}, excludeTesters: ${exclude}`);
 
     const stats = await this.pointService.getUserPointStats({
       startDate,
       endDate,
       startUserId: startUserId ? parseInt(startUserId) : undefined,
       endUserId: endUserId ? parseInt(endUserId) : undefined,
+      excludeTesters: exclude,
     });
 
     const userIds = Object.keys(stats.userStats)
@@ -102,19 +105,23 @@ export class PointController {
     // 워크북 생성
     const workbook = new ExcelJS.Workbook();
 
+    // 테스터 제외 여부 라벨
+    const testerLabel = exclude ? '테스터 제외' : '테스터 포함';
+
     // ========== 1. 개요 시트 (수식 포함) ==========
-    const overviewSheet = workbook.addWorksheet('개요');
+    const overviewSheet = workbook.addWorksheet(`개요 (${testerLabel})`);
     overviewSheet.columns = [
       { header: '항목', key: 'item', width: 25 },
       { header: '값', key: 'value', width: 20 },
     ];
 
-    // 일별 총액 시작 행 (8행부터)
-    const dailyStartRow = 8;
+    // 일별 총액 시작 행 (9행부터 - 테스터 제외 여부 행 추가)
+    const dailyStartRow = 9;
     const dailyEndRow = dailyStartRow + totalDays - 1;
 
     // 데이터 행 추가
-    overviewSheet.addRow({ item: '1인당 최대 획득 포인트', value: null }); // 행2
+    overviewSheet.addRow({ item: '테스터 제외 여부', value: testerLabel }); // 행2
+    overviewSheet.addRow({ item: '1인당 최대 획득 포인트', value: null }); // 행3
     overviewSheet.addRow({ item: `${totalUsers}인 최대 획득 포인트`, value: null }); // 행3
     overviewSheet.addRow({ item: '실 지급 포인트', value: null }); // 행4
     overviewSheet.addRow({ item: '초과 지급 포인트', value: totalDietExcess }); // 행5 (하드코딩)
@@ -131,23 +138,23 @@ export class PointController {
       overviewSheet.addRow({ item: date.substring(5), value: dayTotal });
     }
 
-    // 수식 적용
-    // B2: 1인당 최대 획득 포인트 = 1300 + 1300 * 날짜수
-    overviewSheet.getCell('B2').value = { formula: `1300+1300*${totalDays}` };
-    // B3: N인 최대 획득 포인트 = B2 * 인원수
-    overviewSheet.getCell('B3').value = { formula: `B2*${totalUsers}` };
-    // B4: 실 지급 포인트 = 일별 총액 합계 (B9:B끝)
-    overviewSheet.getCell('B4').value = { formula: `SUM(B${dailyStartRow + 1}:B${dailyEndRow + 1})` };
-    // B5: 초과 지급 포인트 (하드코딩)
-    // B6: 포인트 지급률 = (실 지급 - 초과 지급) / 최대 획득 * 100
-    overviewSheet.getCell('B6').value = { formula: `(B4-B5)/B3*100` };
+    // 수식 적용 (테스터 제외 여부 행 추가로 1행씩 아래로 이동)
+    // B3: 1인당 최대 획득 포인트 = 1300 + 1300 * 날짜수
+    overviewSheet.getCell('B3').value = { formula: `1300+1300*${totalDays}` };
+    // B4: N인 최대 획득 포인트 = B3 * 인원수
+    overviewSheet.getCell('B4').value = { formula: `B3*${totalUsers}` };
+    // B5: 실 지급 포인트 = 일별 총액 합계 (B10:B끝)
+    overviewSheet.getCell('B5').value = { formula: `SUM(B${dailyStartRow + 1}:B${dailyEndRow + 1})` };
+    // B6: 초과 지급 포인트 (하드코딩)
+    // B7: 포인트 지급률 = (실 지급 - 초과 지급) / 최대 획득 * 100
+    overviewSheet.getCell('B7').value = { formula: `(B5-B6)/B4*100` };
 
     // 숫자 서식 적용
-    overviewSheet.getCell('B2').numFmt = '₩#,##0';
     overviewSheet.getCell('B3').numFmt = '₩#,##0';
     overviewSheet.getCell('B4').numFmt = '₩#,##0';
     overviewSheet.getCell('B5').numFmt = '₩#,##0';
-    overviewSheet.getCell('B6').numFmt = '0.00"%"';
+    overviewSheet.getCell('B6').numFmt = '₩#,##0';
+    overviewSheet.getCell('B7').numFmt = '0.00"%"';
     for (let i = dailyStartRow + 1; i <= dailyEndRow + 1; i++) {
       overviewSheet.getCell(`B${i}`).numFmt = '₩#,##0';
     }
@@ -158,7 +165,7 @@ export class PointController {
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
 
     // ========== 2. 일별포인트 시트 ==========
-    const dailySheet = workbook.addWorksheet('일별포인트');
+    const dailySheet = workbook.addWorksheet(`일별포인트 (${testerLabel})`);
     const dailyColumns = [
       { header: 'user_id', key: 'odUserId', width: 10 },
       { header: '이름', key: 'odName', width: 12 },
@@ -213,7 +220,7 @@ export class PointController {
     dailySheet.views = [{ state: 'frozen', ySplit: 1 }];
 
     // ========== 3. 유저별합계 시트 ==========
-    const userSheet = workbook.addWorksheet('유저별합계');
+    const userSheet = workbook.addWorksheet(`유저별합계 (${testerLabel})`);
     userSheet.columns = [
       { header: 'user_id', key: 'userId', width: 10 },
       { header: '이름', key: 'name', width: 12 },
@@ -249,12 +256,78 @@ export class PointController {
     userHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
     userSheet.views = [{ state: 'frozen', ySplit: 1 }];
 
+    // ========== 4. Raw 데이터 시트 ==========
+    const rawSheet = workbook.addWorksheet(`Raw 데이터 (${testerLabel})`);
+    rawSheet.columns = [
+      { header: 'ID', key: 'id', width: 10 },
+      { header: '년월일시', key: 'datetime', width: 20 },
+      { header: '년월일', key: 'date', width: 12 },
+      { header: '시', key: 'hour', width: 6 },
+      { header: 'user_id', key: 'userId', width: 10 },
+      { header: '회원명', key: 'userName', width: 15 },
+      { header: '휴대폰 번호', key: 'userMobile', width: 15 },
+      { header: '구분', key: 'type', width: 10 },
+      { header: '금액', key: 'amount', width: 12 },
+      { header: '잔액', key: 'balance', width: 12 },
+      { header: '사유', key: 'description', width: 40 },
+      { header: '관련 타입', key: 'relatedType', width: 20 },
+      { header: '관련 ID', key: 'relatedId', width: 10 },
+    ];
+
+    // Raw 데이터 추가
+    for (const item of stats.allHistory) {
+      const createdAtDayjs = dayjs(item.createdAt);
+      rawSheet.addRow({
+        id: item.id,
+        datetime: createdAtDayjs.format('YYYY-MM-DD HH:mm:ss'),
+        date: createdAtDayjs.format('YYYY-MM-DD'),
+        hour: createdAtDayjs.format('HH'),
+        userId: item.userId,
+        userName: item.user?.name || '-',
+        userMobile: item.user?.mobile ? this.formatPhoneNumber(item.user.mobile) : '-',
+        type: item.type,
+        amount: item.amount,
+        balance: item.balance,
+        description: item.description,
+        relatedType: item.relatedType || '-',
+        relatedId: item.relatedId || '-',
+      });
+    }
+
+    // 숫자 서식
+    rawSheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        const amountCell = row.getCell(9);
+        const balanceCell = row.getCell(10);
+        if (typeof amountCell.value === 'number') amountCell.numFmt = '#,##0';
+        if (typeof balanceCell.value === 'number') balanceCell.numFmt = '#,##0';
+      }
+    });
+
+    // 헤더 스타일
+    const rawHeaderRow = rawSheet.getRow(1);
+    rawHeaderRow.font = { bold: true };
+    rawHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+    rawSheet.views = [{ state: 'frozen', ySplit: 1 }];
+
     // 응답 전송
     const fileName = `포인트통계_${dayjs().format('YYYYMMDD_HHmmss')}`;
     const encodedFileName = encodeURIComponent(fileName);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFileName}.xlsx`);
     await workbook.xlsx.write(res);
+  }
+
+  /**
+   * 전화번호 포맷팅 (컨트롤러용)
+   */
+  private formatPhoneNumber(phone: string): string {
+    if (!phone) return phone;
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 7)}-${cleaned.slice(7)}`;
+    }
+    return phone;
   }
 
   /**
