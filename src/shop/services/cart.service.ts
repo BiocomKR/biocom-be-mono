@@ -14,6 +14,7 @@ import {
   CartValidationResponseDto
 } from '../dto/cart/cart-item.dto';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { transformProductWithImages } from '../../common/utils/product-image.util';
 
 @Injectable()
 export class CartService {
@@ -93,9 +94,10 @@ export class CartService {
 
     const totalQuantity = cart.items.reduce((sum, item) => sum + item.quantity, 0);
 
-    // 각 아이템의 소계 계산
+    // 각 아이템의 소계 계산 + productFiles -> images 변환
     const itemsWithSubtotal = cart.items.map(item => ({
       ...item,
+      product: transformProductWithImages(item.product),
       subtotal: Number(item.product.price) * item.quantity,
     }));
 
@@ -183,6 +185,7 @@ export class CartService {
 
       return {
         ...updatedItem,
+        product: transformProductWithImages(updatedItem.product),
         subtotal: Number(updatedItem.product.price) * updatedItem.quantity,
       };
     }
@@ -211,6 +214,7 @@ export class CartService {
 
     return {
       ...newItem,
+      product: transformProductWithImages(newItem.product),
       subtotal: Number(newItem.product.price) * newItem.quantity,
     };
   }
@@ -265,6 +269,7 @@ export class CartService {
 
     return {
       ...updatedItem,
+      product: transformProductWithImages(updatedItem.product),
       subtotal: Number(updatedItem.product.price) * updatedItem.quantity,
     };
   }

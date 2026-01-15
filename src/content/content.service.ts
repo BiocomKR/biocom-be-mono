@@ -6,6 +6,7 @@ import { PaginationHelper, PaginatedResult } from '../common/utils/pagination.ut
 import { CreateContentDto, UpdateContentDto, ContentFileDto } from './content.types';
 import * as DOMPurify from 'isomorphic-dompurify';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { transformProductWithImages } from '../common/utils/product-image.util';
 
 /**
  * 컨텐츠 관리 서비스
@@ -251,8 +252,17 @@ export class ContentService {
 
     this.logger.log(`강의 상세 조회 완료 - ID: ${id}, 플레이리스트: ${playlist.length}개, 조회된 ID들: ${playlist.map(p => p.id).join(', ')}`);
 
-    return {
+    // lectureProducts의 product에서 productFiles -> images 변환
+    const transformedContent = {
       ...content,
+      lectureProducts: content.lectureProducts?.map(lp => ({
+        ...lp,
+        product: transformProductWithImages(lp.product),
+      })),
+    };
+
+    return {
+      ...transformedContent,
       playlist,
     };
   }
