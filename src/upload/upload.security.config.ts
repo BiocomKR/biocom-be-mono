@@ -26,7 +26,7 @@ export const UploadSecurityConfig = {
 
   // 파일 크기 제한
   limits: {
-    maxFileSize: 10 * 1024 * 1024, // 10MB
+    maxFileSize: Infinity, // 제한 없음
     minFileSize: 1, // 1 byte (빈 파일 방지)
     maxFileNameLength: 255,
     maxFieldNameSize: 100,
@@ -47,7 +47,7 @@ export const UploadSecurityConfig = {
     fileNotFound: '파일이 업로드되지 않았습니다.',
     invalidFileType: '허용되지 않은 파일 형식입니다. 허용된 형식: JPG, JPEG, PNG, GIF, WebP',
     invalidExtension: '허용되지 않은 파일 확장자입니다.',
-    fileSizeTooLarge: '파일 크기는 10MB를 초과할 수 없습니다.',
+    fileSizeTooLarge: '파일 크기가 너무 큽니다.',
     fileSizeTooSmall: '빈 파일은 업로드할 수 없습니다.',
     fileNameTooLong: '파일명이 너무 깁니다. 255자 이하로 설정해주세요.',
     invalidFileName: '유효하지 않은 파일명입니다.',

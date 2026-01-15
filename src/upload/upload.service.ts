@@ -159,8 +159,8 @@ export class UploadService {
         throw new BadRequestException('파일 데이터가 없습니다.');
       }
 
-      // 2. 파일 크기 검증 (10MB 제한)
-      if (file.size > this.config.limits.maxFileSize) {
+      // 2. 파일 크기 검증 (제한 없음 - Infinity일 경우 검증 스킵)
+      if (this.config.limits.maxFileSize !== Infinity && file.size > this.config.limits.maxFileSize) {
         throw new BadRequestException(this.config.errorMessages.fileSizeTooLarge);
       }
 
@@ -406,8 +406,8 @@ export class UploadService {
         throw new BadRequestException('파일 데이터가 없습니다.');
       }
 
-      // 2. 파일 크기 검증
-      if (file.size > this.config.limits.maxFileSize) {
+      // 2. 파일 크기 검증 (제한 없음 - Infinity일 경우 검증 스킵)
+      if (this.config.limits.maxFileSize !== Infinity && file.size > this.config.limits.maxFileSize) {
         throw new BadRequestException(this.config.errorMessages.fileSizeTooLarge);
       }
 

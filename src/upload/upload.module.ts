@@ -72,7 +72,7 @@ import { UploadSecurityConfig } from './upload.security.config';
         callback(null, true);
       },
       limits: {
-        fileSize: UploadSecurityConfig.limits.maxFileSize,
+        // fileSize 제한 없음 (Infinity는 multer에서 지원하지 않으므로 생략)
         files: UploadSecurityConfig.limits.maxFiles,
         fieldNameSize: UploadSecurityConfig.limits.maxFieldNameSize,
         fieldSize: UploadSecurityConfig.limits.maxFieldSize,
