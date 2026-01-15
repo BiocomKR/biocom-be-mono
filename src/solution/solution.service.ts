@@ -366,6 +366,12 @@ export class SolutionService {
       sibResult,
     );
 
+    // 8. solutionSeenAt 갱신 (솔루션 조회 시점 기록)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { solutionSeenAt: getNowKST() },
+    });
+
     return {
       animal,
       supplements,
