@@ -8,7 +8,7 @@ import { ConfigService } from './common/services/config.service';
 import { AuthModule } from './auth/auth.module';
 import { UploadModule } from './upload/upload.module';
 import { LoggerModule } from './common/modules/logger.module';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { LoggingInterceptor, LastSeenInterceptor } from './common/interceptors';
 import { HealthModule } from './health/health.module';
 import { validationSchema, configuration } from './common/config/env.validation';
 import { UsersModule } from './users/users.module';
@@ -138,6 +138,10 @@ import { DeepReportModule } from './deep-report/deep-report.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LastSeenInterceptor,
     },
   ],
 })

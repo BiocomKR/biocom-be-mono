@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
 import { ExamCode } from '../../common/enums/exam-code.enum';
+import { RecordType } from '../../common/enums';
 import { getNowKST, getDayOfWeek, formatKoreanDate, getKoreanToday } from '../../common/utils/kst-date.util';
 import {
   BeautyStatisticsDto,
@@ -1923,7 +1924,7 @@ export class StatisticsService {
       const missionRecords = await this.prisma.userRecord.findMany({
         where: {
           userId,
-          recordType: 'DAILY_MISSION',
+          recordType: RecordType.DAILY_MISSION,
           date: {
             gte: startDate,
             lte: today
