@@ -62,10 +62,12 @@ export class PointController {
   async getStats(
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    this.logger.log(`[백오피스] 포인트 통계 조회`);
+    const exclude = excludeTesters !== 'false'; // 기본값 true
+    this.logger.log(`[백오피스] 포인트 통계 조회 - excludeTesters: ${exclude}`);
 
-    return await this.pointService.getStats(startDate, endDate);
+    return await this.pointService.getStats(startDate, endDate, exclude);
   }
 
   /**
@@ -267,8 +269,10 @@ export class PointController {
     @Query('search') search?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    this.logger.log(`[백오피스] 포인트 내역 엑셀 다운로드 - type: ${type}, relatedType: ${relatedType}, search: ${search}`);
+    const exclude = excludeTesters !== 'false'; // 기본값 true
+    this.logger.log(`[백오피스] 포인트 내역 엑셀 다운로드 - type: ${type}, relatedType: ${relatedType}, search: ${search}, excludeTesters: ${exclude}`);
 
     // 전체 데이터 조회 (페이지네이션 없이)
     const result = await this.pointService.getAllHistory({
@@ -279,6 +283,7 @@ export class PointController {
       search,
       startDate,
       endDate,
+      excludeTesters: exclude,
     });
 
     const typeLabels: Record<string, string> = {

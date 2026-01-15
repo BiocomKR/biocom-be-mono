@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength, IsArray, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength } from 'class-validator';
 import { PushScheduleType, PushCategory } from '../enums';
 
 /**
@@ -112,21 +112,12 @@ export class CreateScheduleDto {
   isActive?: boolean;
 
   @ApiPropertyOptional({
-    description: '테스트 모드 여부 (true면 testUserIds에게만 발송)',
+    description: '테스트 모드 여부 (true면 User.isTester=true인 유저에게만 발송)',
     default: true,
   })
   @IsOptional()
   @IsBoolean()
   isTest?: boolean;
-
-  @ApiPropertyOptional({
-    description: '테스트 대상 유저 ID 배열',
-    example: [1, 2, 3],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsInt({ each: true })
-  testUserIds?: number[];
 
   // =====================================================
   // 조건 기반 발송 필드

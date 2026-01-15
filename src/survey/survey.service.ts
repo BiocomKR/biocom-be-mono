@@ -321,24 +321,6 @@ export class SurveyService {
   }
 
   /**
-   * 특정 설문 질문 조회
-   */
-  async findOneQuestion(id: number) {
-    const question = await this.prisma.surveyQuestion.findUnique({
-      where: { id },
-      include: {
-        survey: true,
-      },
-    });
-
-    if (!question) {
-      throw new NotFoundException(`설문 질문을 찾을 수 없습니다: ${id}`);
-    }
-
-    return question;
-  }
-
-  /**
    * 모든 설문 질문 조회
    */
   async getAllQuestions() {
@@ -501,13 +483,14 @@ export class SurveyService {
       search?: string;
       startDate?: string;
       endDate?: string;
+      excludeTesters?: boolean;
     },
     sort: {
       sortBy: string;
       sortOrder: 'asc' | 'desc';
     }
   ): Promise<PaginatedResult<any>> {
-    this.logger.log(`페이징 처리된 설문 답변 목록 조회 - page: ${page}, limit: ${limit}`);
+    this.logger.log(`페이징 처리된 설문 답변 목록 조회 - page: ${page}, limit: ${limit}, excludeTesters: ${filters.excludeTesters}`);
 
     const skip = (page - 1) * limit;
 
@@ -555,9 +538,18 @@ export class SurveyService {
       }
     }
 
+    // 테스터 제외 필터
+    if (filters.excludeTesters) {
+      where.user = {
+        ...where.user,
+        isTester: false,
+      };
+    }
+
     // 검색어 필터 (사용자 이름, 이메일)
     if (filters.search) {
       where.user = {
+        ...where.user,
         OR: [
           { name: { contains: filters.search, mode: 'insensitive' } },
           { email: { contains: filters.search, mode: 'insensitive' } },
@@ -647,10 +639,11 @@ export class SurveyService {
    *
    * @param surveyId 설문 ID
    * @param type 설문 타입 (before/after)
+   * @param excludeTesters 테스터 제외 여부
    * @returns 카테고리별, 질문별 답변 통계
    */
-  async getAnswerStatistics(surveyId: number, type?: string): Promise<any> {
-    this.logger.log(`설문 답변 통계 조회 - surveyId: ${surveyId}, type: ${type || '전체'}`);
+  async getAnswerStatistics(surveyId: number, type?: string, excludeTesters: boolean = false): Promise<any> {
+    this.logger.log(`설문 답변 통계 조회 - surveyId: ${surveyId}, type: ${type || '전체'}, excludeTesters: ${excludeTesters}`);
 
     // 설문 정보 조회
     const survey = await this.prisma.survey.findUnique({
@@ -682,6 +675,9 @@ export class SurveyService {
     };
     if (type) {
       whereCondition.type = type;
+    }
+    if (excludeTesters) {
+      whereCondition.user = { isTester: false };
     }
 
     const answers = await this.prisma.surveyAnswer.groupBy({

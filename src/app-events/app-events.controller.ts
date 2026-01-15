@@ -19,12 +19,14 @@ export class AppEventsController {
     @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
     return this.appEventsService.getEventStats({
       appId,
       eventCategory,
       startDate,
       endDate,
+      excludeTesters: excludeTesters === 'true',
     });
   }
 
@@ -34,12 +36,14 @@ export class AppEventsController {
     @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
     return this.appEventsService.getPlatformStats({
       appId,
       eventCategory,
       startDate,
       endDate,
+      excludeTesters: excludeTesters === 'true',
     });
   }
 
@@ -48,8 +52,14 @@ export class AppEventsController {
     @Query('appId') appId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    return this.appEventsService.getCategoryStats({ appId, startDate, endDate });
+    return this.appEventsService.getCategoryStats({
+      appId,
+      startDate,
+      endDate,
+      excludeTesters: excludeTesters === 'true',
+    });
   }
 
   @Get('stats/ecommerce')
@@ -57,8 +67,14 @@ export class AppEventsController {
     @Query('appId') appId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    return this.appEventsService.getEcommerceStats({ appId, startDate, endDate });
+    return this.appEventsService.getEcommerceStats({
+      appId,
+      startDate,
+      endDate,
+      excludeTesters: excludeTesters === 'true',
+    });
   }
 
   @Get('stats/summary')
@@ -67,12 +83,14 @@ export class AppEventsController {
     @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
     return this.appEventsService.getSummary({
       appId,
       eventCategory,
       startDate,
       endDate,
+      excludeTesters: excludeTesters === 'true',
     });
   }
 
@@ -82,12 +100,14 @@ export class AppEventsController {
     @Query('eventCategory') eventCategory?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
     return this.appEventsService.getHourlyStats({
       appId,
       eventCategory,
       startDate,
       endDate,
+      excludeTesters: excludeTesters === 'true',
     });
   }
 
@@ -95,7 +115,12 @@ export class AppEventsController {
   async getDailyTrend(
     @Query('appId') appId?: string,
     @Query('eventCategory') eventCategory?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ) {
-    return this.appEventsService.getDailyTrend({ appId, eventCategory });
+    return this.appEventsService.getDailyTrend({
+      appId,
+      eventCategory,
+      excludeTesters: excludeTesters === 'true',
+    });
   }
 }

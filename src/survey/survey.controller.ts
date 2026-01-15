@@ -163,6 +163,7 @@ export class SurveyController {
     @Query('endDate') endDate?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ): Promise<ApiResponseDto<any>> {
     this.logger.log('설문 답변 목록 조회 요청');
 
@@ -179,6 +180,7 @@ export class SurveyController {
         search,
         startDate,
         endDate,
+        excludeTesters: excludeTesters === 'true',
       };
 
       const sort = {
@@ -522,11 +524,13 @@ export class SurveyController {
   async getAnswerStatistics(
     @Param('id', ParseIntPipe) surveyId: number,
     @Query('type') type?: string,
+    @Query('excludeTesters') excludeTesters?: string,
   ): Promise<ApiResponseDto<any>> {
-    this.logger.log(`설문 답변 통계 조회 요청 - surveyId: ${surveyId}, type: ${type || '전체'}`);
+    const exclude = excludeTesters === 'true';
+    this.logger.log(`설문 답변 통계 조회 요청 - surveyId: ${surveyId}, type: ${type || '전체'}, excludeTesters: ${exclude}`);
 
     try {
-      const statistics = await this.managementSurveyService.getAnswerStatistics(surveyId, type);
+      const statistics = await this.managementSurveyService.getAnswerStatistics(surveyId, type, exclude);
 
       this.logger.log(`설문 답변 통계 조회 성공 - surveyId: ${surveyId}`);
 

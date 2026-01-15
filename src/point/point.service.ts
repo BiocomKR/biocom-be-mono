@@ -199,9 +199,22 @@ export class PointService {
 
   /**
    * 포인트 통계 조회
+   * getUserPointStats와 동일한 로직 (테스터 제외, DIET 초과지급분 포함)
    */
-  async getStats(startDate?: string, endDate?: string) {
+  async getStats(startDate?: string, endDate?: string, excludeTesters: boolean = true) {
     const where: any = {};
+
+    // 테스터 제외 옵션 처리
+    if (excludeTesters) {
+      const testers = await this.prisma.user.findMany({
+        where: { isTester: true },
+        select: { id: true },
+      });
+      const excludedTesterIds = testers.map((t) => t.id);
+      if (excludedTesterIds.length > 0) {
+        where.userId = { notIn: excludedTesterIds };
+      }
+    }
 
     if (startDate || endDate) {
       where.createdAt = {};
@@ -215,22 +228,47 @@ export class PointService {
       }
     }
 
-    // 백엔드 기록에 EARN/EARNED, SPEND/SPENT/USE 혼재
-    const [earnData, spendData, totalTransactions] = await Promise.all([
-      this.prisma.pointHistory.aggregate({
-        where: { ...where, type: { in: ['EARN', 'EARNED'] } },
-        _sum: { amount: true },
-        _count: true,
-      }),
-      this.prisma.pointHistory.aggregate({
-        where: { ...where, type: { in: ['SPEND', 'SPENT', 'USE'] } },
-        _sum: { amount: true },
-        _count: true,
-      }),
-      this.prisma.pointHistory.count({ where }),
-    ]);
+    // 적립 내역 조회 (DIET 초과지급분 계산을 위해)
+    const earnHistory = await this.prisma.pointHistory.findMany({
+      where: { ...where, type: { in: ['EARN', 'EARNED'] } },
+      select: {
+        userId: true,
+        amount: true,
+        description: true,
+        createdAt: true,
+      },
+    });
 
-    const totalEarned = earnData._sum.amount || 0;
+    // DIET 초과지급 계산 (하루 3회 초과분)
+    const dietByUserDate: Record<string, number> = {};
+    let totalDietExcess = 0;
+
+    for (const item of earnHistory) {
+      if (item.description === 'DIET 기록 완료') {
+        const dateKey = `${item.userId}_${item.createdAt.toISOString().split('T')[0]}`;
+        dietByUserDate[dateKey] = (dietByUserDate[dateKey] || 0) + 1;
+      }
+    }
+
+    for (const [, count] of Object.entries(dietByUserDate)) {
+      if (count > 3) {
+        totalDietExcess += (count - 3) * 100;
+      }
+    }
+
+    // 총 적립금액 계산
+    const totalEarnedRaw = earnHistory.reduce((sum, item) => sum + item.amount, 0);
+    const totalEarned = totalEarnedRaw - totalDietExcess;
+
+    // 사용 내역 집계
+    const spendData = await this.prisma.pointHistory.aggregate({
+      where: { ...where, type: { in: ['SPEND', 'SPENT', 'USE'] } },
+      _sum: { amount: true },
+      _count: true,
+    });
+
+    const totalTransactions = await this.prisma.pointHistory.count({ where });
+
     const totalSpent = Math.abs(spendData._sum.amount || 0);
 
     return {
@@ -238,8 +276,9 @@ export class PointService {
       totalSpent,
       netChange: totalEarned - totalSpent,
       totalTransactions,
-      earnCount: earnData._count,
+      earnCount: earnHistory.length,
       spendCount: spendData._count,
+      totalDietExcess,
     };
   }
 

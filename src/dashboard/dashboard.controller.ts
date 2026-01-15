@@ -133,7 +133,10 @@ export class DashboardController {
    * 실시간 현황
    */
   @Get('realtime')
-    async getRealtimeStatus() {
-    return this.dashboardService.getRealtimeStatus();
+  async getRealtimeStatus(
+    @Query('excludeTesters') excludeTesters?: string,
+  ) {
+    const exclude = excludeTesters === 'true';
+    return this.dashboardService.getRealtimeStatus(exclude);
   }
 }

@@ -8,6 +8,14 @@ import { getNowKST } from '../common/utils/kst-date.util';
 export class AppEventsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async getTesterUserIds(): Promise<number[]> {
+    const testers = await this.prisma.user.findMany({
+      where: { isTester: true },
+      select: { id: true },
+    });
+    return testers.map((t) => t.id);
+  }
+
   private buildWhereClause(dto: {
     appId?: string;
     eventName?: string;
@@ -16,6 +24,7 @@ export class AppEventsService {
     itemType?: string;
     startDate?: string;
     endDate?: string;
+    excludeTesterIds?: number[];
   }): Prisma.AppEventWhereInput {
     const where: Prisma.AppEventWhereInput = {};
 
@@ -49,6 +58,14 @@ export class AppEventsService {
       }
     }
 
+    // 테스터 제외
+    if (dto.excludeTesterIds && dto.excludeTesterIds.length > 0) {
+      where.OR = [
+        { userId: { notIn: dto.excludeTesterIds } },
+        { userId: null },
+      ];
+    }
+
     return where;
   }
 
@@ -80,8 +97,10 @@ export class AppEventsService {
     eventCategory?: string;
     startDate?: string;
     endDate?: string;
+    excludeTesters?: boolean;
   }) {
-    const where = this.buildWhereClause(dto);
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
+    const where = this.buildWhereClause({ ...dto, excludeTesterIds });
 
     const stats = await this.prisma.appEvent.groupBy({
       by: ['eventName'],
@@ -100,8 +119,10 @@ export class AppEventsService {
     eventCategory?: string;
     startDate?: string;
     endDate?: string;
+    excludeTesters?: boolean;
   }) {
-    const where = this.buildWhereClause(dto);
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
+    const where = this.buildWhereClause({ ...dto, excludeTesterIds });
 
     const stats = await this.prisma.appEvent.groupBy({
       by: ['platform'],
@@ -119,8 +140,10 @@ export class AppEventsService {
     appId?: string;
     startDate?: string;
     endDate?: string;
+    excludeTesters?: boolean;
   }) {
-    const where = this.buildWhereClause(dto);
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
+    const where = this.buildWhereClause({ ...dto, excludeTesterIds });
 
     const stats = await this.prisma.appEvent.groupBy({
       by: ['eventCategory'],
@@ -138,8 +161,10 @@ export class AppEventsService {
     appId?: string;
     startDate?: string;
     endDate?: string;
+    excludeTesters?: boolean;
   }) {
-    const baseWhere = this.buildWhereClause(dto);
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
+    const baseWhere = this.buildWhereClause({ ...dto, excludeTesterIds });
     const where: Prisma.AppEventWhereInput = {
       ...baseWhere,
       eventCategory: 'ecommerce',
@@ -169,8 +194,10 @@ export class AppEventsService {
     eventCategory?: string;
     startDate?: string;
     endDate?: string;
+    excludeTesters?: boolean;
   }) {
-    const where = this.buildWhereClause(dto);
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
+    const where = this.buildWhereClause({ ...dto, excludeTesterIds });
 
     // 오늘/어제 날짜 계산
     const today = new Date();
@@ -189,6 +216,13 @@ export class AppEventsService {
     const baseFilter: Prisma.AppEventWhereInput = {};
     if (dto.appId) baseFilter.appId = dto.appId;
     if (dto.eventCategory) baseFilter.eventCategory = dto.eventCategory;
+    // 테스터 제외 필터 추가
+    if (excludeTesterIds && excludeTesterIds.length > 0) {
+      baseFilter.OR = [
+        { userId: { notIn: excludeTesterIds } },
+        { userId: null },
+      ];
+    }
 
     const [
       todayEvents,
@@ -246,8 +280,10 @@ export class AppEventsService {
     eventCategory?: string;
     startDate?: string;
     endDate?: string;
+    excludeTesters?: boolean;
   }) {
-    let where = this.buildWhereClause(dto);
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
+    let where = this.buildWhereClause({ ...dto, excludeTesterIds });
 
     // 기본: 오늘 데이터 (KST 기준)
     if (!dto.startDate && !dto.endDate) {
@@ -280,7 +316,9 @@ export class AppEventsService {
   async getDailyTrend(dto: {
     appId?: string;
     eventCategory?: string;
+    excludeTesters?: boolean;
   }) {
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
     const result = [];
     const today = getNowKST();
     today.setUTCHours(0, 0, 0, 0);
@@ -289,6 +327,12 @@ export class AppEventsService {
     const baseFilter: Prisma.AppEventWhereInput = {};
     if (dto.appId) baseFilter.appId = dto.appId;
     if (dto.eventCategory) baseFilter.eventCategory = dto.eventCategory;
+    if (excludeTesterIds && excludeTesterIds.length > 0) {
+      baseFilter.OR = [
+        { userId: { notIn: excludeTesterIds } },
+        { userId: null },
+      ];
+    }
 
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today.getTime());

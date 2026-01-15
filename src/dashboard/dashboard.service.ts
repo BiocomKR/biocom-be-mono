@@ -639,7 +639,7 @@ export class DashboardService {
   /**
    * 실시간 현황
    */
-  async getRealtimeStatus() {
+  async getRealtimeStatus(excludeTesters: boolean = false) {
     const now = getNowKST();
     const today = new Date(now);
     today.setUTCHours(0, 0, 0, 0);
@@ -651,7 +651,8 @@ export class DashboardService {
       where: {
         orderedAt: {
           gte: oneHourAgo
-        }
+        },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
       },
       orderBy: {
         orderedAt: 'desc'

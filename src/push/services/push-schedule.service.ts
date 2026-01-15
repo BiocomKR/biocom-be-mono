@@ -51,7 +51,6 @@ export class PushScheduleService {
           endDate: dto.endDate ? stringToKSTDate(dto.endDate, 23, 59, 59) : null,
           isActive: dto.isActive ?? true,
           isTest: dto.isTest ?? true,
-          testUserIds: dto.testUserIds ?? [],
           // 조건 기반 발송 필드
           conditionType: dto.conditionType,
           conditionParams: dto.conditionParams,
@@ -210,7 +209,6 @@ export class PushScheduleService {
           }),
           ...(dto.isActive !== undefined && { isActive: dto.isActive }),
           ...(dto.isTest !== undefined && { isTest: dto.isTest }),
-          ...(dto.testUserIds !== undefined && { testUserIds: dto.testUserIds }),
           // 조건 기반 발송 필드
           ...(dto.conditionType !== undefined && { conditionType: dto.conditionType }),
           ...(dto.conditionParams !== undefined && { conditionParams: dto.conditionParams }),
