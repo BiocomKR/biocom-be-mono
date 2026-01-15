@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { UserSubscriptionStatus } from '../common/enums/user-subscription-status.enum';
-import { getKoreanToday } from '../common/utils/kst-date.util';
+import { getKoreanToday, getNowKST } from '../common/utils/kst-date.util';
 
 /**
  * 미션 노출 컨텍스트
@@ -141,13 +141,23 @@ export class MissionService {
       },
     });
 
-    // ONCE 타입 미션 완료 여부 및 완료 날짜 조회 (DECLARATION, SELF_PRAISE, AFTER_SURVEY)
-    const onceRecordTypes = ['DECLARATION', 'SELF_PRAISE', 'AFTER_SURVEY'];
+    // A그룹 미션 완료 여부 조회 (완료 시 즉시 삭제 대상)
+    // - ONCE 타입: DECLARATION, SELF_PRAISE, AFTER_SURVEY
+    // - WEEKLY 타입: WEEKLY_REPORT (심층리포트)
+    const aGroupRecordTypes = ['DECLARATION', 'SELF_PRAISE', 'AFTER_SURVEY', 'WEEKLY_REPORT'];
     let completedRecordTypes: Set<string> = new Set();
     let completedRecordDates: Map<string, string> = new Map(); // recordType → 완료 날짜 (YYYY-MM-DD)
 
+    // 이번 주 월요일 계산 (WEEKLY_REPORT 주간 부활 체크용)
+    const now = getNowKST();
+    const dayOfWeek = now.getUTCDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const thisMonday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysToMonday, 0, 0, 0));
+
     if (userChallengeId) {
-      const completedMissions = await this.prisma.userRecord.findMany({
+      // ONCE 타입 미션 (DECLARATION, SELF_PRAISE, AFTER_SURVEY) - 챌린지 전체 기간 조회
+      const onceRecordTypes = ['DECLARATION', 'SELF_PRAISE', 'AFTER_SURVEY'];
+      const completedOnceMissions = await this.prisma.userRecord.findMany({
         where: {
           userId,
           userChallengeId,
@@ -155,12 +165,34 @@ export class MissionService {
         },
         select: { recordType: true, date: true },
       });
-      completedRecordTypes = new Set(completedMissions.map((m) => m.recordType));
-      // 완료 날짜 저장 (KST 날짜 문자열로 변환)
-      for (const m of completedMissions) {
+
+      for (const m of completedOnceMissions) {
+        completedRecordTypes.add(m.recordType);
         const dateStr = m.date.toISOString().split('T')[0];
         completedRecordDates.set(m.recordType, dateStr);
       }
+    }
+
+    // WEEKLY_REPORT 완료 여부 조회
+    // - CHALLENGER: 전체 기간 조회 (한 번 완료하면 삭제)
+    // - SUBSCRIBER: 이번 주 월요일 이후만 조회 (매주 월요일 부활)
+    const weeklyReportWhere: any = {
+      userId,
+      recordType: 'WEEKLY_REPORT',
+    };
+    if (userStatus === UserSubscriptionStatus.SUBSCRIBER) {
+      weeklyReportWhere.createdAt = { gte: thisMonday };
+    }
+
+    const completedWeeklyReport = await this.prisma.userRecord.findFirst({
+      where: weeklyReportWhere,
+      select: { recordType: true, date: true },
+    });
+
+    if (completedWeeklyReport) {
+      completedRecordTypes.add('WEEKLY_REPORT');
+      const dateStr = completedWeeklyReport.date.toISOString().split('T')[0];
+      completedRecordDates.set('WEEKLY_REPORT', dateStr);
     }
 
     // 정책 기반 필터링
@@ -204,13 +236,21 @@ export class MissionService {
         }
       }
 
-      // 5. ONCE 타입 미션은 완료한 익일부터 숨김
-      if (mission.frequency === 'ONCE' && completedRecordTypes.has(mission.recordType)) {
-        const completedDate = completedRecordDates.get(mission.recordType);
-        const today = getKoreanToday();
-        // 완료 날짜와 오늘이 같으면 노출 (당일은 보임), 다르면 숨김 (익일부터 삭제)
-        if (completedDate !== today) {
+      // 5. A그룹 미션 완료 시 즉시 삭제
+      // - WEEKLY_REPORT: 완료 즉시 삭제 (SUBSCRIBER는 매주 월요일 부활)
+      // - ONCE 타입(DECLARATION, SELF_PRAISE, AFTER_SURVEY): 완료 익일부터 삭제
+      if (completedRecordTypes.has(mission.recordType)) {
+        // WEEKLY_REPORT는 완료 즉시 삭제
+        if (mission.recordType === 'WEEKLY_REPORT') {
           return false;
+        }
+        // ONCE 타입은 완료 익일부터 삭제 (당일은 보임)
+        if (mission.frequency === 'ONCE') {
+          const completedDate = completedRecordDates.get(mission.recordType);
+          const today = getKoreanToday();
+          if (completedDate !== today) {
+            return false;
+          }
         }
       }
 
