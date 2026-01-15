@@ -86,26 +86,17 @@ export class PushSchedulerService {
       // - ONCE 타입: 예약 시간이 지난 것
       // - RECURRING 타입: 기간 내에 있는 것
       // ---------------------------------------------------------------
-      const allSchedules = await this.getExecutableSchedules();
+      const schedules = await this.getExecutableSchedules();
 
-      if (allSchedules.length === 0) {
+      if (schedules.length === 0) {
         this.logger.log('ℹ️ [PushScheduler] 실행할 스케줄 없음');
         return;
       }
 
-      this.logger.log(`📋 [PushScheduler] 실행 가능한 스케줄: ${allSchedules.length}개`);
+      this.logger.log(`📋 [PushScheduler] 실행할 스케줄: ${schedules.length}개`);
 
       // ---------------------------------------------------------------
-      // Step 2: pushGroup별 중복 방지 - 같은 그룹 내 최고 우선순위만 실행
-      // - pushGroup이 같은 스케줄들 중 priority가 가장 높은 것만 실행
-      // - 예: MISSION 그룹에 priority 100, 200, 300이 있으면 300만 실행
-      // ---------------------------------------------------------------
-      const schedules = this.filterByPushGroupPriority(allSchedules);
-
-      this.logger.log(`📋 [PushScheduler] 중복 필터링 후 실행할 스케줄: ${schedules.length}개`);
-
-      // ---------------------------------------------------------------
-      // Step 3: 각 스케줄별로 캠페인 실행
+      // Step 2: 각 스케줄별로 캠페인 실행
       // - Python의 for loop과 동일
       // - async/await = Python의 await와 동일
       // ---------------------------------------------------------------
@@ -242,61 +233,6 @@ export class PushSchedulerService {
       this.logger.error(`❌ [PushScheduler] 실행 가능한 스케줄 조회 실패: ${error.message}`, error.stack);
       throw error;
     }
-  }
-
-  /**
-   * ========================================================================
-   * pushGroup별 중복 방지 필터링
-   * ========================================================================
-   *
-   * [역할]
-   * - 같은 pushGroup 내에서 priority가 가장 높은 스케줄만 선택
-   * - 나머지 스케줄은 제외하여 중복 발송 방지
-   *
-   * [예시]
-   * - MISSION 그룹: priority 100, 200, 300 → 300만 선택
-   * - REMIND 그룹: priority 500 → 500 선택
-   * - 결과: 2개 스케줄만 실행
-   *
-   * @param schedules - 실행 가능한 스케줄 목록
-   * @returns pushGroup별 최고 우선순위 스케줄만 포함된 목록
-   */
-  private filterByPushGroupPriority(schedules: any[]): any[] {
-    // pushGroup별로 그룹핑
-    const groupMap = new Map<string, any[]>();
-
-    for (const schedule of schedules) {
-      const group = schedule.pushGroup || 'DEFAULT';
-      if (!groupMap.has(group)) {
-        groupMap.set(group, []);
-      }
-      groupMap.get(group)!.push(schedule);
-    }
-
-    // 각 그룹에서 priority가 가장 높은 스케줄만 선택
-    const result: any[] = [];
-
-    for (const [group, groupSchedules] of groupMap) {
-      // priority 내림차순 정렬 후 첫 번째 선택
-      groupSchedules.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-      const selected = groupSchedules[0];
-
-      this.logger.debug(
-        `🎯 [PushScheduler] ${group} 그룹: ${groupSchedules.length}개 중 priority=${selected.priority || 0} 선택 (scheduleId=${selected.id})`,
-      );
-
-      // 제외된 스케줄 로깅
-      if (groupSchedules.length > 1) {
-        const excluded = groupSchedules.slice(1).map((s) => `id=${s.id}(p=${s.priority || 0})`).join(', ');
-        this.logger.log(
-          `⏭️ [PushScheduler] ${group} 그룹 중복 방지로 제외: ${excluded}`,
-        );
-      }
-
-      result.push(selected);
-    }
-
-    return result;
   }
 
   /**

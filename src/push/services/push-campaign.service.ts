@@ -3,7 +3,6 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { PushScheduleType, PushCampaignType, PushCampaignStatus } from '../enums';
 import { QueueService, PushNotificationType } from '../../queues/queue.service';
-import { ConditionEvaluatorService } from './condition-evaluator.service';
 
 /**
  * ============================================================================
@@ -49,7 +48,6 @@ export class PushCampaignService {
   constructor(
     private readonly prisma: PrismaService, // DB 접근용 (SQLAlchemy의 session과 유사)
     private readonly queueService: QueueService, // MQ를 통한 푸시 발송
-    private readonly conditionEvaluator: ConditionEvaluatorService, // 조건 기반 유저 평가
   ) {}
 
   /**
@@ -104,43 +102,30 @@ export class PushCampaignService {
 
       // ---------------------------------------------------------------
       // Step 0.5: 테스트 모드 체크
-      // - isTest=true면 User.isTester=true인 유저에게만 발송
+      // - isTest=true면 testUserIds에게만 발송
+      // - testUserIds가 비어있으면 발송 스킵
       // ---------------------------------------------------------------
       if (schedule.isTest) {
-        this.logger.log(`🧪 [PushCampaignService] 테스트 모드: isTester=true 유저에게만 발송`);
+        if (!schedule.testUserIds || schedule.testUserIds.length === 0) {
+          this.logger.warn(`⚠️ [PushCampaignService] 테스트 모드지만 testUserIds가 비어있음: scheduleId=${schedule.id}`);
+          return { success: false, message: '테스트 모드이지만 테스트 대상 유저가 없습니다', campaignId: null };
+        }
+        this.logger.log(`🧪 [PushCampaignService] 테스트 모드: ${schedule.testUserIds.length}명에게만 발송`);
       }
 
       // ---------------------------------------------------------------
       // Step 1: 대상 유저 조회
-      // - conditionType이 있으면 조건 기반 유저 평가
-      // - 없으면 targetQuery로 유저 필터링
-      // - 테스트 모드면 User.isTester=true인 유저에게만 발송
+      // - schedule.targetQuery에 정의된 조건으로 유저 필터링
+      // - 테스트 모드면 testUserIds로 제한
       // ---------------------------------------------------------------
-      let targetUsers: number[] = [];
+      const targetQuery = schedule.targetQuery || {};
+      let targetUsers = await this.getTargetUsers(targetQuery);
 
-      if (schedule.conditionType) {
-        // 조건 기반 유저 평가 (ConditionEvaluatorService 사용)
-        this.logger.log(
-          `🎯 [PushCampaignService] 조건 기반 유저 평가: type=${schedule.conditionType}, params=${JSON.stringify(schedule.conditionParams)}`,
-        );
-        targetUsers = await this.conditionEvaluator.evaluateCondition(
-          schedule.conditionType,
-          schedule.conditionParams || {},
-        );
-      } else {
-        // 기존 targetQuery 기반 유저 조회
-        const targetQuery = schedule.targetQuery || {};
-        targetUsers = await this.getTargetUsers(targetQuery);
-      }
-
-      // 테스트 모드면 isTester=true 유저만 필터링
-      if (schedule.isTest) {
-        const testerUsers = await this.prisma.user.findMany({
-          where: { id: { in: targetUsers }, isTester: true },
-          select: { id: true },
-        });
-        targetUsers = testerUsers.map((u) => u.id);
-        this.logger.log(`🧪 [PushCampaignService] 테스터 유저로 필터링: ${targetUsers.length}명`);
+      // 테스트 모드면 testUserIds와 교집합
+      if (schedule.isTest && schedule.testUserIds?.length > 0) {
+        const testUserSet = new Set(schedule.testUserIds);
+        targetUsers = targetUsers.filter((userId) => testUserSet.has(userId));
+        this.logger.log(`🧪 [PushCampaignService] 테스트 대상으로 필터링: ${targetUsers.length}명`);
       }
 
       // ---------------------------------------------------------------
@@ -183,7 +168,6 @@ export class PushCampaignService {
       // Step 4: 푸시 발송 (MQ로 비동기 처리)
       // - 대상 유저 전체를 한 번에 MQ Job으로 전달
       // - 실제 FCM 발송은 MQ Worker가 처리
-      // - personaMessages가 있으면 유저별 페르소나에 맞는 메시지 발송
       // ---------------------------------------------------------------
       const job = await this.queueService.addPushToUsers(
         targetUsers,
@@ -198,8 +182,6 @@ export class PushCampaignService {
         },
         PushNotificationType.SYSTEM,
         schedule.isTest ?? false, // 테스트 모드 여부
-        schedule.personaMessages, // 페르소나별 메시지 (있으면 MQ Worker에서 처리)
-        schedule.senderType, // 발송자 타입 (BIOCOM/PERSONA)
       );
 
       this.logger.log(

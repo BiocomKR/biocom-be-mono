@@ -92,7 +92,7 @@ describe('FcmProvider - 재시도 로직 테스트', () => {
 
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('messaging/server-unavailable');
-      expect(sendSpy).toHaveBeenCalledTimes(3); // maxRetries=3 → 총 3번 시도
+      expect(sendSpy).toHaveBeenCalledTimes(4); // 초기 3번 + 마지막 1번
     });
   });
 

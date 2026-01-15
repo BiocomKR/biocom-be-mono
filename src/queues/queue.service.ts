@@ -38,10 +38,6 @@ export interface PushNotificationJobData {
   filter?: {
     marketingEnabled?: boolean;
   };
-  /** 페르소나별 메시지 (키: 페르소나 이름, 값: { title, body }) */
-  personaMessages?: Record<string, { title: string; body: string }>;
-  /** 발송자 타입 (BIOCOM: 공통 메시지, PERSONA: 페르소나별 메시지) */
-  senderType?: 'BIOCOM' | 'PERSONA';
 }
 
 /**
@@ -115,21 +111,12 @@ export class QueueService {
 
   /**
    * 다수 유저에게 푸시 전송 Job 추가
-   *
-   * @param userIds - 대상 유저 ID 배열
-   * @param message - 기본 메시지 (personaMessages가 없거나 매칭 안 될 때 사용)
-   * @param notificationType - 알림 타입
-   * @param isTest - 테스트 발송 여부
-   * @param personaMessages - 페르소나별 메시지 (키: 페르소나 이름, 예: '메이브')
-   * @param senderType - 발송자 타입 (BIOCOM: 공통, PERSONA: 페르소나별)
    */
   async addPushToUsers(
     userIds: number[],
     message: PushMessage,
     notificationType: PushNotificationType = PushNotificationType.ETC,
     isTest: boolean = false,
-    personaMessages?: Record<string, { title: string; body: string }>,
-    senderType?: 'BIOCOM' | 'PERSONA',
   ) {
     const jobData: PushNotificationJobData = {
       type: 'users',
@@ -137,15 +124,13 @@ export class QueueService {
       message,
       notificationType,
       isTest,
-      personaMessages,
-      senderType,
     };
 
     const job = await this.pushQueue.add('send', jobData, {
       removeOnComplete: 100,
       removeOnFail: 1000,
     });
-    this.logger.log(`📤 [Queue] push-notification (users) job added: ${job.id}, count=${userIds.length}, senderType=${senderType || 'BIOCOM'}`);
+    this.logger.log(`📤 [Queue] push-notification (users) job added: ${job.id}, count=${userIds.length}`);
     return job;
   }
 
