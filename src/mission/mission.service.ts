@@ -55,9 +55,44 @@ export class MissionService {
     if (userStatus === UserSubscriptionStatus.NEWCOMER) {
       // [3단계] 챌린지 종료 후 일주일 이내 (22~28일): A그룹만 노출, B그룹은 리스트에서 제외
       // A그룹: AFTER_SURVEY(애프터문진), WEEKLY_REPORT(심층리포트)
+      // 완료된 A그룹 미션은 즉시 삭제
       if (daysAfterChallengeEnd !== undefined && daysAfterChallengeEnd <= 7) {
         this.logger.log(`뉴커머 + 챌린지 종료 후 ${daysAfterChallengeEnd}일 - A그룹만 노출`);
         const aGroupRecordTypes = ['AFTER_SURVEY', 'WEEKLY_REPORT'];
+
+        // A그룹 미션 완료 여부 조회 (가장 최근 완료된 챌린지 기준)
+        const completedAGroupRecordTypes = new Set<string>();
+
+        if (userChallengeId) {
+          // AFTER_SURVEY 완료 여부 (userChallengeId 또는 userId 기반)
+          const completedAfterSurvey = await this.prisma.userRecord.findFirst({
+            where: {
+              userId,
+              recordType: 'AFTER_SURVEY',
+              OR: [
+                { userChallengeId },
+                { userChallengeId: null },
+              ],
+            },
+            select: { recordType: true },
+          });
+          if (completedAfterSurvey) {
+            completedAGroupRecordTypes.add('AFTER_SURVEY');
+          }
+
+          // WEEKLY_REPORT 완료 여부 (NEWCOMER_EXP는 전체 기간 조회)
+          const completedWeeklyReport = await this.prisma.userRecord.findFirst({
+            where: {
+              userId,
+              recordType: 'WEEKLY_REPORT',
+            },
+            select: { recordType: true },
+          });
+          if (completedWeeklyReport) {
+            completedAGroupRecordTypes.add('WEEKLY_REPORT');
+          }
+        }
+
         const aGroupMissions = await this.prisma.mission.findMany({
           where: {
             isActive: true,
@@ -76,7 +111,45 @@ export class MissionService {
           },
         });
 
-        return aGroupMissions.map((m) => ({
+        // 완료된 A그룹 미션은 필터링 (즉시 삭제)
+        const filteredAGroupMissions = aGroupMissions.filter(
+          (m) => !completedAGroupRecordTypes.has(m.recordType),
+        );
+
+        this.logger.log(`A그룹 필터링: ${aGroupMissions.length}개 중 ${filteredAGroupMissions.length}개 노출 (완료: ${Array.from(completedAGroupRecordTypes).join(', ')})`);
+
+        // A그룹 미션 모두 완료 시 → 블러 처리 + 전체 미션 목업 반환
+        if (filteredAGroupMissions.length === 0) {
+          this.logger.log('A그룹 미션 모두 완료 - 전체 미션 목업 반환');
+          const allMissions = await this.prisma.mission.findMany({
+            where: { isActive: true },
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              points: true,
+              dailyLimit: true,
+              maxPointsPerDay: true,
+              recordType: true,
+              sortOrder: true,
+            },
+          });
+
+          return allMissions.map((m) => ({
+            id: m.id,
+            title: m.name,
+            description: m.description || '',
+            point: m.points,
+            max: m.recordType === 'DIET' ? 3 : (m.maxPointsPerDay ?? m.dailyLimit),
+            current: 0,
+            executed: 0,
+            recordType: m.recordType,
+            sortOrder: m.sortOrder,
+          }));
+        }
+
+        return filteredAGroupMissions.map((m) => ({
           id: m.id,
           title: m.name,
           description: m.description || '',

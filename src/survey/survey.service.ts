@@ -598,12 +598,17 @@ export class SurveyService {
 
     // 트랜잭션으로 처리
     return await this.prisma.$transaction(async (tx) => {
-      // 활성 챌린지 조회
-      const activeChallenge = await tx.userChallenge.findFirst({
+      // 챌린지 조회 (사후문진은 COMPLETED/EXPIRED 상태에서도 연결 필요)
+      const targetStatuses = type === SurveyType.AFTER
+        ? [UserChallengeStatus.ACTIVE, UserChallengeStatus.COMPLETED, UserChallengeStatus.EXPIRED]
+        : [UserChallengeStatus.ACTIVE];
+
+      const userChallenge = await tx.userChallenge.findFirst({
         where: {
           userId,
-          status: UserChallengeStatus.ACTIVE
-        }
+          status: { in: targetStatuses }
+        },
+        orderBy: { createdAt: 'desc' }
       });
 
       // 기존 답변 삭제
@@ -622,7 +627,7 @@ export class SurveyService {
           type,
           surveyQuestionId: answer.questionId,
           surveyOptionId: answer.optionId,
-          userChallengeId: activeChallenge?.id || null,
+          userChallengeId: userChallenge?.id || null,
           createdAt: now,
         })),
       });
@@ -764,9 +769,9 @@ export class SurveyService {
     surveyType: SurveyType
   ): Promise<void> {
     try {
-      // 사후 문진은 별도 처리 없음 (추후 앱에서 호출 시 구현)
+      // 사후 문진 완료 처리
       if (surveyType === SurveyType.AFTER) {
-        this.logger.log(`사후 문진 완료 - 사용자: ${userId}`);
+        await this.processAfterSurveyCompletion(tx, userId);
         return;
       }
 
@@ -843,6 +848,100 @@ export class SurveyService {
     } catch (error) {
       this.logger.error('설문 완료 챌린지 연동 실패:', error);
       // 챌린지 연동 실패해도 설문 완료는 진행
+    }
+  }
+
+  /**
+   * 사후문진 완료 처리
+   * - user_records 생성 (isCompleted: true)
+   * - 포인트 지급 (missions 테이블의 points 기준)
+   */
+  private async processAfterSurveyCompletion(
+    tx: Prisma.TransactionClient,
+    userId: number
+  ): Promise<void> {
+    // 1. 완료된 챌린지 조회 (COMPLETED/EXPIRED)
+    const userChallenge = await tx.userChallenge.findFirst({
+      where: {
+        userId,
+        status: { in: [UserChallengeStatus.COMPLETED, UserChallengeStatus.EXPIRED] }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!userChallenge) {
+      this.logger.log(`사후문진 완료 - 완료된 챌린지 없음 (사용자: ${userId})`);
+      return;
+    }
+
+    // 2. AFTER_SURVEY 미션 정보 조회 (포인트 정보)
+    const afterSurveyMission = await tx.mission.findFirst({
+      where: { recordType: 'AFTER_SURVEY', isActive: true }
+    });
+
+    if (!afterSurveyMission) {
+      this.logger.warn(`AFTER_SURVEY 미션을 찾을 수 없음`);
+      return;
+    }
+
+    // 3. 이미 완료했는지 확인 (중복 방지)
+    const existingRecord = await tx.userRecord.findFirst({
+      where: {
+        userId,
+        userChallengeId: userChallenge.id,
+        recordType: 'AFTER_SURVEY'
+      }
+    });
+
+    if (existingRecord) {
+      this.logger.log(`사후문진 이미 완료됨 - 사용자: ${userId}, 챌린지: ${userChallenge.id}`);
+      return;
+    }
+
+    const now = getNowKST();
+    const todayStr = now.toISOString().split('T')[0];
+    const points = afterSurveyMission.points;
+
+    // 4. user_records 생성
+    await tx.userRecord.create({
+      data: {
+        userId,
+        userChallengeId: userChallenge.id,
+        recordType: 'AFTER_SURVEY',
+        date: new Date(todayStr),
+        metadata: {
+          missionId: afterSurveyMission.id,
+          missionName: afterSurveyMission.name,
+          isCompleted: true,
+          pointsEarned: points
+        },
+        createdAt: now,
+        updatedAt: now
+      }
+    });
+
+    // 5. 포인트 지급
+    if (points > 0) {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { points: { increment: points } }
+      });
+
+      await tx.pointHistory.create({
+        data: {
+          userId,
+          type: 'EARNED',
+          amount: points,
+          balance: user.points,
+          description: `${afterSurveyMission.name} 완료`,
+          relatedType: 'MISSION_COMPLETION',
+          relatedId: afterSurveyMission.id,
+          recordType: 'AFTER_SURVEY',
+          createdAt: now
+        }
+      });
+
+      this.logger.log(`사후문진 완료 - 사용자: ${userId}, 포인트: ${points}P 지급`);
     }
   }
 
