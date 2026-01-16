@@ -254,6 +254,11 @@ export class MissionService {
     maxPointsPerDay?: number | null;
     // 주기
     frequency?: string;
+    // 포인트 지급 설정
+    pointsConfig?: {
+      afterChallengeDays?: number;     // 챌린지 종료 후 N일까지 포인트 지급
+      subscriberUnlimited?: boolean;   // 구독자 무제한 여부
+    } | null;
   }) {
     try {
       // 미션 존재 여부 확인
@@ -305,6 +310,7 @@ export class MissionService {
         prerequisiteMissionId,
         maxPointsPerDay,
         frequency,
+        pointsConfig,
       } = data;
 
       const mission = await this.prisma.mission.update({
@@ -334,6 +340,7 @@ export class MissionService {
           prerequisiteMissionId,
           maxPointsPerDay,
           frequency,
+          pointsConfig,
           updatedAt: getNowKST()
         }
       });
