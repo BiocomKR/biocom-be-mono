@@ -50,4 +50,19 @@ export class RegisterPushTokenDto {
   @IsEnum(['ios', 'android', 'web'])
   @IsOptional()
   platform?: string;
+
+  /**
+   * 번들 ID (선택)
+   *
+   * iOS: bundleIdentifier, Android: applicationId
+   * 예: kr.biocom.challenge (운영), kr.biocom.challenge.dev (개발)
+   */
+  @ApiProperty({
+    description: '앱 번들 ID (dev/prod 구분)',
+    example: 'kr.biocom.challenge',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  bundleId?: string;
 }
