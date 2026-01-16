@@ -89,6 +89,12 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'test-fail': {
+        // 테스트용 - 무조건 실패하는 배치
+        logger.log('테스트 실패 배치 실행...');
+        throw new Error('테스트용 강제 실패 에러입니다.');
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         await sendBatchSlackNotification('fail', schedulerName, {
