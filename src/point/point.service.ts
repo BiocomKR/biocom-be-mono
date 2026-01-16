@@ -1,7 +1,13 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { getNowKST } from '../common/utils/kst-date.util';
-import { PointRelatedType } from '../common/enums';
+import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { PointRelatedType, UserChallengeStatus } from '../common/enums';
+
+// 포인트 지급 설정 타입
+interface PointsConfig {
+  afterChallengeDays?: number;     // 챌린지 종료 후 N일까지 포인트 지급 (0이면 종료 즉시 포인트 없음)
+  subscriberUnlimited?: boolean;   // 구독자 무제한 여부
+}
 
 /**
  * 포인트 관리 서비스
@@ -419,5 +425,96 @@ export class PointService {
 
       this.logger.log(`포인트 적립 완료 - 잔액: ${updatedUser.points}`);
     });
+  }
+
+  /**
+   * 포인트 지급 가능 여부 체크
+   * pointsConfig 설정에 따라 계급별, 일차별 포인트 지급 가능 여부 판단
+   *
+   * @param userId 사용자 ID
+   * @param recordType 기록 타입 (BEAUTY, DIET, WEEKLY_REPORT 등)
+   * @returns { canAward: boolean, reason?: string }
+   */
+  async checkPointsEligibility(
+    userId: number,
+    recordType: string,
+  ): Promise<{ canAward: boolean; reason?: string }> {
+    // 1. 사용자 정보 및 활성 챌린지 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        status: true,
+        userChallenges: {
+          where: { status: UserChallengeStatus.ACTIVE },
+          orderBy: { activatedAt: 'desc' },
+          take: 1,
+          select: {
+            activatedAt: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return { canAward: false, reason: '사용자를 찾을 수 없습니다' };
+    }
+
+    // 2. 미션 설정 조회
+    const mission = await this.prisma.mission.findUnique({
+      where: { recordType },
+      select: {
+        id: true,
+        pointsConfig: true,
+        totalDays: true,
+      },
+    });
+
+    if (!mission) {
+      // 미션 설정이 없으면 기본적으로 지급 허용
+      return { canAward: true };
+    }
+
+    // 3. pointsConfig가 없으면 기본적으로 지급 허용
+    const pointsConfig = mission.pointsConfig as PointsConfig | null;
+    if (!pointsConfig) {
+      return { canAward: true };
+    }
+
+    // 4. 사용자 계급에 해당하는 설정 확인
+    const userStatus = user.status;
+    const userConfig = pointsConfig[userStatus];
+
+    if (!userConfig) {
+      // 해당 계급 설정이 없으면 지급 불가
+      return { canAward: false, reason: `${userStatus} 계급에 대한 포인트 설정이 없습니다` };
+    }
+
+    // 5. 무제한이면 지급 허용
+    if (userConfig.unlimited) {
+      return { canAward: true };
+    }
+
+    // 6. untilDay 체크
+    if (userConfig.untilDay) {
+      const activeChallenge = user.userChallenges[0];
+
+      if (!activeChallenge) {
+        // 활성 챌린지가 없으면 지급 불가
+        return { canAward: false, reason: '활성 챌린지가 없습니다' };
+      }
+
+      const currentDay = calculateChallengeDay(activeChallenge.activatedAt);
+
+      if (currentDay > userConfig.untilDay) {
+        return {
+          canAward: false,
+          reason: `포인트 지급 가능 기간(${userConfig.untilDay}일차)을 초과했습니다 (현재 ${currentDay}일차)`
+        };
+      }
+    }
+
+    return { canAward: true };
   }
 }

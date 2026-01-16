@@ -2,7 +2,13 @@ import { Injectable, Logger, ForbiddenException, NotFoundException } from '@nest
 import { PrismaService } from '../common/services/prisma.service';
 import { DeepReportResponseDto, DeepReportContentDto, DeepReportListResponseDto, DeepReportListItemDto } from './dto/deep-report.dto';
 import { YesNo, UserSubscriptionStatus, UserChallengeStatus, PointRelatedType } from '../common/enums';
-import { getNowKST } from '../common/utils/kst-date.util';
+import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+
+// 포인트 지급 설정 타입
+interface PointsConfig {
+  afterChallengeDays?: number;     // 챌린지 종료 후 N일까지 포인트 지급 (0이면 종료 즉시 포인트 없음)
+  subscriberUnlimited?: boolean;   // 구독자 무제한 여부
+}
 
 /**
  * 심층리포트 서비스
@@ -236,7 +242,7 @@ export class DeepReportService {
    * @returns 지급된 포인트 (이미 지급받았으면 0)
    */
   private async awardPointsAndRecord(userId: number, reportId: string): Promise<number> {
-    // 1. WEEKLY_REPORT 미션 정보 조회
+    // 1. WEEKLY_REPORT 미션 정보 조회 (pointsConfig 포함)
     const mission = await this.prisma.mission.findFirst({
       where: {
         recordType: 'WEEKLY_REPORT',
@@ -246,6 +252,7 @@ export class DeepReportService {
         id: true,
         name: true,
         points: true,
+        pointsConfig: true,
       },
     });
 
@@ -269,32 +276,102 @@ export class DeepReportService {
       return 0;
     }
 
-    // 3. 포인트 지급 (트랜잭션)
-    const pointsToAward = mission.points;
-    const now = getNowKST();
+    // 3. pointsConfig 기반 포인트 지급 가능 여부 체크
+    let actualPointsToAward = mission.points;
 
-    await this.prisma.$transaction(async (tx) => {
-      // 사용자 포인트 증가
-      const updatedUser = await tx.user.update({
+    if (mission.pointsConfig) {
+      const pointsConfig = mission.pointsConfig as PointsConfig;
+
+      // 사용자 정보 및 챌린지 정보 조회
+      const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        data: { points: { increment: pointsToAward } },
-      });
-
-      // 포인트 히스토리 기록
-      await tx.pointHistory.create({
-        data: {
-          userId,
-          type: 'EARNED',
-          amount: pointsToAward,
-          balance: updatedUser.points,
-          description: `심층리포트 조회 (${reportId})`,
-          relatedType: PointRelatedType.WEEKLY_REPORT,
-          relatedId: null, // reportId는 string이므로 description에 포함
-          createdAt: now,
+        select: {
+          status: true,
+          userChallenges: {
+            where: { status: UserChallengeStatus.ACTIVE },
+            orderBy: { activatedAt: 'desc' },
+            take: 1,
+            select: { activatedAt: true },
+          },
         },
       });
 
-      // user_records 기록 (홈화면 미션 비활성화용)
+      if (user) {
+        // 구독자인 경우
+        if (user.status === UserSubscriptionStatus.SUBSCRIBER) {
+          if (!pointsConfig.subscriberUnlimited) {
+            this.logger.log(`[awardPoints] 포인트 지급 제한 - userId: ${userId}, 구독자 무제한 설정 없음`);
+            actualPointsToAward = 0;
+          }
+          // subscriberUnlimited === true 이면 그대로 지급
+        }
+        // 챌린지 진행 중인 경우 (CHALLENGER) - 기본적으로 포인트 지급
+        else if (user.status === UserSubscriptionStatus.CHALLENGER) {
+          // 챌린지 진행 중에는 기본적으로 포인트 지급 (별도 제한 없음)
+        }
+        // NEWCOMER인 경우 (챌린지 종료 후)
+        else if (user.status === UserSubscriptionStatus.NEWCOMER) {
+          const afterChallengeDays = pointsConfig.afterChallengeDays;
+
+          // afterChallengeDays가 설정되지 않았으면 포인트 없음
+          if (afterChallengeDays === undefined || afterChallengeDays === null) {
+            this.logger.log(`[awardPoints] 포인트 지급 제한 - userId: ${userId}, 챌린지 종료 후 설정 없음`);
+            actualPointsToAward = 0;
+          } else {
+            // 챌린지 종료 후 경과 일수 계산
+            const expiredChallenge = await this.prisma.userChallenge.findFirst({
+              where: {
+                userId,
+                status: UserChallengeStatus.EXPIRED,
+              },
+              orderBy: { expiresAt: 'desc' },
+              select: { expiresAt: true },
+            });
+
+            if (expiredChallenge?.expiresAt) {
+              const now = getNowKST();
+              const daysSinceExpired = Math.floor(
+                (now.getTime() - expiredChallenge.expiresAt.getTime()) / (1000 * 60 * 60 * 24)
+              );
+
+              if (daysSinceExpired > afterChallengeDays) {
+                this.logger.log(`[awardPoints] 포인트 지급 제한 - userId: ${userId}, 종료 후 ${daysSinceExpired}일 경과, 제한: ${afterChallengeDays}일`);
+                actualPointsToAward = 0;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. 포인트 지급 (트랜잭션)
+    const now = getNowKST();
+
+    await this.prisma.$transaction(async (tx) => {
+      // 포인트 지급 (조건부)
+      if (actualPointsToAward > 0) {
+        // 사용자 포인트 증가
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: { points: { increment: actualPointsToAward } },
+        });
+
+        // 포인트 히스토리 기록
+        await tx.pointHistory.create({
+          data: {
+            userId,
+            type: 'EARNED',
+            amount: actualPointsToAward,
+            balance: updatedUser.points,
+            description: `심층리포트 조회 (${reportId})`,
+            relatedType: PointRelatedType.WEEKLY_REPORT,
+            relatedId: null, // reportId는 string이므로 description에 포함
+            createdAt: now,
+          },
+        });
+      }
+
+      // user_records 기록 (홈화면 미션 비활성화용 - 포인트와 무관하게 기록)
       await tx.userRecord.create({
         data: {
           userId,
@@ -303,16 +380,16 @@ export class DeepReportService {
           metadata: {
             reportId,
             isCompleted: true,
-            pointsEarned: pointsToAward,
+            pointsEarned: actualPointsToAward,
           },
           createdAt: now,
         },
       });
 
-      this.logger.log(`[awardPoints] 포인트 지급 완료 - userId: ${userId}, points: ${pointsToAward}, reportId: ${reportId}`);
+      this.logger.log(`[awardPoints] 처리 완료 - userId: ${userId}, points: ${actualPointsToAward}, reportId: ${reportId}`);
     });
 
-    return pointsToAward;
+    return actualPointsToAward;
   }
 
   /**
