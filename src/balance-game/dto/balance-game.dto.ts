@@ -89,6 +89,7 @@ export class BalanceGameStepResponseDto {
     discountType: string;
     discountValue: number;
     productName: string;
+    imageUrl?: string;
   };
 }
 
@@ -128,6 +129,7 @@ export class BalanceGameCompleteResponseDto {
     discountValue: number;
     productName: string;
     expiresAt: string;
+    imageUrl?: string;
   };
 }
 
