@@ -208,7 +208,7 @@ export class HomeService {
       const challengeInfo = this.buildChallengeInfo(user.status, challenges.active, challengeDays.currentDay);
 
       // 6. 첫 방문 플래그 처리
-      const firstVisitFlags = this.handleFirstVisitFlags(userId, user, reportInfo, challenges, challengeDays.currentDay);
+      const firstVisitFlags = this.handleFirstVisitFlags(userId, user, challenges, challengeDays.currentDay);
 
       // 7. 날짜 정보
       const { startDate, endDate } = this.getChallengeDates(challenges);
@@ -721,7 +721,6 @@ export class HomeService {
   private handleFirstVisitFlags(
     userId: number,
     user: UserData,
-    reportInfo: ReportInfo,
     challenges: ChallengesByStatus,
     currentDay?: number,
   ): {
@@ -731,9 +730,11 @@ export class HomeService {
     hasCompletedChallengeHistory: boolean;
   } {
     // 뉴커머 첫 방문
+    // 조건: NEWCOMER + isFirstAppEntry === true
+    // reportInfo.resultYN 조건 제거: 리포트 결과 유무와 첫 방문은 무관함
+    // (회원 탈퇴 후 재가입 시 전화번호 기반으로 기존 리포트가 조회되어 resultYN이 Y가 될 수 있음)
     const isFirstVisitAsNewcomer =
       user.status === UserSubscriptionStatus.NEWCOMER &&
-      reportInfo.resultYN === YesNo.N &&
       user.isFirstAppEntry === true;
 
     if (isFirstVisitAsNewcomer) {

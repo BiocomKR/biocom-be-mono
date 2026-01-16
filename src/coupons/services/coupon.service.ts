@@ -88,7 +88,8 @@ export class CouponService {
         status,
         issuedAt: uc.issuedAt.toISOString(),
         expiresAt: uc.expiresAt.toISOString(),
-        remainingHours
+        remainingHours,
+        imageUrl: uc.coupon.imageUrl
       };
     });
 
@@ -191,7 +192,8 @@ export class CouponService {
         discountValue: uc.coupon.discountValue,
         maxDiscountAmount: uc.coupon.maxDiscountAmount,
         expectedDiscount,
-        remainingHours
+        remainingHours,
+        imageUrl: uc.coupon.imageUrl
       };
     });
 
@@ -267,9 +269,7 @@ export class CouponService {
         isApplicable = userCoupon.coupon.categoryCode === product.categoryCode;
         break;
       case CouponScopeType.PRODUCT:
-        // 기존 productId 방식 또는 couponProducts 관계 테이블 방식
-        isApplicable = userCoupon.coupon.productId === productId ||
-          userCoupon.coupon.couponProducts.some(cp => cp.productId === productId);
+        isApplicable = userCoupon.coupon.couponProducts.some(cp => cp.productId === productId);
         break;
     }
 
@@ -366,8 +366,7 @@ export class CouponService {
         case CouponScopeType.CATEGORY:
           return item.product.categoryCode === userCoupon.coupon.categoryCode;
         case CouponScopeType.PRODUCT:
-          return item.product.id === userCoupon.coupon.productId ||
-            couponProductIds.includes(item.product.id);
+          return couponProductIds.includes(item.product.id);
         default:
           return false;
       }
@@ -500,7 +499,8 @@ export class CouponService {
       issuedAt: userCoupon.issuedAt.toISOString(),
       expiresAt: userCoupon.expiresAt.toISOString(),
       remainingHours,
-      usedAt: userCoupon.usedAt?.toISOString()
+      usedAt: userCoupon.usedAt?.toISOString(),
+      imageUrl: userCoupon.coupon.imageUrl
     };
   }
 
