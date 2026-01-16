@@ -79,6 +79,15 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'expire-coupons': {
+        // 쿠폰 만료 처리 배치 (매분 실행)
+        logger.log('쿠폰 만료 처리 배치 실행...');
+        const { CouponSchedulerService } = await import('./coupons/services/coupon-scheduler.service');
+        const couponSchedulerService = app.get(CouponSchedulerService);
+        await couponSchedulerService.handleCouponExpiryCheck();
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         process.exit(1);

@@ -16,6 +16,7 @@ resources:
   - cronjob-check-push-schedules.yaml
   - cronjob-create-supplements.yaml
   - cronjob-expire-challenges.yaml
+  - cronjob-expire-coupons.yaml
   - cronjob-iap-acknowledge-retry.yaml
   - cronjob-sync-shipping-status.yaml
 

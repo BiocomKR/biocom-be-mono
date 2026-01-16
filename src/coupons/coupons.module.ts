@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CouponController } from './controllers/coupon.controller';
 import { CouponService } from './services/coupon.service';
+import { CouponSchedulerService } from './services/coupon-scheduler.service';
 
 /**
  * 쿠폰 모듈
@@ -8,7 +9,7 @@ import { CouponService } from './services/coupon.service';
  */
 @Module({
   controllers: [CouponController],
-  providers: [CouponService],
-  exports: [CouponService],
+  providers: [CouponService, CouponSchedulerService],
+  exports: [CouponService, CouponSchedulerService],
 })
 export class CouponsModule {}
