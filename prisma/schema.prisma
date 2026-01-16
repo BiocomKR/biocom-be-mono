@@ -342,7 +342,6 @@ model HealthTypeAnimal {
   isActive            Boolean                   @default(true) @map("is_active")
   images              HealthTypeAnimalFile[]
   recommendedProducts HealthTypeAnimalProduct[]
-  solutionScreens     SolutionScreen[]
   users               User[]
 
   @@map("health_type_animals")
@@ -420,6 +419,7 @@ model Mission {
   visibleAfterSettings  Json?              @map("visible_after_settings")
   dailyTimeLimitMinutes Int?               @map("daily_time_limit_minutes")
   targetProductIds      Int[]              @default([]) @map("target_product_ids")
+  pointsConfig          Json?              @map("points_config") // 계급별 포인트 지급 설정 { "CHALLENGER": { "untilDay": 21 }, "SUBSCRIBER": { "unlimited": true } }
   challengeMissions     ChallengeMission[]
   dailyMissions         DailyMission[]
   missionQuizzes        MissionQuiz[]
@@ -2989,57 +2989,6 @@ model UserAddress {
   @@map("user_addresses")
 }
 
-/// 솔루션 화면 테이블
-/// screenKey 기반 화면 관리 및 배포 정보 포함
-model SolutionScreen {
-  id                 Int                     @id @default(autoincrement())
-  /// 화면 고유 키 (예: healthType:penguin:diet:original)
-  screenKey          String                  @unique @map("screen_key")
-  /// 건강 타입 동물 ID (RECOMMENDATION은 nullable)
-  healthTypeAnimalId Int?                    @map("health_type_animal_id")
-  /// 화면 타입
-  screenType         SolutionScreenType      @map("screen_type")
-  /// 현재 배포된 버전 ID
-  publishedVersionId Int?                    @unique @map("published_version_id")
-  /// 배포 일시
-  publishedAt        DateTime?               @map("published_at")
-  /// 배포자 ID (Operator)
-  publishedBy        Int?                    @map("published_by")
-  /// 활성화 여부
-  isActive           Boolean                 @default(true) @map("is_active")
-  createdAt          DateTime                @default(now()) @map("created_at")
-  updatedAt          DateTime?               @updatedAt @map("updated_at")
-  versions           SolutionScreenVersion[] @relation("ScreenVersions")
-  healthTypeAnimal   HealthTypeAnimal?       @relation(fields: [healthTypeAnimalId], references: [id])
-  publishedVersion   SolutionScreenVersion?  @relation("PublishedVersion", fields: [publishedVersionId], references: [id])
-
-  @@index([healthTypeAnimalId])
-  @@index([screenType])
-  @@map("solution_screens")
-}
-
-/// 솔루션 화면 버전 테이블
-/// screenKey당 DRAFT는 1개만 유지 (partial unique index 필요)
-model SolutionScreenVersion {
-  id            Int                         @id @default(autoincrement())
-  /// 화면 ID
-  screenId      Int                         @map("screen_id")
-  /// 버전 상태
-  status        SolutionScreenVersionStatus @default(DRAFT)
-  /// JSON payload (화면 콘텐츠)
-  payload       Json
-  /// 스키마 버전 (하위 호환성 관리용)
-  schemaVersion Int                         @default(1) @map("schema_version")
-  /// 작성자 ID (Operator)
-  createdBy     Int                         @map("created_by")
-  createdAt     DateTime                    @default(now()) @map("created_at")
-  screen        SolutionScreen              @relation("ScreenVersions", fields: [screenId], references: [id], onDelete: Cascade)
-  publishedFor  SolutionScreen?             @relation("PublishedVersion")
-
-  @@index([screenId, status])
-  @@map("solution_screen_versions")
-}
-
 /// 문제 신고 테이블
 model IssueReport {
   /// 신고 ID
@@ -3091,15 +3040,6 @@ model ProductLineup {
   products    Product[]
 
   @@map("product_lineups")
-}
-
-model ingredient_order_templates {
-  id               Int      @id @default(autoincrement())
-  template_key     String   @unique @db.VarChar(50)
-  name             String   @db.VarChar(100)
-  ingredient_order String[]
-  is_active        Boolean  @default(true)
-  created_at       DateTime @default(now())
 }
 
 /// 앱 설정 테이블
@@ -3200,32 +3140,4 @@ enum IAPProductType {
   AUTO_RENEWABLE
   /// 비갱신 구독
   NON_RENEWING
-}
-
-/// 솔루션 화면 타입
-enum SolutionScreenType {
-  /// 식단 > 오리지널
-  DIET_ORIGINAL
-  /// 식단 > 저속노화
-  DIET_SLOW_AGING
-  /// 영양제 > 종합세트
-  SUPPLEMENT_SET
-  /// 영양제 > 단품
-  SUPPLEMENT_SINGLE
-  /// 세트 상세
-  SET_DETAIL
-  /// 단품 상세
-  PRODUCT_DETAIL
-  /// 조건부 추천 (메타드림, 리셋데이 등)
-  RECOMMENDATION
-}
-
-/// 솔루션 화면 버전 상태
-enum SolutionScreenVersionStatus {
-  /// 작성 중
-  DRAFT
-  /// 배포됨
-  PUBLISHED
-  /// 보관됨
-  ARCHIVED
 }
