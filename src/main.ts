@@ -22,9 +22,6 @@ async function runScheduler(schedulerName: string) {
   const logger = new Logger('Scheduler');
   logger.log(`🕐 스케줄러 단독 실행 모드: ${schedulerName}`);
 
-  // 배치 시작 알림
-  await sendBatchSlackNotification('start', schedulerName);
-
   const app = await NestFactory.createApplicationContext(AppModule);
 
   try {
@@ -101,8 +98,6 @@ async function runScheduler(schedulerName: string) {
     }
 
     logger.log(`✅ 스케줄러 실행 완료: ${schedulerName}`);
-    // 배치 완료 알림
-    await sendBatchSlackNotification('success', schedulerName);
     await app.close();
     process.exit(0);
   } catch (error: any) {
