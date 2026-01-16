@@ -19,7 +19,7 @@ import {
 } from '../dto/records/records.dto';
 import { CategoryCode } from '@/common/enums/category-code.enum';
 import { RecordType } from '@/common/enums/record-type.enum';
-import { PointRelatedType } from '@/common/enums';
+import { PointRelatedType, UserSubscriptionStatus } from '@/common/enums';
 import { SibApiService } from '../../sib/services/sib-api.service';
 
 /**
@@ -745,7 +745,8 @@ export class RecordsService {
   }
 
   /**
-   * 뷰티 기록 구현 (중복 불허, 매번 포인트)
+   * 뷰티 기록 구현 (중복 불허, 1일 1회 포인트)
+   * 포인트 지급 여부는 point_histories 테이블에서 확인 (동시 요청 중복 지급 방지)
    */
   private async createBeautyRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     // 중복 체크
@@ -757,14 +758,30 @@ export class RecordsService {
       throw new ConflictException(`오늘 이미 BEAUTY 기록을 완료했습니다`);
     }
 
-    return await this.createRecordBase(tx, userId, 'BEAUTY', date, metadata, 100);
+    // 당일 뷰티 포인트 이미 받았는지 확인 (point_histories 테이블에서 직접 확인)
+    const existingPointHistory = await tx.pointHistory.findFirst({
+      where: {
+        userId,
+        recordType: RecordType.BEAUTY,
+        createdAt: {
+          gte: new Date(`${date} 00:00:00`),
+          lte: new Date(`${date} 23:59:59.999`),
+        },
+      },
+    });
+
+    // 포인트 지급 여부 (당일 point_histories에 BEAUTY 기록이 없으면 지급)
+    const pointsToAward = existingPointHistory ? 0 : 100;
+
+    return await this.createRecordBase(tx, userId, 'BEAUTY', date, metadata, pointsToAward);
   }
 
   /**
    * 식단 기록 구현
-   * 아침/점심/저녁: 각각 1일 1회만 허용, 첫 기록 시 100점
+   * 아침/점심/저녁: 각각 1일 1회만 허용, 각각 첫 기록 시 100점 (최대 300점)
    * 간식: 1일 3회까지 허용, 포인트 없음
    * 야식: 1일 3회까지 허용, 포인트 없음
+   * 포인트 지급 여부는 point_histories 테이블에서 확인 (동시 요청 중복 지급 방지)
    */
   private async createDietRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     const dietType = metadata.diet;
@@ -779,15 +796,30 @@ export class RecordsService {
     });
 
     // 같은 diet 타입 개수 확인
-    const sameDietTypeCount = todayRecords.filter(r => r.metadata?.diet === dietType).length;
+    const sameDietTypeCount = todayRecords.filter((r: any) => r.metadata?.diet === dietType).length;
 
     // 아침/점심/저녁: 1번만 허용
     if (dietType === 'BREAKFAST' || dietType === 'LUNCH' || dietType === 'DINNER') {
       if (sameDietTypeCount >= 1) {
         throw new ConflictException(`오늘 이미 ${dietType} 기록을 완료했습니다`);
       }
-      // 첫 기록이므로 100점
-      return await this.createRecordBase(tx, userId, 'DIET', date, metadata, 100);
+
+      // 당일 DIET 포인트 지급 횟수 확인 (point_histories에서 확인, 최대 3회 = 300포인트)
+      const dietPointCount = await tx.pointHistory.count({
+        where: {
+          userId,
+          recordType: RecordType.DIET,
+          createdAt: {
+            gte: new Date(`${date} 00:00:00`),
+            lte: new Date(`${date} 23:59:59.999`),
+          },
+        },
+      });
+
+      // 포인트 지급 여부 (당일 DIET 포인트가 3회 미만이면 지급)
+      const pointsToAward = dietPointCount < 3 ? 100 : 0;
+
+      return await this.createRecordBase(tx, userId, 'DIET', date, metadata, pointsToAward);
     }
 
     // 간식/야식: 3번까지 허용
@@ -819,7 +851,8 @@ export class RecordsService {
   }
 
   /**
-   * 간헐적단식 기록 구현 (중복 불허, 매번 포인트)
+   * 간헐적단식 기록 구현 (중복 불허, 1일 1회 포인트)
+   * 포인트 지급 여부는 point_histories 테이블에서 확인 (동시 요청 중복 지급 방지)
    */
   private async createFastingRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     // 중복 체크
@@ -831,11 +864,27 @@ export class RecordsService {
       throw new ConflictException(`오늘 이미 FASTING 기록을 완료했습니다`);
     }
 
-    return await this.createRecordBase(tx, userId, 'FASTING', date, metadata, 100);
+    // 당일 단식 포인트 이미 받았는지 확인 (point_histories 테이블에서 직접 확인)
+    const existingPointHistory = await tx.pointHistory.findFirst({
+      where: {
+        userId,
+        recordType: RecordType.FASTING,
+        createdAt: {
+          gte: new Date(`${date} 00:00:00`),
+          lte: new Date(`${date} 23:59:59.999`),
+        },
+      },
+    });
+
+    // 포인트 지급 여부 (당일 point_histories에 FASTING 기록이 없으면 지급)
+    const pointsToAward = existingPointHistory ? 0 : 100;
+
+    return await this.createRecordBase(tx, userId, 'FASTING', date, metadata, pointsToAward);
   }
 
   /**
-   * 수면 기록 구현 (중복 불허, 매번 포인트)
+   * 수면 기록 구현 (중복 불허, 1일 1회 포인트)
+   * 포인트 지급 여부는 point_histories 테이블에서 확인 (동시 요청 중복 지급 방지)
    */
   private async createSleepRecordImpl(tx: any, userId: number, date: string, metadata: any) {
     // 중복 체크
@@ -847,7 +896,22 @@ export class RecordsService {
       throw new ConflictException(`오늘 이미 SLEEP 기록을 완료했습니다`);
     }
 
-    return await this.createRecordBase(tx, userId, 'SLEEP', date, metadata, 100);
+    // 당일 수면 포인트 이미 받았는지 확인 (point_histories 테이블에서 직접 확인)
+    const existingPointHistory = await tx.pointHistory.findFirst({
+      where: {
+        userId,
+        recordType: RecordType.SLEEP,
+        createdAt: {
+          gte: new Date(`${date} 00:00:00`),
+          lte: new Date(`${date} 23:59:59.999`),
+        },
+      },
+    });
+
+    // 포인트 지급 여부 (당일 point_histories에 SLEEP 기록이 없으면 지급)
+    const pointsToAward = existingPointHistory ? 0 : 100;
+
+    return await this.createRecordBase(tx, userId, 'SLEEP', date, metadata, pointsToAward);
   }
 
   /**
@@ -900,9 +964,11 @@ export class RecordsService {
     let missionId: number | null = null;
     let missionName: string | null = null;
 
+    // 미션 설정 및 pointsConfig 조회
+    let mission: any = null;
     if (activeChallenge && currentDay) {
       // missions 테이블에서 recordType으로 미션 조회
-      const mission = await tx.mission.findFirst({
+      mission = await tx.mission.findFirst({
         where: {
           recordType: recordCode,
           isActive: true,
@@ -929,10 +995,45 @@ export class RecordsService {
       }
     }
 
+    // pointsConfig 기반 포인트 지급 가능 여부 체크
+    let actualPointsToAward = pointsToAward;
+    if (pointsToAward > 0 && mission?.pointsConfig) {
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { status: true },
+      });
+
+      if (user) {
+        const pointsConfig = mission.pointsConfig as {
+          afterChallengeDays?: number;
+          subscriberUnlimited?: boolean;
+        };
+
+        // 구독자인 경우
+        if (user.status === UserSubscriptionStatus.SUBSCRIBER) {
+          if (!pointsConfig.subscriberUnlimited) {
+            this.logger.log(`포인트 지급 제한 - 사용자: ${userId}, 구독자 무제한 설정 없음`);
+            actualPointsToAward = 0;
+          }
+          // subscriberUnlimited === true 이면 그대로 지급
+        }
+        // 챌린지 진행 중인 경우 (CHALLENGER) - 기본적으로 포인트 지급
+        else if (user.status === UserSubscriptionStatus.CHALLENGER) {
+          // 챌린지 진행 중에는 기본적으로 포인트 지급 (별도 제한 없음)
+        }
+        // NEWCOMER인 경우 (챌린지 종료 후) - 기록형 미션은 포인트 지급 안함
+        else if (user.status === UserSubscriptionStatus.NEWCOMER) {
+          // 기록형 미션에서 NEWCOMER는 포인트 지급 안함 (afterChallengeDays 설정과 무관)
+          this.logger.log(`포인트 지급 제한 - 사용자: ${userId}, NEWCOMER 상태 (기록형 미션)`);
+          actualPointsToAward = 0;
+        }
+      }
+    }
+
     // 기록 저장 (pointsEarned, isCompleted, day, challengeMissionId를 metadata에 포함)
     const metadataWithPoints = {
       ...metadata,
-      pointsEarned: pointsToAward,
+      pointsEarned: actualPointsToAward,
       isCompleted: true,
       day: currentDay,
       challengeMissionId,
@@ -952,11 +1053,11 @@ export class RecordsService {
     });
 
     // 포인트 지급 (조건부)
-    if (pointsToAward > 0) {
+    if (actualPointsToAward > 0) {
       await this.pointService.awardPointsInTransaction(
         tx,
         userId,
-        pointsToAward,
+        actualPointsToAward,
         `${recordCode} 기록 완료`,
         PointRelatedType.RECORD_COMPLETION,
         userRecord.id,
@@ -964,13 +1065,13 @@ export class RecordsService {
       );
     }
 
-    this.logger.log(`${recordCode} 기록 저장 완료 - 사용자: ${userId}, 포인트: ${pointsToAward}점 지급`);
+    this.logger.log(`${recordCode} 기록 저장 완료 - 사용자: ${userId}, 포인트: ${actualPointsToAward}점 지급`);
 
     return {
       id: userRecord.id,
       recordType: recordCode,
       date,
-      pointsEarned: pointsToAward,
+      pointsEarned: actualPointsToAward,
       metadata,
     };
   }
