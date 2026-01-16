@@ -1,9 +1,15 @@
 import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { UserChallengeStatus, SurveyOptionType, SurveyType, HealthCategory, HEALTH_CATEGORY_PRIORITY } from '../common/enums';
+import { UserChallengeStatus, SurveyOptionType, SurveyType, HealthCategory, HEALTH_CATEGORY_PRIORITY, UserSubscriptionStatus } from '../common/enums';
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
 import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption } from '@prisma/client';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+
+// 포인트 지급 설정 타입
+interface PointsConfig {
+  afterChallengeDays?: number;     // 챌린지 종료 후 N일까지 포인트 지급 (0이면 종료 즉시 포인트 없음)
+  subscriberUnlimited?: boolean;   // 구독자 무제한 여부
+}
 
 /**
  * 설문 서비스
@@ -854,7 +860,7 @@ export class SurveyService {
   /**
    * 사후문진 완료 처리
    * - user_records 생성 (isCompleted: true)
-   * - 포인트 지급 (missions 테이블의 points 기준)
+   * - 포인트 지급 (missions 테이블의 points 기준, pointsConfig 조건 적용)
    */
   private async processAfterSurveyCompletion(
     tx: Prisma.TransactionClient,
@@ -874,7 +880,7 @@ export class SurveyService {
       return;
     }
 
-    // 2. AFTER_SURVEY 미션 정보 조회 (포인트 정보)
+    // 2. AFTER_SURVEY 미션 정보 조회 (포인트 정보 + pointsConfig)
     const afterSurveyMission = await tx.mission.findFirst({
       where: { recordType: 'AFTER_SURVEY', isActive: true }
     });
@@ -900,9 +906,59 @@ export class SurveyService {
 
     const now = getNowKST();
     const todayStr = now.toISOString().split('T')[0];
-    const points = afterSurveyMission.points;
 
-    // 4. user_records 생성
+    // 4. pointsConfig 기반 포인트 지급 가능 여부 체크
+    let actualPointsToAward = afterSurveyMission.points;
+    const missionPointsConfig = (afterSurveyMission as any).pointsConfig as PointsConfig | null;
+
+    if (missionPointsConfig) {
+      const pointsConfig = missionPointsConfig;
+
+      // 사용자 정보 조회
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { status: true },
+      });
+
+      if (user) {
+        // 구독자인 경우
+        if (user.status === UserSubscriptionStatus.SUBSCRIBER) {
+          if (!pointsConfig.subscriberUnlimited) {
+            this.logger.log(`[사후문진] 포인트 지급 제한 - userId: ${userId}, 구독자 무제한 설정 없음`);
+            actualPointsToAward = 0;
+          }
+          // subscriberUnlimited === true 이면 그대로 지급
+        }
+        // 챌린지 진행 중인 경우 (CHALLENGER) - 기본적으로 포인트 지급
+        else if (user.status === UserSubscriptionStatus.CHALLENGER) {
+          // 챌린지 진행 중에는 기본적으로 포인트 지급 (별도 제한 없음)
+        }
+        // NEWCOMER인 경우 (챌린지 종료 후)
+        else if (user.status === UserSubscriptionStatus.NEWCOMER) {
+          const afterChallengeDays = pointsConfig.afterChallengeDays;
+
+          // afterChallengeDays가 설정되지 않았으면 포인트 없음
+          if (afterChallengeDays === undefined || afterChallengeDays === null) {
+            this.logger.log(`[사후문진] 포인트 지급 제한 - userId: ${userId}, 챌린지 종료 후 설정 없음`);
+            actualPointsToAward = 0;
+          } else {
+            // 챌린지 종료 후 경과 일수 계산 (userChallenge.expiresAt 사용)
+            if (userChallenge.expiresAt) {
+              const daysSinceExpired = Math.floor(
+                (now.getTime() - userChallenge.expiresAt.getTime()) / (1000 * 60 * 60 * 24)
+              );
+
+              if (daysSinceExpired > afterChallengeDays) {
+                this.logger.log(`[사후문진] 포인트 지급 제한 - userId: ${userId}, 종료 후 ${daysSinceExpired}일 경과, 제한: ${afterChallengeDays}일`);
+                actualPointsToAward = 0;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 5. user_records 생성
     await tx.userRecord.create({
       data: {
         userId,
@@ -913,25 +969,25 @@ export class SurveyService {
           missionId: afterSurveyMission.id,
           missionName: afterSurveyMission.name,
           isCompleted: true,
-          pointsEarned: points
+          pointsEarned: actualPointsToAward
         },
         createdAt: now,
         updatedAt: now
       }
     });
 
-    // 5. 포인트 지급
-    if (points > 0) {
+    // 6. 포인트 지급 (조건부)
+    if (actualPointsToAward > 0) {
       const user = await tx.user.update({
         where: { id: userId },
-        data: { points: { increment: points } }
+        data: { points: { increment: actualPointsToAward } }
       });
 
       await tx.pointHistory.create({
         data: {
           userId,
           type: 'EARNED',
-          amount: points,
+          amount: actualPointsToAward,
           balance: user.points,
           description: `${afterSurveyMission.name} 완료`,
           relatedType: 'MISSION_COMPLETION',
@@ -941,7 +997,9 @@ export class SurveyService {
         }
       });
 
-      this.logger.log(`사후문진 완료 - 사용자: ${userId}, 포인트: ${points}P 지급`);
+      this.logger.log(`[사후문진] 포인트 지급 완료 - 사용자: ${userId}, 포인트: ${actualPointsToAward}P`);
+    } else {
+      this.logger.log(`[사후문진] 완료 처리됨 (포인트 없음) - 사용자: ${userId}`);
     }
   }
 

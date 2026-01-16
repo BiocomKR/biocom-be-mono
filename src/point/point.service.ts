@@ -341,12 +341,19 @@ export class PointService {
       }
     }
 
-    return await this.prisma.pointHistory.findMany({
+    const items = await this.prisma.pointHistory.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
     });
+
+    // description에서 영어 ID 부분 제거 (예: "심층리포트 조회 (report_abc123)" → "심층리포트 조회")
+    // TODO: 추후 일괄적으로 파싱할 수 있도록 변경 필요 (description 포맷 표준화 또는 별도 파서 모듈화)
+    return items.map(item => ({
+      ...item,
+      description: item.description?.replace(/\s*\([a-zA-Z0-9_-]+\)\s*$/, '').trim() || item.description,
+    }));
   }
 
   /**
