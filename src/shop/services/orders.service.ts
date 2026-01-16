@@ -176,7 +176,11 @@ export class OrdersService {
           include: {
             coupon: {
               include: {
-                product: true
+                couponProducts: {
+                  include: {
+                    product: true
+                  }
+                }
               }
             }
           }
@@ -193,13 +197,15 @@ export class OrdersService {
         }
 
         // 쿠폰 적용 가능한 상품이 주문에 포함되어 있는지 확인
+        const couponProductIds = userCoupon.coupon.couponProducts.map(cp => cp.productId);
         const applicableItem = orderItemsData.find(
-          item => item.product.id === userCoupon.coupon.productId
+          item => couponProductIds.includes(item.product.id)
         );
 
         if (!applicableItem) {
+          const productNames = userCoupon.coupon.couponProducts.map(cp => cp.product.name).join(', ');
           throw new BadRequestException(
-            `이 쿠폰은 ${userCoupon.coupon.product.name}에만 사용할 수 있습니다`
+            `이 쿠폰은 ${productNames}에만 사용할 수 있습니다`
           );
         }
 

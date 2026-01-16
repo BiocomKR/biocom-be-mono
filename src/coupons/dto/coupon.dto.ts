@@ -45,6 +45,7 @@ export class UserCouponListResponseDto {
     issuedAt: string;
     expiresAt: string;
     remainingHours: number;
+    imageUrl?: string;
   }>;
 
   @ApiProperty({ description: '총 쿠폰 수', example: 5 })
@@ -75,6 +76,7 @@ export class AvailableCouponsForProductResponseDto {
     maxDiscountAmount?: number;
     expectedDiscount: number; // 실제 할인될 금액
     remainingHours: number;
+    imageUrl?: string;
   }>;
 
   @ApiProperty({ description: '상품 원가', example: 50000 })
@@ -180,4 +182,7 @@ export class CouponDetailResponseDto {
 
   @ApiPropertyOptional({ description: '사용일시 (사용된 경우)', example: '2025-09-26T15:30:00Z' })
   usedAt?: string;
+
+  @ApiPropertyOptional({ description: '쿠폰 이미지 URL' })
+  imageUrl?: string;
 }
