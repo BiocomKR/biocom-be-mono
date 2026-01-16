@@ -9,6 +9,7 @@ import { ConfigService } from './common/services/config.service';
 import { LoggerService } from './common/services/logger.service';
 import { createCorsOptions } from './common/config/cors.config';
 import { RequestIdInterceptor, ResponseTransformInterceptor, TimeoutInterceptor } from './common/interceptors';
+import { sendBatchSlackNotification } from './common/utils/batch-slack.util';
 
 /**
  * 스케줄러 단독 실행 함수
@@ -20,6 +21,9 @@ import { RequestIdInterceptor, ResponseTransformInterceptor, TimeoutInterceptor 
 async function runScheduler(schedulerName: string) {
   const logger = new Logger('Scheduler');
   logger.log(`🕐 스케줄러 단독 실행 모드: ${schedulerName}`);
+
+  // 배치 시작 알림
+  await sendBatchSlackNotification('start', schedulerName);
 
   const app = await NestFactory.createApplicationContext(AppModule);
 
@@ -90,14 +94,24 @@ async function runScheduler(schedulerName: string) {
 
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
+        await sendBatchSlackNotification('fail', schedulerName, {
+          error: `알 수 없는 스케줄러: ${schedulerName}`,
+        });
         process.exit(1);
     }
 
     logger.log(`✅ 스케줄러 실행 완료: ${schedulerName}`);
+    // 배치 완료 알림
+    await sendBatchSlackNotification('success', schedulerName);
     await app.close();
     process.exit(0);
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`❌ 스케줄러 실행 실패: ${schedulerName}`, error);
+    // 배치 실패 알림
+    await sendBatchSlackNotification('fail', schedulerName, {
+      error: error.message,
+      stack: error.stack,
+    });
     await app.close();
     process.exit(1);
   }
