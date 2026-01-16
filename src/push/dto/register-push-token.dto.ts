@@ -65,4 +65,49 @@ export class RegisterPushTokenDto {
   @IsString()
   @IsOptional()
   bundleId?: string;
+
+  /**
+   * 디바이스 모델명 (선택)
+   *
+   * 예: iPhone 15 Pro, Galaxy S24
+   * CS 디버깅용
+   */
+  @ApiProperty({
+    description: '디바이스 모델명',
+    example: 'iPhone 15 Pro',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  deviceModel?: string;
+
+  /**
+   * OS 버전 (선택)
+   *
+   * 예: 17.2, 14
+   * CS 디버깅용
+   */
+  @ApiProperty({
+    description: 'OS 버전',
+    example: '17.2',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  osVersion?: string;
+
+  /**
+   * 앱 버전 (선택)
+   *
+   * 예: 1.1.0
+   * CS 디버깅용
+   */
+  @ApiProperty({
+    description: '앱 버전',
+    example: '1.1.0',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  appVersion?: string;
 }

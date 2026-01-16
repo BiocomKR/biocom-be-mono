@@ -29,7 +29,7 @@ export class PushTokenService {
     userId: number,
     dto: RegisterPushTokenDto,
   ): Promise<PushTokenResponseDto> {
-    const { token, deviceId, platform, bundleId } = dto;
+    const { token, deviceId, platform, bundleId, deviceModel, osVersion, appVersion } = dto;
 
     this.logger.log(
       `📝 [PushTokenService] 푸시 토큰 등록 시도: userId=${userId}, deviceId=${deviceId || 'auto'}, platform=${platform}, bundleId=${bundleId}`,

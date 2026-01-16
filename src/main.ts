@@ -22,9 +22,11 @@ async function runScheduler(schedulerName: string) {
   const logger = new Logger('Scheduler');
   logger.log(`🕐 스케줄러 단독 실행 모드: ${schedulerName}`);
 
-  const app = await NestFactory.createApplicationContext(AppModule);
+  let app: Awaited<ReturnType<typeof NestFactory.createApplicationContext>> | null = null;
 
   try {
+    // 앱 컨텍스트 생성 (DB 연결 포함)
+    app = await NestFactory.createApplicationContext(AppModule);
     const { ChallengeSchedulerService } = await import('./challenge/challenge-scheduler.service');
     const schedulerService = app.get(ChallengeSchedulerService);
 
@@ -102,12 +104,14 @@ async function runScheduler(schedulerName: string) {
     process.exit(0);
   } catch (error: any) {
     logger.error(`❌ 스케줄러 실행 실패: ${schedulerName}`, error);
-    // 배치 실패 알림
+    // 배치 실패 알림 (DB 연결 실패 등 앱 컨텍스트 생성 실패도 포함)
     await sendBatchSlackNotification('fail', schedulerName, {
       error: error.message,
       stack: error.stack,
     });
-    await app.close();
+    if (app) {
+      await app.close();
+    }
     process.exit(1);
   }
 }
