@@ -85,6 +85,9 @@ export class PushTokenService {
           token, // 토큰 업데이트
           platform,
           bundleId,
+          deviceModel,
+          osVersion,
+          appVersion,
           isActive: true,
           updatedAt: getNowKST(),
         },
@@ -95,6 +98,9 @@ export class PushTokenService {
           deviceId: deviceId || token,
           platform,
           bundleId,
+          deviceModel,
+          osVersion,
+          appVersion,
           isActive: true,
         },
       });
