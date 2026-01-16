@@ -29,10 +29,10 @@ export class PushTokenService {
     userId: number,
     dto: RegisterPushTokenDto,
   ): Promise<PushTokenResponseDto> {
-    const { token, deviceId, platform } = dto;
+    const { token, deviceId, platform, bundleId } = dto;
 
     this.logger.log(
-      `📝 [PushTokenService] 푸시 토큰 등록 시도: userId=${userId}, deviceId=${deviceId || 'auto'}, platform=${platform}`,
+      `📝 [PushTokenService] 푸시 토큰 등록 시도: userId=${userId}, deviceId=${deviceId || 'auto'}, platform=${platform}, bundleId=${bundleId}`,
     );
 
     try {
@@ -84,6 +84,7 @@ export class PushTokenService {
         update: {
           token, // 토큰 업데이트
           platform,
+          bundleId,
           isActive: true,
           updatedAt: getNowKST(),
         },
@@ -93,6 +94,7 @@ export class PushTokenService {
           token,
           deviceId: deviceId || token,
           platform,
+          bundleId,
           isActive: true,
         },
       });

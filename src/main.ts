@@ -9,6 +9,7 @@ import { ConfigService } from './common/services/config.service';
 import { LoggerService } from './common/services/logger.service';
 import { createCorsOptions } from './common/config/cors.config';
 import { RequestIdInterceptor, ResponseTransformInterceptor, TimeoutInterceptor } from './common/interceptors';
+import { sendBatchSlackNotification } from './common/utils/batch-slack.util';
 
 /**
  * 스케줄러 단독 실행 함수
@@ -79,16 +80,33 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'expire-coupons': {
+        // 쿠폰 만료 처리 배치 (매분 실행)
+        logger.log('쿠폰 만료 처리 배치 실행...');
+        const { CouponSchedulerService } = await import('./coupons/services/coupon-scheduler.service');
+        const couponSchedulerService = app.get(CouponSchedulerService);
+        await couponSchedulerService.handleCouponExpiryCheck();
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
+        await sendBatchSlackNotification('fail', schedulerName, {
+          error: `알 수 없는 스케줄러: ${schedulerName}`,
+        });
         process.exit(1);
     }
 
     logger.log(`✅ 스케줄러 실행 완료: ${schedulerName}`);
     await app.close();
     process.exit(0);
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`❌ 스케줄러 실행 실패: ${schedulerName}`, error);
+    // 배치 실패 알림
+    await sendBatchSlackNotification('fail', schedulerName, {
+      error: error.message,
+      stack: error.stack,
+    });
     await app.close();
     process.exit(1);
   }
