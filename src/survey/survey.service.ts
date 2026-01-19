@@ -484,13 +484,14 @@ export class SurveyService {
       startDate?: string;
       endDate?: string;
       excludeTesters?: boolean;
+      excludeDeleted?: boolean;
     },
     sort: {
       sortBy: string;
       sortOrder: 'asc' | 'desc';
     }
   ): Promise<PaginatedResult<any>> {
-    this.logger.log(`페이징 처리된 설문 답변 목록 조회 - page: ${page}, limit: ${limit}, excludeTesters: ${filters.excludeTesters}`);
+    this.logger.log(`페이징 처리된 설문 답변 목록 조회 - page: ${page}, limit: ${limit}, excludeTesters: ${filters.excludeTesters}, excludeDeleted: ${filters.excludeDeleted}`);
 
     const skip = (page - 1) * limit;
 
@@ -543,6 +544,14 @@ export class SurveyService {
       where.user = {
         ...where.user,
         isTester: false,
+      };
+    }
+
+    // 탈퇴회원 제외 필터
+    if (filters.excludeDeleted) {
+      where.user = {
+        ...where.user,
+        deletedAt: null,
       };
     }
 
@@ -1066,6 +1075,7 @@ export class SurveyService {
     startDate?: string;
     endDate?: string;
     excludeTesters?: boolean;
+    excludeDeleted?: boolean;
   }): Promise<{
     userAnswers: any[];
     questionStats: any[];
@@ -1098,7 +1108,16 @@ export class SurveyService {
     // 테스터 제외 필터
     if (filters.excludeTesters) {
       where.user = {
+        ...where.user,
         isTester: false,
+      };
+    }
+
+    // 탈퇴회원 제외 필터
+    if (filters.excludeDeleted) {
+      where.user = {
+        ...where.user,
+        deletedAt: null,
       };
     }
 
