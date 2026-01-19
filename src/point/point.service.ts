@@ -500,17 +500,7 @@ export class PointService {
       dailyStats[date][item.userId] = (dailyStats[date][item.userId] || 0) + item.amount;
     }
 
-    // 첫 날짜에서 DIET 초과분 차감
     const dates = Object.keys(dailyStats).sort();
-    if (dates.length > 0) {
-      const firstDate = dates[0];
-      for (const [userId, excess] of Object.entries(dietExcess)) {
-        const uid = parseInt(userId);
-        if (dailyStats[firstDate]?.[uid]) {
-          dailyStats[firstDate][uid] -= excess;
-        }
-      }
-    }
 
     const totalDietExcess = Object.values(dietExcess).reduce((a, b) => a + b, 0);
     const totalEarned = Object.values(userStats).reduce((sum, u) => sum + u.total, 0);
