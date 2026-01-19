@@ -168,6 +168,7 @@ export class SurveyController {
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: string,
     @Query('excludeTesters') excludeTesters?: string,
+    @Query('excludeDeleted') excludeDeleted?: string,
   ): Promise<ApiResponseDto<any>> {
     this.logger.log('설문 답변 목록 조회 요청');
 
@@ -185,6 +186,7 @@ export class SurveyController {
         startDate,
         endDate,
         excludeTesters: excludeTesters === 'true',
+        excludeDeleted: excludeDeleted === 'true',
       };
 
       const sort = {
@@ -223,14 +225,16 @@ export class SurveyController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('excludeTesters') excludeTesters?: string,
+    @Query('excludeDeleted') excludeDeleted?: string,
   ) {
-    this.logger.log(`설문 답변 엑셀 다운로드 요청 - productId: ${productId}, excludeTesters: ${excludeTesters}`);
+    this.logger.log(`설문 답변 엑셀 다운로드 요청 - productId: ${productId}, excludeTesters: ${excludeTesters}, excludeDeleted: ${excludeDeleted}`);
 
     const data = await this.managementSurveyService.getAnswersForExcel({
       productId: productId ? parseInt(productId, 10) : undefined,
       startDate,
       endDate,
       excludeTesters: excludeTesters === 'true',
+      excludeDeleted: excludeDeleted === 'true',
     });
 
     const workbook = new ExcelJS.Workbook();
