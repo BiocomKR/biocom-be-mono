@@ -16,6 +16,11 @@ import {
   UserRecordSummaryDto,
   RecordRowListDto,
   RecordRowItemDto,
+  ComparisonDto,
+  MetricChangeDto,
+  FunnelStageDto,
+  CohortDto,
+  CohortWeekDto,
 } from './dto/records-dashboard.dto';
 import {
   UserRecordsQueryDto,
@@ -362,7 +367,299 @@ export class RecordsService {
       typeHabits,
       dauTrend,
       challengeAnalysis,
+      // 고도화: 비교, 퍼널, 코호트
+      comparison: await this.getComparison(excludeTesters),
+      funnel: await this.getFunnel(excludeTesters),
+      cohorts: await this.getCohorts(excludeTesters),
     };
+  }
+
+  /**
+   * 전주 대비 비교 데이터
+   */
+  private async getComparison(excludeTesters: boolean): Promise<ComparisonDto> {
+    const now = getNowKST();
+    const today = new Date(now);
+    today.setUTCHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // 이번 주 시작 (월요일)
+    const weekStart = new Date(today);
+    const dayOfWeek = weekStart.getDay();
+    const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    weekStart.setDate(weekStart.getDate() - diff);
+    weekStart.setUTCHours(0, 0, 0, 0);
+
+    // 저번 주 시작/끝
+    const lastWeekStart = new Date(weekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    const lastWeekEnd = new Date(weekStart);
+
+    // 7일 전
+    const days7Ago = new Date(today);
+    days7Ago.setDate(days7Ago.getDate() - 7);
+    const days14Ago = new Date(today);
+    days14Ago.setDate(days14Ago.getDate() - 14);
+
+    const testerFilter = excludeTesters ? { user: { isTester: false } } : {};
+
+    // 이번 주 DAU (오늘)
+    const todayRecords = await this.prisma.userRecord.findMany({
+      where: { createdAt: { gte: today, lt: tomorrow }, ...testerFilter },
+      select: { userId: true },
+    });
+    const currentDau = new Set(todayRecords.map((r) => r.userId)).size;
+
+    // 저번 주 같은 요일 DAU
+    const lastWeekSameDay = new Date(today);
+    lastWeekSameDay.setDate(lastWeekSameDay.getDate() - 7);
+    const lastWeekSameDayEnd = new Date(lastWeekSameDay);
+    lastWeekSameDayEnd.setDate(lastWeekSameDayEnd.getDate() + 1);
+    const lastWeekRecords = await this.prisma.userRecord.findMany({
+      where: { createdAt: { gte: lastWeekSameDay, lt: lastWeekSameDayEnd }, ...testerFilter },
+      select: { userId: true },
+    });
+    const previousDau = new Set(lastWeekRecords.map((r) => r.userId)).size;
+
+    // 이번 주 WAU
+    const thisWeekRecords = await this.prisma.userRecord.findMany({
+      where: { createdAt: { gte: weekStart, lt: tomorrow }, ...testerFilter },
+      select: { userId: true },
+    });
+    const currentWau = new Set(thisWeekRecords.map((r) => r.userId)).size;
+
+    // 저번 주 WAU
+    const lastWeekAllRecords = await this.prisma.userRecord.findMany({
+      where: { createdAt: { gte: lastWeekStart, lt: lastWeekEnd }, ...testerFilter },
+      select: { userId: true },
+    });
+    const previousWau = new Set(lastWeekAllRecords.map((r) => r.userId)).size;
+
+    // 7일 리텐션 비교 (이번 주 vs 저번 주)
+    // 이번 주: 7일 전 기록자 중 오늘 기록자
+    const users7dAgo = await this.prisma.userRecord.findMany({
+      where: { createdAt: { gte: days7Ago, lt: new Date(days7Ago.getTime() + 86400000) } },
+      select: { userId: true },
+    });
+    const userIds7dAgo = new Set(users7dAgo.map((r) => r.userId));
+    const todayUserIds = new Set(todayRecords.map((r) => r.userId));
+    const retained7d = [...userIds7dAgo].filter((id) => todayUserIds.has(id)).length;
+    const currentRetention7d = userIds7dAgo.size > 0 ? Math.round((retained7d / userIds7dAgo.size) * 100) : 0;
+
+    // 저번 주: 14일 전 기록자 중 7일 전 기록자
+    const users14dAgo = await this.prisma.userRecord.findMany({
+      where: { createdAt: { gte: days14Ago, lt: new Date(days14Ago.getTime() + 86400000) } },
+      select: { userId: true },
+    });
+    const userIds14dAgo = new Set(users14dAgo.map((r) => r.userId));
+    const userIds7dAgoSet = new Set(users7dAgo.map((r) => r.userId));
+    const retained7dPrev = [...userIds14dAgo].filter((id) => userIds7dAgoSet.has(id)).length;
+    const previousRetention7d = userIds14dAgo.size > 0 ? Math.round((retained7dPrev / userIds14dAgo.size) * 100) : 0;
+
+    // 완주율 비교
+    const days30Ago = new Date(today);
+    days30Ago.setDate(days30Ago.getDate() - 30);
+    const days60Ago = new Date(today);
+    days60Ago.setDate(days60Ago.getDate() - 60);
+
+    const currentCompleted = await this.prisma.userChallenge.count({
+      where: { status: 'COMPLETED', updatedAt: { gte: days30Ago } },
+    });
+    const currentTotal = await this.prisma.userChallenge.count({
+      where: { activatedAt: { lte: days30Ago }, OR: [{ status: 'COMPLETED' }, { status: 'ACTIVE' }] },
+    });
+    const currentCompletionRate = currentTotal > 0 ? Math.round((currentCompleted / currentTotal) * 100) : 0;
+
+    const previousCompleted = await this.prisma.userChallenge.count({
+      where: { status: 'COMPLETED', updatedAt: { gte: days60Ago, lt: days30Ago } },
+    });
+    const previousTotal = await this.prisma.userChallenge.count({
+      where: { activatedAt: { lte: days60Ago }, updatedAt: { lt: days30Ago }, OR: [{ status: 'COMPLETED' }, { status: 'ACTIVE' }] },
+    });
+    const previousCompletionRate = previousTotal > 0 ? Math.round((previousCompleted / previousTotal) * 100) : 0;
+
+    const calcChange = (current: number, previous: number): MetricChangeDto => ({
+      current,
+      previous,
+      change: current - previous,
+      changePercent: previous > 0 ? Math.round(((current - previous) / previous) * 100) : 0,
+    });
+
+    return {
+      dau: calcChange(currentDau, previousDau),
+      wau: calcChange(currentWau, previousWau),
+      retention7d: calcChange(currentRetention7d, previousRetention7d),
+      completionRate: calcChange(currentCompletionRate, previousCompletionRate),
+    };
+  }
+
+  /**
+   * 퍼널 데이터
+   */
+  private async getFunnel(excludeTesters: boolean): Promise<FunnelStageDto[]> {
+    const now = getNowKST();
+    const today = new Date(now);
+    today.setUTCHours(0, 0, 0, 0);
+
+    const days30Ago = new Date(today);
+    days30Ago.setDate(days30Ago.getDate() - 30);
+
+    // 기준: 최근 30일 챌린지 시작자
+    const challengeStarted = await this.prisma.userChallenge.findMany({
+      where: {
+        activatedAt: { gte: days30Ago },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
+      },
+      select: { userId: true, status: true },
+    });
+    const challengeStartUserIds = [...new Set(challengeStarted.map((c: { userId: number; status: string }) => c.userId))] as number[];
+    const challengeStartUsers = challengeStartUserIds.length;
+
+    if (challengeStartUsers === 0) {
+      return [
+        { stage: 'CHALLENGE_START', label: '챌린지 시작', users: 0, rate: 100, dropoffRate: 0 },
+        { stage: 'WEEK1', label: '1주차 유지', users: 0, rate: 0, dropoffRate: 0 },
+        { stage: 'WEEK2', label: '2주차 유지', users: 0, rate: 0, dropoffRate: 0 },
+        { stage: 'COMPLETED', label: '21일 완주', users: 0, rate: 0, dropoffRate: 0 },
+      ];
+    }
+
+    // 1주차 유지 (7일 이상 기록한 사용자)
+    const week1Retained = await this.countUsersWithRecordDays(challengeStartUserIds, 7, excludeTesters);
+
+    // 2주차 유지 (14일 이상 기록한 사용자)
+    const week2Retained = await this.countUsersWithRecordDays(challengeStartUserIds, 14, excludeTesters);
+
+    // 21일 완주
+    const completedCount = challengeStarted.filter((c: { userId: number; status: string }) => c.status === 'COMPLETED').length;
+
+    const stages = [
+      { stage: 'CHALLENGE_START', label: '챌린지 시작', users: challengeStartUsers },
+      { stage: 'WEEK1', label: '1주차 유지', users: week1Retained },
+      { stage: 'WEEK2', label: '2주차 유지', users: week2Retained },
+      { stage: 'COMPLETED', label: '21일 완주', users: completedCount },
+    ];
+
+    const funnel: FunnelStageDto[] = [];
+    for (let i = 0; i < stages.length; i++) {
+      const rate = challengeStartUsers > 0 ? Math.round((stages[i].users / challengeStartUsers) * 100) : 0;
+      const dropoffRate = i === 0 ? 0 : (stages[i - 1].users > 0
+        ? Math.round(((stages[i - 1].users - stages[i].users) / stages[i - 1].users) * 100)
+        : 0);
+
+      funnel.push({
+        stage: stages[i].stage,
+        label: stages[i].label,
+        users: stages[i].users,
+        rate,
+        dropoffRate,
+      });
+    }
+
+    return funnel;
+  }
+
+  /**
+   * N일 이상 기록한 사용자 수 카운트
+   */
+  private async countUsersWithRecordDays(
+    userIds: number[],
+    minDays: number,
+    excludeTesters: boolean,
+  ): Promise<number> {
+    let count = 0;
+    for (const userId of userIds) {
+      const records = await this.prisma.userRecord.findMany({
+        where: {
+          userId,
+          ...(excludeTesters ? { user: { isTester: false } } : {}),
+        },
+        select: { date: true },
+      });
+      const uniqueDays = new Set(records.map((r: { date: Date | null }) => r.date?.toISOString().split('T')[0])).size;
+      if (uniqueDays >= minDays) count++;
+    }
+    return count;
+  }
+
+  /**
+   * 코호트 데이터 (챌린지 시작월 기준, 최근 6개월)
+   */
+  private async getCohorts(excludeTesters: boolean): Promise<CohortDto[]> {
+    const now = getNowKST();
+    const today = new Date(now);
+    today.setUTCHours(0, 0, 0, 0);
+
+    const cohorts: CohortDto[] = [];
+
+    // 최근 6개월
+    for (let i = 5; i >= 0; i--) {
+      const monthStart = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 1);
+      const monthStr = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
+
+      // 해당 월 챌린지 시작자 (개인별 시작일 기준)
+      const monthChallenges = await this.prisma.userChallenge.findMany({
+        where: {
+          activatedAt: { gte: monthStart, lt: monthEnd },
+          ...(excludeTesters ? { user: { isTester: false } } : {}),
+        },
+        select: { userId: true, activatedAt: true },
+      });
+
+      if (monthChallenges.length === 0) {
+        cohorts.push({ month: monthStr, totalUsers: 0, weeks: [] });
+        continue;
+      }
+
+      // 중복 제거 (한 사용자가 여러 챌린지 시작할 수 있음)
+      const userStartDates = new Map<number, Date>();
+      for (const c of monthChallenges) {
+        if (c.activatedAt && !userStartDates.has(c.userId)) {
+          userStartDates.set(c.userId, c.activatedAt);
+        }
+      }
+      const userIds = Array.from(userStartDates.keys());
+      const totalUsers = userIds.length;
+
+      // 주차별 리텐션 (개인별 시작일 기준, 1~3주차)
+      const weeks: CohortWeekDto[] = [];
+
+      for (let w = 0; w < 3; w++) {
+        let activeCount = 0;
+
+        for (const [userId, startDate] of userStartDates) {
+          const weekStart = new Date(startDate.getTime() + w * 7 * 86400000);
+          const weekEnd = new Date(weekStart.getTime() + 7 * 86400000);
+
+          // 아직 해당 주차가 안 된 사용자는 제외
+          if (weekEnd > today) continue;
+
+          const hasRecord = await this.prisma.userRecord.findFirst({
+            where: {
+              userId,
+              createdAt: { gte: weekStart, lt: weekEnd },
+            },
+            select: { id: true },
+          });
+
+          if (hasRecord) activeCount++;
+        }
+
+        const eligibleUsers = Array.from(userStartDates.entries()).filter(([, startDate]) => {
+          const weekEnd = new Date(startDate.getTime() + (w + 1) * 7 * 86400000);
+          return weekEnd <= today;
+        }).length;
+
+        const rate = eligibleUsers > 0 ? Math.round((activeCount / eligibleUsers) * 100) : 0;
+        weeks.push({ week: w + 1, users: activeCount, rate });
+      }
+
+      cohorts.push({ month: monthStr, totalUsers, weeks });
+    }
+
+    return cohorts;
   }
 
   /**
@@ -729,6 +1026,7 @@ export class RecordsService {
     search?: string,
     challengeStatus?: string,
     excludeTesters: boolean = false,
+    churnRisk: boolean = false,
   ): Promise<UserRecordStatsListDto> {
     const now = getNowKST();
     const today = new Date(now);
@@ -746,6 +1044,10 @@ export class RecordsService {
     // 30일 전
     const days30Ago = new Date(today);
     days30Ago.setDate(days30Ago.getDate() - 30);
+
+    // 3일 전 (이탈 위험 기준)
+    const days3Ago = new Date(today);
+    days3Ago.setDate(days3Ago.getDate() - 3);
 
     // 사용자 조회 조건
     const userWhere: any = {};
@@ -918,6 +1220,22 @@ export class RecordsService {
         byType,
       };
     });
+
+    // 이탈 위험 필터: 3일 이상 미기록 사용자만
+    if (churnRisk) {
+      const churnRiskUsers = userSummaries.filter((user) => {
+        if (!user.lastRecordDate) return true; // 기록 없음
+        const lastRecord = new Date(user.lastRecordDate);
+        return lastRecord < days3Ago;
+      });
+      return {
+        users: churnRiskUsers,
+        total: churnRiskUsers.length,
+        page: 1,
+        limit: churnRiskUsers.length,
+        totalPages: 1,
+      };
+    }
 
     return {
       users: userSummaries,
