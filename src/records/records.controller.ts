@@ -67,21 +67,25 @@ export class RecordsController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '페이지당 수' })
   @ApiQuery({ name: 'search', required: false, type: String, description: '검색어 (닉네임/이메일)' })
   @ApiQuery({ name: 'challengeStatus', required: false, type: String, description: '챌린지 상태 필터' })
+  @ApiQuery({ name: 'churnRisk', required: false, type: Boolean, description: '이탈 위험 사용자만 표시 (3일 이상 미기록)' })
   @ApiQuery({ name: 'excludeTesters', required: false, type: Boolean, description: '테스터 제외 여부' })
   async getUserRecordStatsList(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('search') search?: string,
     @Query('challengeStatus') challengeStatus?: string,
+    @Query('churnRisk') churnRisk?: string,
     @Query('excludeTesters') excludeTesters?: string,
   ) {
     const exclude = excludeTesters === 'true';
+    const churnRiskFilter = churnRisk === 'true';
     const data = await this.recordsService.getUserRecordStatsList(
       page,
       limit,
       search,
       challengeStatus,
       exclude,
+      churnRiskFilter,
     );
     return {
       success: true,

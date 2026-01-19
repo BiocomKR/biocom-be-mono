@@ -197,6 +197,88 @@ export class ChallengeAnalysisDto {
 }
 
 /**
+ * 지표 변화량
+ */
+export class MetricChangeDto {
+  @ApiProperty({ description: '현재 값' })
+  current: number;
+
+  @ApiProperty({ description: '이전 값' })
+  previous: number;
+
+  @ApiProperty({ description: '변화량' })
+  change: number;
+
+  @ApiProperty({ description: '변화율 (%)' })
+  changePercent: number;
+}
+
+/**
+ * 주요 지표 비교 데이터
+ */
+export class ComparisonDto {
+  @ApiProperty({ description: 'DAU 비교', type: MetricChangeDto })
+  dau: MetricChangeDto;
+
+  @ApiProperty({ description: 'WAU 비교', type: MetricChangeDto })
+  wau: MetricChangeDto;
+
+  @ApiProperty({ description: '7일 리텐션 비교', type: MetricChangeDto })
+  retention7d: MetricChangeDto;
+
+  @ApiProperty({ description: '완주율 비교', type: MetricChangeDto })
+  completionRate: MetricChangeDto;
+}
+
+/**
+ * 퍼널 단계
+ */
+export class FunnelStageDto {
+  @ApiProperty({ description: '단계명' })
+  stage: string;
+
+  @ApiProperty({ description: '단계 라벨' })
+  label: string;
+
+  @ApiProperty({ description: '사용자 수' })
+  users: number;
+
+  @ApiProperty({ description: '전환율 (%)' })
+  rate: number;
+
+  @ApiProperty({ description: '이탈율 (%)' })
+  dropoffRate: number;
+}
+
+/**
+ * 코호트 주차별 리텐션
+ */
+export class CohortWeekDto {
+  @ApiProperty({ description: '주차' })
+  week: number;
+
+  @ApiProperty({ description: '활성 사용자 수' })
+  users: number;
+
+  @ApiProperty({ description: '리텐션율 (%)' })
+  rate: number;
+}
+
+/**
+ * 코호트 데이터
+ */
+export class CohortDto {
+  @ApiProperty({ description: '코호트 월 (YYYY-MM)' })
+  month: string;
+
+  @ApiProperty({ description: '코호트 총 사용자' })
+  totalUsers: number;
+
+  @ApiProperty({ description: '주차별 리텐션', type: [CohortWeekDto] })
+  weeks: CohortWeekDto[];
+}
+
+/**
  * 챌린지 대시보드 응답 (경영진용)
  */
 export class RecordsDashboardDto {
@@ -220,6 +302,15 @@ export class RecordsDashboardDto {
 
   @ApiProperty({ description: '챌린지 분석', type: ChallengeAnalysisDto })
   challengeAnalysis: ChallengeAnalysisDto;
+
+  @ApiProperty({ description: '전주 대비 비교', type: ComparisonDto, required: false })
+  comparison?: ComparisonDto;
+
+  @ApiProperty({ description: '퍼널 데이터', type: [FunnelStageDto], required: false })
+  funnel?: FunnelStageDto[];
+
+  @ApiProperty({ description: '코호트 데이터 (최근 6개월)', type: [CohortDto], required: false })
+  cohorts?: CohortDto[];
 }
 
 /**
