@@ -7,11 +7,13 @@ import {
   Body,
   Param,
   Query,
+  Res,
   ParseIntPipe,
   HttpStatus,
   Logger,
   UseGuards,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SurveyService } from './survey.service';
@@ -24,6 +26,8 @@ import {
 } from './survey-response.dto';
 import { ApiResponseDto } from '../common/dto/api-response.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
+import * as ExcelJS from 'exceljs';
+import * as dayjs from 'dayjs';
 
 /**
  * Management 설문 관리 컨트롤러
@@ -207,6 +211,82 @@ export class SurveyController {
       this.logger.error('설문 답변 목록 조회 실패', error);
       throw error;
     }
+  }
+
+  /**
+   * 설문 답변 엑셀 다운로드
+   */
+  @Get('answers/excel')
+  async downloadAnswersExcel(
+    @Res() res: Response,
+    @Query('productId') productId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
+  ) {
+    this.logger.log(`설문 답변 엑셀 다운로드 요청 - productId: ${productId}, excludeTesters: ${excludeTesters}`);
+
+    const data = await this.managementSurveyService.getAnswersForExcel({
+      productId: productId ? parseInt(productId, 10) : undefined,
+      startDate,
+      endDate,
+      excludeTesters: excludeTesters === 'true',
+    });
+
+    const workbook = new ExcelJS.Workbook();
+
+    // 단일 시트: 이름, 챌린지명, 구분, 질문, 답변, 점수
+    const sheet = workbook.addWorksheet('문진답변');
+    sheet.columns = [
+      { header: '이름', key: 'userName', width: 12 },
+      { header: '연락처', key: 'userMobile', width: 15 },
+      { header: '챌린지', key: 'productName', width: 25 },
+      { header: '구분', key: 'type', width: 10 },
+      { header: '카테고리', key: 'category', width: 15 },
+      { header: '질문', key: 'questionText', width: 50 },
+      { header: '답변', key: 'optionText', width: 25 },
+      { header: '점수', key: 'score', width: 8 },
+      { header: '답변일시', key: 'createdAt', width: 18 },
+    ];
+
+    // 데이터 추가
+    data.rawData.forEach((item) => {
+      sheet.addRow({
+        userName: item.userName,
+        userMobile: item.userMobile,
+        productName: item.productName,
+        type: item.type === 'before' || item.type === 'BEFORE' ? '사전문진' : '사후문진',
+        category: item.category,
+        questionText: item.questionText,
+        optionText: item.optionText,
+        score: item.score,
+        createdAt: dayjs(item.createdAt).format('YYYY-MM-DD HH:mm:ss'),
+      });
+    });
+
+    // 헤더 스타일
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+    // 자동 필터 설정 (전체 데이터 범위)
+    const lastRow = data.rawData.length + 1;
+    sheet.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: lastRow, column: 9 },
+    };
+
+    // 첫 행 고정
+    sheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // 응답 전송
+    const fileName = `설문답변_${dayjs().format('YYYYMMDD_HHmmss')}`;
+    const encodedFileName = encodeURIComponent(fileName);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFileName}.xlsx`);
+    await workbook.xlsx.write(res);
+
+    this.logger.log(`설문 답변 엑셀 다운로드 완료 - ${data.rawData.length}건`);
   }
 
   /**

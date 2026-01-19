@@ -1056,6 +1056,272 @@ export class SurveyService {
   }
 
   /**
+   * 설문 답변 엑셀 다운로드용 데이터 조회
+   *
+   * @param filters 필터 조건
+   * @returns 사용자별 답변, 질문별 통계, Raw 데이터
+   */
+  async getAnswersForExcel(filters: {
+    productId?: number;
+    startDate?: string;
+    endDate?: string;
+    excludeTesters?: boolean;
+  }): Promise<{
+    userAnswers: any[];
+    questionStats: any[];
+    rawData: any[];
+    questions: any[];
+  }> {
+    this.logger.log(`설문 답변 엑셀 데이터 조회 - productId: ${filters.productId}, excludeTesters: ${filters.excludeTesters}`);
+
+    // 기본 WHERE 조건
+    const where: any = {};
+
+    // 상품(챌린지) 필터
+    if (filters.productId) {
+      where.userChallenge = {
+        productId: filters.productId,
+      };
+    }
+
+    // 날짜 범위 필터
+    if (filters.startDate || filters.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        where.createdAt.gte = new Date(filters.startDate);
+      }
+      if (filters.endDate) {
+        where.createdAt.lte = new Date(filters.endDate + 'T23:59:59.999Z');
+      }
+    }
+
+    // 테스터 제외 필터
+    if (filters.excludeTesters) {
+      where.user = {
+        isTester: false,
+      };
+    }
+
+    // 전체 답변 조회
+    const answers = await this.prisma.surveyAnswer.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            mobile: true,
+            email: true,
+          },
+        },
+        surveyQuestion: {
+          select: {
+            id: true,
+            category: true,
+            categoryCode: true,
+            questionText: true,
+            sortOrder: true,
+          },
+        },
+        surveyOption: {
+          select: {
+            id: true,
+            optionText: true,
+            score: true,
+          },
+        },
+        userChallenge: {
+          select: {
+            id: true,
+            userId: true,
+            productId: true,
+            product: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [
+        { userId: 'asc' },
+        { type: 'asc' },
+        { surveyQuestion: { categoryCode: 'asc' } },
+        { surveyQuestion: { sortOrder: 'asc' } },
+      ],
+    });
+
+    // 질문 목록 조회 (정렬된 순서)
+    const questions = await this.prisma.surveyQuestion.findMany({
+      where: { isActive: true },
+      orderBy: [
+        { categoryCode: 'asc' },
+        { sortOrder: 'asc' },
+      ],
+      select: {
+        id: true,
+        category: true,
+        categoryCode: true,
+        questionText: true,
+        sortOrder: true,
+      },
+    });
+
+    // 건강유형 정보 조회 (userId + productId 조합)
+    const userProductKeys = new Set<string>();
+    answers.forEach((answer) => {
+      if (answer.userChallenge) {
+        userProductKeys.add(`${answer.userChallenge.userId}_${answer.userChallenge.productId}`);
+      }
+    });
+
+    const surveyResults = await this.prisma.userChallengeSurveyResult.findMany({
+      where: {
+        OR: Array.from(userProductKeys).map((key) => {
+          const [userId, productId] = key.split('_').map(Number);
+          return { userId, productId };
+        }),
+      },
+      select: {
+        userId: true,
+        productId: true,
+        beforeHealthType: true,
+        afterHealthType: true,
+      },
+    });
+
+    // 건강유형 매핑 (userId_productId -> healthTypes)
+    const healthTypeMap: Record<string, { beforeHealthType: string | null; afterHealthType: string | null }> = {};
+    surveyResults.forEach((result) => {
+      const key = `${result.userId}_${result.productId}`;
+      healthTypeMap[key] = {
+        beforeHealthType: result.beforeHealthType,
+        afterHealthType: result.afterHealthType,
+      };
+    });
+
+    // 1. 사용자별 답변 데이터 구성
+    const userMap: Record<string, any> = {};
+
+    answers.forEach((answer) => {
+      const key = `${answer.userId}_${answer.userChallengeId || 'none'}_${answer.type}`;
+
+      if (!userMap[key]) {
+        const healthTypeKey = answer.userChallenge
+          ? `${answer.userChallenge.userId}_${answer.userChallenge.productId}`
+          : null;
+        const healthTypes = healthTypeKey ? healthTypeMap[healthTypeKey] : null;
+
+        userMap[key] = {
+          userId: answer.userId,
+          userName: answer.user?.name || '-',
+          userMobile: answer.user?.mobile || '-',
+          userChallengeId: answer.userChallengeId,
+          productName: answer.userChallenge?.product?.name || '-',
+          type: answer.type,
+          beforeHealthType: healthTypes?.beforeHealthType || '-',
+          afterHealthType: healthTypes?.afterHealthType || '-',
+          answers: {},
+          totalScore: 0,
+        };
+      }
+
+      userMap[key].answers[answer.surveyQuestionId] = {
+        optionText: answer.surveyOption?.optionText || '-',
+        score: answer.surveyOption?.score || 0,
+      };
+      userMap[key].totalScore += answer.surveyOption?.score || 0;
+    });
+
+    const userAnswers = Object.values(userMap);
+
+    // 2. 질문별 통계 데이터 구성
+    const questionStatsMap: Record<number, any> = {};
+
+    questions.forEach((q) => {
+      questionStatsMap[q.id] = {
+        questionId: q.id,
+        category: q.category,
+        categoryCode: q.categoryCode,
+        questionText: q.questionText,
+        beforeStats: {} as Record<string, number>,
+        afterStats: {} as Record<string, number>,
+        beforeTotal: 0,
+        afterTotal: 0,
+        beforeAvgScore: 0,
+        afterAvgScore: 0,
+      };
+    });
+
+    answers.forEach((answer) => {
+      const qStats = questionStatsMap[answer.surveyQuestionId];
+      if (!qStats) return;
+
+      const optionText = answer.surveyOption?.optionText || '-';
+      const score = answer.surveyOption?.score || 0;
+      const type = answer.type?.toLowerCase();
+
+      if (type === 'before') {
+        qStats.beforeStats[optionText] = (qStats.beforeStats[optionText] || 0) + 1;
+        qStats.beforeTotal++;
+        qStats.beforeAvgScore += score;
+      } else if (type === 'after') {
+        qStats.afterStats[optionText] = (qStats.afterStats[optionText] || 0) + 1;
+        qStats.afterTotal++;
+        qStats.afterAvgScore += score;
+      }
+    });
+
+    // 평균 점수 계산
+    Object.values(questionStatsMap).forEach((qStats: any) => {
+      if (qStats.beforeTotal > 0) {
+        qStats.beforeAvgScore = Math.round((qStats.beforeAvgScore / qStats.beforeTotal) * 100) / 100;
+      }
+      if (qStats.afterTotal > 0) {
+        qStats.afterAvgScore = Math.round((qStats.afterAvgScore / qStats.afterTotal) * 100) / 100;
+      }
+    });
+
+    const questionStats = Object.values(questionStatsMap);
+
+    // 3. Raw 데이터
+    const rawData = answers.map((answer) => {
+      const healthTypeKey = answer.userChallenge
+        ? `${answer.userChallenge.userId}_${answer.userChallenge.productId}`
+        : null;
+      const healthTypes = healthTypeKey ? healthTypeMap[healthTypeKey] : null;
+
+      return {
+        answerId: answer.id,
+        userId: answer.userId,
+        userName: answer.user?.name || '-',
+        userMobile: answer.user?.mobile || '-',
+        userChallengeId: answer.userChallengeId,
+        productName: answer.userChallenge?.product?.name || '-',
+        type: answer.type,
+        beforeHealthType: healthTypes?.beforeHealthType || '-',
+        afterHealthType: healthTypes?.afterHealthType || '-',
+        category: answer.surveyQuestion?.category || '-',
+        categoryCode: answer.surveyQuestion?.categoryCode || '-',
+        questionText: answer.surveyQuestion?.questionText || '-',
+        optionText: answer.surveyOption?.optionText || '-',
+        score: answer.surveyOption?.score || 0,
+        createdAt: answer.createdAt,
+      };
+    });
+
+    this.logger.log(`설문 답변 엑셀 데이터 조회 완료 - 사용자: ${userAnswers.length}건, 질문: ${questionStats.length}개, Raw: ${rawData.length}건`);
+
+    return {
+      userAnswers,
+      questionStats,
+      rawData,
+      questions,
+    };
+  }
+
+  /**
    * 질문 목록 조회 (페이징 및 필터링)
    *
    * @param page 페이지 번호
