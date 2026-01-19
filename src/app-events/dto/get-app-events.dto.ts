@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsInt, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  IsDateString,
+  IsBooleanString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class GetAppEventsDto {
@@ -40,4 +46,8 @@ export class GetAppEventsDto {
   @Type(() => Number)
   @IsInt()
   limit?: number = 20;
+
+  @IsOptional()
+  @IsBooleanString()
+  excludeTesters?: string;
 }

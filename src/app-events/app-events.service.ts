@@ -71,7 +71,9 @@ export class AppEventsService {
 
   async findAll(dto: GetAppEventsDto) {
     const { page = 1, limit = 20 } = dto;
-    const where = this.buildWhereClause(dto);
+    const excludeTesterIds =
+      dto.excludeTesters === 'true' ? await this.getTesterUserIds() : undefined;
+    const where = this.buildWhereClause({ ...dto, excludeTesterIds });
 
     const [items, total] = await Promise.all([
       this.prisma.appEvent.findMany({
