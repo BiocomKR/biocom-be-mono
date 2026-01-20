@@ -670,39 +670,64 @@ export class RecordsService {
     const today = new Date(now);
     today.setUTCHours(0, 0, 0, 0);
 
-    const days30Ago = new Date(today);
-    days30Ago.setDate(days30Ago.getDate() - 30);
-
     // 활성 챌린지 상품 수 (Product 테이블에서 categoryCode='CHALLENGE')
     const activeChallenges = await this.prisma.product.count({
       where: { categoryCode: 'CHALLENGE', status: 'ACTIVE' },
     });
 
-    // 최근 30일 완료 챌린지
-    const completedChallenges = await this.prisma.userChallenge.count({
-      where: {
-        status: 'COMPLETED',
-        updatedAt: { gte: days30Ago },
+    // 만료된 챌린지 조회 (status가 EXPIRED인 것들)
+    const expiredChallenges = await this.prisma.userChallenge.findMany({
+      where: { status: 'EXPIRED' },
+      select: {
+        id: true,
+        activatedAt: true,
+        expiresAt: true,
+        dailyProgress: {
+          orderBy: { day: 'desc' },
+          take: 1,
+          select: { day: true },
+        },
       },
     });
 
-    // 완주율 계산 (최근 30일 내 21일차 이상 도달한 챌린지 / 전체)
-    const totalChallengesWithProgress = await this.prisma.userChallenge.count({
-      where: {
-        OR: [
-          { status: 'COMPLETED' },
-          { status: 'ACTIVE' },
-        ],
-        activatedAt: { lte: days30Ago }, // 30일 전에 시작한 것들
+    // 완주 = 마지막 일차까지 도달한 챌린지
+    const completedChallengeList = expiredChallenges.filter((challenge) => {
+      const totalDays = Math.ceil(
+        (challenge.expiresAt.getTime() - challenge.activatedAt.getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      const lastProgress = challenge.dailyProgress[0];
+      return lastProgress?.day === totalDays;
+    });
+    const completedChallenges = completedChallengeList.length;
+
+    // 완주율 = 완주한 챌린지 / 만료된 전체 챌린지
+    const completionRate =
+      expiredChallenges.length > 0
+        ? Math.round((completedChallenges / expiredChallenges.length) * 100)
+        : 0;
+
+    // 일차별 기록율 계산을 위해 모든 챌린지의 총 일수 파악
+    const allChallenges = await this.prisma.userChallenge.findMany({
+      select: {
+        id: true,
+        activatedAt: true,
+        expiresAt: true,
       },
     });
-    const completionRate = totalChallengesWithProgress > 0
-      ? Math.round((completedChallenges / totalChallengesWithProgress) * 100)
-      : 0;
+
+    // 최대 일수 계산 (동적으로)
+    const maxDays = allChallenges.reduce((max, challenge) => {
+      const days = Math.ceil(
+        (challenge.expiresAt.getTime() - challenge.activatedAt.getTime()) /
+          (1000 * 60 * 60 * 24),
+      );
+      return Math.max(max, days);
+    }, 0);
 
     // 일차별 기록율 (DailyProgress 기반)
     const dayRecordRates: DayRecordRateDto[] = [];
-    for (let day = 1; day <= 21; day++) {
+    for (let day = 1; day <= maxDays; day++) {
       const progressData = await this.prisma.dailyProgress.findMany({
         where: { day },
         select: {
@@ -715,9 +740,8 @@ export class RecordsService {
       const recordedUsers = progressData.filter(
         (p) => p.trackingsCompleted > 0,
       ).length;
-      const recordRate = totalUsers > 0
-        ? Math.round((recordedUsers / totalUsers) * 100)
-        : 0;
+      const recordRate =
+        totalUsers > 0 ? Math.round((recordedUsers / totalUsers) * 100) : 0;
 
       dayRecordRates.push({
         day,
@@ -727,11 +751,12 @@ export class RecordsService {
       });
     }
 
-    // 주차별 완료율
+    // 주차별 완료율 (7일 단위, 동적 주차 수)
+    const totalWeeks = Math.ceil(maxDays / 7);
     const weekCompletions: WeekCompletionDto[] = [];
-    for (let week = 1; week <= 3; week++) {
+    for (let week = 1; week <= totalWeeks; week++) {
       const startDay = (week - 1) * 7 + 1;
-      const endDay = week * 7;
+      const endDay = Math.min(week * 7, maxDays);
 
       // 해당 주차 시작일에 있던 사용자
       const startDayProgress = await this.prisma.dailyProgress.findMany({
@@ -751,9 +776,8 @@ export class RecordsService {
       const completedUsers = endDayProgress.length;
 
       const droppedUsers = startUsers - completedUsers;
-      const weekCompletionRate = startUsers > 0
-        ? Math.round((completedUsers / startUsers) * 100)
-        : 0;
+      const weekCompletionRate =
+        startUsers > 0 ? Math.round((completedUsers / startUsers) * 100) : 0;
 
       weekCompletions.push({
         week,
