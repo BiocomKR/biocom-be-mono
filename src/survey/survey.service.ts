@@ -4,6 +4,8 @@ import { UserChallengeStatus, SurveyOptionType, SurveyType, HealthCategory, HEAL
 import { CreateSurveyAnswerDto } from './dto/create-survey-answer.dto';
 import type { Prisma, SurveyAnswer, SurveyQuestion, SurveyOption } from '@prisma/client';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { getPointDescription } from '../common/utils/point-description.util';
+import { PointRelatedType } from '../common/enums';
 
 // 포인트 지급 설정 타입
 interface PointsConfig {
@@ -989,8 +991,8 @@ export class SurveyService {
           type: 'EARNED',
           amount: actualPointsToAward,
           balance: user.points,
-          description: `${afterSurveyMission.name} 완료`,
-          relatedType: 'MISSION_COMPLETION',
+          description: getPointDescription(PointRelatedType.MISSION_COMPLETION, 'AFTER_SURVEY'),
+          relatedType: PointRelatedType.MISSION_COMPLETION,
           relatedId: afterSurveyMission.id,
           recordType: 'AFTER_SURVEY',
           createdAt: now

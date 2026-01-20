@@ -3,6 +3,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { DeepReportResponseDto, DeepReportContentDto, DeepReportListResponseDto, DeepReportListItemDto } from './dto/deep-report.dto';
 import { YesNo, UserSubscriptionStatus, UserChallengeStatus, PointRelatedType } from '../common/enums';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
+import { getPointDescription } from '../common/utils/point-description.util';
 
 // 포인트 지급 설정 타입
 interface PointsConfig {
@@ -364,7 +365,7 @@ export class DeepReportService {
             type: 'EARNED',
             amount: actualPointsToAward,
             balance: updatedUser.points,
-            description: `심층리포트 조회 (${reportId})`,
+            description: getPointDescription(PointRelatedType.WEEKLY_REPORT),
             relatedType: PointRelatedType.WEEKLY_REPORT,
             relatedId: reportDbId,
             createdAt: now,

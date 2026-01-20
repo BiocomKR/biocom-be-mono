@@ -20,6 +20,7 @@ import {
 import { CategoryCode } from '@/common/enums/category-code.enum';
 import { RecordType } from '@/common/enums/record-type.enum';
 import { PointRelatedType, UserSubscriptionStatus } from '@/common/enums';
+import { getPointDescription } from '../../common/utils/point-description.util';
 import { SibApiService } from '../../sib/services/sib-api.service';
 
 /**
@@ -1058,7 +1059,7 @@ export class RecordsService {
         tx,
         userId,
         actualPointsToAward,
-        `${recordCode} 기록 완료`,
+        getPointDescription(PointRelatedType.RECORD_COMPLETION, recordCode),
         PointRelatedType.RECORD_COMPLETION,
         userRecord.id,
         recordCode,
@@ -1692,7 +1693,7 @@ export class RecordsService {
             tx,
             userId,
             100,
-            '영양제 섭취 기록',
+            getPointDescription(PointRelatedType.RECORD_COMPLETION, RecordType.SUPPLEMENT),
             PointRelatedType.RECORD_COMPLETION,
             undefined,
             RecordType.SUPPLEMENT,

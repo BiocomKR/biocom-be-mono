@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST, calculateChallengeDay } from '../../common/utils/kst-date.util';
 import { UserChallengeStatus, PointRelatedType } from '../../common/enums';
+import { getPointDescription } from '../../common/utils/point-description.util';
 import {
   TodayBalanceGameResponseDto,
   BalanceGameStepResponseDto,
@@ -339,7 +340,7 @@ export class BalanceGameService {
                 type: 'EARNED',
                 amount: pointsToAward,
                 balance: updatedUser.points,
-                description: `밸런스게임 완료 (${currentDay}일차)`,
+                description: getPointDescription(PointRelatedType.BALANCE_GAME),
                 relatedType: PointRelatedType.BALANCE_GAME,
                 relatedId: gameId,
                 createdAt: getNowKST()

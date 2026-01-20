@@ -22,6 +22,7 @@ import {
 } from '../dto/reviews/review.dto';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { getPointDescription } from '../../common/utils/point-description.util';
 import { OrderStatus } from '../../common/enums';
 
 @Injectable()
@@ -154,7 +155,7 @@ export class ReviewsService {
             type: 'EARNED',
             amount: rewardAmount,
             balance: updatedUser.points,
-            description: `리뷰 작성 적립금 (상품: ${product.name})`,
+            description: getPointDescription(PointRelatedType.REVIEW),
             relatedType: PointRelatedType.REVIEW,
             relatedId: review.id,
             createdAt: getNowKST()

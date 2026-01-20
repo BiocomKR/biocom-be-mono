@@ -19,6 +19,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { getNowKST, parseISO8601ToKST } from '../../common/utils/kst-date.util';
+import { getPointDescription } from '../../common/utils/point-description.util';
 import { OrderStatus, PaymentStatus, PgProvider, PointRelatedType } from '../../common/enums';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 
@@ -251,7 +252,7 @@ export class PaymentService {
             type: 'PURCHASE_REWARD',
             amount: earnedPoints,
             balance: updatedUser.points,
-            description: `구매 적립 10% (${order.orderNumber})`,
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'PURCHASE_REWARD'),
             relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: getNowKST(),
@@ -432,7 +433,7 @@ export class PaymentService {
                 type: 'REFUND',
                 amount: convertDecimalToNumber(order.pointUsed) || 0,
                 balance: updatedUser.points,
-                description: `주문 취소 환불 (${order.orderNumber})`,
+                description: getPointDescription(PointRelatedType.ORDER, undefined, 'REFUND'),
                 relatedType: PointRelatedType.ORDER,
                 relatedId: order.id,
                 createdAt: getNowKST(),
@@ -470,7 +471,7 @@ export class PaymentService {
                   type: 'PURCHASE_REWARD_CANCEL',
                   amount: -pointsToDeduct,
                   balance: updatedUser.points,
-                  description: `구매 적립 회수 (${order.orderNumber})`,
+                  description: getPointDescription(PointRelatedType.ORDER, undefined, 'PURCHASE_REWARD_CANCEL'),
                   relatedType: PointRelatedType.ORDER,
                   relatedId: order.id,
                   createdAt: getNowKST(),

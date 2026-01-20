@@ -19,6 +19,7 @@ import { Prisma } from '@prisma/client';
 import { convertDecimalToNumber } from '../../common/utils/decimal.util';
 import { CryptoUtil } from '../../common/utils/crypto.util';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { getPointDescription } from '../../common/utils/point-description.util';
 import { OrderStatus, ProductStatus, PaymentStatus, ShippingStatus, UserCouponStatus, ExchangeReturnStatus, PointRelatedType } from '../../common/enums';
 
 @Injectable()
@@ -369,7 +370,7 @@ export class OrdersService {
             type: 'USE',
             amount: -pointUsed,
             balance: updatedUser.points,
-            description: `주문 사용 (${orderNumber})`,
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'USE'),
             relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: getNowKST(),
@@ -659,7 +660,7 @@ export class OrdersService {
             type: 'REFUND',
             amount: pointUsed,
             balance: updatedUser.points,
-            description: `주문 취소 환불 (${order.orderNumber})`,
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'REFUND'),
             relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: now,

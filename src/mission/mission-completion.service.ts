@@ -5,6 +5,7 @@ import { PointService } from '../point/point.service';
 import { CompleteMissionDto } from './dto/mission-completion.dto';
 import { Logger } from '@nestjs/common';
 import { getNowKST, calculateChallengeDay, stringToKSTDate } from '../common/utils/kst-date.util';
+import { getPointDescription } from '../common/utils/point-description.util';
 
 /**
  * 챌린지 미션 서비스
@@ -333,7 +334,7 @@ export class MissionCompletionService {
             tx,
             userId,
             pointsEarned,
-            `미션 완료: ${mission.name} (${attemptNumber}/${dailyLimit})`,
+            getPointDescription(PointRelatedType.CHALLENGE_MISSION),
             PointRelatedType.CHALLENGE_MISSION,
             challengeMission.id,
           );
