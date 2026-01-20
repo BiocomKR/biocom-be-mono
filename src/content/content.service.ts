@@ -442,14 +442,13 @@ export class ContentService {
   }
 
   /**
-   * 연관 상품용 상품 목록 조회 (SUPPLEMENT 카테고리만)
+   * 연관 상품용 상품 목록 조회 (모든 상품)
    * description: 상품의 기본 설명 (강의 추가 시 기본값으로 사용)
    */
   async getProductsForLecture() {
     const products = await this.prisma.product.findMany({
       where: {
         status: 'ACTIVE',
-        categoryCode: 'SUPPLEMENT',
       },
       select: {
         id: true,
