@@ -59,4 +59,16 @@ export class SendPushToTopicDto {
   @IsObject()
   @IsOptional()
   data?: Record<string, any>;
+
+  /**
+   * 대상 앱 bundleId (선택)
+   * dev 앱(.dev 포함)과 prod 앱 구분용
+   */
+  @ApiPropertyOptional({
+    description: '대상 앱 bundleId (kr.biocom.challenge.dev 또는 kr.biocom.challenge)',
+    example: 'kr.biocom.challenge',
+  })
+  @IsString()
+  @IsOptional()
+  bundleId?: string;
 }

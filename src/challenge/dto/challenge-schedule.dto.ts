@@ -41,6 +41,12 @@ export class ChallengeScheduleResponseDto {
   id: number;
 
   @ApiProperty({
+    description: '챌린지 코드 (상품 SKU)',
+    example: 'CHALLENGE_INNER_BEAUTY'
+  })
+  challengeCode: string;
+
+  @ApiProperty({
     description: '챌린지 시작일',
     example: '2024-09-10',
     type: 'string',

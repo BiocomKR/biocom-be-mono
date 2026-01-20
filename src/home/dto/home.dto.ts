@@ -171,7 +171,7 @@ export class MissionItemDto {
  * 챌린지 정보 DTO
  */
 export class ChallengeInfoDto {
-  @ApiProperty({ description: '챌린지 코드 (상품 SKU)', example: 'CHALLENGE_21' })
+  @ApiProperty({ description: '챌린지 코드 (상품 SKU)', example: 'CHALLENGE_INNER_BEAUTY' })
   challengeCode: string;
 
   @ApiProperty({ description: '챌린지 시작일', example: '2025-01-01' })

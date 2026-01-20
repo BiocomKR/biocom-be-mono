@@ -5,24 +5,44 @@ import {
   PushMessage,
   PushSendResult,
 } from '../interfaces/push-provider.interface';
+import { FirebaseApps } from '../firebase-admin.module';
+
+/**
+ * 토큰 데이터 인터페이스 (bundleId 포함)
+ */
+export interface TokenData {
+  token: string;
+  bundleId?: string | null;
+}
 
 /**
  * Firebase Cloud Messaging Provider
  *
- * FCM을 사용한 푸시 알림 발송 구현체
+ * Dev/Prod 두 개의 Firebase 앱을 지원하여
+ * bundleId에 따라 올바른 FCM credential 사용
+ *
  * IPushProvider 인터페이스를 구현하여 서비스 중립적인 비즈니스 로직 지원
  */
 @Injectable()
 export class FcmProvider implements IPushProvider {
   readonly name = 'FCM';
   private readonly logger = new Logger(FcmProvider.name);
+  private readonly firebaseApps: FirebaseApps;
 
-  private readonly admin: typeof admin;
+  constructor(@Inject('FIREBASE_APPS') firebaseApps: FirebaseApps) {
+    this.firebaseApps = firebaseApps;
+  }
 
-  constructor(
-    @Inject('FIREBASE_ADMIN') firebaseAdmin: typeof admin,
-  ) {
-    this.admin = firebaseAdmin;
+  /**
+   * bundleId에 맞는 Firebase 앱의 messaging 인스턴스 반환
+   */
+  private getMessaging(bundleId?: string): admin.messaging.Messaging | null {
+    const app = this.firebaseApps.getAppForBundleId(bundleId || '');
+    if (!app) {
+      this.logger.error(`❌ [FCM] Firebase 앱 없음: bundleId=${bundleId}`);
+      return null;
+    }
+    return app.messaging();
   }
 
   /**
@@ -31,18 +51,20 @@ export class FcmProvider implements IPushProvider {
    * @param token - FCM 토큰 문자열
    * @param message - 발송할 메시지
    * @param maxRetries - 최대 재시도 횟수 (기본값: 3)
+   * @param bundleId - 토큰의 bundleId (dev/prod 앱 선택용)
    * @returns 발송 결과
    */
   async sendToToken(
     token: string,
     message: PushMessage,
     maxRetries: number = 3,
+    bundleId?: string,
   ): Promise<PushSendResult> {
     let lastResult: PushSendResult | null = null;
 
     // 재시도 로직 (최대 maxRetries 번 시도)
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const result = await this.sendToTokenOnce(token, message);
+      const result = await this.sendToTokenOnce(token, message, bundleId);
       lastResult = result;
 
       // 성공하거나 재시도 불가능한 에러면 즉시 반환
@@ -57,7 +79,7 @@ export class FcmProvider implements IPushProvider {
       if (attempt < maxRetries - 1) {
         const delay = 1000 * Math.pow(2, attempt); // 1초, 2초, 4초
         this.logger.warn(`🔄 [FCM] 재시도 ${attempt + 1}/${maxRetries} - ${delay}ms 후 재시도`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
@@ -68,10 +90,6 @@ export class FcmProvider implements IPushProvider {
 
   /**
    * 재시도 가능한 에러인지 판단
-   *
-   * @param errorCode - FCM 에러 코드
-   * @returns 재시도 가능 여부
-   * @private
    */
   private isRetryableError(errorCode?: string): boolean {
     if (!errorCode) return false;
@@ -89,20 +107,17 @@ export class FcmProvider implements IPushProvider {
 
   /**
    * 단일 FCM 토큰으로 푸시 발송 (재시도 없이 1회만)
-   *
-   * @param token - FCM 토큰 문자열
-   * @param message - 발송할 메시지
-   * @returns 발송 결과
-   * @private
    */
   private async sendToTokenOnce(
     token: string,
     message: PushMessage,
+    bundleId?: string,
   ): Promise<PushSendResult> {
     this.logger.log('📤 [FCM] 단일 토큰 발송 시작:', {
       hasToken: !!token,
       title: message.title,
       body: message.body?.substring(0, 50),
+      bundleId,
     });
 
     if (!token) {
@@ -111,6 +126,16 @@ export class FcmProvider implements IPushProvider {
         success: false,
         errorCode: 'INVALID_TOKEN',
         errorMessage: 'FCM token is missing',
+      };
+    }
+
+    const messaging = this.getMessaging(bundleId);
+    if (!messaging) {
+      this.logger.error('❌ [FCM] Firebase Messaging 인스턴스 없음');
+      return {
+        success: false,
+        errorCode: 'FIREBASE_NOT_INITIALIZED',
+        errorMessage: `Firebase app not found for bundleId: ${bundleId}`,
       };
     }
 
@@ -186,8 +211,8 @@ export class FcmProvider implements IPushProvider {
           };
 
       // FCM 발송
-      this.logger.log('🚀 [FCM] Firebase로 메시지 전송 중...');
-      const messageId = await this.admin.messaging().send(fcmMessage);
+      this.logger.log(`🚀 [FCM] Firebase로 메시지 전송 중... (bundleId=${bundleId})`);
+      const messageId = await messaging.send(fcmMessage);
 
       this.logger.log('✅ [FCM] 발송 성공:', {
         messageId,
@@ -198,11 +223,12 @@ export class FcmProvider implements IPushProvider {
         success: true,
         messageId,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('❌ [FCM] 발송 실패:', {
         code: error.code,
         message: error.message,
         title: message.title,
+        bundleId,
       });
 
       return {
@@ -215,51 +241,77 @@ export class FcmProvider implements IPushProvider {
 
   /**
    * 여러 FCM 토큰으로 배치 발송
-   *
-   * FCM은 최대 500개까지 한 번에 발송 가능
-   *
-   * @param tokensData - FCM 토큰 데이터 배열 [{ token: string }, ...]
-   * @param message - 발송할 메시지
-   * @returns 각 토큰별 발송 결과 배열
+   * tokensData는 { token, bundleId } 형태의 배열
+   * bundleId별로 그룹핑하여 각각의 Firebase 앱으로 발송
    */
   async sendToMultiple(
-    tokensData: any[],
+    tokensData: TokenData[],
     message: PushMessage,
   ): Promise<PushSendResult[]> {
-    const tokens = tokensData.map((td) => td.token).filter(Boolean);
-
-    if (tokens.length === 0) {
+    if (tokensData.length === 0) {
       return [];
     }
 
-    // FCM 제약: 최대 500개
-    if (tokens.length > 500) {
-      this.logger.warn(
-        `⚠️ FCM 배치 발송 제한 초과: ${tokens.length}개 (최대 500개)`,
-      );
-      // 500개씩 나눠서 발송
-      const results: PushSendResult[] = [];
-      for (let i = 0; i < tokens.length; i += 500) {
-        const batch = tokens.slice(i, i + 500);
-        const batchResults = await this.sendMulticastBatch(batch, message);
-        results.push(...batchResults);
+    // bundleId별로 그룹핑
+    const groupedByBundle = new Map<string, { token: string; index: number }[]>();
+
+    tokensData.forEach((td, index) => {
+      if (!td.token) return;
+      const bundleKey = td.bundleId || 'prod'; // bundleId 없으면 prod로 간주
+      if (!groupedByBundle.has(bundleKey)) {
+        groupedByBundle.set(bundleKey, []);
       }
-      return results;
+      groupedByBundle.get(bundleKey)!.push({ token: td.token, index });
+    });
+
+    // 결과 배열 초기화
+    const results: PushSendResult[] = new Array(tokensData.length).fill({
+      success: false,
+      errorCode: 'NOT_PROCESSED',
+      errorMessage: 'Token was not processed',
+    });
+
+    // 각 bundleId 그룹별로 발송
+    for (const [bundleId, tokenGroup] of groupedByBundle) {
+      const messaging = this.getMessaging(bundleId);
+
+      if (!messaging) {
+        // Firebase 앱이 없으면 해당 그룹 전체 실패 처리
+        tokenGroup.forEach(({ index }) => {
+          results[index] = {
+            success: false,
+            errorCode: 'FIREBASE_NOT_INITIALIZED',
+            errorMessage: `Firebase app not found for bundleId: ${bundleId}`,
+          };
+        });
+        continue;
+      }
+
+      const tokens = tokenGroup.map((t) => t.token);
+
+      // 500개씩 배치 처리
+      for (let i = 0; i < tokens.length; i += 500) {
+        const batchTokens = tokens.slice(i, i + 500);
+        const batchIndices = tokenGroup.slice(i, i + 500).map((t) => t.index);
+
+        const batchResults = await this.sendMulticastBatch(batchTokens, message, messaging);
+
+        batchResults.forEach((result, batchIndex) => {
+          results[batchIndices[batchIndex]] = result;
+        });
+      }
     }
 
-    return await this.sendMulticastBatch(tokens, message);
+    return results;
   }
 
   /**
    * 500개 이하 배치 발송 (내부 메서드)
-   *
-   * @param tokens - FCM 토큰 배열 (최대 500개)
-   * @param message - 발송할 메시지
-   * @returns 발송 결과 배열
    */
   private async sendMulticastBatch(
     tokens: string[],
     message: PushMessage,
+    messaging: admin.messaging.Messaging,
   ): Promise<PushSendResult[]> {
     try {
       // FCM MulticastMessage 구성
@@ -297,22 +349,20 @@ export class FcmProvider implements IPushProvider {
       };
 
       // FCM 배치 발송
-      const response = await this.admin
-        .messaging()
-        .sendEachForMulticast(multicastMessage);
+      const response = await messaging.sendEachForMulticast(multicastMessage);
 
       this.logger.log(
         `✅ FCM 배치 발송 완료: 성공 ${response.successCount}/${tokens.length}`,
       );
 
       // 각 토큰별 결과 매핑
-      return response.responses.map((r) => ({
+      return response.responses.map((r: admin.messaging.SendResponse) => ({
         success: r.success,
         messageId: r.messageId,
         errorCode: r.error?.code,
         errorMessage: r.error?.message,
       }));
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error('❌ FCM 배치 발송 실패:', error);
 
       // 전체 실패
@@ -326,11 +376,8 @@ export class FcmProvider implements IPushProvider {
 
   /**
    * FCM 토큰 유효성 검증
-   *
-   * @param tokenData - FCM 토큰 데이터 { token: string }
-   * @returns 유효하면 true
    */
-  async validateToken(tokenData: any): Promise<boolean> {
+  async validateToken(tokenData: TokenData): Promise<boolean> {
     const { token } = tokenData;
 
     if (!token || typeof token !== 'string') {
@@ -343,17 +390,19 @@ export class FcmProvider implements IPushProvider {
   }
 
   /**
-   * FCM Topic 구독
-   *
-   * @param tokens - FCM 토큰 배열
-   * @param topic - 토픽 이름
-   * @returns 구독 성공 여부
+   * FCM Topic 구독 (bundleId에 따른 Firebase 앱 선택)
    */
-  async subscribeToTopic(tokens: string[], topic: string): Promise<boolean> {
-    this.logger.log(`📌 [FCM] Topic 구독 시작: topic=${topic}, tokens=${tokens.length}개`);
+  async subscribeToTopic(tokens: string[], topic: string, bundleId?: string): Promise<boolean> {
+    this.logger.log(`📌 [FCM] Topic 구독 시작: topic=${topic}, tokens=${tokens.length}개, bundleId=${bundleId}`);
+
+    const messaging = this.getMessaging(bundleId);
+    if (!messaging) {
+      this.logger.error('❌ [FCM] Firebase Messaging 인스턴스 없음');
+      return false;
+    }
 
     try {
-      const response = await this.admin.messaging().subscribeToTopic(tokens, topic);
+      const response = await messaging.subscribeToTopic(tokens, topic);
 
       this.logger.log(`✅ [FCM] Topic 구독 성공: ${response.successCount}/${tokens.length}`);
 
@@ -362,24 +411,26 @@ export class FcmProvider implements IPushProvider {
       }
 
       return response.successCount > 0;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`❌ [FCM] Topic 구독 실패:`, error);
       return false;
     }
   }
 
   /**
-   * FCM Topic 구독 해제
-   *
-   * @param tokens - FCM 토큰 배열
-   * @param topic - 토픽 이름
-   * @returns 구독 해제 성공 여부
+   * FCM Topic 구독 해제 (bundleId에 따른 Firebase 앱 선택)
    */
-  async unsubscribeFromTopic(tokens: string[], topic: string): Promise<boolean> {
-    this.logger.log(`🔕 [FCM] Topic 구독 해제 시작: topic=${topic}, tokens=${tokens.length}개`);
+  async unsubscribeFromTopic(tokens: string[], topic: string, bundleId?: string): Promise<boolean> {
+    this.logger.log(`🔕 [FCM] Topic 구독 해제 시작: topic=${topic}, tokens=${tokens.length}개, bundleId=${bundleId}`);
+
+    const messaging = this.getMessaging(bundleId);
+    if (!messaging) {
+      this.logger.error('❌ [FCM] Firebase Messaging 인스턴스 없음');
+      return false;
+    }
 
     try {
-      const response = await this.admin.messaging().unsubscribeFromTopic(tokens, topic);
+      const response = await messaging.unsubscribeFromTopic(tokens, topic);
 
       this.logger.log(`✅ [FCM] Topic 구독 해제 성공: ${response.successCount}/${tokens.length}`);
 
@@ -388,21 +439,26 @@ export class FcmProvider implements IPushProvider {
       }
 
       return response.successCount > 0;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`❌ [FCM] Topic 구독 해제 실패:`, error);
       return false;
     }
   }
 
   /**
-   * FCM Topic으로 푸시 발송
-   *
-   * @param topic - 토픽 이름
-   * @param message - 발송할 메시지
-   * @returns 발송 결과
+   * FCM Topic으로 푸시 발송 (bundleId에 따른 Firebase 앱 선택)
    */
-  async sendToTopic(topic: string, message: PushMessage): Promise<PushSendResult> {
-    this.logger.log(`📣 [FCM] Topic 푸시 발송 시작: topic=${topic}, title=${message.title}`);
+  async sendToTopic(topic: string, message: PushMessage, bundleId?: string): Promise<PushSendResult> {
+    this.logger.log(`📣 [FCM] Topic 푸시 발송 시작: topic=${topic}, title=${message.title}, bundleId=${bundleId}`);
+
+    const messaging = this.getMessaging(bundleId);
+    if (!messaging) {
+      return {
+        success: false,
+        errorCode: 'FIREBASE_NOT_INITIALIZED',
+        errorMessage: 'Firebase app not initialized',
+      };
+    }
 
     try {
       const fcmMessage: admin.messaging.Message = {
@@ -438,7 +494,7 @@ export class FcmProvider implements IPushProvider {
         },
       };
 
-      const messageId = await this.admin.messaging().send(fcmMessage);
+      const messageId = await messaging.send(fcmMessage);
 
       this.logger.log(`✅ [FCM] Topic 푸시 발송 성공: messageId=${messageId}`);
 
@@ -446,7 +502,7 @@ export class FcmProvider implements IPushProvider {
         success: true,
         messageId,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`❌ [FCM] Topic 푸시 발송 실패:`, error);
 
       return {

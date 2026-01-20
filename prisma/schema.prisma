@@ -381,6 +381,8 @@ model PointHistory {
   relatedType String?  @map("related_type")
   relatedId   Int?     @map("related_id")
   recordType  String?  @map("record_type") @db.VarChar(50)
+  /// 동적 정보 저장 (일차, 강의명, 미션명 등) - 프론트에서 displayKey 렌더링 시 사용
+  metadata    Json?
   createdAt   DateTime @map("created_at")
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
