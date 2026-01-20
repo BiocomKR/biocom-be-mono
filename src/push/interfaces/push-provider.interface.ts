@@ -29,13 +29,13 @@ export interface PushSendResult {
  */
 export interface IPushProvider {
   readonly name: string;
-  sendToToken(token: string, message: PushMessage): Promise<PushSendResult>;
+  sendToToken(token: string, message: PushMessage, maxRetries?: number, bundleId?: string): Promise<PushSendResult>;
   sendToMultiple(
     tokensData: any[],
     message: PushMessage,
   ): Promise<PushSendResult[]>;
   validateToken(tokenData: any): Promise<boolean>;
-  subscribeToTopic(tokens: string[], topic: string): Promise<boolean>;
-  unsubscribeFromTopic(tokens: string[], topic: string): Promise<boolean>;
-  sendToTopic(topic: string, message: PushMessage): Promise<PushSendResult>;
+  subscribeToTopic(tokens: string[], topic: string, bundleId?: string): Promise<boolean>;
+  unsubscribeFromTopic(tokens: string[], topic: string, bundleId?: string): Promise<boolean>;
+  sendToTopic(topic: string, message: PushMessage, bundleId?: string): Promise<PushSendResult>;
 }
