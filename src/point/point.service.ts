@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST, calculateChallengeDay } from '../common/utils/kst-date.util';
 import { PointRelatedType, UserChallengeStatus } from '../common/enums';
+import { cleanPointDescription } from '../common/utils/point-description.util';
 
 // 포인트 지급 설정 타입
 interface PointsConfig {
@@ -348,11 +349,9 @@ export class PointService {
       skip: offset,
     });
 
-    // description에서 영어 ID 부분 제거 (예: "심층리포트 조회 (report_abc123)" → "심층리포트 조회")
-    // TODO: 추후 일괄적으로 파싱할 수 있도록 변경 필요 (description 포맷 표준화 또는 별도 파서 모듈화)
     return items.map(item => ({
       ...item,
-      description: item.description?.replace(/\s*\([a-zA-Z0-9_-]+\)\s*$/, '').trim() || item.description,
+      description: cleanPointDescription(item.description),
     }));
   }
 
