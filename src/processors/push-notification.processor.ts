@@ -37,6 +37,12 @@ export interface PushNotificationJobData {
   filter?: {
     marketingEnabled?: boolean;
   };
+
+  /** 페르소나별 메시지 (키: 페르소나 이름, 값: { title, body }) */
+  personaMessages?: Record<string, { title: string; body: string }>;
+
+  /** 발송자 타입 (BIOCOM: 공통 메시지, PERSONA: 페르소나별 메시지) */
+  senderType?: 'BIOCOM' | 'PERSONA';
 }
 
 /**
@@ -142,19 +148,22 @@ export class PushNotificationProcessor extends WorkerHost {
         isTest || false,
       );
 
-      // 2-2. logId를 포함한 메시지 생성
+      // 2-2. logId와 pushCode를 포함한 메시지 생성
       const enrichedMessage: PushMessage = {
         ...message,
         data: {
           ...message.data,
           logId: logId?.toString(),
+          pushCode: message.data?.pushCode, // GA4 이벤트 추적용
         },
       };
 
-      // 2-3. FCM 전송
+      // 2-3. FCM 전송 (bundleId로 올바른 Firebase 앱 선택)
       const result = await this.fcmProvider.sendToToken(
         pushToken.token,
         enrichedMessage,
+        3, // maxRetries
+        pushToken.bundleId || undefined,
       );
 
       // 2-4. 로그 업데이트 (실패 시)
@@ -188,26 +197,73 @@ export class PushNotificationProcessor extends WorkerHost {
 
   /**
    * 다수 유저에게 푸시 전송
+   * - senderType이 PERSONA이고 personaMessages가 있으면 유저별 페르소나에 맞는 메시지 발송
+   * - 그 외에는 기본 message 사용
    */
   private async sendToUsers(data: PushNotificationJobData) {
-    const { userIds, message, notificationType, isTest } = data;
+    const { userIds, message, personaMessages, senderType } = data;
 
     if (!userIds || userIds.length === 0) {
       throw new Error('userIds is required for type=users');
     }
 
     this.logger.log(
-      `📤 [PushProcessor] 다수 유저 푸시 전송: ${userIds.length}명`,
+      `📤 [PushProcessor] 다수 유저 푸시 전송: ${userIds.length}명, senderType=${senderType || 'BIOCOM'}`,
     );
+
+    // 페르소나별 메시지 사용 여부
+    const usePersonaMessages = senderType === 'PERSONA' && personaMessages && Object.keys(personaMessages).length > 0;
+
+    // 페르소나별 메시지 사용 시 유저별 페르소나 정보 조회
+    let userPersonaMap: Map<number, string> = new Map();
+    if (usePersonaMessages) {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: {
+          id: true,
+          aiPersona: { select: { name: true } },
+        },
+      });
+      users.forEach((u) => {
+        if (u.aiPersona?.name) {
+          userPersonaMap.set(u.id, u.aiPersona.name);
+        }
+      });
+      this.logger.log(`🎭 [PushProcessor] 페르소나 정보 조회 완료: ${userPersonaMap.size}명`);
+    }
 
     let totalSent = 0;
     let totalFailed = 0;
 
     for (const userId of userIds) {
+      // 유저별 메시지 결정
+      let userMessage = message;
+
+      if (usePersonaMessages && personaMessages) {
+        const personaName = userPersonaMap.get(userId);
+        if (personaName && personaMessages[personaName]) {
+          // 페르소나별 메시지 사용
+          userMessage = {
+            ...message,
+            title: personaMessages[personaName].title,
+            body: personaMessages[personaName].body,
+          };
+        } else if (personaMessages['default']) {
+          // 페르소나 없거나 매칭 안 되면 default 사용
+          userMessage = {
+            ...message,
+            title: personaMessages['default'].title,
+            body: personaMessages['default'].body,
+          };
+        }
+        // 둘 다 없으면 원래 message 그대로 사용
+      }
+
       const result = await this.sendToUser({
         ...data,
         type: 'user',
         userId,
+        message: userMessage,
       });
       totalSent += result.sentCount;
       totalFailed += result.failureCount || 0;

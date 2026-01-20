@@ -8,6 +8,7 @@ import { OrderSyncProcessor } from '../processors/order-sync.processor';
 import { HealthCheckProcessor } from '../processors/health-check.processor';
 import { FirebaseAdminModule } from '../push/firebase-admin.module';
 import { FcmProvider } from '../push/providers/fcm.provider';
+import { ConditionEvaluatorService } from '../push/services/condition-evaluator.service';
 
 /**
  * Queue 설정
@@ -67,7 +68,14 @@ export const QUEUE_OPTIONS = {
       adapter: BullMQAdapter as any,
     }),
   ],
-  providers: [AppEventProcessor, PushNotificationProcessor, OrderSyncProcessor, HealthCheckProcessor, FcmProvider],
-  exports: [],
+  providers: [
+    AppEventProcessor,
+    PushNotificationProcessor,
+    OrderSyncProcessor,
+    HealthCheckProcessor,
+    FcmProvider,
+    ConditionEvaluatorService,
+  ],
+  exports: [ConditionEvaluatorService],
 })
 export class QueuesModule {}

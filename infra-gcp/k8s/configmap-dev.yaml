@@ -21,8 +21,9 @@ data:
   REDIS_HOST: "10.213.120.195"
   REDIS_PORT: "6379"
 
-  # Firebase 설정 (FCM 푸시용)
-  FIREBASE_SERVICE_ACCOUNT_PATH: "/app/firebase/firebase-key.json"
+  # Firebase 설정 (FCM 푸시용 - Dev/Prod 앱 동시 지원)
+  FIREBASE_DEV_CREDENTIAL_PATH: "/app/firebase/firebase-dev-key.json"
+  FIREBASE_PROD_CREDENTIAL_PATH: "/app/firebase/firebase-prod-key.json"
 
   # Bull Board 설정
   BULL_BOARD_ENABLED: "true"
