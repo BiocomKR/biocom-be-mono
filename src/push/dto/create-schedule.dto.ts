@@ -6,6 +6,15 @@ import { PushScheduleType, PushCategory } from '../enums';
  * 스케줄 생성 DTO
  */
 export class CreateScheduleDto {
+  @ApiPropertyOptional({
+    description: '푸시 식별 코드 (이벤트 수집용, 고유해야 함)',
+    example: 'CHALLENGE_DAY7_REMIND',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  pushCode?: string;
+
   @ApiProperty({ description: '스케줄 이름', example: '매일 오전 9시 챌린지 알림' })
   @IsString()
   @MinLength(1)

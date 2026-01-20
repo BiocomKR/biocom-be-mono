@@ -42,7 +42,7 @@ export class ConditionEvaluatorService {
     const withTokenCount = withTokenUserIds.length;
 
     const users = await this.prisma.user.findMany({
-      where: { id: { in: rawUserIds.slice(0, 20) } },
+      where: { id: { in: rawUserIds.slice(0, 20) }, isActive: true },
       select: { id: true, name: true, mobile: true, isTester: true },
     });
 

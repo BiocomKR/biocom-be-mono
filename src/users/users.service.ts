@@ -935,18 +935,10 @@ export class UsersService {
       throw new BadRequestException('이미 활성화된 챌린지가 있습니다.');
     }
 
-    // 이너뷰티 챌린지 상품 조회
-    const product = await this.prisma.product.findFirst({
-      where: {
-        name: '이너뷰티 챌린지',
-        categoryCode: 'CHALLENGE',
-        status: 'ACTIVE',
-      },
+    // 기존 PENDING 챌린지 확인
+    const existingPending = await this.prisma.userChallenge.findFirst({
+      where: { userId, status: UserChallengeStatus.PENDING },
     });
-
-    if (!product) {
-      throw new NotFoundException('이너뷰티 챌린지 상품을 찾을 수 없습니다.');
-    }
 
     // 날짜 파싱
     const activatedAt = new Date(data.startDate);
@@ -960,6 +952,50 @@ export class UsersService {
     const isExpired = expiresAt < now;
     const challengeStatus = isExpired ? UserChallengeStatus.EXPIRED : UserChallengeStatus.ACTIVE;
     const userStatus = isExpired ? UserSubscriptionStatus.NEWCOMER : UserSubscriptionStatus.CHALLENGER;
+
+    // PENDING 챌린지가 있으면 해당 챌린지 활성화, 없으면 새로 생성
+    if (existingPending) {
+      // PENDING 챌린지 활성화
+      const [updatedChallenge] = await this.prisma.$transaction([
+        this.prisma.userChallenge.update({
+          where: { id: existingPending.id },
+          data: {
+            activatedAt,
+            expiresAt,
+            status: challengeStatus,
+            isFirstEntry: !isExpired,
+            isFirstChallengeEnd: isExpired,
+            startDateSetAt: now,
+          },
+        }),
+        this.prisma.user.update({
+          where: { id: userId },
+          data: { status: userStatus },
+        }),
+      ]);
+
+      this.logger.log(`PENDING 챌린지 활성화 완료 - userId: ${userId}, challengeId: ${updatedChallenge.id}`);
+
+      return {
+        challengeId: updatedChallenge.id,
+        ticketId: existingPending.ticketId,
+        startDate: activatedAt,
+        endDate: expiresAt,
+      };
+    }
+
+    // 이너뷰티 챌린지 상품 조회
+    const product = await this.prisma.product.findFirst({
+      where: {
+        name: '이너뷰티 챌린지',
+        categoryCode: 'CHALLENGE',
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('이너뷰티 챌린지 상품을 찾을 수 없습니다.');
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // 1. 챌린지 티켓 생성
@@ -1040,13 +1076,20 @@ export class UsersService {
     const newChallengeStatus = isExpired ? UserChallengeStatus.EXPIRED : UserChallengeStatus.ACTIVE;
     const newUserStatus = isExpired ? UserSubscriptionStatus.NEWCOMER : UserSubscriptionStatus.CHALLENGER;
 
-    // 챌린지 조회: ACTIVE 우선, 없으면 최근 EXPIRED/COMPLETED
+    // 챌린지 조회: ACTIVE 우선 → PENDING → 최근 EXPIRED/COMPLETED
     let challenge = await this.prisma.userChallenge.findFirst({
       where: { userId, status: UserChallengeStatus.ACTIVE },
     });
 
     if (!challenge) {
-      // NEWCOMER인 경우 직전 챌린지 조회
+      // PENDING 챌린지 조회
+      challenge = await this.prisma.userChallenge.findFirst({
+        where: { userId, status: UserChallengeStatus.PENDING },
+      });
+    }
+
+    if (!challenge) {
+      // 직전 챌린지 (EXPIRED/COMPLETED) 조회
       challenge = await this.prisma.userChallenge.findFirst({
         where: {
           userId,
@@ -1097,6 +1140,7 @@ export class UsersService {
   /**
    * 사용자의 챌린지 조회
    * - ACTIVE 우선
+   * - 없으면 PENDING (대기 중인 챌린지)
    * - 없으면 최근 EXPIRED/COMPLETED (직전 챌린지)
    */
   async getActiveChallenge(userId: number) {
@@ -1110,7 +1154,19 @@ export class UsersService {
       },
     });
 
-    // ACTIVE 없으면 직전 챌린지 (EXPIRED/COMPLETED) 조회
+    // ACTIVE 없으면 PENDING 챌린지 조회
+    if (!challenge) {
+      challenge = await this.prisma.userChallenge.findFirst({
+        where: { userId, status: UserChallengeStatus.PENDING },
+        include: {
+          product: {
+            select: { name: true },
+          },
+        },
+      });
+    }
+
+    // PENDING도 없으면 직전 챌린지 (EXPIRED/COMPLETED) 조회
     if (!challenge) {
       challenge = await this.prisma.userChallenge.findFirst({
         where: {
