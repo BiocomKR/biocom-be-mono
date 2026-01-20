@@ -281,7 +281,6 @@ export class CouponService {
         maxDiscountAmount,
         scopeType: scopeType || 'PRODUCT',
         categoryCode,
-        productId,
         validHours: validHours || 48,
         isActive: isActive ?? true,
         imageUrl,
@@ -289,10 +288,12 @@ export class CouponService {
       },
     });
 
-    // 다중 상품 연결 (scopeType이 PRODUCT이고 productIds가 있는 경우)
-    if (scopeType === 'PRODUCT' && productIds && productIds.length > 0) {
+    // 다중 상품 연결 (scopeType이 PRODUCT인 경우)
+    // productIds 우선, 없으면 단일 productId 사용 (하위 호환성)
+    const targetProductIds = productIds && productIds.length > 0 ? productIds : (productId ? [productId] : []);
+    if (scopeType === 'PRODUCT' && targetProductIds.length > 0) {
       await this.prisma.couponProduct.createMany({
-        data: productIds.map((pid: number) => ({
+        data: targetProductIds.map((pid: number) => ({
           couponId: coupon.id,
           productId: pid,
         })),
@@ -351,24 +352,25 @@ export class CouponService {
         maxDiscountAmount,
         scopeType,
         categoryCode,
-        productId,
         validHours,
         isActive,
         imageUrl,
       },
     });
 
-    // 다중 상품 연결 업데이트
-    if (scopeType === 'PRODUCT' && productIds !== undefined) {
+    // 다중 상품 연결 업데이트 (scopeType이 PRODUCT인 경우)
+    // productIds 우선, 없으면 단일 productId 사용 (하위 호환성)
+    const targetProductIds = productIds !== undefined ? productIds : (productId ? [productId] : undefined);
+    if (scopeType === 'PRODUCT' && targetProductIds !== undefined) {
       // 기존 연결 삭제
       await this.prisma.couponProduct.deleteMany({
         where: { couponId: id },
       });
 
       // 새 연결 생성
-      if (productIds && productIds.length > 0) {
+      if (targetProductIds.length > 0) {
         await this.prisma.couponProduct.createMany({
-          data: productIds.map((pid: number) => ({
+          data: targetProductIds.map((pid: number) => ({
             couponId: id,
             productId: pid,
           })),

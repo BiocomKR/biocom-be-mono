@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsNumber } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsNumber, IsOptional, IsString } from 'class-validator';
 import { SendPushDto } from './send-push.dto';
 
 /**
@@ -14,4 +14,12 @@ export class SendPushToUsersDto extends SendPushDto {
   @IsArray()
   @IsNumber({}, { each: true })
   userIds: number[];
+
+  @ApiPropertyOptional({
+    description: '조건 타입 (스케줄의 pushCode 조회용)',
+    example: 'ONBOARDING_SURVEY_TYPE_UNCOMPLETED',
+  })
+  @IsOptional()
+  @IsString()
+  conditionType?: string;
 }

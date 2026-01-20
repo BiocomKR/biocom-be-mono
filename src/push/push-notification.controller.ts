@@ -76,6 +76,21 @@ export class PushNotificationController {
    */
   @Post('send-to-users')
   async sendToUsers(@Body() dto: SendPushToUsersDto) {
+    // conditionType이 있으면 해당 스케줄에서 pushCode, type 조회
+    // 테스트 발송은 비활성화된 스케줄도 테스트할 수 있어야 하므로 isActive 조건 제거
+    let schedule: { pushCode: string | null; type: string } | null = null;
+    if (dto.conditionType) {
+      schedule = await this.prisma.pushNotificationSchedule.findFirst({
+        where: {
+          conditionType: dto.conditionType,
+        },
+        select: {
+          pushCode: true,
+          type: true,
+        },
+      });
+    }
+
     // 템플릿 치환
     const titles = await this.templateService.substituteForUsers(dto.title, dto.userIds);
     const bodies = await this.templateService.substituteForUsers(dto.body, dto.userIds);
@@ -93,7 +108,10 @@ export class PushNotificationController {
           title,
           body,
           imageUrl: dto.imageUrl,
-          data: dto.data,
+          data: {
+            ...dto.data,
+            ...(schedule && { pushCode: schedule.pushCode, type: schedule.type }),
+          },
         },
         dto.isTest ?? false,
       );
@@ -272,6 +290,18 @@ export class PushNotificationController {
       };
     }
 
+    // 해당 조건의 스케줄에서 pushCode, type 조회
+    // 테스트 발송은 비활성화된 스케줄도 테스트할 수 있어야 하므로 isActive 조건 제거
+    const schedule = await this.prisma.pushNotificationSchedule.findFirst({
+      where: {
+        conditionType: dto.conditionType,
+      },
+      select: {
+        pushCode: true,
+        type: true,
+      },
+    });
+
     // 템플릿 치환
     const titles = await this.templateService.substituteForUsers(dto.title, testerIds);
     const bodies = await this.templateService.substituteForUsers(dto.body, testerIds);
@@ -289,7 +319,11 @@ export class PushNotificationController {
           title,
           body,
           imageUrl: dto.imageUrl,
-          data: dto.data,
+          data: {
+            ...dto.data,
+            pushCode: schedule?.pushCode,
+            type: schedule?.type,
+          },
         },
         true, // isTest = true
       );
