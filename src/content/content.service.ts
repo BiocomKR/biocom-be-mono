@@ -47,6 +47,14 @@ export class ContentService {
   }
 
   /**
+   * 개행 문자 정규화 (CRLF → LF)
+   * Windows 환경에서 입력된 \r\n을 \n으로 통일
+   */
+  private normalizeLineEndings(text: string): string {
+    return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  }
+
+  /**
    * 컨텐츠 목록 조회 (페이징)
    */
   async getContentsWithPagination(
@@ -212,7 +220,8 @@ export class ContentService {
     },
     files?: Express.Multer.File[],
   ) {
-    const sanitizedContent = this.sanitizeHtml(data.content);
+    const normalizedContent = this.normalizeLineEndings(data.content);
+    const sanitizedContent = this.sanitizeHtml(normalizedContent);
 
     // FormData에서 문자열로 올 수 있으므로 타입 변환
     const isActive = typeof data.isActive === 'string'
@@ -293,7 +302,10 @@ export class ContentService {
     const updateData: any = {};
 
     if (data.title !== undefined) updateData.title = data.title;
-    if (data.content !== undefined) updateData.content = this.sanitizeHtml(data.content);
+    if (data.content !== undefined) {
+      const normalizedContent = this.normalizeLineEndings(data.content);
+      updateData.content = this.sanitizeHtml(normalizedContent);
+    }
     if (data.type !== undefined) updateData.type = data.type;
     if (data.isActive !== undefined) {
       updateData.isActive = typeof data.isActive === 'string'
