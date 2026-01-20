@@ -178,6 +178,8 @@ export class PushCampaignService {
           data: {
             ...schedule.data,
             campaignId: campaign.id,
+            pushCode: schedule.pushCode, // GA4 이벤트 추적용
+            type: schedule.type, // notification_type용
           },
         },
         PushNotificationType.SYSTEM,

@@ -607,6 +607,7 @@ export class ChallengeService {
         // 응답 데이터 생성
         const responseData: ChallengeScheduleResponseDto = {
           id: userChallenge.id,
+          challengeCode: product.sku, // 챌린지 코드 (GA4 이벤트용)
           startDate: formatDateToString(userChallenge.activatedAt),
           endDate: formatDateToString(userChallenge.expiresAt),
           isConfirmed: true,
@@ -615,7 +616,7 @@ export class ChallengeService {
           createdAt: userChallenge.createdAt
         };
 
-        this.logger.log(`빠른 챌린지 시작 완료 - 시작일: ${responseData.startDate}, 종료일: ${responseData.endDate}`);
+        this.logger.log(`빠른 챌린지 시작 완료 - 챌린지: ${product.sku}, 시작일: ${responseData.startDate}, 종료일: ${responseData.endDate}`);
         return { success: true, data: responseData };
       });
     } catch (error) {
@@ -684,6 +685,7 @@ export class ChallengeService {
       // 일정 정보는 이제 userChallenge에 직접 저장됨 (activatedAt/expiresAt 사용)
       const responseData: ChallengeScheduleResponseDto = {
         id: userChallenge.id,
+        challengeCode: ticket.product?.sku || '', // 챌린지 코드 (GA4 이벤트용)
         startDate: userChallenge.activatedAt ? formatDateToString(userChallenge.activatedAt) : null,
         endDate: userChallenge.expiresAt ? formatDateToString(userChallenge.expiresAt) : null,
         isConfirmed: true, // 일정 설정 시 바로 확정됨
@@ -692,7 +694,7 @@ export class ChallengeService {
         createdAt: userChallenge.createdAt
       };
 
-      this.logger.log(`챌린지 일정 조회 완료 - 시작일: ${responseData.startDate}, 확정여부: ${responseData.isConfirmed}`);
+      this.logger.log(`챌린지 일정 조회 완료 - 챌린지: ${responseData.challengeCode}, 시작일: ${responseData.startDate}`);
       return { success: true, data: responseData };
     } catch (error) {
       this.logger.error('챌린지 일정 조회 실패:', error);
@@ -842,6 +844,7 @@ export class ChallengeService {
         // 9. 응답 데이터 생성
         const responseData: ChallengeScheduleResponseDto = {
           id: userChallenge.id,
+          challengeCode: product.sku, // 챌린지 코드 (GA4 이벤트용)
           startDate: formatDateToString(userChallenge.activatedAt),
           endDate: formatDateToString(userChallenge.expiresAt),
           isConfirmed: true,
@@ -850,7 +853,7 @@ export class ChallengeService {
           createdAt: userChallenge.createdAt
         };
 
-        this.logger.log(`챌린지 시작일 설정 완료 및 활성화 - 시작일: ${responseData.startDate}, 종료일: ${responseData.endDate}, 상태: ACTIVE`);
+        this.logger.log(`챌린지 시작일 설정 완료 - 챌린지: ${product.sku}, 시작일: ${responseData.startDate}, 종료일: ${responseData.endDate}`);
         return { success: true, data: responseData };
       });
     } catch (error) {

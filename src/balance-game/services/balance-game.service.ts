@@ -379,11 +379,13 @@ export class BalanceGameService {
       message,
       earnedCoupon: earnedCoupon ? {
         id: earnedCoupon.id,
+        code: earnedCoupon.code,
         name: earnedCoupon.name,
         description: earnedCoupon.description,
         discountType: earnedCoupon.discountType,
         discountValue: earnedCoupon.discountValue,
         productName: earnedCoupon.product?.name,
+        issuedAt: getNowKST().toISOString(),
         expiresAt: new Date(getNowKST().getTime() + earnedCoupon.validHours * 60 * 60 * 1000).toISOString(),
         imageUrl: earnedCoupon.imageUrl
       } : undefined
@@ -404,11 +406,14 @@ export class BalanceGameService {
       options: step.options,
       coupon: step.coupon ? {
         id: step.coupon.id,
+        code: step.coupon.code,
         name: step.coupon.name,
         description: step.coupon.description,
         discountType: step.coupon.discountType,
         discountValue: step.coupon.discountValue,
         productName: step.coupon.product?.name,
+        issuedAt: getNowKST().toISOString(),
+        expiresAt: new Date(getNowKST().getTime() + step.coupon.validHours * 60 * 60 * 1000).toISOString(),
         imageUrl: step.coupon.imageUrl
       } : undefined
     };

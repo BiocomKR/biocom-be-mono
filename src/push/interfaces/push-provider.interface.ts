@@ -163,25 +163,28 @@ export interface IPushProvider {
    *
    * @param tokens - FCM 토큰 배열
    * @param topic - 토픽 이름
+   * @param bundleId - 대상 앱의 bundleId (dev/prod Firebase 앱 선택용)
    * @returns 구독 성공 여부
    */
-  subscribeToTopic(tokens: string[], topic: string): Promise<boolean>;
+  subscribeToTopic(tokens: string[], topic: string, bundleId?: string): Promise<boolean>;
 
   /**
    * Topic 구독 해제
    *
    * @param tokens - FCM 토큰 배열
    * @param topic - 토픽 이름
+   * @param bundleId - 대상 앱의 bundleId (dev/prod Firebase 앱 선택용)
    * @returns 구독 해제 성공 여부
    */
-  unsubscribeFromTopic(tokens: string[], topic: string): Promise<boolean>;
+  unsubscribeFromTopic(tokens: string[], topic: string, bundleId?: string): Promise<boolean>;
 
   /**
    * Topic으로 푸시 발송
    *
    * @param topic - 토픽 이름
    * @param message - 발송할 메시지
+   * @param bundleId - 대상 앱의 bundleId (dev/prod Firebase 앱 선택용)
    * @returns 발송 결과
    */
-  sendToTopic(topic: string, message: PushMessage): Promise<PushSendResult>;
+  sendToTopic(topic: string, message: PushMessage, bundleId?: string): Promise<PushSendResult>;
 }

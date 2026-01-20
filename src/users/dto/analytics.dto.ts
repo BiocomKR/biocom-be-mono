@@ -26,7 +26,7 @@ export class UserAnalyticsDto {
 
   @ApiPropertyOptional({
     description: '챌린지 코드 (상품 SKU)',
-    example: 'CHALLENGE_21',
+    example: 'CHALLENGE_INNER_BEAUTY',
     nullable: true,
   })
   challengeCode: string | null;

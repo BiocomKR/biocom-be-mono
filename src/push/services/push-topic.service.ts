@@ -31,12 +31,12 @@ export class PushTopicService {
       `📌 [PushTopicService] Topic 구독 시작: userId=${userId}, topic=${dto.topic}`,
     );
 
-    // 1. 토큰 가져오기 (제공된 토큰 또는 유저의 모든 활성 토큰)
-    const tokens = dto.tokens && dto.tokens.length > 0
-      ? dto.tokens
-      : await this.getUserActiveTokens(userId);
+    // 1. 토큰 및 bundleId 가져오기
+    const tokenData = dto.tokens && dto.tokens.length > 0
+      ? dto.tokens.map((t) => ({ token: t, bundleId: null }))
+      : await this.getUserActiveTokensWithBundleId(userId);
 
-    if (tokens.length === 0) {
+    if (tokenData.length === 0) {
       this.logger.warn(
         `⚠️ [PushTopicService] 활성 토큰 없음: userId=${userId}`,
       );
@@ -46,16 +46,24 @@ export class PushTopicService {
       };
     }
 
-    // 2. FCM Topic 구독
-    const success = await this.pushProvider.subscribeToTopic(tokens, dto.topic);
+    // 2. bundleId별로 그룹핑하여 FCM Topic 구독
+    const groupedByBundle = this.groupTokensByBundleId(tokenData);
+    let totalSuccess = 0;
+
+    for (const [bundleId, tokens] of groupedByBundle) {
+      const success = await this.pushProvider.subscribeToTopic(tokens, dto.topic, bundleId || undefined);
+      if (success) totalSuccess++;
+    }
+
+    const overallSuccess = totalSuccess > 0;
 
     this.logger.log(
-      `✅ [PushTopicService] Topic 구독 완료: topic=${dto.topic}, success=${success}`,
+      `✅ [PushTopicService] Topic 구독 완료: topic=${dto.topic}, success=${overallSuccess}`,
     );
 
     return {
-      success,
-      message: success
+      success: overallSuccess,
+      message: overallSuccess
         ? `${dto.topic} 토픽에 구독되었습니다`
         : '토픽 구독에 실패했습니다',
     };
@@ -73,12 +81,12 @@ export class PushTopicService {
       `🔕 [PushTopicService] Topic 구독 해제 시작: userId=${userId}, topic=${dto.topic}`,
     );
 
-    // 1. 토큰 가져오기
-    const tokens = dto.tokens && dto.tokens.length > 0
-      ? dto.tokens
-      : await this.getUserActiveTokens(userId);
+    // 1. 토큰 및 bundleId 가져오기
+    const tokenData = dto.tokens && dto.tokens.length > 0
+      ? dto.tokens.map((t) => ({ token: t, bundleId: null }))
+      : await this.getUserActiveTokensWithBundleId(userId);
 
-    if (tokens.length === 0) {
+    if (tokenData.length === 0) {
       this.logger.warn(
         `⚠️ [PushTopicService] 활성 토큰 없음: userId=${userId}`,
       );
@@ -88,16 +96,24 @@ export class PushTopicService {
       };
     }
 
-    // 2. FCM Topic 구독 해제
-    const success = await this.pushProvider.unsubscribeFromTopic(tokens, dto.topic);
+    // 2. bundleId별로 그룹핑하여 FCM Topic 구독 해제
+    const groupedByBundle = this.groupTokensByBundleId(tokenData);
+    let totalSuccess = 0;
+
+    for (const [bundleId, tokens] of groupedByBundle) {
+      const success = await this.pushProvider.unsubscribeFromTopic(tokens, dto.topic, bundleId || undefined);
+      if (success) totalSuccess++;
+    }
+
+    const overallSuccess = totalSuccess > 0;
 
     this.logger.log(
-      `✅ [PushTopicService] Topic 구독 해제 완료: topic=${dto.topic}, success=${success}`,
+      `✅ [PushTopicService] Topic 구독 해제 완료: topic=${dto.topic}, success=${overallSuccess}`,
     );
 
     return {
-      success,
-      message: success
+      success: overallSuccess,
+      message: overallSuccess
         ? `${dto.topic} 토픽 구독이 해제되었습니다`
         : '토픽 구독 해제에 실패했습니다',
     };
@@ -105,21 +121,26 @@ export class PushTopicService {
 
   /**
    * Topic으로 푸시 전송
+   * bundleId 파라미터로 특정 Firebase 앱에만 발송 가능
    *
    * @param dto - Topic 푸시 정보
    * @returns 전송 결과
    */
   async sendToTopic(dto: SendPushToTopicDto) {
     this.logger.log(
-      `📣 [PushTopicService] Topic 푸시 전송: topic=${dto.topic}, title="${dto.title}"`,
+      `📣 [PushTopicService] Topic 푸시 전송: topic=${dto.topic}, title="${dto.title}", bundleId=${dto.bundleId}`,
     );
 
-    const result = await this.pushProvider.sendToTopic(dto.topic, {
-      title: dto.title,
-      body: dto.body,
-      imageUrl: dto.imageUrl,
-      data: dto.data,
-    });
+    const result = await this.pushProvider.sendToTopic(
+      dto.topic,
+      {
+        title: dto.title,
+        body: dto.body,
+        imageUrl: dto.imageUrl,
+        data: dto.data,
+      },
+      dto.bundleId,
+    );
 
     this.logger.log(
       `✅ [PushTopicService] Topic 푸시 전송 완료: success=${result.success}`,
@@ -137,13 +158,9 @@ export class PushTopicService {
   }
 
   /**
-   * 유저의 활성 토큰 조회 (private)
-   *
-   * @param userId - 유저 ID
-   * @returns FCM 토큰 배열
-   * @private
+   * 유저의 활성 토큰 조회 (bundleId 포함)
    */
-  private async getUserActiveTokens(userId: number): Promise<string[]> {
+  private async getUserActiveTokensWithBundleId(userId: number): Promise<{ token: string; bundleId: string | null }[]> {
     const pushTokens = await this.prisma.pushToken.findMany({
       where: {
         userId,
@@ -152,9 +169,28 @@ export class PushTopicService {
       },
       select: {
         token: true,
+        bundleId: true,
       },
     });
 
-    return pushTokens.map((pt) => pt.token);
+    return pushTokens;
+  }
+
+  /**
+   * 토큰을 bundleId별로 그룹핑
+   */
+  private groupTokensByBundleId(
+    tokenData: { token: string; bundleId: string | null }[],
+  ): Map<string | null, string[]> {
+    const grouped = new Map<string | null, string[]>();
+
+    tokenData.forEach(({ token, bundleId }) => {
+      if (!grouped.has(bundleId)) {
+        grouped.set(bundleId, []);
+      }
+      grouped.get(bundleId)!.push(token);
+    });
+
+    return grouped;
   }
 }

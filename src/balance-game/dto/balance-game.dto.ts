@@ -84,11 +84,14 @@ export class BalanceGameStepResponseDto {
   @ApiPropertyOptional({ description: '획득할 쿠폰 정보 (결과 단계인 경우)' })
   coupon?: {
     id: number;
+    code: string;
     name: string;
     description?: string;
     discountType: string;
     discountValue: number;
     productName: string;
+    issuedAt: string;
+    expiresAt: string;
     imageUrl?: string;
   };
 }
@@ -123,11 +126,13 @@ export class BalanceGameCompleteResponseDto {
   @ApiPropertyOptional({ description: '획득한 쿠폰' })
   earnedCoupon?: {
     id: number;
+    code?: string;
     name: string;
     description?: string;
     discountType: string;
     discountValue: number;
     productName: string;
+    issuedAt: string;
     expiresAt: string;
     imageUrl?: string;
   };
