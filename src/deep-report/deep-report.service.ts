@@ -127,7 +127,7 @@ export class DeepReportService {
     }
 
     // 3. 포인트 지급 및 기록 처리 (해당 리포트에 대해 1회만)
-    const pointsEarned = await this.awardPointsAndRecord(userId, deepReport.reportId);
+    const pointsEarned = await this.awardPointsAndRecord(userId, deepReport.reportId, deepReport.id);
 
     // 4. 응답 변환
     const data: DeepReportContentDto = {
@@ -215,7 +215,7 @@ export class DeepReportService {
     }
 
     // 5. 포인트 지급 및 기록 처리 (해당 리포트에 대해 1회만)
-    const pointsEarned = await this.awardPointsAndRecord(userId, deepReport.reportId);
+    const pointsEarned = await this.awardPointsAndRecord(userId, deepReport.reportId, deepReport.id);
 
     // 5. 응답 변환
     const data: DeepReportContentDto = {
@@ -238,10 +238,11 @@ export class DeepReportService {
    * - user_records: 홈화면 미션 비활성화용 기록
    *
    * @param userId 사용자 ID
-   * @param reportId 리포트 ID
+   * @param reportId 리포트 ID (string)
+   * @param reportDbId UserDeepReport.id (Int)
    * @returns 지급된 포인트 (이미 지급받았으면 0)
    */
-  private async awardPointsAndRecord(userId: number, reportId: string): Promise<number> {
+  private async awardPointsAndRecord(userId: number, reportId: string, reportDbId: number): Promise<number> {
     // 1. WEEKLY_REPORT 미션 정보 조회 (pointsConfig 포함)
     const mission = await this.prisma.mission.findFirst({
       where: {
@@ -365,7 +366,7 @@ export class DeepReportService {
             balance: updatedUser.points,
             description: `심층리포트 조회 (${reportId})`,
             relatedType: PointRelatedType.WEEKLY_REPORT,
-            relatedId: null, // reportId는 string이므로 description에 포함
+            relatedId: reportDbId,
             createdAt: now,
           },
         });

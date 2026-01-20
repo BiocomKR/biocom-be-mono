@@ -97,7 +97,6 @@ export class PointService {
    * @param relatedType 관련 타입 (RECORD_COMPLETION, MISSION_COMPLETION 등)
    * @param relatedId 관련 ID
    * @param recordType 기록 타입 (BEAUTY, DIET, SUPPLEMENT 등)
-   * @param metadata 동적 정보 (일차, 강의명, 미션명 등)
    */
   async awardPoints(
     userId: number,
@@ -106,7 +105,6 @@ export class PointService {
     relatedType?: PointRelatedType,
     relatedId?: number,
     recordType?: string,
-    metadata?: Record<string, any>,
   ): Promise<number> {
     this.logger.log(`포인트 지급 - 사용자: ${userId}, 금액: ${amount}`);
 
@@ -133,7 +131,6 @@ export class PointService {
           relatedType: relatedType || PointRelatedType.MANUAL,
           relatedId,
           recordType,
-          metadata,
           createdAt: getNowKST(),
         },
       });
@@ -153,7 +150,6 @@ export class PointService {
    * @param relatedType 관련 타입
    * @param relatedId 관련 ID
    * @param recordType 기록 타입 (BEAUTY, DIET, SUPPLEMENT 등)
-   * @param metadata 동적 정보 (일차, 강의명, 미션명 등)
    */
   async awardPointsInTransaction(
     tx: any,
@@ -163,7 +159,6 @@ export class PointService {
     relatedType?: PointRelatedType,
     relatedId?: number,
     recordType?: string,
-    metadata?: Record<string, any>,
   ): Promise<number> {
     if (amount <= 0) {
       throw new BadRequestException('지급 금액은 0보다 커야 합니다.');
@@ -186,7 +181,6 @@ export class PointService {
         relatedType: relatedType || PointRelatedType.MANUAL,
         relatedId,
         recordType,
-        metadata,
         createdAt: getNowKST(),
       },
     });
