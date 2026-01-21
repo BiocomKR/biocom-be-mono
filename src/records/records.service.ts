@@ -697,9 +697,11 @@ export class RecordsService {
       startDate.setUTCHours(0, 0, 0, 0);
       const endDate = new Date(challenge.expiresAt);
       endDate.setUTCHours(0, 0, 0, 0);
-      const totalDays = Math.round(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      // 시작일 포함이므로 +1 (12/29~1/18 = 21일)
+      const totalDays =
+        Math.round(
+          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+        ) + 1;
       const lastProgress = challenge.dailyProgress[0];
       return lastProgress?.day === totalDays;
     });
@@ -720,15 +722,16 @@ export class RecordsService {
       },
     });
 
-    // 최대 일수 계산 (동적으로, 날짜만 비교)
+    // 최대 일수 계산 (동적으로, 시작일 포함 +1)
     const maxDays = allChallenges.reduce((max, challenge) => {
       const startDate = new Date(challenge.activatedAt);
       startDate.setUTCHours(0, 0, 0, 0);
       const endDate = new Date(challenge.expiresAt);
       endDate.setUTCHours(0, 0, 0, 0);
-      const days = Math.round(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      const days =
+        Math.round(
+          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+        ) + 1;
       return Math.max(max, days);
     }, 0);
 
