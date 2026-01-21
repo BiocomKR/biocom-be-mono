@@ -116,10 +116,11 @@ export class PushCampaignService {
       // ---------------------------------------------------------------
       // Step 1: 대상 유저 조회
       // - schedule.targetQuery에 정의된 조건으로 유저 필터링
+      // - schedule.bundleId에 맞는 토큰을 가진 유저만 조회
       // - 테스트 모드면 testUserIds로 제한
       // ---------------------------------------------------------------
       const targetQuery = schedule.targetQuery || {};
-      let targetUsers = await this.getTargetUsers(targetQuery);
+      let targetUsers = await this.getTargetUsers(targetQuery, schedule.bundleId);
 
       // 테스트 모드면 testUserIds와 교집합
       if (schedule.isTest && schedule.testUserIds?.length > 0) {
@@ -286,9 +287,10 @@ export class PushCampaignService {
    * @param targetQuery - 타겟팅 조건 (JSON)
    *   - marketingEnabled: boolean (마케팅 수신 동의 여부)
    *   - userIds: number[] (특정 유저 ID 지정)
+   * @param bundleId - 대상 앱 번들ID (해당 앱 토큰을 가진 유저만 조회)
    * @returns 유저 ID 배열 (TODO: 페르소나 정보 포함하도록 변경)
    */
-  private async getTargetUsers(targetQuery: any): Promise<number[]> {
+  private async getTargetUsers(targetQuery: any, bundleId?: string): Promise<number[]> {
     // Prisma의 where 조건 객체 (Python SQLAlchemy의 filter()와 유사)
     const where: any = {};
 
@@ -306,18 +308,24 @@ export class PushCampaignService {
     // ---------------------------------------------------------------
     // DB 쿼리 실행
     // - 활성 푸시 토큰이 있는 유저만 조회 (푸시 토큰 없으면 발송 불가)
+    // - bundleId가 지정된 경우 해당 앱의 토큰을 가진 유저만 조회
     //
     // TODO [AI 개발자]: characterId도 select에 추가
     //   select: { id: true, characterId: true }
     // ---------------------------------------------------------------
+    const pushTokenWhere: any = { isActive: true };
+    if (bundleId) {
+      pushTokenWhere.bundleId = bundleId;
+      this.logger.log(`🎯 [PushCampaignService] bundleId 필터 적용: ${bundleId}`);
+    }
+
     const users = await this.prisma.user.findMany({
       where: {
         ...where,
         // 푸시 토큰이 활성화된 유저만 (isActive=true인 토큰이 1개 이상)
+        // bundleId가 지정된 경우 해당 앱의 토큰을 가진 유저만
         pushTokens: {
-          some: {
-            isActive: true,
-          },
+          some: pushTokenWhere,
         },
       },
       select: { id: true }, // TODO: characterId도 추가

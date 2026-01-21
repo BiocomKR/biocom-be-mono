@@ -116,7 +116,7 @@ describe('IapService', () => {
       userId: mockUserId,
       productId: 10,
       ticketType: 'IAP',
-      status: 'AVAILABLE',
+      status: 'PURCHASED',
     };
 
     describe('중복 구매 검증', () => {

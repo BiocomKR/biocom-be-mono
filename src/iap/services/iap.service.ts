@@ -74,7 +74,7 @@ export class IapService {
       };
     }
 
-    // 3. 트랜잭션으로 중복 체크 + 저장 + 티켓 발급을 원자적으로 처리
+    // 3. 트랜잭션으로 중복 체크 + 저장을 원자적으로 처리
     const result = await this.prisma.$transaction(async (tx) => {
       // 중복 트랜잭션 확인 (트랜잭션 내에서 락 효과)
       const existingReceipt = await tx.iAPReceipt.findUnique({
@@ -88,22 +88,12 @@ export class IapService {
       // 영수증 저장
       const receipt = await this.saveReceiptInTx(tx, userId, dto, iapProduct.id, verificationResult);
 
-      // 챌린지 티켓 발급
-      const ticket = await this.issueChallengeTicketInTx(tx, userId, iapProduct.productId);
-
-      // 영수증에 티켓 ID 연결
-      await tx.iAPReceipt.update({
-        where: { id: receipt.id },
-        data: { challengeTicketId: ticket.id },
-      });
-
-      this.logger.log(`구매 처리 완료 - receiptId: ${receipt.id}, ticketId: ${ticket.id}`);
+      this.logger.log(`영수증 검증 완료 - receiptId: ${receipt.id}`);
 
       return {
         success: true,
-        message: '구매가 완료되었습니다.',
+        message: '영수증 검증이 완료되었습니다.',
         receiptId: receipt.id,
-        ticketId: ticket.id,
       };
     });
 
@@ -204,36 +194,6 @@ export class IapService {
         status,
       },
       update: updateData,
-    });
-  }
-
-  /**
-   * 챌린지 티켓 발급 (트랜잭션 내부용)
-   */
-  private async issueChallengeTicketInTx(
-    tx: TransactionClient,
-    userId: number,
-    productId: number,
-  ) {
-    // 상품 정보 조회
-    const product = await tx.product.findUnique({
-      where: { id: productId },
-    });
-
-    if (!product) {
-      throw new BadRequestException('상품 정보를 찾을 수 없습니다.');
-    }
-
-    // 티켓 발급
-    return tx.challengeTicket.create({
-      data: {
-        userId,
-        productId,
-        ticketType: 'IAP',
-        status: 'AVAILABLE',
-        purchaseDate: getNowKST(),
-        createdAt: getNowKST(),
-      },
     });
   }
 
