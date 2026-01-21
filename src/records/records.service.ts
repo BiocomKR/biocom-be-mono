@@ -692,11 +692,17 @@ export class RecordsService {
 
     // 완주 = 마지막 일차까지 도달한 챌린지
     const completedChallengeList = expiredChallenges.filter((challenge) => {
-      // 날짜만 비교 (시간 무시)
-      const startDate = new Date(challenge.activatedAt);
-      startDate.setUTCHours(0, 0, 0, 0);
-      const endDate = new Date(challenge.expiresAt);
-      endDate.setUTCHours(0, 0, 0, 0);
+      // 날짜만 추출 (calculateChallengeDay와 동일한 방식)
+      const startDateStr = challenge.activatedAt.toISOString().split('T')[0];
+      const endDateStr = challenge.expiresAt.toISOString().split('T')[0];
+      const [startYear, startMonth, startDay] = startDateStr
+        .split('-')
+        .map(Number);
+      const [endYear, endMonth, endDay] = endDateStr.split('-').map(Number);
+
+      const startDate = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+      const endDate = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+
       // 시작일 포함이므로 +1 (12/29~1/18 = 21일)
       const totalDays =
         Math.round(
@@ -724,10 +730,16 @@ export class RecordsService {
 
     // 최대 일수 계산 (동적으로, 시작일 포함 +1)
     const maxDays = allChallenges.reduce((max, challenge) => {
-      const startDate = new Date(challenge.activatedAt);
-      startDate.setUTCHours(0, 0, 0, 0);
-      const endDate = new Date(challenge.expiresAt);
-      endDate.setUTCHours(0, 0, 0, 0);
+      const startDateStr = challenge.activatedAt.toISOString().split('T')[0];
+      const endDateStr = challenge.expiresAt.toISOString().split('T')[0];
+      const [startYear, startMonth, startDay] = startDateStr
+        .split('-')
+        .map(Number);
+      const [endYear, endMonth, endDay] = endDateStr.split('-').map(Number);
+
+      const startDate = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+      const endDate = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+
       const days =
         Math.round(
           (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
