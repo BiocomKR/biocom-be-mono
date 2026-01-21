@@ -457,26 +457,55 @@ export class RecordsService {
     const retained7dPrev = [...userIds14dAgo].filter((id) => userIds7dAgoSet.has(id)).length;
     const previousRetention7d = userIds14dAgo.size > 0 ? Math.round((retained7dPrev / userIds14dAgo.size) * 100) : 0;
 
-    // 완주율 비교
+    // 완주율 비교 (마지막 일차가 총 일수와 같은 챌린지를 완주로 판단)
     const days30Ago = new Date(today);
     days30Ago.setDate(days30Ago.getDate() - 30);
     const days60Ago = new Date(today);
     days60Ago.setDate(days60Ago.getDate() - 60);
 
-    const currentCompleted = await this.prisma.userChallenge.count({
-      where: { status: 'COMPLETED', updatedAt: { gte: days30Ago } },
+    // 완주 여부 판단 헬퍼 함수
+    const isCompleted = (challenge: { activatedAt: Date; expiresAt: Date; dailyProgress: { day: number }[] }) => {
+      const startDateStr = challenge.activatedAt.toISOString().split('T')[0];
+      const endDateStr = challenge.expiresAt.toISOString().split('T')[0];
+      const [startYear, startMonth, startDay] = startDateStr.split('-').map(Number);
+      const [endYear, endMonth, endDay] = endDateStr.split('-').map(Number);
+      const startDate = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+      const endDate = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+      const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const lastProgress = challenge.dailyProgress[0];
+      return lastProgress?.day === totalDays;
+    };
+
+    // 현재 기간 (최근 30일 내 종료된 챌린지)
+    const currentChallenges = await this.prisma.userChallenge.findMany({
+      where: {
+        status: { in: ['EXPIRED', 'COMPLETED'] },
+        updatedAt: { gte: days30Ago },
+      },
+      select: {
+        activatedAt: true,
+        expiresAt: true,
+        dailyProgress: { orderBy: { day: 'desc' }, take: 1, select: { day: true } },
+      },
     });
-    const currentTotal = await this.prisma.userChallenge.count({
-      where: { activatedAt: { lte: days30Ago }, OR: [{ status: 'COMPLETED' }, { status: 'ACTIVE' }] },
-    });
+    const currentCompleted = currentChallenges.filter(isCompleted).length;
+    const currentTotal = currentChallenges.length;
     const currentCompletionRate = currentTotal > 0 ? Math.round((currentCompleted / currentTotal) * 100) : 0;
 
-    const previousCompleted = await this.prisma.userChallenge.count({
-      where: { status: 'COMPLETED', updatedAt: { gte: days60Ago, lt: days30Ago } },
+    // 이전 기간 (30~60일 전 종료된 챌린지)
+    const previousChallenges = await this.prisma.userChallenge.findMany({
+      where: {
+        status: { in: ['EXPIRED', 'COMPLETED'] },
+        updatedAt: { gte: days60Ago, lt: days30Ago },
+      },
+      select: {
+        activatedAt: true,
+        expiresAt: true,
+        dailyProgress: { orderBy: { day: 'desc' }, take: 1, select: { day: true } },
+      },
     });
-    const previousTotal = await this.prisma.userChallenge.count({
-      where: { activatedAt: { lte: days60Ago }, updatedAt: { lt: days30Ago }, OR: [{ status: 'COMPLETED' }, { status: 'ACTIVE' }] },
-    });
+    const previousCompleted = previousChallenges.filter(isCompleted).length;
+    const previousTotal = previousChallenges.length;
     const previousCompletionRate = previousTotal > 0 ? Math.round((previousCompleted / previousTotal) * 100) : 0;
 
     const calcChange = (current: number, previous: number): MetricChangeDto => ({
@@ -511,9 +540,19 @@ export class RecordsService {
         activatedAt: { gte: days30Ago },
         ...(excludeTesters ? { user: { isTester: false } } : {}),
       },
-      select: { userId: true, status: true },
+      select: {
+        userId: true,
+        status: true,
+        activatedAt: true,
+        expiresAt: true,
+        dailyProgress: {
+          orderBy: { day: 'desc' },
+          take: 1,
+          select: { day: true },
+        },
+      },
     });
-    const challengeStartUserIds = [...new Set(challengeStarted.map((c: { userId: number; status: string }) => c.userId))] as number[];
+    const challengeStartUserIds = [...new Set(challengeStarted.map((c) => c.userId))] as number[];
     const challengeStartUsers = challengeStartUserIds.length;
 
     if (challengeStartUsers === 0) {
@@ -531,8 +570,19 @@ export class RecordsService {
     // 2주차 유지 (14일 이상 기록한 사용자)
     const week2Retained = await this.countUsersWithRecordDays(challengeStartUserIds, 14, excludeTesters);
 
-    // 21일 완주
-    const completedCount = challengeStarted.filter((c: { userId: number; status: string }) => c.status === 'COMPLETED').length;
+    // 21일 완주 (마지막 일차가 총 일수와 같은 챌린지)
+    const completedCount = challengeStarted.filter((challenge) => {
+      if (!['EXPIRED', 'COMPLETED'].includes(challenge.status)) return false;
+      const startDateStr = challenge.activatedAt.toISOString().split('T')[0];
+      const endDateStr = challenge.expiresAt.toISOString().split('T')[0];
+      const [startYear, startMonth, startDay] = startDateStr.split('-').map(Number);
+      const [endYear, endMonth, endDay] = endDateStr.split('-').map(Number);
+      const startDate = new Date(Date.UTC(startYear, startMonth - 1, startDay));
+      const endDate = new Date(Date.UTC(endYear, endMonth - 1, endDay));
+      const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const lastProgress = challenge.dailyProgress[0];
+      return lastProgress?.day === totalDays;
+    }).length;
 
     const stages = [
       { stage: 'CHALLENGE_START', label: '챌린지 시작', users: challengeStartUsers },
