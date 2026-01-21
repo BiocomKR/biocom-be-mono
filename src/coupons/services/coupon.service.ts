@@ -186,6 +186,7 @@ export class CouponService {
       return {
         id: uc.id,
         couponId: uc.couponId,
+        code: uc.coupon.code,
         name: uc.coupon.name,
         description: uc.coupon.description,
         discountType: uc.coupon.discountType as DiscountType,
@@ -193,6 +194,8 @@ export class CouponService {
         maxDiscountAmount: uc.coupon.maxDiscountAmount,
         expectedDiscount,
         remainingHours,
+        issuedAt: uc.issuedAt.toISOString(),
+        expiresAt: uc.expiresAt.toISOString(),
         imageUrl: uc.coupon.imageUrl
       };
     });

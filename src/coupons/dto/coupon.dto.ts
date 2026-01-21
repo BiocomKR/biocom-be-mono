@@ -69,6 +69,7 @@ export class AvailableCouponsForProductResponseDto {
   availableCoupons: Array<{
     id: number;
     couponId: number;
+    code?: string;
     name: string;
     description?: string;
     discountType: DiscountType;
@@ -76,6 +77,8 @@ export class AvailableCouponsForProductResponseDto {
     maxDiscountAmount?: number;
     expectedDiscount: number; // 실제 할인될 금액
     remainingHours: number;
+    issuedAt: string;
+    expiresAt: string;
     imageUrl?: string;
   }>;
 
