@@ -797,21 +797,46 @@ export class RecordsService {
       return Math.max(max, days);
     }, 0);
 
-    // 일차별 기록율 (DailyProgress 기반)
+    // 일차별 기록율 (UserRecord 기반)
     const dayRecordRates: DayRecordRateDto[] = [];
     for (let day = 1; day <= maxDays; day++) {
+      // 해당 일차에 해당하는 DailyProgress 조회 (userChallenge 정보 포함)
       const progressData = await this.prisma.dailyProgress.findMany({
         where: { day },
         select: {
-          trackingsTotal: true,
-          trackingsCompleted: true,
+          userChallengeId: true,
+          userChallenge: {
+            select: {
+              userId: true,
+              activatedAt: true,
+            },
+          },
         },
       });
 
       const totalUsers = progressData.length;
-      const recordedUsers = progressData.filter(
-        (p) => p.trackingsCompleted > 0,
-      ).length;
+
+      // 각 유저가 해당 일차에 기록했는지 확인
+      let recordedUsers = 0;
+      for (const progress of progressData) {
+        const { userId, activatedAt } = progress.userChallenge;
+        // 해당 일차의 시작/종료 시간 계산
+        const dayStart = new Date(activatedAt);
+        dayStart.setDate(dayStart.getDate() + day - 1);
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        // UserRecord에서 해당 기간에 기록이 있는지 확인
+        const recordCount = await this.prisma.userRecord.count({
+          where: {
+            userId,
+            createdAt: { gte: dayStart, lt: dayEnd },
+          },
+        });
+        if (recordCount > 0) recordedUsers++;
+      }
+
       const recordRate =
         totalUsers > 0 ? Math.round((recordedUsers / totalUsers) * 100) : 0;
 
@@ -823,7 +848,7 @@ export class RecordsService {
       });
     }
 
-    // 주차별 완료율 (7일 단위, 동적 주차 수)
+    // 주차별 완료율 (7일 단위, 동적 주차 수) - UserRecord 기반
     const totalWeeks = Math.ceil(maxDays / 7);
     const weekCompletions: WeekCompletionDto[] = [];
     for (let week = 1; week <= totalWeeks; week++) {
@@ -837,15 +862,37 @@ export class RecordsService {
       });
       const startUsers = startDayProgress.length;
 
-      // 해당 주차 마지막일 완료한 사용자
+      // 해당 주차 마지막일에 기록한 사용자 (UserRecord 기반)
       const endDayProgress = await this.prisma.dailyProgress.findMany({
-        where: {
-          day: endDay,
-          trackingsCompleted: { gt: 0 },
+        where: { day: endDay },
+        select: {
+          userChallengeId: true,
+          userChallenge: {
+            select: {
+              userId: true,
+              activatedAt: true,
+            },
+          },
         },
-        select: { userChallengeId: true },
       });
-      const completedUsers = endDayProgress.length;
+
+      let completedUsers = 0;
+      for (const progress of endDayProgress) {
+        const { userId, activatedAt } = progress.userChallenge;
+        const dayStart = new Date(activatedAt);
+        dayStart.setDate(dayStart.getDate() + endDay - 1);
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        const recordCount = await this.prisma.userRecord.count({
+          where: {
+            userId,
+            createdAt: { gte: dayStart, lt: dayEnd },
+          },
+        });
+        if (recordCount > 0) completedUsers++;
+      }
 
       const droppedUsers = startUsers - completedUsers;
       const weekCompletionRate =
