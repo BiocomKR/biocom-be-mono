@@ -675,9 +675,9 @@ export class RecordsService {
       where: { categoryCode: 'CHALLENGE', status: 'ACTIVE' },
     });
 
-    // 만료된 챌린지 조회 (status가 EXPIRED인 것들)
-    const expiredChallenges = await this.prisma.userChallenge.findMany({
-      where: { status: 'EXPIRED' },
+    // 종료된 챌린지 조회 (EXPIRED 또는 COMPLETED)
+    const finishedChallenges = await this.prisma.userChallenge.findMany({
+      where: { status: { in: ['EXPIRED', 'COMPLETED'] } },
       select: {
         id: true,
         activatedAt: true,
@@ -691,7 +691,7 @@ export class RecordsService {
     });
 
     // 완주 = 마지막 일차까지 도달한 챌린지
-    const completedChallengeList = expiredChallenges.filter((challenge) => {
+    const completedChallengeList = finishedChallenges.filter((challenge) => {
       // 날짜만 추출 (calculateChallengeDay와 동일한 방식)
       const startDateStr = challenge.activatedAt.toISOString().split('T')[0];
       const endDateStr = challenge.expiresAt.toISOString().split('T')[0];
@@ -713,10 +713,10 @@ export class RecordsService {
     });
     const completedChallenges = completedChallengeList.length;
 
-    // 완주율 = 완주한 챌린지 / 만료된 전체 챌린지
+    // 완주율 = 완주한 챌린지 / 종료된 전체 챌린지
     const completionRate =
-      expiredChallenges.length > 0
-        ? Math.round((completedChallenges / expiredChallenges.length) * 100)
+      finishedChallenges.length > 0
+        ? Math.round((completedChallenges / finishedChallenges.length) * 100)
         : 0;
 
     // 일차별 기록율 계산을 위해 모든 챌린지의 총 일수 파악
