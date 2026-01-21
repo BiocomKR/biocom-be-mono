@@ -65,7 +65,6 @@ import { CouponController } from './coupon/coupon.controller';
 import { CouponService } from './coupon/coupon.service';
 import { PersonaModule } from './master/persona.module';
 import { AnimalModule } from './master/animal.module';
-import { BatchLogsModule } from './batch-logs/batch-logs.module';
 
 /**
  * 애플리케이션 루트 모듈
@@ -117,7 +116,6 @@ import { BatchLogsModule } from './batch-logs/batch-logs.module';
     RecordsModule,    // 기록 통계 모듈
     PersonaModule,    // 페르소나 관리 모듈
     AnimalModule,     // 동물 관리 모듈
-    BatchLogsModule,  // 배치 로그 모듈
   ],
   controllers: [
     UsersController,
