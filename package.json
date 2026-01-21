@@ -26,7 +26,6 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@google-cloud/logging": "^11.2.1",
     "@google-cloud/storage": "^7.17.0",
     "@google/generative-ai": "^0.24.1",
     "@nestjs/axios": "^4.0.1",
