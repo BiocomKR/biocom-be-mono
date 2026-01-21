@@ -37,6 +37,7 @@ export * from './beauty-type.enum';
 // 기타
 export * from './exam-code.enum';
 export * from './ticket-type.enum';
+export * from './point-related-type.enum';
 
 // 앱 관련
 export * from './app-bundle-id.enum';

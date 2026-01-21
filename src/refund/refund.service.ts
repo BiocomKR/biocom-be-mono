@@ -8,8 +8,9 @@ import { PrismaService } from '../common/services/prisma.service';
 import { TossPaymentsService } from '../toss/toss-payments.service';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
-import { RefundStatus, ExchangeReturnStatus, OrderStatus, PgProvider } from '../common/enums';
+import { RefundStatus, ExchangeReturnStatus, OrderStatus, PgProvider, PointRelatedType } from '../common/enums';
 import { CryptoUtil } from '../common/utils/crypto.util';
+import { getPointDescription } from '../common/utils/point-description.util';
 
 @Injectable()
 export class RefundService {
@@ -295,8 +296,8 @@ export class RefundService {
             type: 'REFUND',
             amount: Number(order.pointUsed),
             balance: updatedUser.points,
-            description: `주문 취소 환불 (${order.orderNumber})`,
-            relatedType: 'ORDER',
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'REFUND'),
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: now,
           }
@@ -350,8 +351,8 @@ export class RefundService {
             type: 'PURCHASE_REWARD_CANCEL',
             amount: -rewardAmount,
             balance: updatedUserForReward.points,
-            description: `주문 취소로 인한 적립금 회수 (${order.orderNumber})`,
-            relatedType: 'ORDER',
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'PURCHASE_REWARD_CANCEL'),
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: now,
           },
@@ -878,8 +879,8 @@ export class RefundService {
             type: 'REFUND',
             amount: Number(order.pointUsed),
             balance: 0, // 추후 계산
-            description: `반품 환불 (${order.orderNumber})`,
-            relatedType: 'ORDER',
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'REFUND'),
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: getNowKST(),
           }
@@ -1134,8 +1135,8 @@ export class RefundService {
             type: 'REFUND',
             amount: Number(order.pointUsed),
             balance: updatedUser.points,
-            description: `관리자 주문 취소 환불 (${order.orderNumber})`,
-            relatedType: 'ORDER',
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'REFUND'),
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: now,
           }
@@ -1192,8 +1193,8 @@ export class RefundService {
             type: 'PURCHASE_REWARD_CANCEL',
             amount: -rewardAmount,
             balance: updatedUserForReward.points,
-            description: `관리자 주문 취소로 인한 적립금 회수 (${order.orderNumber})`,
-            relatedType: 'ORDER',
+            description: getPointDescription(PointRelatedType.ORDER, undefined, 'PURCHASE_REWARD_CANCEL'),
+            relatedType: PointRelatedType.ORDER,
             relatedId: order.id,
             createdAt: now,
           },
