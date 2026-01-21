@@ -264,12 +264,12 @@ export class DeepReportService {
     }
 
     // 2. 해당 리포트에 대해 이미 포인트 지급했는지 확인
-    // relatedType: PointRelatedType.WEEKLY_REPORT, description에 reportId 포함
+    // relatedId에 reportDbId(UserDeepReport.id)가 저장되므로 이를 기준으로 체크
     const existingPointHistory = await this.prisma.pointHistory.findFirst({
       where: {
         userId,
         relatedType: PointRelatedType.WEEKLY_REPORT,
-        description: { contains: reportId },
+        relatedId: reportDbId,
       },
     });
 
