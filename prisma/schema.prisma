@@ -2104,6 +2104,8 @@ model PushNotificationSchedule {
   personaMessages    Json?                      @map("persona_messages")
   /// 발신자 타입 (BIOCOM: default 메시지 사용, PERSONA: 유저 페르소나별 메시지 사용)
   senderType         String?                    @map("sender_type") @db.VarChar(20)
+  /// 대상 앱 번들ID (kr.biocom.challenge: 운영, kr.biocom.challenge.dev: 개발)
+  bundleId           String                     @default("kr.biocom.challenge") @map("bundle_id") @db.VarChar(100)
   /// 반복 발송 시작일 (RECURRING 타입일 때 유효 기간 시작)
   startDate          DateTime?                  @map("start_date")
   /// 반복 발송 종료일 (RECURRING 타입일 때 유효 기간 종료)
@@ -2140,6 +2142,7 @@ model PushNotificationSchedule {
   @@index([isTest])
   @@index([pushGroup])
   @@index([pushGroup, priority])
+  @@index([bundleId])
   @@map("push_notification_schedules")
 }
 
