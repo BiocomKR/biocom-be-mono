@@ -769,68 +769,42 @@ export class RecordsService {
         ? Math.round((completedChallenges / finishedChallenges.length) * 100)
         : 0;
 
-    // 일차별 기록율 계산을 위해 모든 챌린지의 총 일수 파악
+    // 모든 챌린지 조회 (userId 포함)
     const allChallenges = await this.prisma.userChallenge.findMany({
       select: {
         id: true,
+        userId: true,
         activatedAt: true,
         expiresAt: true,
       },
     });
 
-    // 최대 일수 계산 (동적으로, 시작일 포함 +1)
-    const maxDays = allChallenges.reduce((max, challenge) => {
-      const startDateStr = challenge.activatedAt.toISOString().split('T')[0];
-      const endDateStr = challenge.expiresAt.toISOString().split('T')[0];
-      const [startYear, startMonth, startDay] = startDateStr
-        .split('-')
-        .map(Number);
-      const [endYear, endMonth, endDay] = endDateStr.split('-').map(Number);
-
-      const startDate = new Date(Date.UTC(startYear, startMonth - 1, startDay));
-      const endDate = new Date(Date.UTC(endYear, endMonth - 1, endDay));
-
-      const days =
-        Math.round(
-          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-        ) + 1;
-      return Math.max(max, days);
-    }, 0);
-
-    // 일차별 기록율 (UserRecord 기반)
+    // 일차별 기록율 (UserRecord + UserChallenge 기반, DailyProgress 사용 안함)
+    // 21일 챌린지 기준 고정
+    const challengeDays = 21;
     const dayRecordRates: DayRecordRateDto[] = [];
-    for (let day = 1; day <= maxDays; day++) {
-      // 해당 일차에 해당하는 DailyProgress 조회 (userChallenge 정보 포함)
-      const progressData = await this.prisma.dailyProgress.findMany({
-        where: { day },
-        select: {
-          userChallengeId: true,
-          userChallenge: {
-            select: {
-              userId: true,
-              activatedAt: true,
-            },
-          },
-        },
+
+    for (let day = 1; day <= challengeDays; day++) {
+      // 해당 일차에 도달 가능한 챌린지 (activatedAt + day - 1 <= 오늘)
+      const eligibleChallenges = allChallenges.filter((c) => {
+        const dayDate = new Date(c.activatedAt);
+        dayDate.setDate(dayDate.getDate() + day - 1);
+        return dayDate <= today;
       });
 
-      const totalUsers = progressData.length;
-
-      // 각 유저가 해당 일차에 기록했는지 확인
+      const totalUsers = eligibleChallenges.length;
       let recordedUsers = 0;
-      for (const progress of progressData) {
-        const { userId, activatedAt } = progress.userChallenge;
-        // 해당 일차의 시작/종료 시간 계산
-        const dayStart = new Date(activatedAt);
+
+      for (const challenge of eligibleChallenges) {
+        const dayStart = new Date(challenge.activatedAt);
         dayStart.setDate(dayStart.getDate() + day - 1);
         dayStart.setUTCHours(0, 0, 0, 0);
         const dayEnd = new Date(dayStart);
         dayEnd.setDate(dayEnd.getDate() + 1);
 
-        // UserRecord에서 해당 기간에 기록이 있는지 확인
         const recordCount = await this.prisma.userRecord.count({
           where: {
-            userId,
+            userId: challenge.userId,
             createdAt: { gte: dayStart, lt: dayEnd },
           },
         });
@@ -848,38 +822,50 @@ export class RecordsService {
       });
     }
 
-    // 주차별 완료율 (7일 단위, 동적 주차 수) - UserRecord 기반
-    const totalWeeks = Math.ceil(maxDays / 7);
+    // 주차별 완료율 (UserRecord 기반, 3주차까지만)
+    const totalWeeks = 3;
     const weekCompletions: WeekCompletionDto[] = [];
+
     for (let week = 1; week <= totalWeeks; week++) {
       const startDay = (week - 1) * 7 + 1;
-      const endDay = Math.min(week * 7, maxDays);
+      const endDay = week * 7;
 
-      // 해당 주차 시작일에 있던 사용자
-      const startDayProgress = await this.prisma.dailyProgress.findMany({
-        where: { day: startDay },
-        select: { userChallengeId: true },
+      // 시작일에 도달 가능한 챌린지
+      const startEligible = allChallenges.filter((c) => {
+        const dayDate = new Date(c.activatedAt);
+        dayDate.setDate(dayDate.getDate() + startDay - 1);
+        return dayDate <= today;
       });
-      const startUsers = startDayProgress.length;
 
-      // 해당 주차 마지막일에 기록한 사용자 (UserRecord 기반)
-      const endDayProgress = await this.prisma.dailyProgress.findMany({
-        where: { day: endDay },
-        select: {
-          userChallengeId: true,
-          userChallenge: {
-            select: {
-              userId: true,
-              activatedAt: true,
-            },
+      // 시작일에 기록한 사용자 수
+      let startUsers = 0;
+      for (const challenge of startEligible) {
+        const dayStart = new Date(challenge.activatedAt);
+        dayStart.setDate(dayStart.getDate() + startDay - 1);
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        const recordCount = await this.prisma.userRecord.count({
+          where: {
+            userId: challenge.userId,
+            createdAt: { gte: dayStart, lt: dayEnd },
           },
-        },
+        });
+        if (recordCount > 0) startUsers++;
+      }
+
+      // 마지막일에 도달 가능한 챌린지
+      const endEligible = allChallenges.filter((c) => {
+        const dayDate = new Date(c.activatedAt);
+        dayDate.setDate(dayDate.getDate() + endDay - 1);
+        return dayDate <= today;
       });
 
+      // 마지막일에 기록한 사용자 수
       let completedUsers = 0;
-      for (const progress of endDayProgress) {
-        const { userId, activatedAt } = progress.userChallenge;
-        const dayStart = new Date(activatedAt);
+      for (const challenge of endEligible) {
+        const dayStart = new Date(challenge.activatedAt);
         dayStart.setDate(dayStart.getDate() + endDay - 1);
         dayStart.setUTCHours(0, 0, 0, 0);
         const dayEnd = new Date(dayStart);
@@ -887,7 +873,7 @@ export class RecordsService {
 
         const recordCount = await this.prisma.userRecord.count({
           where: {
-            userId,
+            userId: challenge.userId,
             createdAt: { gte: dayStart, lt: dayEnd },
           },
         });
