@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { HttpModule } from '@nestjs/axios';
 import { StatisticsController } from './controllers/statistics.controller';
 import { AiAgentStatisticsController } from './controllers/ai-agent-statistics.controller';
 import { StatisticsService } from './services/statistics.service';
+import { SibModule } from '../sib/sib.module';
 
 /**
  * 통계 모듈
@@ -17,7 +17,7 @@ import { StatisticsService } from './services/statistics.service';
  * - AI Agent 통계 (별도 인증 방식)
  */
 @Module({
-  imports: [HttpModule],
+  imports: [SibModule],
   controllers: [StatisticsController, AiAgentStatisticsController],
   providers: [StatisticsService],
   exports: [StatisticsService],

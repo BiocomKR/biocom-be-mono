@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
-import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../../common/services/prisma.service';
+import { SibApiService } from '../../sib/services/sib-api.service';
 import { ExamCode } from '../../common/enums/exam-code.enum';
 import { RecordType } from '../../common/enums';
 import { getNowKST, getDayOfWeek, formatKoreanDate, getKoreanToday } from '../../common/utils/kst-date.util';
@@ -35,7 +34,7 @@ export class StatisticsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly httpService: HttpService,
+    private readonly sibApiService: SibApiService,
   ) {}
 
   /**
@@ -1841,22 +1840,15 @@ export class StatisticsService {
 
       this.logger.log(`날짜 필터 (KST): ${startDate.toISOString()} ~ ${today.toISOString()}`);
 
-      // 2. 외부 API: 음식물과민증 검사 결과 조회 (orderCode에 따라 신/구 API 분기)
+      // 2. SibApiService를 통한 음식물과민증 검사 결과 조회 (orderCode에 따라 신/구 API 분기)
       let iggLevels = [];
       try {
-        const apiEndpoint = userChart.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY
-          ? 'https://sib.codns.com:3001/api/report/getIggLevelOld'
-          : 'https://sib.codns.com:3001/api/report/getIggLevels';
+        const iggResult = userChart.orderCode === ExamCode.LEGACY_DELAYED_ALLERGY
+          ? await this.sibApiService.getIggLevelsOld(chartId, userId)
+          : await this.sibApiService.getIggLevels(chartId, userId);
 
-        const iggResponse = await firstValueFrom(
-          this.httpService.get(apiEndpoint, {
-            params: { chartId },
-            timeout: 10000 // 10초 타임아웃
-          })
-        );
-
-        if (iggResponse.data && Array.isArray(iggResponse.data)) {
-          iggLevels = iggResponse.data;
+        if (iggResult && Array.isArray(iggResult)) {
+          iggLevels = iggResult;
         }
 
         this.logger.log(`음식물과민증 검사 결과 조회 완료: ${iggLevels.length}건, orderCode: ${userChart.orderCode}`);
@@ -1881,7 +1873,7 @@ export class StatisticsService {
       const 이름 = user.name || '없음';
       const 이너뷰티유형 = user.healthTypeAnimal?.animalName || '없음';
       const AI코치유형 = user.aiPersona?.name || '없음';
-      const MBTI = '없음'; // MBTI 필드는 아직 미구현
+      const MBTI = user.mbti || '없음';
 
       this.logger.log(`사용자 정보 조회 완료: ${이름}, ${이너뷰티유형}, ${AI코치유형}`);
 
