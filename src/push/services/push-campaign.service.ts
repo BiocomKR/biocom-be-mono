@@ -188,31 +188,40 @@ export class PushCampaignService {
         },
       });
 
-      // 4. 푸시 발송 (각 유저별)
+      // 4. 푸시 발송 (배치 병렬 처리)
       let successCount = 0;
       let failureCount = 0;
+      const BATCH_SIZE = 50;
 
-      for (const userId of targetUsers) {
-        try {
-          const result = await this.pushNotificationService.sendToUser(
-            userId,
-            {
-              title: schedule.title,
-              body: schedule.bodyTemplate,
-              imageUrl: schedule.imageUrl,
-              data: {
-                ...schedule.data,
-                campaignId: campaign.id,
-              },
-            },
-            false, // 실제 발송
-          );
+      for (let i = 0; i < targetUsers.length; i += BATCH_SIZE) {
+        const batch = targetUsers.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (userId) => {
+            try {
+              const result = await this.pushNotificationService.sendToUser(
+                userId,
+                {
+                  title: schedule.title,
+                  body: schedule.bodyTemplate,
+                  imageUrl: schedule.imageUrl,
+                  data: {
+                    ...schedule.data,
+                    campaignId: campaign.id,
+                  },
+                },
+                false,
+              );
+              return { success: true, sentCount: result.sentCount, failureCount: result.failureCount || 0 };
+            } catch (error) {
+              this.logger.error(`❌ [PushCampaignService] 발송 실패: userId=${userId}, error=${error.message}`);
+              return { success: false, sentCount: 0, failureCount: 1 };
+            }
+          })
+        );
 
+        for (const result of batchResults) {
           successCount += result.sentCount;
-          failureCount += result.failureCount || 0;
-        } catch (error) {
-          this.logger.error(`❌ [PushCampaignService] 발송 실패: userId=${userId}, error=${error.message}`);
-          failureCount++;
+          failureCount += result.failureCount;
         }
       }
 
