@@ -337,12 +337,13 @@ export class RecordsService {
     }
 
     // ========== 챌린지 분석 (병렬 실행) ==========
-    const [challengeAnalysis, comparison, funnel, cohorts] = await Promise.all([
+    const [challengeAnalysis, comparison, funnel] = await Promise.all([
       this.getChallengeAnalysis(),
       this.getComparison(excludeTesters),
       this.getFunnel(excludeTesters),
-      this.getCohorts(excludeTesters),
+      // this.getCohorts(excludeTesters), // 속도 문제로 비활성화
     ]);
+    const cohorts: CohortDto[] = []; // 빈 배열 반환
 
     return {
       retention: {
