@@ -146,32 +146,41 @@ export class RecordsService {
       where: { status: 'ACTIVE' },
       select: { userId: true },
     });
-    const activeUserIds = [...new Set(activeUsers.map((u) => u.userId))];
+    const activeUserIds = [...new Set(activeUsers.map((u) => u.userId))] as number[];
+
+    // 모든 활성 유저의 기록을 한 번에 조회
+    const allActiveUserRecords = await this.prisma.userRecord.findMany({
+      where: {
+        userId: { in: activeUserIds },
+        createdAt: { gte: days30Ago, lt: tomorrow },
+      },
+      select: { userId: true, date: true },
+    });
+
+    // userId별 기록 날짜 Set 생성
+    const userRecordDatesMap = new Map<number, Set<string>>();
+    for (const record of allActiveUserRecords) {
+      if (!userRecordDatesMap.has(record.userId)) {
+        userRecordDatesMap.set(record.userId, new Set());
+      }
+      userRecordDatesMap.get(record.userId)!.add(record.date.toISOString().split('T')[0]);
+    }
 
     let totalStreak = 0;
     let maxStreak = 0;
     let streak7dUsers = 0;
 
     for (const userId of activeUserIds) {
-      const userRecordDates = await this.prisma.userRecord.findMany({
-        where: {
-          userId,
-          createdAt: { gte: days30Ago, lt: tomorrow },
-        },
-        select: { date: true },
-        orderBy: { date: 'desc' },
-      });
-
-      const uniqueDates = [...new Set(userRecordDates.map((r) => r.date.toISOString().split('T')[0]))].sort().reverse();
+      const uniqueDates = userRecordDatesMap.get(userId);
+      if (!uniqueDates || uniqueDates.size === 0) continue;
 
       // 현재 연속 일수 계산
       let streak = 0;
-      const todayStr = today.toISOString().split('T')[0];
-      let checkDate = new Date(today);
+      const checkDate = new Date(today);
 
-      for (let i = 0; i < uniqueDates.length; i++) {
+      for (let i = 0; i < 30; i++) {
         const checkStr = checkDate.toISOString().split('T')[0];
-        if (uniqueDates.includes(checkStr)) {
+        if (uniqueDates.has(checkStr)) {
           streak++;
           checkDate.setDate(checkDate.getDate() - 1);
         } else {
