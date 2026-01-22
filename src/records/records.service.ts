@@ -336,8 +336,13 @@ export class RecordsService {
       current.setDate(current.getDate() + 1);
     }
 
-    // ========== 챌린지 분석 ==========
-    const challengeAnalysis = await this.getChallengeAnalysis();
+    // ========== 챌린지 분석 (병렬 실행) ==========
+    const [challengeAnalysis, comparison, funnel, cohorts] = await Promise.all([
+      this.getChallengeAnalysis(),
+      this.getComparison(excludeTesters),
+      this.getFunnel(excludeTesters),
+      this.getCohorts(excludeTesters),
+    ]);
 
     return {
       retention: {
@@ -367,10 +372,9 @@ export class RecordsService {
       typeHabits,
       dauTrend,
       challengeAnalysis,
-      // 고도화: 비교, 퍼널, 코호트
-      comparison: await this.getComparison(excludeTesters),
-      funnel: await this.getFunnel(excludeTesters),
-      cohorts: await this.getCohorts(excludeTesters),
+      comparison,
+      funnel,
+      cohorts,
     };
   }
 
