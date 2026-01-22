@@ -779,6 +779,27 @@ export class RecordsService {
       },
     });
 
+    // 모든 UserRecord를 한 번에 조회 (속도 최적화)
+    const userIds = [...new Set(allChallenges.map((c) => c.userId))];
+    const allUserRecords = await this.prisma.userRecord.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, createdAt: true },
+    });
+
+    // userId + 날짜(YYYY-MM-DD) 기준으로 Map 생성
+    const recordMap = new Map<string, boolean>();
+    for (const record of allUserRecords) {
+      const dateStr = record.createdAt.toISOString().split('T')[0];
+      const key = `${record.userId}_${dateStr}`;
+      recordMap.set(key, true);
+    }
+
+    // 특정 유저가 특정 날짜에 기록했는지 확인하는 헬퍼
+    const hasRecord = (userId: number, date: Date): boolean => {
+      const dateStr = date.toISOString().split('T')[0];
+      return recordMap.has(`${userId}_${dateStr}`);
+    };
+
     // 일차별 기록율 (UserRecord + UserChallenge 기반, DailyProgress 사용 안함)
     // 21일 챌린지 기준 고정
     const challengeDays = 21;
@@ -796,19 +817,9 @@ export class RecordsService {
       let recordedUsers = 0;
 
       for (const challenge of eligibleChallenges) {
-        const dayStart = new Date(challenge.activatedAt);
-        dayStart.setDate(dayStart.getDate() + day - 1);
-        dayStart.setUTCHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart);
-        dayEnd.setDate(dayEnd.getDate() + 1);
-
-        const recordCount = await this.prisma.userRecord.count({
-          where: {
-            userId: challenge.userId,
-            createdAt: { gte: dayStart, lt: dayEnd },
-          },
-        });
-        if (recordCount > 0) recordedUsers++;
+        const dayDate = new Date(challenge.activatedAt);
+        dayDate.setDate(dayDate.getDate() + day - 1);
+        if (hasRecord(challenge.userId, dayDate)) recordedUsers++;
       }
 
       const recordRate =
@@ -840,19 +851,9 @@ export class RecordsService {
       // 시작일에 기록한 사용자 수
       let startUsers = 0;
       for (const challenge of startEligible) {
-        const dayStart = new Date(challenge.activatedAt);
-        dayStart.setDate(dayStart.getDate() + startDay - 1);
-        dayStart.setUTCHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart);
-        dayEnd.setDate(dayEnd.getDate() + 1);
-
-        const recordCount = await this.prisma.userRecord.count({
-          where: {
-            userId: challenge.userId,
-            createdAt: { gte: dayStart, lt: dayEnd },
-          },
-        });
-        if (recordCount > 0) startUsers++;
+        const dayDate = new Date(challenge.activatedAt);
+        dayDate.setDate(dayDate.getDate() + startDay - 1);
+        if (hasRecord(challenge.userId, dayDate)) startUsers++;
       }
 
       // 마지막일에 도달 가능한 챌린지
@@ -865,19 +866,9 @@ export class RecordsService {
       // 마지막일에 기록한 사용자 수
       let completedUsers = 0;
       for (const challenge of endEligible) {
-        const dayStart = new Date(challenge.activatedAt);
-        dayStart.setDate(dayStart.getDate() + endDay - 1);
-        dayStart.setUTCHours(0, 0, 0, 0);
-        const dayEnd = new Date(dayStart);
-        dayEnd.setDate(dayEnd.getDate() + 1);
-
-        const recordCount = await this.prisma.userRecord.count({
-          where: {
-            userId: challenge.userId,
-            createdAt: { gte: dayStart, lt: dayEnd },
-          },
-        });
-        if (recordCount > 0) completedUsers++;
+        const dayDate = new Date(challenge.activatedAt);
+        dayDate.setDate(dayDate.getDate() + endDay - 1);
+        if (hasRecord(challenge.userId, dayDate)) completedUsers++;
       }
 
       const droppedUsers = startUsers - completedUsers;
