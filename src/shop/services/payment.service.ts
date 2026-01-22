@@ -6,7 +6,10 @@ import {
   Inject
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { TossPaymentsService } from './toss-payments.service';
+import {
+  IPaymentGateway,
+  PAYMENT_GATEWAY_TOKEN,
+} from '../interfaces/payment-gateway.interface';
 import {
   ILogisticsProvider,
   LOGISTICS_PROVIDER_TOKEN,
@@ -29,7 +32,7 @@ export class PaymentService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tossPayments: TossPaymentsService,
+    @Inject(PAYMENT_GATEWAY_TOKEN) private readonly paymentGateway: IPaymentGateway,
     @Inject(LOGISTICS_PROVIDER_TOKEN) private readonly logistics: ILogisticsProvider
   ) {}
 
@@ -157,8 +160,8 @@ export class PaymentService {
     // 2. 토스페이먼츠 결제 승인 (외부 API 호출 - 트랜잭션 밖)
     let tossResult: any;
     try {
-      // 토스 API에 orderId 필드로 주문번호를 전달
-      tossResult = await this.tossPayments.confirmPayment(
+      // PG사 API에 orderId 필드로 주문번호를 전달
+      tossResult = await this.paymentGateway.confirmPayment(
         dto.paymentKey,
         dto.orderId,
         dto.amount
@@ -331,8 +334,8 @@ export class PaymentService {
       }
 
       try {
-        // 토스페이먼츠 결제 취소
-        const tossResult = await this.tossPayments.cancelPayment(
+        // PG사 결제 취소
+        const tossResult = await this.paymentGateway.cancelPayment(
           payment.pgTransactionId,
           dto.cancelReason,
           dto.cancelAmount,
@@ -349,8 +352,8 @@ export class PaymentService {
             reason: dto.cancelReason,
             status: PaymentStatus.COMPLETED,
             pgProvider: PgProvider.TOSS,
-            pgCancelId: tossResult.cancels[0].transactionKey,
-            pgResponse: tossResult as any,
+            pgCancelId: tossResult.transactionKey,
+            pgResponse: tossResult.rawResponse,
             requestedAt: getNowKST(),
             completedAt: getNowKST(),
             createdAt: getNowKST(),

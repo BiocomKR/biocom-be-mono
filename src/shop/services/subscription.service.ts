@@ -4,9 +4,13 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { TossPaymentsService } from './toss-payments.service';
+import {
+  IPaymentGateway,
+  PAYMENT_GATEWAY_TOKEN,
+} from '../interfaces/payment-gateway.interface';
 import { RegisterBillingDto } from '../dto/subscription/register-billing.dto';
 import { CreateSubscriptionDto } from '../dto/subscription/create-subscription.dto';
 import { SubscriptionStatus } from '../../common/enums';
@@ -27,7 +31,7 @@ export class SubscriptionService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tossPaymentsService: TossPaymentsService,
+    @Inject(PAYMENT_GATEWAY_TOKEN) private readonly paymentGateway: IPaymentGateway,
   ) {}
 
   /**
@@ -61,7 +65,7 @@ export class SubscriptionService {
     }
 
     // 토스 API를 호출하여 billingKey 발급
-    const billingKey = await this.tossPaymentsService.issueBillingKey(
+    const billingKey = await this.paymentGateway.issueBillingKey(
       authKey,
       customerKey,
     );
@@ -200,7 +204,7 @@ export class SubscriptionService {
     // 첫 결제 실행 (토스페이먼츠 빌링키 자동결제)
     this.logger.log(`첫 결제 실행: amount=${price}원`);
 
-    const paymentResult = await this.tossPaymentsService.chargeWithBillingKey(
+    const paymentResult = await this.paymentGateway.chargeWithBillingKey(
       user.billingKey,
       user.customerKey,
       price,
@@ -387,7 +391,7 @@ export class SubscriptionService {
     try {
       // 토스페이먼츠 빌링키로 자동결제
       const paymentResult =
-        await this.tossPaymentsService.chargeWithBillingKey(
+        await this.paymentGateway.chargeWithBillingKey(
           subscription.billingKey,
           subscription.customerKey,
           subscription.price,
