@@ -2851,12 +2851,10 @@ model LogisticsApiLog {
 }
 
 /// 사용자 알레르기 검사 리포트
-/// 사용자 알레르기 검사 리포트
 model UserAllergyReport {
   id         Int       @id @default(autoincrement())
   userId     Int       @map("user_id")
   chartId    String    @map("chart_id") @db.VarChar(50)
-  userName   String    @map("user_name")
   level1     String?
   level2     String?
   level3     String?
