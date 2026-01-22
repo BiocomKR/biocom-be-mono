@@ -1,11 +1,12 @@
 import {
   Injectable,
+  Inject,
   Logger,
   NotFoundException,
   BadRequestException
 } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
-import { TossPaymentsService } from '../toss/toss-payments.service';
+import { IPaymentGateway, PAYMENT_GATEWAY_TOKEN } from '../toss/interfaces/payment-gateway.interface';
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { RefundStatus, ExchangeReturnStatus, OrderStatus, PgProvider, PointRelatedType } from '../common/enums';
@@ -18,7 +19,7 @@ export class RefundService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tossPaymentsService: TossPaymentsService,
+    @Inject(PAYMENT_GATEWAY_TOKEN) private readonly paymentGateway: IPaymentGateway,
   ) {}
 
   /**
@@ -216,7 +217,7 @@ export class RefundService {
       // 1. PG사 결제 취소 API 호출
       let pgResponse: any = null;
       try {
-        pgResponse = await this.tossPaymentsService.cancelPayment(
+        pgResponse = await this.paymentGateway.cancelPayment(
           payment.pgTransactionId,
           `주문 취소 승인 - ${refund.reason || '관리자 승인'}`,
           undefined // 전액 취소
@@ -247,7 +248,7 @@ export class RefundService {
           completedAt: now,
           pgProvider: PgProvider.TOSS,
           pgResponse: pgResponse as any,
-          pgCancelId: pgResponse.cancels?.[0]?.transactionKey || null,
+          pgCancelId: pgResponse.transactionKey || null,
           adminMemo: adminMemo || refund.adminMemo,
         }
       });
@@ -809,7 +810,7 @@ export class RefundService {
 
       // 3. PG사 결제 취소 API 호출
       try {
-        const pgResponse = await this.tossPaymentsService.cancelPayment(
+        const pgResponse = await this.paymentGateway.cancelPayment(
           order.payment.pgTransactionId, // paymentKey
           `반품 환불 - ${exchangeReturn.reason}`,
           undefined // 전액 취소
@@ -821,7 +822,7 @@ export class RefundService {
           data: {
             pgProvider: PgProvider.TOSS,
             pgResponse: pgResponse as any,
-            pgCancelId: pgResponse.cancels?.[0]?.transactionKey || null,
+            pgCancelId: pgResponse.transactionKey || null,
             status: RefundStatus.COMPLETED,
             completedAt: getNowKST(),
           }
@@ -1056,7 +1057,7 @@ export class RefundService {
       // 2. PG사 결제 취소 API 호출
       let pgResponse: any = null;
       try {
-        pgResponse = await this.tossPaymentsService.cancelPayment(
+        pgResponse = await this.paymentGateway.cancelPayment(
           order.payment!.pgTransactionId,
           `관리자 취소 - ${reason}`,
           undefined // 전액 취소
@@ -1086,7 +1087,7 @@ export class RefundService {
           completedAt: now,
           pgProvider: PgProvider.TOSS,
           pgResponse: pgResponse as any,
-          pgCancelId: pgResponse.cancels?.[0]?.transactionKey || null,
+          pgCancelId: pgResponse.transactionKey || null,
         }
       });
 
