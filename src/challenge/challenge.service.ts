@@ -633,19 +633,26 @@ export class ChallengeService {
    */
   async quickStartChallengeTest(userIds: number[]) {
     const FIXED_START_DATE = '2025-12-29';
+    const BATCH_SIZE = 10;
     this.logger.log(`[테스트] 사전 챌린지 시작: ${userIds.length}명, 시작일: ${FIXED_START_DATE}`);
 
-    const results = [];
+    const results: Array<{ success: boolean; userId: number; data?: any; error?: string }> = [];
 
-    for (const userId of userIds) {
-      try {
-        const result = await this.quickStartChallenge(userId, FIXED_START_DATE);
-        this.logger.log(`[테스트] 챌린지 시작 성공: userId=${userId}`);
-        results.push({ success: true, userId, data: result.data });
-      } catch (error) {
-        this.logger.error(`[테스트] 챌린지 시작 실패: userId=${userId} - ${error.message}`);
-        results.push({ success: false, userId, error: error.message });
-      }
+    for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+      const batch = userIds.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (userId) => {
+          try {
+            const result = await this.quickStartChallenge(userId, FIXED_START_DATE);
+            this.logger.log(`[테스트] 챌린지 시작 성공: userId=${userId}`);
+            return { success: true, userId, data: result.data };
+          } catch (error) {
+            this.logger.error(`[테스트] 챌린지 시작 실패: userId=${userId} - ${error.message}`);
+            return { success: false, userId, error: error.message };
+          }
+        })
+      );
+      results.push(...batchResults);
     }
 
     this.logger.log(`[테스트] 사전 챌린지 시작 완료: 성공 ${results.filter(r => r.success).length}명 / 전체 ${userIds.length}명`);
