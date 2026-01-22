@@ -1631,6 +1631,8 @@ export class RecordsService {
         });
 
         // RequestBody의 배열만큼 루프 돌면서 각 레코드 업데이트
+        let firstRecordId: number | undefined;
+
         for (let index = 0; index < data.length; index++) {
           const item = data[index];
           const { productId, morning, afternoon, evening } = item;
@@ -1671,9 +1673,10 @@ export class RecordsService {
             updatedMetadata.imageUrl = imageUrl;
           }
 
-          // 당일 최초 기록이고 첫 번째 아이템인 경우 pointsEarned 추가
+          // 당일 최초 기록이고 첫 번째 아이템인 경우 pointsEarned 추가 및 relatedId 저장
           if (isFirstRecordOfDay && index === 0) {
             updatedMetadata.pointsEarned = 100;
+            firstRecordId = record.id;
           }
 
           // 레코드 업데이트 (userChallengeId도 함께 업데이트)
@@ -1695,7 +1698,7 @@ export class RecordsService {
             100,
             getPointDescription(PointRelatedType.RECORD_COMPLETION, RecordType.SUPPLEMENT),
             PointRelatedType.RECORD_COMPLETION,
-            undefined,
+            firstRecordId,
             RecordType.SUPPLEMENT,
           );
 
