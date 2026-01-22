@@ -168,7 +168,6 @@ export class SibApiService {
         where: { chartId },
         select: {
           chartId: true,
-          userName: true,
           level1: true,
           level2: true,
           level3: true,
@@ -181,7 +180,6 @@ export class SibApiService {
 
       return {
         chartId: cached.chartId,
-        userName: cached.userName,
         level1: cached.level1 || '',
         level2: cached.level2 || '',
         level3: cached.level3 || '',
@@ -209,7 +207,6 @@ export class SibApiService {
         await this.prisma.userAllergyReport.update({
           where: { id: existing.id },
           data: {
-            userName: data.userName,
             level1: data.level1,
             level2: data.level2,
             level3: data.level3,
@@ -223,7 +220,6 @@ export class SibApiService {
           data: {
             userId,
             chartId: data.chartId,
-            userName: data.userName,
             level1: data.level1,
             level2: data.level2,
             level3: data.level3,

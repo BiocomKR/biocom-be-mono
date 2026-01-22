@@ -31,7 +31,7 @@ export interface ChartIdByMobileResponse {
  * 신규/구 API 동일한 응답 형태
  */
 export interface FoodLevelItem {
-  userName: string;
+  userName?: string; // SIB API 응답에는 있지만, DB에 저장하지 않음 (개인정보 정책)
   chartId: string;
   level1: string;
   level2: string;
