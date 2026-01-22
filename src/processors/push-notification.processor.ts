@@ -234,39 +234,51 @@ export class PushNotificationProcessor extends WorkerHost {
 
     let totalSent = 0;
     let totalFailed = 0;
+    const BATCH_SIZE = 50;
 
-    for (const userId of userIds) {
-      // 유저별 메시지 결정
+    // 유저별 메시지 미리 결정
+    const userMessages = userIds.map((userId) => {
       let userMessage = message;
 
       if (usePersonaMessages && personaMessages) {
         const personaName = userPersonaMap.get(userId);
         if (personaName && personaMessages[personaName]) {
-          // 페르소나별 메시지 사용
           userMessage = {
             ...message,
             title: personaMessages[personaName].title,
             body: personaMessages[personaName].body,
           };
         } else if (personaMessages['default']) {
-          // 페르소나 없거나 매칭 안 되면 default 사용
           userMessage = {
             ...message,
             title: personaMessages['default'].title,
             body: personaMessages['default'].body,
           };
         }
-        // 둘 다 없으면 원래 message 그대로 사용
       }
 
-      const result = await this.sendToUser({
-        ...data,
-        type: 'user',
-        userId,
-        message: userMessage,
-      });
-      totalSent += result.sentCount;
-      totalFailed += result.failureCount || 0;
+      return { userId, userMessage };
+    });
+
+    // 배치 병렬 처리
+    for (let i = 0; i < userMessages.length; i += BATCH_SIZE) {
+      const batch = userMessages.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async ({ userId, userMessage }) => {
+          const result = await this.sendToUser({
+            ...data,
+            type: 'user',
+            userId,
+            message: userMessage,
+          });
+          return result;
+        }),
+      );
+
+      for (const result of batchResults) {
+        totalSent += result.sentCount;
+        totalFailed += result.failureCount || 0;
+      }
     }
 
     this.logger.log(
