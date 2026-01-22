@@ -641,6 +641,49 @@ export class RecordsService {
     const today = new Date(now);
     today.setUTCHours(0, 0, 0, 0);
 
+    // 6개월 전 날짜
+    const sixMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+
+    // 모든 관련 챌린지 한 번에 조회
+    const allChallenges = await this.prisma.userChallenge.findMany({
+      where: {
+        activatedAt: { gte: sixMonthsAgo },
+        ...(excludeTesters ? { user: { isTester: false } } : {}),
+      },
+      select: { userId: true, activatedAt: true },
+    });
+
+    // 모든 관련 UserRecord 한 번에 조회
+    const userIds = [...new Set(allChallenges.map((c) => c.userId))];
+    const allRecords = await this.prisma.userRecord.findMany({
+      where: {
+        userId: { in: userIds },
+        createdAt: { gte: sixMonthsAgo },
+      },
+      select: { userId: true, createdAt: true },
+    });
+
+    // userId별 기록 날짜 Set으로 변환 (빠른 조회용)
+    const userRecordDatesMap = new Map<number, Set<string>>();
+    for (const record of allRecords) {
+      if (!userRecordDatesMap.has(record.userId)) {
+        userRecordDatesMap.set(record.userId, new Set());
+      }
+      userRecordDatesMap.get(record.userId)!.add(record.createdAt.toISOString().split('T')[0]);
+    }
+
+    // 특정 유저가 특정 기간에 기록이 있는지 확인
+    const hasRecordInRange = (userId: number, start: Date, end: Date): boolean => {
+      const dates = userRecordDatesMap.get(userId);
+      if (!dates) return false;
+      const current = new Date(start);
+      while (current < end) {
+        if (dates.has(current.toISOString().split('T')[0])) return true;
+        current.setDate(current.getDate() + 1);
+      }
+      return false;
+    };
+
     const cohorts: CohortDto[] = [];
 
     // 최근 6개월
@@ -649,14 +692,10 @@ export class RecordsService {
       const monthEnd = new Date(today.getFullYear(), today.getMonth() - i + 1, 1);
       const monthStr = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
 
-      // 해당 월 챌린지 시작자 (개인별 시작일 기준)
-      const monthChallenges = await this.prisma.userChallenge.findMany({
-        where: {
-          activatedAt: { gte: monthStart, lt: monthEnd },
-          ...(excludeTesters ? { user: { isTester: false } } : {}),
-        },
-        select: { userId: true, activatedAt: true },
-      });
+      // 해당 월 챌린지 시작자 필터링
+      const monthChallenges = allChallenges.filter(
+        (c) => c.activatedAt && c.activatedAt >= monthStart && c.activatedAt < monthEnd,
+      );
 
       if (monthChallenges.length === 0) {
         cohorts.push({ month: monthStr, totalUsers: 0, weeks: [] });
@@ -670,14 +709,14 @@ export class RecordsService {
           userStartDates.set(c.userId, c.activatedAt);
         }
       }
-      const userIds = Array.from(userStartDates.keys());
-      const totalUsers = userIds.length;
+      const totalUsers = userStartDates.size;
 
       // 주차별 리텐션 (개인별 시작일 기준, 1~3주차)
       const weeks: CohortWeekDto[] = [];
 
       for (let w = 0; w < 3; w++) {
         let activeCount = 0;
+        let eligibleUsers = 0;
 
         for (const [userId, startDate] of userStartDates) {
           const weekStart = new Date(startDate.getTime() + w * 7 * 86400000);
@@ -686,21 +725,9 @@ export class RecordsService {
           // 아직 해당 주차가 안 된 사용자는 제외
           if (weekEnd > today) continue;
 
-          const hasRecord = await this.prisma.userRecord.findFirst({
-            where: {
-              userId,
-              createdAt: { gte: weekStart, lt: weekEnd },
-            },
-            select: { id: true },
-          });
-
-          if (hasRecord) activeCount++;
+          eligibleUsers++;
+          if (hasRecordInRange(userId, weekStart, weekEnd)) activeCount++;
         }
-
-        const eligibleUsers = Array.from(userStartDates.entries()).filter(([, startDate]) => {
-          const weekEnd = new Date(startDate.getTime() + (w + 1) * 7 * 86400000);
-          return weekEnd <= today;
-        }).length;
 
         const rate = eligibleUsers > 0 ? Math.round((activeCount / eligibleUsers) * 100) : 0;
         weeks.push({ week: w + 1, users: activeCount, rate });
