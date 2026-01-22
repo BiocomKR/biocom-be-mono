@@ -2104,6 +2104,8 @@ model PushNotificationSchedule {
   personaMessages    Json?                      @map("persona_messages")
   /// 발신자 타입 (BIOCOM: default 메시지 사용, PERSONA: 유저 페르소나별 메시지 사용)
   senderType         String?                    @map("sender_type") @db.VarChar(20)
+  /// 대상 앱 번들ID (kr.biocom.challenge: 운영, kr.biocom.challenge.dev: 개발)
+  bundleId           String                     @default("kr.biocom.challenge") @map("bundle_id") @db.VarChar(100)
   /// 반복 발송 시작일 (RECURRING 타입일 때 유효 기간 시작)
   startDate          DateTime?                  @map("start_date")
   /// 반복 발송 종료일 (RECURRING 타입일 때 유효 기간 종료)
@@ -2140,6 +2142,7 @@ model PushNotificationSchedule {
   @@index([isTest])
   @@index([pushGroup])
   @@index([pushGroup, priority])
+  @@index([bundleId])
   @@map("push_notification_schedules")
 }
 
@@ -2848,25 +2851,23 @@ model LogisticsApiLog {
 }
 
 /// 사용자 알레르기 검사 리포트
-/// 사용자 알레르기 검사 리포트
+/// 배치 동기화 시 userId 없이 저장 가능 (나중에 유저 조회 시 매핑)
 model UserAllergyReport {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @map("user_id")
-  chartId    String    @map("chart_id") @db.VarChar(50)
-  userName   String    @map("user_name")
+  id         Int        @id @default(autoincrement())
+  userId     Int?       @map("user_id")
+  chartId    String     @unique @map("chart_id") @db.VarChar(50)
   level1     String?
   level2     String?
   level3     String?
   level4     String?
   level5     String?
-  animalType String?   @map("animal_type")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime? @updatedAt @map("updated_at")
-  userChart  UserChart @relation(fields: [chartId], references: [chartId], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_chart_id")
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_user_id")
+  animalType String?    @map("animal_type")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime?  @updatedAt @map("updated_at")
+  userChart  UserChart? @relation(fields: [chartId], references: [chartId], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_chart_id")
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_allergy_reports_user_id")
 
   @@index([userId], map: "idx_user_allergy_reports_user_id")
-  @@index([chartId], map: "idx_user_allergy_reports_chart_id")
   @@map("user_allergy_reports")
 }
 
