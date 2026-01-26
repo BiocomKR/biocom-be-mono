@@ -4,8 +4,8 @@
  * 기준 문서: [맞춤솔루션] 식재료-항원 정의서 - v1.0 (260106).csv
  *
  * 검사 종류:
- * - 90종 (D0060, 알바이오팜): antigen90
- * - 89종 (D0004, 프로티아): antigen89
+ * - 90종 (D0004, 프로티아): antigen90
+ * - 89종 (D0060, 알바이오팜): antigen89
  */
 
 import { ExamType } from '../../sib/enums/exam-type.enum';
@@ -216,9 +216,11 @@ export const INGREDIENT_TO_ANTIGEN_MAP: Record<string, IngredientAntigenMapping>
 
 /**
  * 검사 타입(orderCode)을 검사 버전으로 변환
+ * - D0004 (IGG_OLD, 프로티아): 90종
+ * - D0060 (IGG, 알바이오팜): 89종
  */
 export function getExamVersion(orderCode: string): ExamVersion {
-  return orderCode === ExamType.IGG_OLD ? '89' : '90';
+  return orderCode === ExamType.IGG_OLD ? '90' : '89';
 }
 
 /**
