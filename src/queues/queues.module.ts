@@ -6,6 +6,7 @@ import { AppEventProcessor } from '../processors/app-event.processor';
 import { PushNotificationProcessor } from '../processors/push-notification.processor';
 import { OrderSyncProcessor } from '../processors/order-sync.processor';
 import { HealthCheckProcessor } from '../processors/health-check.processor';
+import { AllergySyncProcessor } from '../processors/allergy-sync.processor';
 import { FirebaseAdminModule } from '../push/firebase-admin.module';
 import { FcmProvider } from '../push/providers/fcm.provider';
 import { ConditionEvaluatorService } from '../push/services/condition-evaluator.service';
@@ -54,6 +55,12 @@ export const QUEUE_OPTIONS = {
       ...QUEUE_OPTIONS,
     }),
 
+    // Allergy Sync Queue
+    BullModule.registerQueue({
+      name: 'allergy-sync',
+      ...QUEUE_OPTIONS,
+    }),
+
     // Bull Board - Queue 모니터링
     BullBoardModule.forFeature({
       name: 'app-event',
@@ -67,12 +74,17 @@ export const QUEUE_OPTIONS = {
       name: 'order-sync',
       adapter: BullMQAdapter as any,
     }),
+    BullBoardModule.forFeature({
+      name: 'allergy-sync',
+      adapter: BullMQAdapter as any,
+    }),
   ],
   providers: [
     AppEventProcessor,
     PushNotificationProcessor,
     OrderSyncProcessor,
     HealthCheckProcessor,
+    AllergySyncProcessor,
     FcmProvider,
     ConditionEvaluatorService,
   ],
