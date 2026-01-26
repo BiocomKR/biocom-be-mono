@@ -445,15 +445,12 @@ export class RecordsService {
           include: { file: true },
           take: 1,
         },
-        nutrients: {
+        supplementNutrients: {
           select: {
-            name: true,
-            amount: true,
-            unit: true,
-            rda: true,
+            nutrientName: true,
           },
           orderBy: {
-            name: 'asc',
+            nutrientName: 'asc',
           },
         },
       },
@@ -470,8 +467,8 @@ export class RecordsService {
           type: 'PRODUCT',
           name: product.name,
           description: product.description,
-          imageUrl: product.productFiles[0]?.file.filePath,
-          nutrients: product.nutrients,
+          imageUrl: product.productFiles[0]?.file?.filePath,
+          nutrients: product.supplementNutrients.map(n => n.nutrientName),
         })),
       },
     };
