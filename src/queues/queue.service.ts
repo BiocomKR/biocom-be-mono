@@ -52,6 +52,16 @@ export interface OrderSyncJobData {
   };
 }
 
+/**
+ * 알러지 동기화 Job 데이터 인터페이스
+ */
+export interface AllergySyncJobData {
+  type: 'master' | 'page';
+  syncType?: 'full' | 'incremental';
+  pageNo?: number;
+  date?: string;
+}
+
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
@@ -61,6 +71,7 @@ export class QueueService {
     @InjectQueue(QUEUE_NAMES.PUSH_NOTIFICATION) private pushQueue: Queue,
     @InjectQueue(QUEUE_NAMES.ORDER_SYNC) private orderSyncQueue: Queue,
     @InjectQueue(QUEUE_NAMES.HEALTH_CHECK) private healthCheckQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.ALLERGY_SYNC) private allergySyncQueue: Queue,
   ) {}
 
   async addAppEvent(data: {
@@ -205,6 +216,24 @@ export class QueueService {
       removeOnFail: 10,
     });
     this.logger.log(`🏥 [Queue] health-check job added: ${job.id}`);
+    return job;
+  }
+
+  /**
+   * 알러지 데이터 동기화 Job 추가
+   * 마스터 job이 워커 job들을 생성하는 방식
+   */
+  async addAllergySync(syncType: 'full' | 'incremental' = 'incremental') {
+    const jobData: AllergySyncJobData = {
+      type: 'master',
+      syncType,
+    };
+
+    const job = await this.allergySyncQueue.add('sync', jobData, {
+      removeOnComplete: 10,
+      removeOnFail: 100,
+    });
+    this.logger.log(`🧬 [Queue] allergy-sync (master) job added: ${job.id}, syncType=${syncType}`);
     return job;
   }
 }

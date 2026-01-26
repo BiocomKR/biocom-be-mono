@@ -94,15 +94,19 @@ export class SibApiService {
    * 지연성 알러지 검사 결과 조회 (신규)
    * - DB 캐시 우선 조회
    * - 캐시 미스 시 SIB API 호출 후 DB에 저장
-   * - SIB 장애 시 캐시 데이터 반환
+   * - 캐시 히트 시 userId가 없으면 현재 userId로 매핑
    * @param chartId 차트 ID
-   * @param userId 사용자 ID (캐시 저장용, 선택)
+   * @param userId 사용자 ID (캐시 저장/매핑용, 선택)
    */
   async getIggLevels(chartId: string, userId?: number): Promise<IggLevelsResponse | null> {
     // 1. DB 캐시 조회
     const cached = await this.getCachedIggLevels(chartId);
     if (cached) {
       this.logger.log(`IgG Levels 캐시 히트 (chartId: ${chartId})`);
+      // 캐시 히트 + userId 있는데 캐시에 userId 없으면 매핑
+      if (userId && cached.userId === null) {
+        await this.updateCacheUserId(chartId, userId);
+      }
       return [cached];
     }
 
@@ -112,8 +116,8 @@ export class SibApiService {
       const result = await this.callApi<IggLevelsResponse>(endpoint);
 
       // 3. 결과를 DB에 캐싱
-      if (result && result.length > 0 && userId) {
-        await this.cacheIggLevels(userId, result[0]);
+      if (result && result.length > 0) {
+        await this.cacheIggLevels(result[0], userId);
       }
 
       return result;
@@ -127,15 +131,19 @@ export class SibApiService {
    * 지연성 알러지 검사 결과 조회 (구)
    * - DB 캐시 우선 조회
    * - 캐시 미스 시 SIB API 호출 후 DB에 저장
-   * - SIB 장애 시 캐시 데이터 반환
+   * - 캐시 히트 시 userId가 없으면 현재 userId로 매핑
    * @param chartId 차트 ID
-   * @param userId 사용자 ID (캐시 저장용, 선택)
+   * @param userId 사용자 ID (캐시 저장/매핑용, 선택)
    */
   async getIggLevelsOld(chartId: string, userId?: number): Promise<IggLevelsResponse | null> {
     // 1. DB 캐시 조회
     const cached = await this.getCachedIggLevels(chartId);
     if (cached) {
       this.logger.log(`IgG Levels Old 캐시 히트 (chartId: ${chartId})`);
+      // 캐시 히트 + userId 있는데 캐시에 userId 없으면 매핑
+      if (userId && cached.userId === null) {
+        await this.updateCacheUserId(chartId, userId);
+      }
       return [cached];
     }
 
@@ -145,8 +153,8 @@ export class SibApiService {
       const result = await this.callApi<IggLevelsResponse>(endpoint);
 
       // 3. 결과를 DB에 캐싱
-      if (result && result.length > 0 && userId) {
-        await this.cacheIggLevels(userId, result[0]);
+      if (result && result.length > 0) {
+        await this.cacheIggLevels(result[0], userId);
       }
 
       return result;
@@ -162,11 +170,12 @@ export class SibApiService {
   /**
    * DB에서 캐시된 IgG 레벨 데이터 조회
    */
-  private async getCachedIggLevels(chartId: string): Promise<FoodLevelItem | null> {
+  private async getCachedIggLevels(chartId: string): Promise<(FoodLevelItem & { userId: number | null }) | null> {
     try {
-      const cached = await this.prisma.userAllergyReport.findFirst({
+      const cached = await this.prisma.userAllergyReport.findUnique({
         where: { chartId },
         select: {
+          userId: true,
           chartId: true,
           level1: true,
           level2: true,
@@ -179,6 +188,7 @@ export class SibApiService {
       if (!cached) return null;
 
       return {
+        userId: cached.userId,
         chartId: cached.chartId,
         level1: cached.level1 || '',
         level2: cached.level2 || '',
@@ -194,45 +204,54 @@ export class SibApiService {
 
   /**
    * IgG 레벨 데이터를 DB에 캐싱
+   * - chartId가 unique이므로 upsert 사용
+   * - userId는 optional (배치 동기화 시 null)
+   * - UserChart는 생성하지 않음 (잘못된 orderCode 방지)
+   *   → 유저가 앱에서 조회 시 정상 플로우로 UserChart 생성됨
    */
-  private async cacheIggLevels(userId: number, data: FoodLevelItem): Promise<void> {
+  private async cacheIggLevels(data: FoodLevelItem, userId?: number): Promise<void> {
     try {
-      // chartId가 unique가 아니므로 findFirst + create/update 패턴 사용
-      const existing = await this.prisma.userAllergyReport.findFirst({
+      await this.prisma.userAllergyReport.upsert({
         where: { chartId: data.chartId },
-        select: { id: true },
+        update: {
+          level1: data.level1,
+          level2: data.level2,
+          level3: data.level3,
+          level4: data.level4,
+          level5: data.level5,
+          updatedAt: getNowKST(),
+        },
+        create: {
+          userId: userId ?? null,
+          chartId: data.chartId,
+          level1: data.level1,
+          level2: data.level2,
+          level3: data.level3,
+          level4: data.level4,
+          level5: data.level5,
+          createdAt: getNowKST(),
+        },
       });
-
-      if (existing) {
-        await this.prisma.userAllergyReport.update({
-          where: { id: existing.id },
-          data: {
-            level1: data.level1,
-            level2: data.level2,
-            level3: data.level3,
-            level4: data.level4,
-            level5: data.level5,
-            updatedAt: getNowKST(),
-          },
-        });
-      } else {
-        await this.prisma.userAllergyReport.create({
-          data: {
-            userId,
-            chartId: data.chartId,
-            level1: data.level1,
-            level2: data.level2,
-            level3: data.level3,
-            level4: data.level4,
-            level5: data.level5,
-            createdAt: getNowKST(),
-          },
-        });
-      }
       this.logger.log(`IgG Levels 캐시 저장 완료 (chartId: ${data.chartId})`);
     } catch (error) {
       this.logger.warn(`IgG 캐시 저장 실패 (chartId: ${data.chartId}):`, error);
       // 캐시 저장 실패해도 에러 throw 안 함
+    }
+  }
+
+  /**
+   * 캐시된 레코드에 userId 매핑 (배치 동기화된 데이터에 유저 연결)
+   * - UserChart는 생성하지 않음 (잘못된 orderCode 방지)
+   */
+  private async updateCacheUserId(chartId: string, userId: number): Promise<void> {
+    try {
+      await this.prisma.userAllergyReport.update({
+        where: { chartId },
+        data: { userId },
+      });
+      this.logger.log(`IgG 캐시 userId 매핑 완료 (chartId: ${chartId}, userId: ${userId})`);
+    } catch (error) {
+      this.logger.warn(`IgG 캐시 userId 매핑 실패 (chartId: ${chartId}):`, error);
     }
   }
 

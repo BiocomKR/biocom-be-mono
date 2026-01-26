@@ -25,6 +25,7 @@ export { QUEUE_NAMES };
       { name: QUEUE_NAMES.PUSH_NOTIFICATION },
       { name: QUEUE_NAMES.ORDER_SYNC },
       { name: QUEUE_NAMES.HEALTH_CHECK },
+      { name: QUEUE_NAMES.ALLERGY_SYNC },
     ),
   ],
   controllers: [QueueTestController],
