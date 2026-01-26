@@ -351,6 +351,10 @@ export class SurveyService {
           orderBy: {
             displayOrder: 'asc',
           },
+          select: {
+            productId: true,
+            type: true,
+          },
         });
 
         this.logger.log(`[사전설문] 동물 ${animalCharacter}의 맞춤 영양제 ${animalProducts.length}개 조회 완료`);
@@ -368,11 +372,12 @@ export class SurveyService {
           });
 
           // 새로운 기본 영양제 루틴 생성
+          // CONDITIONAL 타입(메타드림/리셋데이)은 isDefault: false (편집 가능)
           await prismaClient.userSupplementRoutine.createMany({
             data: animalProducts.map((product, index) => ({
               userId,
               productId: product.productId,
-              isDefault: true,
+              isDefault: product.type !== 'CONDITIONAL',
               displayOrder: index + 1,
               isActive: true,
               createdAt: now,
