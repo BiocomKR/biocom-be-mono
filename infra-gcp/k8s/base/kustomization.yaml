@@ -19,6 +19,7 @@ resources:
   - cronjob-expire-coupons.yaml
   - cronjob-iap-acknowledge-retry.yaml
   - cronjob-sync-shipping-status.yaml
+  - cronjob-allergy-sync.yaml
 
 # 공통 레이블
 commonLabels:

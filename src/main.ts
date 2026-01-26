@@ -91,6 +91,16 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'allergy-sync': {
+        // SIB IgG 알러지 데이터 동기화 배치 (매일 새벽 3시)
+        logger.log('알러지 데이터 동기화 배치 실행...');
+        const { QueueService } = await import('./queues/queue.service');
+        const queueService = app.get(QueueService);
+        await queueService.addAllergySync('incremental');
+        logger.log('알러지 동기화 Job 큐 등록 완료 (MQ에서 처리)');
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         await sendBatchSlackNotification('fail', schedulerName, {
