@@ -675,15 +675,11 @@ export class HomeService {
     return missionList.map((m) => {
       const current = currentMap.get(m.recordType) || 0;
       const executed = executedMap.get(m.recordType) || 0;
-      const max = m.max || 1;
-
-      // executed >= max 이면 current를 max로 설정 (완료 표시용)
-      const finalCurrent = executed >= max ? max : current;
 
       return {
         ...m,
-        current: finalCurrent,
-        executed,
+        current,  // point_histories 기준 (포인트 지급 횟수)
+        executed, // user_records 기준 (실행 횟수)
       };
     });
   }
