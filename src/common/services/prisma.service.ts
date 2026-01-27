@@ -419,6 +419,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // 구독 테이블
   get subscription() { return this.prisma.subscription; }
+  get paymentCustomer() { return this.prisma.paymentCustomer; }
 
   // 사용자 차트 테이블
   get userChart() { return this.prisma.userChart; }

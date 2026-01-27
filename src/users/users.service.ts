@@ -131,12 +131,12 @@ export class UsersService {
       };
     }
 
-    // 빌링키 등록 여부 필터
+    // 빌링키 등록 여부 필터 (PaymentCustomer 기반)
     if (hasBillingKey !== undefined) {
       if (hasBillingKey) {
-        where.billingKey = { not: null };
+        where.paymentCustomers = { some: { billingKey: { not: null } } };
       } else {
-        where.billingKey = null;
+        where.paymentCustomers = { none: { billingKey: { not: null } } };
       }
     }
 
@@ -176,7 +176,11 @@ export class UsersService {
           birthDate: true,
           sex: true,
           telecom: true,
-          billingKey: true,
+          paymentCustomers: {
+            select: { billingKey: true },
+            where: { billingKey: { not: null } },
+            take: 1,
+          },
           pushEnabled: true,
           health_type_animal_id: true,
           createdAt: true,
@@ -231,7 +235,7 @@ export class UsersService {
         birthDate: user.birthDate,
         sex: user.sex,
         telecom: user.telecom,
-        hasBillingKey: !!user.billingKey,
+        hasBillingKey: user.paymentCustomers.length > 0,
         pushEnabled: user.pushEnabled,
         healthTypeAnimalId: user.health_type_animal_id,
         healthTypeAnimalName: user.healthTypeAnimal?.animalName,
@@ -273,7 +277,11 @@ export class UsersService {
         birthDate: true,
         sex: true,
         telecom: true,
-        billingKey: true,
+        paymentCustomers: {
+          select: { billingKey: true },
+          where: { billingKey: { not: null } },
+          take: 1,
+        },
         pushEnabled: true,
         health_type_animal_id: true,
         createdAt: true,
@@ -320,7 +328,7 @@ export class UsersService {
       birthDate: user.birthDate,
       sex: user.sex,
       telecom: user.telecom,
-      hasBillingKey: !!user.billingKey,
+      hasBillingKey: user.paymentCustomers.length > 0,
       pushEnabled: user.pushEnabled,
       healthTypeAnimalId: user.health_type_animal_id,
       healthTypeAnimalName: user.healthTypeAnimal?.animalName,
@@ -376,7 +384,11 @@ export class UsersService {
         sex: true,
         telecom: true,
         localCode: true,
-        billingKey: true,
+        paymentCustomers: {
+          select: { billingKey: true },
+          where: { billingKey: { not: null } },
+          take: 1,
+        },
         pushEnabled: true,
         createdAt: true,
         updatedAt: true,
@@ -527,7 +539,7 @@ export class UsersService {
       sex: user.sex,
       telecom: user.telecom,
       localCode: user.localCode,
-      hasBillingKey: !!user.billingKey,
+      hasBillingKey: user.paymentCustomers.length > 0,
       pushEnabled: user.pushEnabled,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

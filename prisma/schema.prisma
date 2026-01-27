@@ -45,8 +45,6 @@ model User {
   aiPersonaId                  Int?                           @map("ai_persona_id")
   status                       String                         @default("NEWCOMER") @map("status") @db.VarChar(20)
   role                         String?                        @default("USER") @db.VarChar(20)
-  billingKey                   String?                        @map("billing_key") @db.VarChar(200)
-  customerKey                  String?                        @map("customer_key") @db.VarChar(200)
   birthDate                    String?                        @map("birth_date") @db.VarChar(8)
   telecom                      String?                        @db.VarChar(3)
   sex                          String?                        @db.VarChar(2)
@@ -106,6 +104,7 @@ model User {
   healthTypeAnimal             HealthTypeAnimal?              @relation(fields: [health_type_animal_id], references: [id])
   wishlist                     Wishlist[]
   notificationInbox            NotificationInbox[]
+  paymentCustomers             PaymentCustomer[]
 
   @@map("users")
 }
@@ -1953,19 +1952,46 @@ model PhoneVerificationLog {
   @@map("phone_verification_logs")
 }
 
+/// 결제 고객 테이블
+/// PG사별 고객 식별자 관리 (정합성 및 확장성)
+model PaymentCustomer {
+  /// 고유 ID
+  id              Int            @id @default(autoincrement())
+  /// 사용자 ID (nullable - 탈퇴 대응)
+  userId          Int?           @map("user_id")
+  /// PG사 (TOSS, INICIS, KAKAO, NAVER 등)
+  provider        String         @db.VarChar(20)
+  /// PG사 고객 식별자 (UUID)
+  customerUid     String         @map("customer_uid") @db.VarChar(100)
+  /// 빌링키 (구독/정기결제용, nullable)
+  billingKey      String?        @map("billing_key") @db.VarChar(200)
+  /// 기본 결제수단 여부
+  isDefault       Boolean        @default(false) @map("is_default")
+  /// 생성일시
+  createdAt       DateTime       @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt       DateTime?      @updatedAt @map("updated_at")
+
+  user            User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscriptions   Subscription[]
+
+  @@unique([userId, provider])
+  @@unique([provider, customerUid])
+  @@index([userId], map: "idx_payment_customers_user_id")
+  @@map("payment_customers")
+}
+
 /// 구독 테이블
 /// 정기 구독 상품 관리 (자동결제)
 model Subscription {
   /// 구독 ID
-  id              Int       @id @default(autoincrement())
+  id                  Int              @id @default(autoincrement())
   /// 사용자 ID
-  userId          Int       @map("user_id")
+  userId              Int              @map("user_id")
   /// 구독 상품 ID (products 테이블 참조)
-  productId       Int       @map("product_id")
-  /// 빌링키 (토스페이먼츠 자동결제 키)
-  billingKey      String    @map("billing_key") @db.VarChar(200)
-  /// 고객키 (토스페이먼츠 고객 식별자)
-  customerKey     String    @map("customer_key") @db.VarChar(200)
+  productId           Int              @map("product_id")
+  /// 결제 고객 ID (PG사 식별자 참조)
+  paymentCustomerId   Int              @map("payment_customer_id")
   /// 구독 상태
   /// - ACTIVE: 정상 구독 중
   /// - PAUSED: 일시정지
@@ -1973,24 +1999,26 @@ model Subscription {
   /// - BILLING_DELETED: 빌링키 삭제됨 (카드 삭제, 유효기간 만료 등)
   /// - PAYMENT_FAILED: 자동결제 실패로 중지
   /// - EXPIRED: 구독 기간 만료
-  status          String    @default("ACTIVE") @db.VarChar(20)
+  status              String           @default("ACTIVE") @db.VarChar(20)
   /// 구독 시작일
-  startDate       DateTime  @map("start_date")
+  startDate           DateTime         @map("start_date")
   /// 다음 결제일 (자동결제 예정일)
-  nextBillingDate DateTime  @map("next_billing_date")
+  nextBillingDate     DateTime         @map("next_billing_date")
   /// 구독 종료일 (취소 시 설정)
-  endDate         DateTime? @map("end_date")
+  endDate             DateTime?        @map("end_date")
   /// 결제 주기 (일 단위)
   /// 예: 30 (월 구독), 90 (3개월 구독), 365 (연 구독)
-  billingCycle    Int       @default(30) @map("billing_cycle")
+  billingCycle        Int              @default(30) @map("billing_cycle")
   /// 구독 가격 (매 결제 금액)
-  price           Int
+  price               Int
   /// 생성일시
-  createdAt       DateTime  @default(now()) @map("created_at")
+  createdAt           DateTime         @default(now()) @map("created_at")
   /// 수정일시
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
 
-  @@index([billingKey], map: "idx_subscriptions_billing_key")
+  paymentCustomer     PaymentCustomer  @relation(fields: [paymentCustomerId], references: [id])
+
+  @@index([paymentCustomerId], map: "idx_subscriptions_payment_customer_id")
   @@index([nextBillingDate], map: "idx_subscriptions_next_billing_date")
   @@index([status], map: "idx_subscriptions_status")
   @@index([userId], map: "idx_subscriptions_user_id")
@@ -2246,6 +2274,8 @@ model PushNotificationLog {
   pushCode      String?                   @map("push_code") @db.VarChar(100)
   /// 예약 발송 날짜 (중복 방지용, KST 기준)
   scheduledDate DateTime?                 @map("scheduled_date") @db.Date
+  /// 앱 번들 ID (dev/prod 구분)
+  bundleId      String?                   @map("bundle_id") @db.VarChar(100)
   campaign      PushNotificationCampaign? @relation(fields: [campaignId], references: [id])
   pushToken     PushToken?                @relation(fields: [pushTokenId], references: [id])
   user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
