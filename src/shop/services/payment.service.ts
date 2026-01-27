@@ -240,30 +240,30 @@ export class PaymentService {
       // - 구독: IAP 인앱결제로만 구매 (iap.service.ts)
       // - 주문 플로우에서 CHALLENGE/SUBSCRIPTION 상품은 orders.service.ts에서 차단됨
 
-      // 구매 포인트 적립 (상품 금액의 10%)
-      const totalProductPrice = convertDecimalToNumber(order.totalProductPrice) || 0;
-      const earnedPoints = Math.floor(totalProductPrice * 0.1);
-      if (earnedPoints > 0) {
-        const updatedUser = await tx.user.update({
-          where: { id: order.userId },
-          data: { points: { increment: earnedPoints } },
-        });
+      // [주석처리] 구매 포인트 적립 (상품 금액의 10%) - 2026.01.27 비활성화
+      // const totalProductPrice = convertDecimalToNumber(order.totalProductPrice) || 0;
+      // const earnedPoints = Math.floor(totalProductPrice * 0.1);
+      // if (earnedPoints > 0) {
+      //   const updatedUser = await tx.user.update({
+      //     where: { id: order.userId },
+      //     data: { points: { increment: earnedPoints } },
+      //   });
 
-        await tx.pointHistory.create({
-          data: {
-            userId: order.userId,
-            type: 'PURCHASE_REWARD',
-            amount: earnedPoints,
-            balance: updatedUser.points,
-            description: getPointDescription(PointRelatedType.ORDER, undefined, 'PURCHASE_REWARD'),
-            relatedType: PointRelatedType.ORDER,
-            relatedId: order.id,
-            createdAt: getNowKST(),
-          },
-        });
+      //   await tx.pointHistory.create({
+      //     data: {
+      //       userId: order.userId,
+      //       type: 'PURCHASE_REWARD',
+      //       amount: earnedPoints,
+      //       balance: updatedUser.points,
+      //       description: getPointDescription(PointRelatedType.ORDER, undefined, 'PURCHASE_REWARD'),
+      //       relatedType: PointRelatedType.ORDER,
+      //       relatedId: order.id,
+      //       createdAt: getNowKST(),
+      //     },
+      //   });
 
-        this.logger.log(`구매 포인트 적립: ${earnedPoints}P (주문: ${order.orderNumber})`);
-      }
+      //   this.logger.log(`구매 포인트 적립: ${earnedPoints}P (주문: ${order.orderNumber})`);
+      // }
 
       this.logger.log(`결제 승인 완료: ${dto.orderId} / ${dto.paymentKey}`);
 
