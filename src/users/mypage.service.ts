@@ -17,6 +17,7 @@ import {
 import { ProfileImageResponseDto } from './dto/profile-image.dto';
 import { WithdrawResponseDto } from './dto/withdraw.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
  * 마이페이지 서비스
@@ -95,11 +96,11 @@ export class MypageService {
       data: {
         userId,
         alias: dto.alias,
-        recipientName: dto.recipientName,
-        recipientPhone: dto.recipientPhone,
+        recipientName: CryptoUtil.encrypt(dto.recipientName),
+        recipientPhone: CryptoUtil.encrypt(dto.recipientPhone),
         postalCode: dto.postalCode,
-        address: dto.address,
-        addressDetail: dto.addressDetail,
+        address: CryptoUtil.encrypt(dto.address),
+        addressDetail: dto.addressDetail ? CryptoUtil.encrypt(dto.addressDetail) : null,
         isDefault: shouldBeDefault,
         createdAt: now,
         updatedAt: now,
@@ -138,11 +139,13 @@ export class MypageService {
       where: { id: addressId },
       data: {
         alias: dto.alias,
-        recipientName: dto.recipientName,
-        recipientPhone: dto.recipientPhone,
+        recipientName: dto.recipientName ? CryptoUtil.encrypt(dto.recipientName) : undefined,
+        recipientPhone: dto.recipientPhone ? CryptoUtil.encrypt(dto.recipientPhone) : undefined,
         postalCode: dto.postalCode,
-        address: dto.address,
-        addressDetail: dto.addressDetail,
+        address: dto.address ? CryptoUtil.encrypt(dto.address) : undefined,
+        addressDetail: dto.addressDetail !== undefined
+          ? (dto.addressDetail ? CryptoUtil.encrypt(dto.addressDetail) : null)
+          : undefined,
         isDefault: dto.isDefault,
       },
     });
@@ -505,11 +508,11 @@ export class MypageService {
     return {
       id: address.id,
       alias: address.alias,
-      recipientName: address.recipientName,
-      recipientPhone: address.recipientPhone,
+      recipientName: CryptoUtil.decrypt(address.recipientName),
+      recipientPhone: CryptoUtil.decrypt(address.recipientPhone),
       postalCode: address.postalCode,
-      address: address.address,
-      addressDetail: address.addressDetail,
+      address: CryptoUtil.decrypt(address.address),
+      addressDetail: address.addressDetail ? CryptoUtil.decrypt(address.addressDetail) : null,
       isDefault: address.isDefault,
       createdAt: address.createdAt,
       updatedAt: address.updatedAt,
