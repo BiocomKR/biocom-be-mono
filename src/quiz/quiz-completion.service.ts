@@ -575,4 +575,43 @@ export class QuizCompletionService {
       throw error;
     }
   }
+
+  /**
+   * 강의 퀴즈 완료 여부 조회 (가벼운 API)
+   * 홈화면의 퀴즈 상태 로직과 동일
+   * @param userId 사용자 ID
+   * @param lectureId 강의 ID
+   * @returns { alreadyCompleted: boolean }
+   */
+  async getQuizStatusByLecture(userId: number, lectureId: number): Promise<{ alreadyCompleted: boolean }> {
+    // 1. 강의에 연결된 퀴즈 조회
+    const lecture = await this.prisma.content.findUnique({
+      where: { id: lectureId },
+      select: {
+        lectureQuizzes: {
+          where: { isActive: true },
+          select: { quizId: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!lecture?.lectureQuizzes?.[0]?.quizId) {
+      // 퀴즈가 없는 강의
+      return { alreadyCompleted: false };
+    }
+
+    const quizId = lecture.lectureQuizzes[0].quizId;
+
+    // 2. quizAttempt에서 시도 여부 확인 (홈화면 로직과 동일)
+    const quizAttempt = await this.prisma.quizAttempt.findFirst({
+      where: {
+        userId,
+        quizId,
+      },
+      select: { id: true },
+    });
+
+    return { alreadyCompleted: !!quizAttempt };
+  }
 }

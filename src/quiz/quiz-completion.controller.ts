@@ -64,6 +64,32 @@ export class QuizCompletionController {
   }
 
   /**
+   * 강의 퀴즈 완료 여부 조회 (가벼운 API)
+   * @description 홈화면의 퀴즈 상태 로직과 동일하게 quizAttempt 시도 여부 확인
+   */
+  @Get('status/:lectureId')
+  @ApiOperation({
+    summary: '강의 퀴즈 완료 여부 조회',
+    description: '강의에 연결된 퀴즈의 완료 여부를 조회합니다. 홈화면의 퀴즈 상태 로직과 동일합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '퀴즈 상태 조회 성공',
+    schema: {
+      properties: {
+        alreadyCompleted: { type: 'boolean', description: '퀴즈 완료 여부' }
+      }
+    }
+  })
+  async getQuizStatus(
+    @Param('lectureId', ParseIntPipe) lectureId: number,
+    @Request() req: any
+  ) {
+    const userId = req.user?.userId || req.user?.sub || req.user?.id;
+    return this.quizCompletionService.getQuizStatusByLecture(userId, lectureId);
+  }
+
+  /**
    * 강의 퀴즈 답변 제출 및 완료 처리
    * @description 강의 연결 퀴즈 답변을 제출하고 채점하여 포인트를 적립합니다
    * - 챌린저 당일 퀴즈 (currentDay === dayNumber): 200점 지급
