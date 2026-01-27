@@ -201,7 +201,7 @@ export class HomeService {
       // - NEWCOMER: 완료된 챌린지가 있는 경우 (사후문진, 심층리포트 진행도 표시)
       const shouldUpdateProgress = user.status !== UserSubscriptionStatus.NEWCOMER || !!challenges.completed;
       if (shouldUpdateProgress) {
-        missionList = await this.updateMissionProgress(userId, missionList, user.status);
+        missionList = await this.updateMissionProgress(userId, missionList, user.status, challengeDays.currentDay);
       }
 
       // 5. 챌린지 정보 구성 (CHALLENGER만)
@@ -512,6 +512,7 @@ export class HomeService {
     userId: number,
     missionList: MissionItemDto[],
     userStatus: string,
+    currentDay?: number,
   ): Promise<MissionItemDto[]> {
     // 오늘 날짜 (KST 기준)
     const today = getKoreanToday();
@@ -672,13 +673,56 @@ export class HomeService {
       }
     }
 
+    // QUIZ 미션: quizAttempt 기반으로 current 계산 (시도 여부)
+    // - 포인트 지급 여부와 관계없이, 한 번 시도하면 current = 1
+    if (currentDay) {
+      // 당일 강의 조회 (dayNumber === currentDay)
+      const todayLecture = await this.prisma.content.findFirst({
+        where: {
+          type: 'LECTURE',
+          dayNumber: currentDay,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          lectureQuizzes: {
+            where: { isActive: true },
+            select: { quizId: true },
+            take: 1,
+          },
+        },
+      });
+
+      if (todayLecture?.lectureQuizzes?.[0]?.quizId) {
+        const quizId = todayLecture.lectureQuizzes[0].quizId;
+
+        // quizAttempt에서 시도 여부 확인
+        const quizAttempt = await this.prisma.quizAttempt.findFirst({
+          where: {
+            userId,
+            quizId,
+          },
+          select: { id: true },
+        });
+
+        if (quizAttempt) {
+          // 시도했으면 current = 1 (max도 1이므로 완료 처리)
+          currentMap.set('QUIZ', 1);
+          this.logger.log(`[updateMissionProgress] QUIZ 시도 확인됨 - userId: ${userId}, quizId: ${quizId}`);
+        }
+      }
+    }
+
     return missionList.map((m) => {
       const current = currentMap.get(m.recordType) || 0;
       const executed = executedMap.get(m.recordType) || 0;
 
       return {
         ...m,
-        current,  // point_histories 기준 (포인트 지급 횟수)
+        // current: 포인트 획득 횟수
+        // - 일반 미션: point_histories 기준
+        // - QUIZ: quizAttempt 기반 (시도 여부, 정답/오답 무관하게 1회 시도 시 1)
+        current,
         executed, // user_records 기준 (실행 횟수)
       };
     });
