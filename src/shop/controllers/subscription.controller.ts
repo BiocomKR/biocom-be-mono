@@ -42,6 +42,28 @@ export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
   /**
+   * customerKey 조회/생성
+   *
+   * @description
+   * 토스 결제창 호출 전 customerKey를 조회하거나 새로 생성
+   * 빌링키 등록 여부도 함께 반환
+   *
+   * @param req - 사용자 정보
+   */
+  @Get('customer-key')
+  @ApiOperation({
+    summary: 'customerKey 조회/생성',
+    description: '토스 결제창 호출 전 customerKey를 조회하거나 생성합니다',
+  })
+  @ApiResponse({ status: 200, description: 'customerKey 반환' })
+  async getOrCreateCustomerKey(@Request() req) {
+    const userId = req.user.id;
+    this.logger.log(`customerKey 조회/생성 요청: userId=${userId}`);
+
+    return this.subscriptionService.getOrCreateCustomerKey(userId);
+  }
+
+  /**
    * 빌링키 등록
    *
    * @description

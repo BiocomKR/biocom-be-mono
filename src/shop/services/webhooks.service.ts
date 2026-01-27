@@ -762,22 +762,23 @@ export class WebhooksService {
     );
 
     await this.prisma.$transaction(async (tx) => {
-      // 1. 해당 빌링키로 등록된 사용자 찾기
-      const user = await tx.user.findFirst({
+      // 1. 해당 빌링키로 등록된 PaymentCustomer 찾기
+      const paymentCustomer = await tx.paymentCustomer.findFirst({
         where: { billingKey: billingKey },
+        include: { user: true },
       });
 
-      if (!user) {
-        this.logger.warn(`⚠️  빌링키에 해당하는 사용자가 없습니다: ${billingKey}`);
+      if (!paymentCustomer) {
+        this.logger.warn(`⚠️  빌링키에 해당하는 PaymentCustomer가 없습니다: ${billingKey}`);
         return;
       }
 
-      this.logger.log(`사용자 발견: userId=${user.id}, email=${user.email}`);
+      this.logger.log(`PaymentCustomer 발견: id=${paymentCustomer.id}, userId=${paymentCustomer.userId}`);
 
-      // 2. 해당 빌링키로 활성화된 구독 찾기
+      // 2. 해당 PaymentCustomer로 활성화된 구독 찾기
       const subscriptions = await tx.subscription.findMany({
         where: {
-          billingKey: billingKey,
+          paymentCustomerId: paymentCustomer.id,
           status: SubscriptionStatus.ACTIVE,
         },
         include: {
@@ -787,55 +788,49 @@ export class WebhooksService {
 
       if (subscriptions.length === 0) {
         this.logger.warn(`⚠️  활성화된 구독이 없습니다: ${billingKey}`);
-        return;
+      } else {
+        this.logger.log(
+          `활성화된 구독 ${subscriptions.length}건 발견. 상태 변경 시작...`,
+        );
+
+        // 3. 구독 상태를 BILLING_DELETED로 변경
+        const updateResult = await tx.subscription.updateMany({
+          where: {
+            paymentCustomerId: paymentCustomer.id,
+            status: SubscriptionStatus.ACTIVE,
+          },
+          data: {
+            status: SubscriptionStatus.BILLING_DELETED,
+            endDate: getNowKST(),
+            updatedAt: getNowKST(),
+          },
+        });
+
+        this.logger.log(
+          `✅ ${updateResult.count}건의 구독 상태를 BILLING_DELETED로 변경 완료`,
+        );
+
+        // 중지된 구독 목록 로깅
+        subscriptions.forEach((sub) => {
+          this.logger.log(
+            `  - 구독 중지: 상품명=${sub.product.name}, 구독ID=${sub.id}`,
+          );
+        });
       }
 
-      this.logger.log(
-        `활성화된 구독 ${subscriptions.length}건 발견. 상태 변경 시작...`,
-      );
-
-      // 3. 구독 상태를 BILLING_DELETED로 변경
-      const updateResult = await tx.subscription.updateMany({
-        where: {
-          billingKey: billingKey,
-          status: SubscriptionStatus.ACTIVE,
-        },
-        data: {
-          status: SubscriptionStatus.BILLING_DELETED,
-          endDate: getNowKST(),
-          updatedAt: getNowKST(),
-        },
+      // 4. PaymentCustomer 삭제
+      await tx.paymentCustomer.delete({
+        where: { id: paymentCustomer.id },
       });
 
-      this.logger.log(
-        `✅ ${updateResult.count}건의 구독 상태를 BILLING_DELETED로 변경 완료`,
-      );
-
-      // 4. 사용자 테이블에서 빌링키 삭제
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          billingKey: null,
-          customerKey: null,
-          updatedAt: getNowKST(),
-        },
-      });
-
-      this.logger.log(`사용자의 빌링키 정보 삭제 완료: userId=${user.id}`);
+      this.logger.log(`PaymentCustomer 삭제 완료: id=${paymentCustomer.id}`);
 
       // 5. 사용자에게 알림 발송 (선택)
-      // TODO: 이메일/푸시 알림 발송
-      // "자동결제 카드가 삭제되어 구독이 중지되었습니다."
-      this.logger.warn(
-        `📧 TODO: 사용자에게 구독 중지 알림 발송 필요 - ${user.email}`,
-      );
-
-      // 6. 중지된 구독 목록 로깅
-      subscriptions.forEach((sub) => {
-        this.logger.log(
-          `  - 구독 중지: 상품명=${sub.product.name}, 구독ID=${sub.id}`,
+      if (paymentCustomer.user) {
+        this.logger.warn(
+          `📧 TODO: 사용자에게 구독 중지 알림 발송 필요 - ${paymentCustomer.user.email}`,
         );
-      });
+      }
 
       this.logger.log(`✅ 빌링키 삭제 처리 완료: ${billingKey}`);
     });

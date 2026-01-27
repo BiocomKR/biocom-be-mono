@@ -434,9 +434,7 @@ export class MypageService {
           // 계정 비활성화
           isActive: false,
           deletedAt: now,
-          // 빌링키, 환불계좌 등 민감정보 삭제
-          billingKey: null,
-          customerKey: null,
+          // 환불계좌 등 민감정보 삭제
           refundAccountNo: null,
           refundBankCode: null,
           refundBankName: null,

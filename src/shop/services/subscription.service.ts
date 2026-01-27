@@ -16,6 +16,7 @@ import { CreateSubscriptionDto } from '../dto/subscription/create-subscription.d
 import { SubscriptionStatus } from '../../common/enums';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { transformProductWithImages } from '../../common/utils/product-image.util';
+import { randomUUID } from 'crypto';
 
 /**
  * 구독 관리 서비스
@@ -33,6 +34,50 @@ export class SubscriptionService {
     private readonly prisma: PrismaService,
     @Inject(PAYMENT_GATEWAY_TOKEN) private readonly paymentGateway: IPaymentGateway,
   ) {}
+
+  /**
+   * customerKey 조회 또는 생성
+   * 토스 결제창 호출 전에 호출하여 customerKey를 받아감
+   *
+   * @param userId - 사용자 ID
+   * @returns customerKey (UUID)
+   */
+  async getOrCreateCustomerKey(userId: number) {
+    this.logger.log(`customerKey 조회/생성: userId=${userId}`);
+
+    // 기존 PaymentCustomer 조회
+    let paymentCustomer = await this.prisma.paymentCustomer.findUnique({
+      where: { userId_provider: { userId, provider: 'TOSS' } },
+    });
+
+    if (paymentCustomer) {
+      this.logger.log(`기존 PaymentCustomer 발견: customerUid=${paymentCustomer.customerUid}`);
+      return {
+        success: true,
+        customerKey: paymentCustomer.customerUid,
+        hasBillingKey: !!paymentCustomer.billingKey,
+      };
+    }
+
+    // 새로 생성
+    const customerUid = randomUUID();
+    paymentCustomer = await this.prisma.paymentCustomer.create({
+      data: {
+        userId,
+        provider: 'TOSS',
+        customerUid,
+        isDefault: true,
+      },
+    });
+
+    this.logger.log(`PaymentCustomer 생성: customerUid=${customerUid}`);
+
+    return {
+      success: true,
+      customerKey: paymentCustomer.customerUid,
+      hasBillingKey: false,
+    };
+  }
 
   /**
    * 빌링키 등록
@@ -56,10 +101,14 @@ export class SubscriptionService {
       throw new NotFoundException('사용자를 찾을 수 없습니다');
     }
 
-    // 이미 빌링키가 등록되어 있으면 에러
-    if (user.billingKey) {
+    // 이미 빌링키가 등록되어 있으면 에러 (PaymentCustomer에서 확인)
+    const existingPaymentCustomer = await this.prisma.paymentCustomer.findUnique({
+      where: { userId_provider: { userId, provider: 'TOSS' } },
+    });
+
+    if (existingPaymentCustomer?.billingKey) {
       this.logger.warn(
-        `빌링키 중복 등록 시도: userId=${userId}, existingBillingKey=${user.billingKey}`,
+        `빌링키 중복 등록 시도: userId=${userId}, existingBillingKey=${existingPaymentCustomer.billingKey}`,
       );
       throw new BadRequestException('이미 등록된 카드가 있습니다. 카드를 변경하려면 먼저 삭제해주세요.');
     }
@@ -72,12 +121,19 @@ export class SubscriptionService {
 
     this.logger.log(`토스로부터 빌링키 발급 성공: billingKey=${billingKey}`);
 
-    // 빌링키 저장
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
+    // PaymentCustomer에 빌링키 저장 (upsert)
+    await this.prisma.paymentCustomer.upsert({
+      where: { userId_provider: { userId, provider: 'TOSS' } },
+      create: {
+        userId,
+        provider: 'TOSS',
+        customerUid: customerKey,
         billingKey: billingKey,
-        customerKey: customerKey,
+        isDefault: true,
+      },
+      update: {
+        billingKey: billingKey,
+        customerUid: customerKey,
         updatedAt: getNowKST(),
       },
     });
@@ -99,19 +155,19 @@ export class SubscriptionService {
     this.logger.log(`빌링키 삭제: userId=${userId}`);
 
     await this.prisma.$transaction(async (tx) => {
-      // 사용자 조회
-      const user = await tx.user.findUnique({
-        where: { id: userId },
+      // PaymentCustomer 조회
+      const paymentCustomer = await tx.paymentCustomer.findUnique({
+        where: { userId_provider: { userId, provider: 'TOSS' } },
       });
 
-      if (!user || !user.billingKey) {
+      if (!paymentCustomer || !paymentCustomer.billingKey) {
         throw new BadRequestException('등록된 빌링키가 없습니다');
       }
 
       // 활성 구독 중지
       const updateResult = await tx.subscription.updateMany({
         where: {
-          userId: userId,
+          paymentCustomerId: paymentCustomer.id,
           status: SubscriptionStatus.ACTIVE,
         },
         data: {
@@ -123,14 +179,9 @@ export class SubscriptionService {
 
       this.logger.log(`${updateResult.count}건의 구독이 취소되었습니다`);
 
-      // 빌링키 삭제
-      await tx.user.update({
-        where: { id: userId },
-        data: {
-          billingKey: null,
-          customerKey: null,
-          updatedAt: getNowKST(),
-        },
+      // PaymentCustomer 삭제
+      await tx.paymentCustomer.delete({
+        where: { id: paymentCustomer.id },
       });
     });
 
@@ -158,16 +209,12 @@ export class SubscriptionService {
       `구독 생성: userId=${userId}, productId=${productId}, billingCycle=${billingCycle}일`,
     );
 
-    // 사용자 조회 (빌링키 확인)
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    // PaymentCustomer 조회 (빌링키 확인)
+    const paymentCustomer = await this.prisma.paymentCustomer.findUnique({
+      where: { userId_provider: { userId, provider: 'TOSS' } },
     });
 
-    if (!user) {
-      throw new NotFoundException('사용자를 찾을 수 없습니다');
-    }
-
-    if (!user.billingKey) {
+    if (!paymentCustomer || !paymentCustomer.billingKey) {
       throw new BadRequestException(
         '빌링키가 등록되지 않았습니다. 먼저 결제 수단을 등록해주세요',
       );
@@ -205,8 +252,8 @@ export class SubscriptionService {
     this.logger.log(`첫 결제 실행: amount=${price}원`);
 
     const paymentResult = await this.paymentGateway.chargeWithBillingKey(
-      user.billingKey,
-      user.customerKey,
+      paymentCustomer.billingKey,
+      paymentCustomer.customerUid,
       price,
       `${product.name} 구독 - 첫 결제`,
     );
@@ -222,8 +269,7 @@ export class SubscriptionService {
       data: {
         userId: userId,
         productId: productId,
-        billingKey: user.billingKey,
-        customerKey: user.customerKey,
+        paymentCustomerId: paymentCustomer.id,
         status: SubscriptionStatus.ACTIVE,
         startDate: startDate,
         nextBillingDate: nextBillingDate,
@@ -250,10 +296,9 @@ export class SubscriptionService {
    * @returns 구독 목록 + 빌링키 등록 여부
    */
   async getMySubscriptions(userId: number) {
-    // 빌링키 등록 여부 확인
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { billingKey: true },
+    // 빌링키 등록 여부 확인 (PaymentCustomer에서)
+    const paymentCustomer = await this.prisma.paymentCustomer.findUnique({
+      where: { userId_provider: { userId, provider: 'TOSS' } },
     });
 
     // 구독 목록 조회
@@ -287,7 +332,7 @@ export class SubscriptionService {
 
     return {
       success: true,
-      hasBillingKey: !!user?.billingKey,
+      hasBillingKey: !!paymentCustomer?.billingKey,
       data: transformedSubscriptions,
     };
   }
@@ -380,6 +425,7 @@ export class SubscriptionService {
       include: {
         user: true,
         product: true,
+        paymentCustomer: true,
       },
     });
 
@@ -388,12 +434,17 @@ export class SubscriptionService {
       return;
     }
 
+    if (!subscription.paymentCustomer?.billingKey) {
+      this.logger.error(`빌링키가 없음: subscriptionId=${subscriptionId}`);
+      return;
+    }
+
     try {
       // 토스페이먼츠 빌링키로 자동결제
       const paymentResult =
         await this.paymentGateway.chargeWithBillingKey(
-          subscription.billingKey,
-          subscription.customerKey,
+          subscription.paymentCustomer.billingKey,
+          subscription.paymentCustomer.customerUid,
           subscription.price,
           `${subscription.product.name} 구독 - ${getNowKST().toISOString().split('T')[0]} 결제`,
         );
