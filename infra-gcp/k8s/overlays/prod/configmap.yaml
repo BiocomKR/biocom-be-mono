@@ -101,7 +101,7 @@ data:
   # ==========================================
   OPENAI_MODEL: "gpt-4o"
   AI_ANALYSIS_TIMEOUT: "30000"
-  GEMINI_MODEL: "gemini-2.5-flash-image-preview"
+  GEMINI_MODEL: "gemini-2.5-flash-image"
   FACE_SLIMMING_TIMEOUT: "60000"
 
   # ==========================================

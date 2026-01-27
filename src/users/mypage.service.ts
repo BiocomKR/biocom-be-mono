@@ -451,6 +451,31 @@ export class MypageService {
       await tx.pushToken.deleteMany({
         where: { userId },
       });
+
+      // 2-5. 배송 주소 삭제
+      await tx.userAddress.deleteMany({
+        where: { userId },
+      });
+
+      // 2-6. 사용자 파일 삭제
+      await tx.userFile.deleteMany({
+        where: { userId },
+      });
+
+      // 2-7. AI 채팅 이력 삭제
+      await tx.userChatHistory.deleteMany({
+        where: { userId },
+      });
+
+      // 2-8. AI 채팅 일별 요약 삭제
+      await tx.userChatDailySummary.deleteMany({
+        where: { userId },
+      });
+
+      // 2-9. AI 심층 리포트 삭제
+      await tx.userDeepReport.deleteMany({
+        where: { userId },
+      });
     });
 
     this.logger.log(`회원탈퇴 완료: userId=${userId}`);

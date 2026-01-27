@@ -22,7 +22,7 @@ export class FaceSlimmingService {
     private readonly googleStorageService: GoogleStorageService
   ) {
     const apiKey = this.configService.get<string>('GOOGLE_API_KEY');
-    this.model = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash-image-preview';
+    this.model = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash-image';
     this.timeout = this.configService.get<number>('FACE_SLIMMING_TIMEOUT') || 60000;
 
     if (!apiKey) {
