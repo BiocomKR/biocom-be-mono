@@ -10,7 +10,6 @@ import { IPaymentGateway, PAYMENT_GATEWAY_TOKEN } from '../toss/interfaces/payme
 import { Prisma } from '@prisma/client';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { RefundStatus, ExchangeReturnStatus, OrderStatus, PgProvider, PointRelatedType } from '../common/enums';
-import { CryptoUtil } from '../common/utils/crypto.util';
 import { getPointDescription } from '../common/utils/point-description.util';
 
 @Injectable()
@@ -84,9 +83,9 @@ export class RefundService {
       items: items.map(item => ({
         id: item.id,
         orderNumber: item.order.orderNumber,
-        customerName: CryptoUtil.decrypt(item.order.user.name),
+        customerName: item.order.user.name,
         customerEmail: item.order.user.email,
-        customerMobile: CryptoUtil.decryptDeterministic(item.order.user.mobile),
+        customerMobile: item.order.user.mobile,
         refundType: item.refundType,
         status: item.status,
         refundAmount: Number(item.refundAmount),
@@ -145,9 +144,9 @@ export class RefundService {
       },
       customer: {
         id: refund.order.user.id,
-        name: CryptoUtil.decrypt(refund.order.user.name),
+        name: refund.order.user.name,
         email: refund.order.user.email,
-        mobile: CryptoUtil.decryptDeterministic(refund.order.user.mobile)
+        mobile: refund.order.user.mobile
       },
       payment: {
         method: null, // method 필드가 없음
@@ -683,7 +682,7 @@ export class RefundService {
       items: refunds.map(item => ({
         id: item.id,
         orderNumber: item.order.orderNumber,
-        customerName: CryptoUtil.decrypt(item.order.user.name),
+        customerName: item.order.user.name,
         customerEmail: item.order.user.email,
         refundAmount: Number(item.refundAmount),
         reason: item.reason,

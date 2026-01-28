@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { getNowKST } from '../common/utils/kst-date.util';
-import { CryptoUtil } from '../common/utils/crypto.util';
 import {
   RecordsDashboardDto,
   RecordsByTypeDto,
@@ -1273,10 +1272,9 @@ export class RecordsService {
         orderBy: { createdAt: 'desc' },
       });
 
-      // 복호화 후 이름 필터링
+      // 이름 필터링 (Prisma 미들웨어에서 이미 복호화됨)
       const filteredUsers = allUsers.filter(user => {
-        const decryptedName = CryptoUtil.decrypt(user.name);
-        return decryptedName && decryptedName.includes(nameSearchKeyword);
+        return user.name && user.name.includes(nameSearchKeyword);
       });
 
       total = filteredUsers.length;
@@ -1370,7 +1368,7 @@ export class RecordsService {
 
       return {
         userId: user.id,
-        nickname: CryptoUtil.decrypt(user.name) || '',
+        nickname: user.name || '',
         email: user.email || '',
         challengeStatus: challenge?.status || null,
         challengeDay: challenge?.dailyProgress[0]?.day || null,
@@ -1482,8 +1480,7 @@ export class RecordsService {
     let filteredRecords = records;
     if (search && !search.includes('@')) {
       filteredRecords = records.filter((r: any) => {
-        const decryptedName = CryptoUtil.decrypt(r.user.name);
-        return decryptedName && decryptedName.includes(search);
+        return r.user.name && r.user.name.includes(search);
       });
     }
 
@@ -1491,7 +1488,7 @@ export class RecordsService {
     const recordItems: RecordRowItemDto[] = filteredRecords.map((r: any) => ({
       id: r.id,
       userId: r.userId,
-      userName: CryptoUtil.decrypt(r.user.name) || '',
+      userName: r.user.name || '',
       userEmail: r.user.email || '',
       recordType: r.recordType,
       recordTypeLabel: RECORD_TYPE_LABELS[r.recordType as RecordType] || r.recordType,

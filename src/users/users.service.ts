@@ -4,7 +4,6 @@ import * as bcrypt from 'bcrypt';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { UserQueryDto } from './dto/user-query.dto';
 import { OrderStatus, UserChallengeStatus, CouponStatus, SubscriptionStatus, UserSubscriptionStatus, ChallengeTicketStatus } from '../common/enums';
-import { CryptoUtil } from '../common/utils/crypto.util';
 
 /**
  * 백오피스 사용자 관리 서비스
@@ -212,13 +211,9 @@ export class UsersService {
         orderBy,
       });
 
-      // 복호화 후 이름 필터링
+      // 이름 필터링 (Prisma 미들웨어가 이미 복호화)
       const filteredUsers = allUsers
-        .map(user => ({
-          ...user,
-          decryptedName: CryptoUtil.decrypt(user.name),
-        }))
-        .filter(user => user.decryptedName?.includes(nameSearchKeyword));
+        .filter(user => user.name?.includes(nameSearchKeyword));
 
       const total = filteredUsers.length;
       const paginatedUsers = filteredUsers.slice(offset, offset + limit);
@@ -226,7 +221,7 @@ export class UsersService {
       const userList = paginatedUsers.map(user => ({
         id: user.id,
         email: user.email,
-        name: user.decryptedName,
+        name: user.name,
         mobile: user.mobile,
         points: user.points,
         status: user.status,

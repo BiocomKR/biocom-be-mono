@@ -84,6 +84,7 @@ export class CryptoUtil {
       return decrypted.toString('utf8');
     } catch (error) {
       console.error('복호화 실패:', error);
+      console.error('복호화 실패 원본값:', JSON.stringify(encryptedText), '길이:', encryptedText?.length);
       // 복호화 실패 시 원본 반환 (마이그레이션 고려)
       return encryptedText;
     }

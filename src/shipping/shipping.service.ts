@@ -73,7 +73,7 @@ export class ShippingService {
       items: items.map(item => ({
         id: item.id,
         orderNumber: item.order.orderNumber,
-        customerName: CryptoUtil.decrypt(item.order.user.name),
+        customerName: item.order.user.name,
         customerEmail: item.order.user.email,
         recipientName: CryptoUtil.decrypt(item.order.recipientName),
         recipientPhone: CryptoUtil.decrypt(item.order.recipientPhone),
