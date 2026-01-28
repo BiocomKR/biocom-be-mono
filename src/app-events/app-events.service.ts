@@ -357,4 +357,36 @@ export class AppEventsService {
 
     return result;
   }
+
+  // 앱별 이벤트 통계
+  async getAppStats(dto: {
+    startDate?: string;
+    endDate?: string;
+    excludeTesters?: boolean;
+  }) {
+    const excludeTesterIds = dto.excludeTesters ? await this.getTesterUserIds() : undefined;
+    const where = this.buildWhereClause({ ...dto, excludeTesterIds });
+
+    const stats = await this.prisma.appEvent.groupBy({
+      by: ['appId'],
+      where,
+      _count: { id: true },
+    });
+
+    return stats.map((s) => ({
+      appId: s.appId,
+      count: s._count.id,
+    }));
+  }
+
+  // 앱 목록 조회 (distinct appId)
+  async getAppList() {
+    const apps = await this.prisma.appEvent.findMany({
+      distinct: ['appId'],
+      select: { appId: true },
+      orderBy: { appId: 'asc' },
+    });
+
+    return apps.map((a) => a.appId);
+  }
 }

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength } from 'class-validator';
 import { PushScheduleType, PushCategory } from '../enums';
+import { AppBundleId } from '../../common/enums';
 
 /**
  * 스케줄 생성 DTO
@@ -185,4 +186,12 @@ export class CreateScheduleDto {
   @IsString()
   @MaxLength(20)
   senderType?: string;
+
+  @ApiProperty({
+    description: '대상 앱 번들ID',
+    enum: AppBundleId,
+    example: AppBundleId.CHALLENGE_PROD,
+  })
+  @IsEnum(AppBundleId)
+  bundleId: AppBundleId;
 }

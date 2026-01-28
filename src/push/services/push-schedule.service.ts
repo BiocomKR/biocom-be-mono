@@ -58,6 +58,7 @@ export class PushScheduleService {
           landingParams: dto.landingParams,
           personaMessages: dto.personaMessages,
           senderType: dto.senderType,
+          bundleId: dto.bundleId,
           createdBy,
           createdAt: getNowKST(),
         },
@@ -75,7 +76,7 @@ export class PushScheduleService {
    * 스케줄 목록 조회
    */
   async getSchedules(query: ScheduleQueryDto) {
-    const { page = 1, limit = 20, scheduleType, category, isActive } = query;
+    const { page = 1, limit = 20, scheduleType, category, isActive, bundleId } = query;
     const skip = (page - 1) * limit;
 
     this.logger.log(`📋 [PushScheduleService] 스케줄 목록 조회: page=${page}, limit=${limit}`);
@@ -86,6 +87,7 @@ export class PushScheduleService {
       if (scheduleType) where.scheduleType = scheduleType;
       if (category) where.category = category;
       if (isActive !== undefined) where.isActive = isActive;
+      if (bundleId) where.bundleId = bundleId;
 
       const [schedules, total] = await Promise.all([
         this.prisma.pushNotificationSchedule.findMany({
@@ -216,6 +218,7 @@ export class PushScheduleService {
           ...(dto.landingParams !== undefined && { landingParams: dto.landingParams }),
           ...(dto.personaMessages !== undefined && { personaMessages: dto.personaMessages }),
           ...(dto.senderType !== undefined && { senderType: dto.senderType }),
+          ...(dto.bundleId !== undefined && { bundleId: dto.bundleId }),
           updatedAt: getNowKST(),
         },
       });

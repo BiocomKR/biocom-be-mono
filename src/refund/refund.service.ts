@@ -1015,6 +1015,56 @@ export class RefundService {
             }
           });
 
+          // 포인트 환급 (결제 전이라도 주문 생성 시 포인트 차감됨)
+          let pointRefunded = 0;
+          if (Number(order.pointUsed) > 0) {
+            const updatedUser = await tx.user.update({
+              where: { id: order.userId },
+              data: {
+                points: { increment: Number(order.pointUsed) }
+              }
+            });
+
+            await tx.pointHistory.create({
+              data: {
+                userId: order.userId,
+                type: 'REFUND',
+                amount: Number(order.pointUsed),
+                balance: updatedUser.points,
+                description: getPointDescription(PointRelatedType.ORDER, undefined, 'REFUND'),
+                relatedType: PointRelatedType.ORDER,
+                relatedId: order.id,
+                createdAt: now,
+              }
+            });
+
+            pointRefunded = Number(order.pointUsed);
+            this.logger.log(`포인트 환급 (결제 전 취소): userId=${order.userId}, amount=${order.pointUsed}`);
+          }
+
+          // 쿠폰 복구
+          let couponRestored = false;
+          const usedCoupon = await tx.userCoupon.findFirst({
+            where: {
+              usedOrderId: order.id,
+              status: 'USED'
+            }
+          });
+
+          if (usedCoupon) {
+            const newStatus = usedCoupon.expiresAt > now ? 'ACTIVE' : 'EXPIRED';
+            await tx.userCoupon.update({
+              where: { id: usedCoupon.id },
+              data: {
+                status: newStatus,
+                usedAt: null,
+                usedOrderId: null
+              }
+            });
+            couponRestored = true;
+            this.logger.log(`쿠폰 복구 (결제 전 취소): couponId=${usedCoupon.id}, status=${newStatus}`);
+          }
+
           this.logger.log(`관리자 주문 취소 완료 (결제 전): ${order.orderNumber}`);
 
           return {
@@ -1022,8 +1072,8 @@ export class RefundService {
             message: '주문이 취소되었습니다 (결제 전 취소)',
             orderNumber: order.orderNumber,
             refundAmount: 0,
-            pointRefunded: 0,
-            couponRestored: false,
+            pointRefunded,
+            couponRestored,
             ticketsCancelled: 0,
           };
         });

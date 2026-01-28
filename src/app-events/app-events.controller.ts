@@ -123,4 +123,22 @@ export class AppEventsController {
       excludeTesters: excludeTesters === 'true',
     });
   }
+
+  @Get('stats/apps')
+  async getAppStats(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('excludeTesters') excludeTesters?: string,
+  ) {
+    return this.appEventsService.getAppStats({
+      startDate,
+      endDate,
+      excludeTesters: excludeTesters === 'true',
+    });
+  }
+
+  @Get('apps')
+  async getAppList() {
+    return this.appEventsService.getAppList();
+  }
 }

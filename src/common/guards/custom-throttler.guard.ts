@@ -29,7 +29,6 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
     
     // 디버깅 로그 추가
     console.log(`[CustomThrottlerGuard] 🔍 Checking ${request.method} ${request.url}`);
@@ -45,9 +44,6 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
       console.log(`[CustomThrottlerGuard] ⏳ 부모 ThrottlerGuard 체크 시작...`);
       const result = await super.canActivate(context);
       console.log(`[CustomThrottlerGuard] ✅ ThrottlerGuard 체크 결과: ${result}`);
-      
-      // Rate limit 정보를 응답 헤더에 추가
-      this.addRateLimitHeaders(response);
       
       return result;
     } catch (error) {
@@ -134,14 +130,4 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
     }
   }
 
-  /**
-   * Rate limit 정보를 응답 헤더에 추가
-   */
-  private addRateLimitHeaders(response: any): void {
-    // TODO: 실제 rate limit 정보를 storage에서 가져와서 설정
-    // 예시 헤더:
-    // X-RateLimit-Limit: 100
-    // X-RateLimit-Remaining: 99
-    // X-RateLimit-Reset: 1640995200
-  }
 }

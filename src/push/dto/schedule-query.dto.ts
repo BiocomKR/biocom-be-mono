@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsInt, Min, Max, IsBoolean, IsEnum } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { PushScheduleType, PushCategory } from '../enums';
+import { AppBundleId } from '../../common/enums';
 
 /**
  * 스케줄 조회 쿼리 DTO
@@ -47,4 +48,12 @@ export class ScheduleQueryDto {
   })
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    description: '앱 번들ID 필터',
+    enum: AppBundleId,
+  })
+  @IsOptional()
+  @IsEnum(AppBundleId)
+  bundleId?: AppBundleId;
 }
