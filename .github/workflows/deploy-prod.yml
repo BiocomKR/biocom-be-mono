@@ -11,7 +11,7 @@ env:
   REGION: asia-northeast3
   REPOSITORY: biocom-api
   IMAGE_NAME: biocom-mq
-  GKE_CLUSTER: biocom-cluster-prod
+  GKE_CLUSTER: cluster-api-prod
   GKE_ZONE: asia-northeast3-a
   NAMESPACE: biocom-api
 
@@ -30,6 +30,20 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      # 클러스터 존재 여부 사전 검증 (빠른 실패)
+      - name: Validate GKE Cluster
+        run: |
+          gcloud container clusters describe ${{ env.GKE_CLUSTER }} \
+            --zone ${{ env.GKE_ZONE }} \
+            --project ${{ env.PROJECT_ID }} \
+            --format="value(name)" > /dev/null
+
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
 
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
@@ -74,12 +88,6 @@ jobs:
 
           # Proxy 종료
           kill $PROXY_PID || true
-
-      - name: Get GKE Credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: ${{ env.GKE_CLUSTER }}
-          location: ${{ env.GKE_ZONE }}
 
       - name: Update Deployment Image
         run: |

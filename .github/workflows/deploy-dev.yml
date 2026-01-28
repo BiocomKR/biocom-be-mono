@@ -11,7 +11,7 @@ env:
   REGION: asia-northeast3
   REPOSITORY: biocom-api
   IMAGE_NAME: biocom-mq
-  GKE_CLUSTER: biocom-cluster-dev
+  GKE_CLUSTER: cluster-api-dev
   GKE_ZONE: asia-northeast3-a
   NAMESPACE: biocom-api
 
@@ -30,6 +30,20 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      # 클러스터 존재 여부 사전 검증 (빠른 실패)
+      - name: Validate GKE Cluster
+        run: |
+          gcloud container clusters describe ${{ env.GKE_CLUSTER }} \
+            --zone ${{ env.GKE_ZONE }} \
+            --project ${{ env.PROJECT_ID }} \
+            --format="value(name)" > /dev/null
+
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
 
       - name: Configure Docker
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
@@ -55,16 +69,25 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Setup Cloud SQL Proxy
+        run: |
+          curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.2/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+
       - name: Run DB Migration
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
-        run: npx prisma db push --accept-data-loss
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV_PROXY }}
+        run: |
+          # Cloud SQL Proxy 백그라운드 실행
+          ./cloud-sql-proxy --port 5432 ${{ env.PROJECT_ID }}:${{ env.REGION }}:biocom-postgres-dev &
+          PROXY_PID=$!
+          sleep 5
 
-      - name: Get GKE Credentials
-        uses: google-github-actions/get-gke-credentials@v2
-        with:
-          cluster_name: ${{ env.GKE_CLUSTER }}
-          location: ${{ env.GKE_ZONE }}
+          # DB 마이그레이션 실행
+          npx prisma db push --accept-data-loss
+
+          # Proxy 종료
+          kill $PROXY_PID || true
 
       - name: Update Deployment Image
         run: |
