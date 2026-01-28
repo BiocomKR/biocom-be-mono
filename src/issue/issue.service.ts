@@ -134,13 +134,9 @@ export class IssueService {
 
   /**
    * 백오피스 피드백 등록
-   * TODO: 스키마 변경 후 userId nullable로 변경 필요
    */
   async createBoFeedback(dto: CreateBoFeedbackDto) {
     this.logger.log('백오피스 피드백 등록');
-
-    // TODO: 스키마 변경 전까지 userId=1로 강제 설정
-    const SYSTEM_USER_ID = 1;
 
     // fileUrls를 content에 포함 (스키마에 fileIds가 Int[]라서 URL 직접 저장 불가)
     let content = dto.content;
@@ -150,7 +146,6 @@ export class IssueService {
 
     await this.prisma.issueReport.create({
       data: {
-        userId: SYSTEM_USER_ID,
         content,
         type: 'BO_FEEDBACK',
         createdAt: getNowKST(),
