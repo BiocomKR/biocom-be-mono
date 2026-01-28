@@ -284,6 +284,7 @@ export class AllergySyncProcessor extends WorkerHost {
         level5: data.level5 || null,
         userId: null, // 나중에 유저 조회 시 매핑
         createdAt: getNowKST(),
+        updatedAt: getNowKST(),
       },
     });
 
