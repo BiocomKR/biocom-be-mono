@@ -3027,8 +3027,8 @@ model UserAddress {
 model IssueReport {
   /// 신고 ID
   id         Int       @id @default(autoincrement())
-  /// 사용자 ID
-  userId     Int       @map("user_id")
+  /// 사용자 ID (백오피스 피드백의 경우 null)
+  userId     Int?      @map("user_id")
   /// 신고 내용
   content    String
   /// 관리자 답변
@@ -3043,9 +3043,9 @@ model IssueReport {
   createdAt  DateTime  @default(now()) @map("created_at")
   /// 첨부파일 ID 배열
   fileIds    Int[]     @default([]) @map("file_ids")
-  /// 신고 유형 (ISSUE: 불편사항, ACCOUNT_DELETION: 계정삭제요청)
+  /// 신고 유형 (ISSUE: 불편사항, ACCOUNT_DELETION: 계정삭제요청, BO_FEEDBACK: 백오피스피드백)
   type       String    @default("ISSUE") @db.VarChar(30)
-  user       User      @relation(fields: [userId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_issue_reports_user_id")
   @@map("issue_reports")
