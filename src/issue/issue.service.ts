@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/services/prisma.service';
 import { AnswerIssueReportDto } from './dto/answer-issue-report.dto';
+import { CreateBoFeedbackDto } from './dto/create-bo-feedback.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 
 @Injectable()
@@ -128,6 +129,37 @@ export class IssueService {
     return {
       success: true,
       message: '답변이 등록되었습니다.',
+    };
+  }
+
+  /**
+   * 백오피스 피드백 등록
+   * TODO: 스키마 변경 후 userId nullable로 변경 필요
+   */
+  async createBoFeedback(dto: CreateBoFeedbackDto) {
+    this.logger.log('백오피스 피드백 등록');
+
+    // TODO: 스키마 변경 전까지 userId=1로 강제 설정
+    const SYSTEM_USER_ID = 1;
+
+    // fileUrls를 content에 포함 (스키마에 fileIds가 Int[]라서 URL 직접 저장 불가)
+    let content = dto.content;
+    if (dto.fileUrls && dto.fileUrls.length > 0) {
+      content += '\n\n[첨부파일]\n' + dto.fileUrls.join('\n');
+    }
+
+    await this.prisma.issueReport.create({
+      data: {
+        userId: SYSTEM_USER_ID,
+        content,
+        type: 'BO_FEEDBACK',
+        createdAt: getNowKST(),
+      },
+    });
+
+    return {
+      success: true,
+      message: '피드백이 등록되었습니다.',
     };
   }
 }

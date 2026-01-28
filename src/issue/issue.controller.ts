@@ -1,8 +1,9 @@
-import { Controller, Get, Patch, Param, Body, Query, ParseIntPipe, UseGuards, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, ParseIntPipe, UseGuards, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IssueService } from './issue.service';
 import { AnswerIssueReportDto } from './dto/answer-issue-report.dto';
+import { CreateBoFeedbackDto } from './dto/create-bo-feedback.dto';
 
 @ApiTags('문제 신고 관리')
 @Controller('issues')
@@ -72,5 +73,19 @@ export class IssueController {
   ) {
     this.logger.log(`신고 답변 작성 요청: id=${id}`);
     return this.issueService.answerReport(id, dto);
+  }
+
+  /**
+   * 백오피스 피드백 등록
+   */
+  @Post('bo-feedback')
+  @ApiOperation({
+    summary: '백오피스 피드백 등록',
+    description: '백오피스 사용 중 발견한 불편사항을 등록합니다.',
+  })
+  @ApiResponse({ status: 201, description: '피드백 등록 성공' })
+  async createBoFeedback(@Body() dto: CreateBoFeedbackDto) {
+    this.logger.log('백오피스 피드백 등록 요청');
+    return this.issueService.createBoFeedback(dto);
   }
 }
