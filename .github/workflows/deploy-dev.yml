@@ -89,9 +89,9 @@ jobs:
       - name: Deploy to GKE
         run: |
           kubectl apply -f infra-gcp/k8s/configmap.yaml -n ${{ env.NAMESPACE }}
-          kubectl apply -f infra-gcp/k8s/service.yaml -n ${{ env.NAMESPACE }}
+          kubectl apply -f infra-gcp/k8s/service.yaml -n ${{ env.NAMESPACE }} --server-side=true
           kubectl apply -f infra-gcp/k8s/deployment.yaml -n ${{ env.NAMESPACE }}
-          kubectl apply -f infra-gcp/k8s/ingress.yaml -n ${{ env.NAMESPACE }}
+          kubectl apply -f infra-gcp/k8s/ingress.yaml -n ${{ env.NAMESPACE }} --server-side=true
           kubectl rollout status deployment/biocom-bo-api -n ${{ env.NAMESPACE }} --timeout=300s
 
       - name: Verify Deployment
