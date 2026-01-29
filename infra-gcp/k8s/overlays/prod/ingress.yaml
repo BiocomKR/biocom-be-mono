@@ -1,0 +1,86 @@
+# Ingress - biocom-bo-api 운영 환경 외부 트래픽 라우팅
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: biocom-bo-api-ingress
+  namespace: biocom-bo-api
+  labels:
+    app: biocom-bo-api
+    environment: prod
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
+    networking.gke.io/managed-certificates: "biocom-bo-api-ssl-cert"
+    cloud.google.com/backend-config: '{"default": "biocom-bo-api-backend-config"}'
+    networking.gke.io/v1beta1.FrontendConfig: "biocom-bo-api-frontend-config"
+    kubernetes.io/ingress.global-static-ip-name: "biocom-bo-cluster-prod-external-ip"
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/load-balancer-type: "External"
+spec:
+  defaultBackend:
+    service:
+      name: biocom-bo-api-service
+      port:
+        number: 80
+  rules:
+    - host: bo-api.biocom.ai.kr
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: biocom-bo-api-service
+                port:
+                  number: 80
+
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: biocom-bo-api-service
+                port:
+                  number: 80
+
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: biocom-bo-api-service
+                port:
+                  number: 80
+
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: biocom-bo-api-service
+                port:
+                  number: 80
+
+---
+# ManagedCertificate - Google Managed SSL 인증서 (운영)
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: biocom-bo-api-ssl-cert
+  namespace: biocom-bo-api
+  labels:
+    app: biocom-bo-api
+spec:
+  domains:
+    - bo-api.biocom.ai.kr
+
+---
+# FrontendConfig - HTTPS 강제 리다이렉트
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: biocom-bo-api-frontend-config
+  namespace: biocom-bo-api
+spec:
+  sslPolicy: "biocom-bo-cluster-prod-ssl-policy"
+  redirectToHttps:
+    enabled: true
+    responseCodeName: "MOVED_PERMANENTLY_DEFAULT"

@@ -1,0 +1,73 @@
+# Service - biocom-bo-api 네트워크 서비스
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: biocom-bo-api-service
+  namespace: biocom-bo-api
+  labels:
+    app: biocom-bo-api
+    service: biocom-bo-api
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "biocom-bo-api-backend-config"}'
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 10805
+      protocol: TCP
+  selector:
+    app: biocom-bo-api
+
+---
+# BackendConfig - GCP Load Balancer 세부 설정
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: biocom-bo-api-backend-config
+  namespace: biocom-bo-api
+spec:
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /api/health
+    port: 10805
+
+  timeoutSec: 30
+
+  connectionDraining:
+    drainingTimeoutSec: 60
+
+  sessionAffinity:
+    affinityType: "NONE"
+
+  logging:
+    enable: true
+    sampleRate: 1.0
+
+---
+# Headless Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: biocom-bo-api-headless
+  namespace: biocom-bo-api
+  labels:
+    app: biocom-bo-api
+    service: biocom-bo-api-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 10805
+      targetPort: 10805
+      protocol: TCP
+  selector:
+    app: biocom-bo-api

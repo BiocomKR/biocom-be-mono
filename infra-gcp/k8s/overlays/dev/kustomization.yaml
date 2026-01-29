@@ -1,0 +1,38 @@
+# Dev Environment Kustomization - biocom-bo-api 개발 환경
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 네임스페이스 지정
+namespace: biocom-bo-api
+
+# Base 리소스 참조
+resources:
+  - ../../base
+  - configmap.yaml
+  - ingress.yaml
+
+# 이미지 태그 (배포 시 동적으로 변경됨)
+images:
+  - name: biocom-bo-api
+    newName: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-bo-api
+    newTag: "latest"
+
+# 환경별 레이블
+commonLabels:
+  environment: dev
+
+# 환경별 어노테이션
+commonAnnotations:
+  environment: dev
+
+# dev 환경 ServiceAccount patch (Workload Identity)
+patches:
+  - patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          iam.gke.io/gcp-service-account: biocom-bo-api@biocom-backoffice.iam.gserviceaccount.com
+    target:
+      kind: ServiceAccount
+      name: biocom-bo-api-sa
