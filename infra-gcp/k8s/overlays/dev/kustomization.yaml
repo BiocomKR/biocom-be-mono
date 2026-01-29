@@ -15,7 +15,7 @@ resources:
 images:
   - name: biocom-mq
     newName: asia-northeast3-docker.pkg.dev/api-dev-biocom/biocom-api/biocom-mq
-    newTag: "latest"
+    newTag: "20260129012319"
 
 # 환경별 레이블
 commonLabels:
