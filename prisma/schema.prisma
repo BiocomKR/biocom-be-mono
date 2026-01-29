@@ -3045,6 +3045,8 @@ model IssueReport {
   fileIds    Int[]     @default([]) @map("file_ids")
   /// 신고 유형 (ISSUE: 불편사항, ACCOUNT_DELETION: 계정삭제요청, BO_FEEDBACK: 백오피스피드백)
   type       String    @default("ISSUE") @db.VarChar(30)
+  /// 카테고리 (BUG: 버그, FEATURE: 기능개선, UI: UI개선, OTHER: 기타)
+  category   String?   @db.VarChar(30)
   user       User?     @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_issue_reports_user_id")
