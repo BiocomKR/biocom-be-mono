@@ -21,14 +21,18 @@ export class IssueService {
     type?: string,
     category?: string,
     search?: string,
+    excludeType?: string,
   ) {
-    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}, type=${type}, category=${category}, search=${search}`);
+    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}, type=${type}, category=${category}, search=${search}, excludeType=${excludeType}`);
 
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (type) {
       where.type = type;
+    }
+    if (excludeType) {
+      where.type = { not: excludeType };
     }
     // BO_FEEDBACK은 status로, 나머지는 answer로 필터링
     if (isAnswered !== undefined) {

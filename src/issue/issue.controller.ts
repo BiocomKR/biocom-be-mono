@@ -29,6 +29,7 @@ export class IssueController {
   @ApiQuery({ name: 'type', required: false, type: String, description: '유형 필터 (ISSUE, ACCOUNT_DELETION, BO_FEEDBACK)' })
   @ApiQuery({ name: 'category', required: false, type: String, description: '카테고리 필터 (BUG, FEATURE, UI, OTHER)' })
   @ApiQuery({ name: 'search', required: false, type: String, description: '내용 검색어' })
+  @ApiQuery({ name: 'excludeType', required: false, type: String, description: '제외할 유형 (예: BO_FEEDBACK)' })
   @ApiResponse({ status: 200, description: '목록 조회 성공' })
   async getReports(
     @Query('page') page?: string,
@@ -37,6 +38,7 @@ export class IssueController {
     @Query('type') type?: string,
     @Query('category') category?: string,
     @Query('search') search?: string,
+    @Query('excludeType') excludeType?: string,
   ) {
     this.logger.log(`신고 목록 조회 요청`);
     return this.issueService.getReports(
@@ -46,6 +48,7 @@ export class IssueController {
       type,
       category,
       search,
+      excludeType,
     );
   }
 
