@@ -3041,6 +3041,8 @@ model IssueReport {
   deviceInfo String?   @map("device_info") @db.VarChar(200)
   /// 생성일시
   createdAt  DateTime  @default(now()) @map("created_at")
+  /// 수정일시
+  updatedAt  DateTime? @updatedAt @map("updated_at")
   /// 첨부파일 ID 배열
   fileIds    Int[]     @default([]) @map("file_ids")
   /// 신고 유형 (ISSUE: 불편사항, ACCOUNT_DELETION: 계정삭제요청, BO_FEEDBACK: 백오피스피드백)

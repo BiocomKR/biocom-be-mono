@@ -8,8 +8,17 @@ import {
   SUPPORTED_INPUT_FORMATS,
   ImageConvertResponseDto,
 } from './dto/image-convert.dto';
+import { PrismaService } from '../common/services/prisma.service';
+import { getNowKST } from '../common/utils/kst-date.util';
 
 export interface FileUploadResult {
+  url: string;
+  originalName: string;
+  size: number;
+}
+
+export interface FileUploadWithIdResult {
+  id: number;
   url: string;
   originalName: string;
   size: number;
@@ -21,7 +30,7 @@ export class UtilsService {
   private readonly storage: Storage;
   private readonly bucketName: string;
 
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     this.storage = new Storage({
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
       keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
@@ -192,6 +201,61 @@ export class UtilsService {
           `파일 업로드 실패: ${file.originalname} - ${error.message}`,
         );
       }
+    }
+
+    return results;
+  }
+
+  /**
+   * 파일 업로드 + File 테이블 저장 (ID 반환)
+   */
+  async uploadFilesWithRecord(
+    files: Express.Multer.File[],
+    folder?: string,
+  ): Promise<FileUploadWithIdResult[]> {
+    if (files.length > this.MAX_FILES) {
+      throw new BadRequestException(
+        `최대 ${this.MAX_FILES}개의 파일만 업로드할 수 있습니다`,
+      );
+    }
+
+    const results: FileUploadWithIdResult[] = [];
+
+    for (const file of files) {
+      const fileExt = extname(file.originalname).toLowerCase();
+      const safeFileName = `${crypto.randomBytes(16).toString('hex')}${fileExt}`;
+      const filePath = folder ? `${folder}/${safeFileName}` : safeFileName;
+
+      const bucket = this.storage.bucket(this.bucketName);
+      const gcsFile = bucket.file(filePath);
+
+      await gcsFile.save(file.buffer, {
+        metadata: { contentType: file.mimetype },
+        public: true,
+      });
+
+      const publicUrl = `https://storage.googleapis.com/${this.bucketName}/${filePath}`;
+
+      const fileRecord = await this.prisma.file.create({
+        data: {
+          originalName: file.originalname,
+          storedName: safeFileName,
+          filePath: publicUrl,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          storageType: 'gcs',
+          createdAt: getNowKST(),
+        },
+      });
+
+      results.push({
+        id: fileRecord.id,
+        url: publicUrl,
+        originalName: file.originalname,
+        size: file.size,
+      });
+
+      this.logger.log(`파일 업로드 완료 (ID: ${fileRecord.id}): ${publicUrl}`);
     }
 
     return results;

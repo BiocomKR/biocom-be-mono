@@ -13,8 +13,15 @@ export class IssueService {
   /**
    * 신고 목록 조회
    */
-  async getReports(page: number = 1, limit: number = 20, isAnswered?: boolean, type?: string) {
-    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}, type=${type}`);
+  async getReports(
+    page: number = 1,
+    limit: number = 20,
+    isAnswered?: boolean,
+    type?: string,
+    category?: string,
+    search?: string,
+  ) {
+    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}, type=${type}, category=${category}, search=${search}`);
 
     const skip = (page - 1) * limit;
 
@@ -26,6 +33,12 @@ export class IssueService {
     }
     if (type) {
       where.type = type;
+    }
+    if (category) {
+      where.category = category;
+    }
+    if (search) {
+      where.content = { contains: search, mode: 'insensitive' };
     }
 
     const [items, total] = await Promise.all([
@@ -47,6 +60,16 @@ export class IssueService {
       this.prisma.issueReport.count({ where }),
     ]);
 
+    // fileIds로 파일 URL 조회
+    const allFileIds = items.flatMap((item) => item.fileIds || []);
+    const files = allFileIds.length > 0
+      ? await this.prisma.file.findMany({
+          where: { id: { in: allFileIds } },
+          select: { id: true, filePath: true },
+        })
+      : [];
+    const fileMap = new Map(files.map((f) => [f.id, f.filePath]));
+
     return {
       items: items.map((item) => ({
         id: item.id,
@@ -58,6 +81,8 @@ export class IssueService {
         createdAt: item.createdAt,
         isAnswered: item.answer !== null,
         type: item.type,
+        category: item.category,
+        fileUrls: (item.fileIds || []).map((id) => fileMap.get(id)).filter(Boolean),
         user: item.user,
       })),
       total,
@@ -138,15 +163,11 @@ export class IssueService {
   async createBoFeedback(dto: CreateBoFeedbackDto) {
     this.logger.log('백오피스 피드백 등록');
 
-    // fileUrls를 content에 포함 (스키마에 fileIds가 Int[]라서 URL 직접 저장 불가)
-    let content = dto.content;
-    if (dto.fileUrls && dto.fileUrls.length > 0) {
-      content += '\n\n[첨부파일]\n' + dto.fileUrls.join('\n');
-    }
-
     await this.prisma.issueReport.create({
       data: {
-        content,
+        content: dto.content,
+        category: dto.category,
+        fileIds: dto.fileIds || [],
         type: 'BO_FEEDBACK',
         createdAt: getNowKST(),
       },
@@ -155,6 +176,30 @@ export class IssueService {
     return {
       success: true,
       message: '피드백이 등록되었습니다.',
+    };
+  }
+
+  /**
+   * 신고/피드백 삭제
+   */
+  async deleteReport(id: number) {
+    this.logger.log(`신고/피드백 삭제: id=${id}`);
+
+    const report = await this.prisma.issueReport.findUnique({
+      where: { id },
+    });
+
+    if (!report) {
+      throw new NotFoundException('신고/피드백을 찾을 수 없습니다.');
+    }
+
+    await this.prisma.issueReport.delete({
+      where: { id },
+    });
+
+    return {
+      success: true,
+      message: '삭제되었습니다.',
     };
   }
 }

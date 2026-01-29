@@ -20,7 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { UtilsService, FileUploadResult } from './utils.service';
+import { UtilsService, FileUploadResult, FileUploadWithIdResult } from './utils.service';
 import {
   ImageConvertDto,
   SUPPORTED_INPUT_FORMATS,
@@ -193,6 +193,47 @@ export class UtilsController {
     }
 
     const results = await this.utilsService.uploadFiles(files, folder);
+
+    return {
+      success: true,
+      data: results,
+      timestamp: getNowKST(),
+    };
+  }
+
+  @Post('upload-files-with-record')
+  @UseInterceptors(FilesInterceptor('files', 50))
+  @ApiOperation({
+    summary: '파일 업로드 + File 테이블 저장',
+    description: '파일을 GCS에 업로드하고 File 테이블에 저장하여 ID를 반환합니다.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['files'],
+      properties: {
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+        },
+        folder: {
+          type: 'string',
+          description: '저장할 폴더 경로 (선택)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: '업로드 성공' })
+  async uploadFilesWithRecord(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('folder') folder?: string,
+  ): Promise<{ success: boolean; data: FileUploadWithIdResult[]; timestamp: Date }> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('파일을 업로드해주세요');
+    }
+
+    const results = await this.utilsService.uploadFilesWithRecord(files, folder);
 
     return {
       success: true,
