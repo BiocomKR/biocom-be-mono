@@ -1,13 +1,64 @@
-# 🚀 **BIOCOM API: AWS → GCP 한방배포 완전정복기**
+# biocom-api
 
-# 📋 프로젝트 개요
+바이오컴 유저 백엔드 API (NestJS)
 
-> 💡 프로젝트 핵심 정보
-> 
-> - **목표**: AWS EKS에서 GCP GKE로 완전 자동화 이관
-> - **핵심**: "한방배포" - 수동 개입 없는 완전 자동화 시스템
-> - **기간**: 2025.09.02 ~ 2025.09.03 (2일간)
-> - **최종 결과**: ✅ **완전 성공** (HTTP/HTTPS 모두 동작)
+## 프로젝트 구조
+
+```
+biocom-api/
+├── src/                    # 소스 코드
+├── prisma/
+│   └── schema.prisma       # Prisma 스키마
+├── docs/                   # 문서
+├── infra-gcp/              # GCP 인프라 (Terraform, K8s)
+├── test/                   # 테스트
+├── dist/                   # 빌드 결과물
+├── logs/                   # 로그 파일
+└── node_modules/           # 의존성
+```
+
+## 루트 파일
+
+| 파일 | 용도 |
+|-----|------|
+| `package.json` | npm 의존성 및 스크립트 |
+| `tsconfig.json` | TypeScript 설정 |
+| `nest-cli.json` | NestJS CLI 설정 |
+| `jest.config.js` | Jest 테스트 설정 |
+| `Dockerfile` | Docker 빌드 설정 |
+| `.env.*` | 환경 변수 (local, dev, prod) |
+| `HANDOVER.md` | 인수인계 문서 |
+| `CLAUDE.md` | Claude AI 가이드라인 |
+| `*-firebase-*.json` | Firebase 푸시 알림용 서비스 계정 |
+| `google-service-account-*.json` | GCS 접근용 서비스 계정 |
+
+## 실행 방법
+
+```bash
+# 의존성 설치
+npm install
+
+# 개발 서버 실행
+npm run start:dev
+
+# 빌드
+npm run build
+
+# 프로덕션 실행
+npm run start:prod
+```
+
+## 배포
+
+GitHub Actions로 자동 배포됨
+- `development` push → 개발서버 자동 배포
+- `main` push → 운영서버 자동 배포
+
+---
+
+# GCP 이관 기록
+
+> 💡 AWS EKS → GCP GKE 이관 (2025.09.02 ~ 2025.09.03)
 
 ---
 
