@@ -31,7 +31,7 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      # 클러스터 존재 여부 사전 검증 (빠른 실패)
+      # GKE 클러스터 존재 여부 사전 검증
       - name: Validate GKE Cluster
         run: |
           gcloud container clusters describe ${{ env.GKE_CLUSTER }} \
@@ -52,14 +52,11 @@ jobs:
         run: |
           IMAGE_TAG=$(date +%Y%m%d%H%M%S)
           docker build -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG .
-          docker tag ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG \
-                     ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
       - name: Push Docker Image
         run: |
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,16 +86,14 @@ jobs:
           # Proxy 종료
           kill $PROXY_PID || true
 
-      - name: Update Deployment Image
+      - name: Update kustomization.yaml
         run: |
-          cd infra-gcp/k8s
-          sed -i "s|image: .*biocom-mq.*|image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}|" deployment.yaml
+          cd infra-gcp/k8s/overlays/prod
+          sed -i "s/newTag: .*/newTag: \"${{ env.IMAGE_TAG }}\"/" kustomization.yaml
 
       - name: Deploy to GKE
         run: |
-          kubectl apply -f infra-gcp/k8s/configmap-prod.yaml -n ${{ env.NAMESPACE }}
-          kubectl apply -f infra-gcp/k8s/service.yaml -n ${{ env.NAMESPACE }}
-          kubectl apply -f infra-gcp/k8s/deployment.yaml -n ${{ env.NAMESPACE }}
+          kubectl apply -k infra-gcp/k8s/overlays/prod/
           kubectl rollout status deployment/biocom-mq -n ${{ env.NAMESPACE }} --timeout=300s
 
       - name: Verify Deployment
@@ -109,8 +104,8 @@ jobs:
 
       - name: Notify Success
         if: success()
-        run: echo "✅ biocom-mq 운영서버 배포 완료 - 태그:${{ env.IMAGE_TAG }}"
+        run: echo "biocom-mq 운영서버 배포 완료 - 태그:${{ env.IMAGE_TAG }}"
 
       - name: Notify Failure
         if: failure()
-        run: echo "❌ biocom-mq 운영서버 배포 실패"
+        run: echo "biocom-mq 운영서버 배포 실패"
