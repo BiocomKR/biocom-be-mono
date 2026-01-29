@@ -560,12 +560,19 @@ export class UsersService {
       select: { status: true },
     });
 
+    // PaymentCustomer 조회 (토스페이먼츠 고객 키)
+    const paymentCustomer = await this.prisma.paymentCustomer.findFirst({
+      where: { userId },
+      select: { customerUid: true },
+    });
+
     return {
       userId: user.id,
       userType: user.status as UserSubscriptionStatus,
       challengeStatus: (activeChallenge?.status as UserChallengeStatus) || null,
       challengeCode: activeChallenge?.product?.sku || null,
-      subscriptionStatus: latestSubscription?.status || 'NONE',
+      subscriptionStatus: latestSubscription?.status || null,
+      customerKey: paymentCustomer?.customerUid || null,
       createdAt: user.createdAt.toISOString(),
     };
   }

@@ -43,4 +43,11 @@ export class UserAnalyticsDto {
     example: '2025-01-01T00:00:00.000Z',
   })
   createdAt: string;
+
+  @ApiPropertyOptional({
+    description: '토스페이먼츠 고객 키 (PaymentCustomer.customerUid)',
+    example: 'cust_abc123def456',
+    nullable: true,
+  })
+  customerKey: string | null;
 }
