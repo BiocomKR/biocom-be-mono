@@ -101,6 +101,22 @@ http://localhost:4001/admin/queues
 
 ## 📁 프로젝트 구조
 
+### 루트 파일
+
+| 파일 | 용도 |
+|-----|------|
+| `package.json` | npm 의존성 및 스크립트 |
+| `tsconfig.json` | TypeScript 설정 |
+| `nest-cli.json` | NestJS CLI 설정 |
+| `Dockerfile` | Docker 빌드 설정 |
+| `docker-compose.yml` | 로컬 Redis 실행용 |
+| `.env.*` | 환경 변수 (local, dev, prod) |
+| `HANDOVER.md` | 인수인계 문서 |
+| `CLAUDE.md` | Claude AI 가이드라인 |
+| `*-firebase-*.json` | Firebase 푸시 알림용 서비스 계정 |
+
+### 폴더 구조
+
 ```
 biocom-mq/
 ├── src/
