@@ -135,6 +135,38 @@ PAYMENT_FAILED → CANCELLED
 
 ---
 
+## 파일 첨부 설계 가이드라인
+
+### 기본 원칙
+1. **File 테이블 참조**: 특별한 경우가 아니라면 `File` 테이블을 사용
+2. **데이터 규모에 따른 선택**:
+   - 대량 데이터 예상 → **관계 테이블 생성** (ProductFile, ContentFile 등)
+   - 소량/단순 데이터 → **배열 필드** (fileIds Int[], fileUrls String[])
+
+### 적용 사례
+| 테이블 | 방식 | 이유 |
+|--------|------|------|
+| Product | ProductFile 관계 테이블 | 상품 이미지 많음, 순서/정렬 필요 |
+| Content | ContentFile 관계 테이블 | 콘텐츠별 다수 미디어 |
+| IssueReport | fileUrls String[] | 규모 작음, 정규화 불필요 |
+
+### File 테이블 구조
+```prisma
+model File {
+  id           Int      @id @default(autoincrement())
+  originalName String   // 원본 파일명
+  storedName   String   // 저장된 파일명 (unique)
+  filePath     String   // GCS URL
+  fileSize     Int
+  mimeType     String
+  storageType  String   @default("local")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+```
+
+---
+
 ## 기술적 주의사항
 
 ### KST 날짜/시간 처리

@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { IssueService } from './issue.service';
 import { AnswerIssueReportDto } from './dto/answer-issue-report.dto';
 import { CreateBoFeedbackDto } from './dto/create-bo-feedback.dto';
+import { UpdateStatusDto } from './dto/update-status.dto';
 
 @ApiTags('문제 신고 관리')
 @Controller('issues')
@@ -93,6 +94,24 @@ export class IssueController {
   async createBoFeedback(@Body() dto: CreateBoFeedbackDto) {
     this.logger.log('백오피스 피드백 등록 요청');
     return this.issueService.createBoFeedback(dto);
+  }
+
+  /**
+   * 피드백 상태 변경
+   */
+  @Patch(':id/status')
+  @ApiOperation({
+    summary: '피드백 상태 변경',
+    description: '백오피스 피드백의 처리 상태를 변경합니다. (PENDING, IN_PROGRESS, RESOLVED)',
+  })
+  @ApiParam({ name: 'id', description: '피드백 ID' })
+  @ApiResponse({ status: 200, description: '상태 변경 성공' })
+  async updateStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStatusDto,
+  ) {
+    this.logger.log(`피드백 상태 변경 요청: id=${id}, status=${dto.status}`);
+    return this.issueService.updateStatus(id, dto.status);
   }
 
   /**

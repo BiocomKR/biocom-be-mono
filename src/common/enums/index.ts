@@ -41,3 +41,7 @@ export * from './point-related-type.enum';
 
 // 앱 관련
 export * from './app-bundle-id.enum';
+
+// 피드백 관련
+export * from './feedback-status.enum';
+export * from './issue-report-type.enum';

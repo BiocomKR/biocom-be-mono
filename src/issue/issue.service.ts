@@ -3,6 +3,7 @@ import { PrismaService } from '../common/services/prisma.service';
 import { AnswerIssueReportDto } from './dto/answer-issue-report.dto';
 import { CreateBoFeedbackDto } from './dto/create-bo-feedback.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { FeedbackStatus, IssueReportType } from '../common/enums';
 
 @Injectable()
 export class IssueService {
@@ -26,13 +27,16 @@ export class IssueService {
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (isAnswered === true) {
-      where.answer = { not: null };
-    } else if (isAnswered === false) {
-      where.answer = null;
-    }
     if (type) {
       where.type = type;
+    }
+    // BO_FEEDBACK은 status로, 나머지는 answer로 필터링
+    if (isAnswered !== undefined) {
+      if (type === IssueReportType.BO_FEEDBACK) {
+        where.status = isAnswered ? FeedbackStatus.RESOLVED : { not: FeedbackStatus.RESOLVED };
+      } else {
+        where.answer = isAnswered ? { not: null } : null;
+      }
     }
     if (category) {
       where.category = category;
@@ -79,9 +83,13 @@ export class IssueService {
         appVersion: item.appVersion,
         deviceInfo: item.deviceInfo,
         createdAt: item.createdAt,
-        isAnswered: item.answer !== null,
+        // BO_FEEDBACK은 status로, 나머지는 answer로 판단
+        isAnswered: item.type === IssueReportType.BO_FEEDBACK
+          ? item.status === FeedbackStatus.RESOLVED
+          : item.answer !== null,
         type: item.type,
         category: item.category,
+        status: item.status,
         fileUrls: (item.fileIds || []).map((id) => fileMap.get(id)).filter(Boolean),
         user: item.user,
       })),
@@ -168,7 +176,8 @@ export class IssueService {
         content: dto.content,
         category: dto.category,
         fileIds: dto.fileIds || [],
-        type: 'BO_FEEDBACK',
+        type: IssueReportType.BO_FEEDBACK,
+        status: FeedbackStatus.PENDING,
         createdAt: getNowKST(),
       },
     });
@@ -176,6 +185,35 @@ export class IssueService {
     return {
       success: true,
       message: '피드백이 등록되었습니다.',
+    };
+  }
+
+  /**
+   * 피드백 상태 변경 (BO_FEEDBACK 전용)
+   */
+  async updateStatus(id: number, status: string) {
+    this.logger.log(`피드백 상태 변경: id=${id}, status=${status}`);
+
+    const report = await this.prisma.issueReport.findUnique({
+      where: { id },
+    });
+
+    if (!report) {
+      throw new NotFoundException('피드백을 찾을 수 없습니다.');
+    }
+
+    if (report.type !== IssueReportType.BO_FEEDBACK) {
+      throw new Error('상태 변경은 백오피스 피드백에서만 가능합니다.');
+    }
+
+    await this.prisma.issueReport.update({
+      where: { id },
+      data: { status },
+    });
+
+    return {
+      success: true,
+      message: '상태가 변경되었습니다.',
     };
   }
 
