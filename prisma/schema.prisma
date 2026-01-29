@@ -3049,6 +3049,8 @@ model IssueReport {
   type       String    @default("ISSUE") @db.VarChar(30)
   /// 카테고리 (BUG: 버그, FEATURE: 기능개선, UI: UI개선, OTHER: 기타)
   category   String?   @db.VarChar(30)
+  /// 처리 상태 (PENDING: 대기중, IN_PROGRESS: 진행중, RESOLVED: 완료) - BO_FEEDBACK 전용
+  status     String?   @db.VarChar(20)
   user       User?     @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "idx_issue_reports_user_id")
