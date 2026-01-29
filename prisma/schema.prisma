@@ -3146,6 +3146,27 @@ model DomainKnowledgeEmbedding {
   @@map("domain_knowledge_embeddings")
 }
 
+/// 취업 분석용 지식 임베딩 테이블 (이력서/포트폴리오/깃허브)
+model AnalysisKnowledgeEmbedding {
+  id          Int                         @id @default(autoincrement())
+  domain      String                      @db.VarChar(50) // resume, interview, portfolio, career
+  position    String                      @default("all") @db.VarChar(50) // backend, frontend, all, etc.
+  category    String?                     @db.VarChar(100) // 세부 카테고리
+  title       String                      @db.VarChar(500) // 문서 제목
+  content     String                      // 청크 내용
+  chunkIndex  Int                         @default(0) @map("chunk_index") // 청크 순서
+  embedding   Unsupported("vector(1536)")
+  metadata    Json?
+  sourceFile  String?                     @map("source_file") @db.VarChar(500) // 원본 파일 경로
+  createdAt   DateTime?                   @default(now()) @map("created_at")
+  updatedAt   DateTime?                   @map("updated_at")
+
+  @@index([domain])
+  @@index([position])
+  @@index([domain, position])
+  @@map("analysis_knowledge_embeddings")
+}
+
 /// IAP 플랫폼 Enum
 enum IAPPlatform {
   APPLE
