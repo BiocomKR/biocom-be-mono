@@ -231,6 +231,7 @@ export class SibApiService {
           level4: data.level4,
           level5: data.level5,
           createdAt: getNowKST(),
+          updatedAt: getNowKST(),
         },
       });
       this.logger.log(`IgG Levels 캐시 저장 완료 (chartId: ${data.chartId})`);
