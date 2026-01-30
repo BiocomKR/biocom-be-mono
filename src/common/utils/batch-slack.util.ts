@@ -20,6 +20,7 @@ const BATCH_NAME_KO: Record<string, string> = {
   'sync-shipping-status': '배송 상태 동기화',
   'retry-logistics': '물류 주문 재시도',
   'expire-coupons': '쿠폰 만료 처리',
+  'sib-health-check': 'SIB API 헬스체크',
 };
 
 interface BatchResult {

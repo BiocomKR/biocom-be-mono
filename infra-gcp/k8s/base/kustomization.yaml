@@ -20,6 +20,7 @@ resources:
   - cronjob-iap-acknowledge-retry.yaml
   - cronjob-sync-shipping-status.yaml
   - cronjob-allergy-sync.yaml
+  - cronjob-sib-health-check.yaml
 
 # 공통 레이블
 commonLabels:

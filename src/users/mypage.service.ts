@@ -479,6 +479,12 @@ export class MypageService {
       await tx.userDeepReport.deleteMany({
         where: { userId },
       });
+
+      // 2-10. PaymentCustomer userId 연결 해제 (데이터는 유지 - 환불/분쟁 처리용)
+      await tx.paymentCustomer.updateMany({
+        where: { userId },
+        data: { userId: null },
+      });
     });
 
     this.logger.log(`회원탈퇴 완료: userId=${userId}`);

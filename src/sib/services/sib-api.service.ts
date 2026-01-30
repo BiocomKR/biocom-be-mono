@@ -10,6 +10,7 @@ import {
   UgiAiSolutionResponse,
 } from '../interfaces/sib-response.interface';
 import { ExamType, IGG_EXAM_TYPES } from '../enums/exam-type.enum';
+import { SIB_API_URL } from '../constants/sib.constants';
 import { YesNo } from '../../common/enums';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
@@ -24,7 +25,7 @@ import { getNowKST } from '../../common/utils/kst-date.util';
 @Injectable()
 export class SibApiService {
   private readonly logger = new Logger(SibApiService.name);
-  private readonly baseUrl = 'https://sib.codns.com:3001';
+  private readonly baseUrl = SIB_API_URL;
   private readonly timeout = 5000; // 5초 타임아웃
   private readonly maxRetries = 1; // 1회 재시도
 
@@ -230,6 +231,7 @@ export class SibApiService {
           level4: data.level4,
           level5: data.level5,
           createdAt: getNowKST(),
+          updatedAt: getNowKST(),
         },
       });
       this.logger.log(`IgG Levels 캐시 저장 완료 (chartId: ${data.chartId})`);

@@ -60,6 +60,7 @@ interface UserChallengeData {
     id: number;
     sku: string;
     name: string;
+    metadata: { totalDays?: number } | null;
     challengeMissions: ChallengeMissionData[];
   };
 }
@@ -314,6 +315,7 @@ export class HomeService {
                 id: true,
                 sku: true,
                 name: true,
+                metadata: true,
                 challengeMissions: {
                   where: { isActive: true },
                   select: {
@@ -740,10 +742,11 @@ export class HomeService {
       return null;
     }
 
-    // 챌린지 총 일수 (21일)
-    const CHALLENGE_TOTAL_DAYS = 21;
+    // 챌린지 총 일수 (Product.metadata.totalDays, 없으면 기본 21일)
+    const metadata = activeChallenge.product.metadata as { totalDays?: number } | null;
+    const totalDays = metadata?.totalDays ?? 21;
     // 진행률: 현재 일차 / 총 일수 * 100 (최대 100%)
-    const challengePercent = Math.min(100, Math.round((currentDay / CHALLENGE_TOTAL_DAYS) * 100));
+    const challengePercent = Math.min(100, Math.round((currentDay / totalDays) * 100));
 
     return {
       challengeCode: activeChallenge.product.sku,
@@ -999,6 +1002,7 @@ export class HomeService {
       }
 
       // 2. 해당 일차 강의가 없으면 21일 넘은 경우 마지막 강의 반환
+      // TODO: 챌린지 기간이 다양해지면 Product.metadata.totalDays로 대체 필요
       if (currentDay > 21) {
         const lastLecture = await this.prisma.content.findFirst({
           where: {
