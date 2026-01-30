@@ -101,6 +101,30 @@ async function runScheduler(schedulerName: string) {
         break;
       }
 
+      case 'sib-health-check': {
+        // SIB API 헬스체크 배치 (1분마다 실행)
+        logger.log('SIB API 헬스체크 배치 실행...');
+        const { SibHealthSchedulerService } = await import('./sib/services/sib-health-scheduler.service');
+        const sibHealthSchedulerService = app.get(SibHealthSchedulerService);
+        const result = await sibHealthSchedulerService.handleHealthCheck();
+
+        // 결과에 따라 슬랙 알림
+        if (result.status === 'fail') {
+          await sendBatchSlackNotification('fail', schedulerName, {
+            error: result.message,
+            failCount: result.retryCount,
+          });
+        } else if (result.status === 'warning') {
+          await sendBatchSlackNotification('warning', schedulerName, {
+            error: result.message,
+            successCount: 1,
+            failCount: result.retryCount - 1,
+          });
+        }
+        // success는 알림 없음
+        break;
+      }
+
       default:
         logger.error(`알 수 없는 스케줄러: ${schedulerName}`);
         await sendBatchSlackNotification('fail', schedulerName, {
