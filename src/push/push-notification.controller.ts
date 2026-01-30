@@ -239,8 +239,9 @@ export class PushNotificationController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('isTest') isTest?: boolean,
+    @Query('bundleId') bundleId?: string,
   ) {
-    return await this.pushNotificationService.getPushStats(startDate, endDate, isTest);
+    return await this.pushNotificationService.getPushStats(startDate, endDate, isTest, bundleId);
   }
 
   /**

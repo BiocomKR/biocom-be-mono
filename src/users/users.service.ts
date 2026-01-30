@@ -185,6 +185,7 @@ export class UsersService {
           createdAt: true,
           updatedAt: true,
           deletedAt: true,
+          lastSeenAt: true,
           healthTypeAnimal: {
             select: {
               id: true,
@@ -237,6 +238,7 @@ export class UsersService {
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         deletedAt: user.deletedAt,
+        lastSeenAt: user.lastSeenAt,
         orderCount: user._count.orders,
         challengeCount: user._count.userChallenges,
         couponCount: user._count.userCoupons,
@@ -282,6 +284,7 @@ export class UsersService {
         createdAt: true,
         updatedAt: true,
         deletedAt: true,
+        lastSeenAt: true,
         healthTypeAnimal: {
           select: {
             id: true,
@@ -330,6 +333,7 @@ export class UsersService {
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       deletedAt: user.deletedAt,
+      lastSeenAt: user.lastSeenAt,
       orderCount: user._count.orders,
       challengeCount: user._count.userChallenges,
       couponCount: user._count.userCoupons,

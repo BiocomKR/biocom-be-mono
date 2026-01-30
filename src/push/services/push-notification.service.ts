@@ -272,8 +272,8 @@ export class PushNotificationService {
   /**
    * 푸시 통계 조회 (관리자용)
    */
-  async getPushStats(startDate?: string, endDate?: string, isTest?: boolean): Promise<PushStatsResponseDto> {
-    this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회 (isTest=${isTest})`);
+  async getPushStats(startDate?: string, endDate?: string, isTest?: boolean, bundleId?: string): Promise<PushStatsResponseDto> {
+    this.logger.log(`📊 [PushNotificationService] 푸시 통계 조회 (isTest=${isTest}, bundleId=${bundleId})`);
 
     try {
       const whereFilter: any = {};
@@ -292,6 +292,9 @@ export class PushNotificationService {
       }
       if (isTest !== undefined) {
         whereFilter.isTest = isTest;
+      }
+      if (bundleId) {
+        whereFilter.bundleId = bundleId;
       }
 
       const [totalSent, successCount, failureCount, readCount, clickedCount, typeStats] = await Promise.all([

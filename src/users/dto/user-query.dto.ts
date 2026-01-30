@@ -14,6 +14,7 @@ export enum UserSortBy {
   ORDER_COUNT = 'orderCount',
   CHALLENGE_COUNT = 'challengeCount',
   LAST_RECORD_DATE = 'lastRecordDate',
+  LAST_SEEN_AT = 'lastSeenAt',
 }
 
 export enum UserSex {
