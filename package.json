@@ -42,8 +42,6 @@
     "@nestjs/terminus": "^11.0.0",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.19.0",
-    "@types/dompurify": "^3.0.5",
-    "@types/uuid": "^10.0.0",
     "axios": "^1.11.0",
     "bcrypt": "^5.1.1",
     "bullmq": "^5.66.0",
