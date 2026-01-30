@@ -30,6 +30,7 @@ export class IssueController {
   @ApiQuery({ name: 'category', required: false, type: String, description: '카테고리 필터 (BUG, FEATURE, UI, OTHER)' })
   @ApiQuery({ name: 'search', required: false, type: String, description: '내용 검색어' })
   @ApiQuery({ name: 'excludeType', required: false, type: String, description: '제외할 유형 (예: BO_FEEDBACK)' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: '상태 필터 (PENDING, IN_PROGRESS, RESOLVED)' })
   @ApiResponse({ status: 200, description: '목록 조회 성공' })
   async getReports(
     @Query('page') page?: string,
@@ -39,6 +40,7 @@ export class IssueController {
     @Query('category') category?: string,
     @Query('search') search?: string,
     @Query('excludeType') excludeType?: string,
+    @Query('status') status?: string,
   ) {
     this.logger.log(`신고 목록 조회 요청`);
     return this.issueService.getReports(
@@ -49,6 +51,7 @@ export class IssueController {
       category,
       search,
       excludeType,
+      status,
     );
   }
 

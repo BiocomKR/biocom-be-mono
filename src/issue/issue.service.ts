@@ -22,8 +22,9 @@ export class IssueService {
     category?: string,
     search?: string,
     excludeType?: string,
+    status?: string,
   ) {
-    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}, type=${type}, category=${category}, search=${search}, excludeType=${excludeType}`);
+    this.logger.log(`신고 목록 조회: page=${page}, limit=${limit}, isAnswered=${isAnswered}, type=${type}, category=${category}, search=${search}, excludeType=${excludeType}, status=${status}`);
 
     const skip = (page - 1) * limit;
 
@@ -34,8 +35,11 @@ export class IssueService {
     if (excludeType) {
       where.type = { not: excludeType };
     }
-    // BO_FEEDBACK은 status로, 나머지는 answer로 필터링
-    if (isAnswered !== undefined) {
+    // status 파라미터가 있으면 직접 필터링 (BO_FEEDBACK용)
+    if (status) {
+      where.status = status;
+    } else if (isAnswered !== undefined) {
+      // BO_FEEDBACK은 status로, 나머지는 answer로 필터링
       if (type === IssueReportType.BO_FEEDBACK) {
         where.status = isAnswered ? FeedbackStatus.RESOLVED : { not: FeedbackStatus.RESOLVED };
       } else {
