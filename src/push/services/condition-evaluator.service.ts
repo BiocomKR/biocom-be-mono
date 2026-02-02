@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { UserChallengeStatus } from '../../common/enums/challenge-ticket-status.enum';
 
 /**
  * 조건 타입 정의
@@ -29,6 +30,30 @@ export enum ConditionType {
   POINTS = 'POINTS',
   COUPON_EXPIRING_HOURS = 'COUPON_EXPIRING_HOURS',
   CART_HAS_ITEMS = 'CART_HAS_ITEMS',
+}
+
+/**
+ * 심층 리포트 상태 (REPORT_STATE 조건용)
+ */
+export enum ReportState {
+  /** 읽지 않은 심층 리포트가 있는 유저 */
+  UNREAD = 'UNREAD',
+  /** 모든 심층 리포트를 읽은 유저 */
+  ALL_READ = 'ALL_READ',
+}
+
+/**
+ * 온보딩 상태 (ONBOARDING_STATE 조건용)
+ */
+export enum OnboardingState {
+  /** 설문 미완료 */
+  SURVEY_INCOMPLETE = 'SURVEY_INCOMPLETE',
+  /** 솔루션 미조회 */
+  SOLUTION_NOT_VIEWED = 'SOLUTION_NOT_VIEWED',
+  /** 챌린지 시작일 미지정 */
+  CHALLENGE_NOT_STARTED = 'CHALLENGE_NOT_STARTED',
+  /** 온보딩 완료 */
+  COMPLETED = 'COMPLETED',
 }
 
 /**
@@ -250,7 +275,7 @@ export class ConditionEvaluatorService {
     // 활성 챌린지가 있는 유저 조회
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
       where: {
-        status: 'ACTIVE',
+        status: UserChallengeStatus.ACTIVE,
       },
       select: {
         userId: true,
@@ -386,7 +411,7 @@ export class ConditionEvaluatorService {
   }
 
   /**
-   * INCOMPLETE_COUNT: 오늘 미완료 기록 수
+   * INCOMPLETE_COUNT: 오늘 미완료 미션 수 (ChallengeMission 기반)
    *
    * params:
    * - count: 정확한 개수
@@ -396,45 +421,62 @@ export class ConditionEvaluatorService {
     params: ConditionParams,
   ): Promise<number[]> {
     const { count, countMin, countMax } = params;
-    const today = this.getTodayDateString();
+    const now = getNowKST();
 
-    // 활성 챌린지 유저 조회
+    // 활성 챌린지 유저 조회 (activatedAt, productId 포함)
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: UserChallengeStatus.ACTIVE, activatedAt: { not: undefined } },
       select: {
         userId: true,
         id: true,
+        productId: true,
+        activatedAt: true,
       },
     });
 
     const matchedUserIds: number[] = [];
 
-    // 필수 기록 타입 (6개)
-    const requiredTypes = [
-      'WEIGHT',
-      'BREAKFAST',
-      'LUNCH',
-      'DINNER',
-      'EXERCISE',
-      'SLEEP',
-    ];
-
     for (const uc of activeUserChallenges) {
-      // 오늘 기록 조회
-      const todayRecords = await this.prisma.userRecord.findMany({
+      if (!uc.activatedAt) continue;
+
+      // 현재 일차 계산
+      const currentDay = this.calculateChallengeDay(uc.activatedAt, now);
+
+      // 오늘 일차의 미션 목록 조회
+      const todayMissions = await this.prisma.challengeMission.findMany({
+        where: {
+          productId: uc.productId,
+          day: currentDay,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      if (todayMissions.length === 0) continue;
+
+      // 완료된 미션 조회 (metadata.isCompleted = true)
+      const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId: uc.userId,
           userChallengeId: uc.id,
-          date: new Date(today),
+          metadata: {
+            path: ['isCompleted'],
+            equals: true,
+          },
         },
-        select: {
-          recordType: true,
-        },
+        select: { metadata: true },
       });
 
-      const completedTypes = new Set(todayRecords.map((r) => r.recordType));
-      const incompleteCount = requiredTypes.filter(
-        (t) => !completedTypes.has(t),
+      // 완료된 challengeMissionId 수집
+      const completedMissionIds = new Set(
+        completedRecords
+          .map((r) => (r.metadata as any)?.challengeMissionId)
+          .filter((id) => id !== undefined),
+      );
+
+      // 미완료 미션 수 계산
+      const incompleteCount = todayMissions.filter(
+        (m) => !completedMissionIds.has(m.id),
       ).length;
 
       let matched = false;
@@ -443,7 +485,7 @@ export class ConditionEvaluatorService {
         matched = incompleteCount === count;
       } else if (countMin !== undefined || countMax !== undefined) {
         const min = countMin ?? 0;
-        const max = countMax ?? 6;
+        const max = countMax ?? 999;
         matched = incompleteCount >= min && incompleteCount <= max;
       }
 
@@ -460,10 +502,13 @@ export class ConditionEvaluatorService {
   }
 
   /**
-   * INCOMPLETE_TYPES: 특정 기록 타입 미완료
+   * INCOMPLETE_TYPES: 특정 recordType 미완료 (UserRecord 기반)
    *
    * params:
-   * - types: 미완료 체크할 타입 배열 (예: ['BREAKFAST', 'LUNCH'])
+   * - types: 미완료 체크할 recordType 배열 (예: ['DIET', 'ACTIVITY', 'SLEEP'])
+   *
+   * 실제 DB의 recordType 값: BEAUTY, DIET, FASTING, SLEEP, ACTIVITY,
+   * DECLARATION, SELF_PRAISE, QUIZ, BALANCE_GAME, DAILY_MISSION, SUPPLEMENT 등
    */
   private async evaluateIncompleteTypes(
     params: ConditionParams,
@@ -479,7 +524,7 @@ export class ConditionEvaluatorService {
 
     // 활성 챌린지 유저 조회
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: UserChallengeStatus.ACTIVE },
       select: {
         userId: true,
         id: true,
@@ -504,7 +549,7 @@ export class ConditionEvaluatorService {
       const completedTypes = new Set(todayRecords.map((r) => r.recordType));
 
       // 지정된 타입 중 하나라도 미완료면 매칭
-      const hasIncomplete = types.some((t) => !completedTypes.has(t));
+      const hasIncomplete = types.some((t: string) => !completedTypes.has(t));
 
       if (hasIncomplete) {
         matchedUserIds.push(uc.userId);
@@ -519,7 +564,7 @@ export class ConditionEvaluatorService {
   }
 
   /**
-   * COMPLETION_RATE: 오늘 기록 완료율
+   * COMPLETION_RATE: 오늘 미션 완료율 (ChallengeMission 기반)
    *
    * params:
    * - rate: 정확한 비율 (0~100)
@@ -529,48 +574,64 @@ export class ConditionEvaluatorService {
     params: ConditionParams,
   ): Promise<number[]> {
     const { rate, rateMin, rateMax } = params;
-    const today = this.getTodayDateString();
+    const now = getNowKST();
 
-    // 활성 챌린지 유저 조회
+    // 활성 챌린지 유저 조회 (activatedAt, productId 포함)
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: UserChallengeStatus.ACTIVE, activatedAt: { not: undefined } },
       select: {
         userId: true,
         id: true,
+        productId: true,
+        activatedAt: true,
       },
     });
 
     const matchedUserIds: number[] = [];
 
-    // 필수 기록 타입 (6개)
-    const requiredTypes = [
-      'WEIGHT',
-      'BREAKFAST',
-      'LUNCH',
-      'DINNER',
-      'EXERCISE',
-      'SLEEP',
-    ];
-    const totalRequired = requiredTypes.length;
-
     for (const uc of activeUserChallenges) {
-      // 오늘 기록 조회
-      const todayRecords = await this.prisma.userRecord.findMany({
+      if (!uc.activatedAt) continue;
+
+      // 현재 일차 계산
+      const currentDay = this.calculateChallengeDay(uc.activatedAt, now);
+
+      // 오늘 일차의 미션 목록 조회
+      const todayMissions = await this.prisma.challengeMission.findMany({
+        where: {
+          productId: uc.productId,
+          day: currentDay,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      if (todayMissions.length === 0) continue;
+
+      // 완료된 미션 조회 (metadata.isCompleted = true)
+      const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId: uc.userId,
           userChallengeId: uc.id,
-          date: new Date(today),
+          metadata: {
+            path: ['isCompleted'],
+            equals: true,
+          },
         },
-        select: {
-          recordType: true,
-        },
+        select: { metadata: true },
       });
 
-      const completedTypes = new Set(todayRecords.map((r) => r.recordType));
-      const completedCount = requiredTypes.filter((t) =>
-        completedTypes.has(t),
+      // 완료된 challengeMissionId 수집
+      const completedMissionIds = new Set(
+        completedRecords
+          .map((r: { metadata: unknown }) => (r.metadata as any)?.challengeMissionId)
+          .filter((id: unknown) => id !== undefined),
+      );
+
+      // 완료율 계산
+      const completedCount = todayMissions.filter(
+        (m: { id: number }) => completedMissionIds.has(m.id),
       ).length;
-      const completionRate = (completedCount / totalRequired) * 100;
+      const completionRate = (completedCount / todayMissions.length) * 100;
 
       let matched = false;
 
@@ -649,7 +710,7 @@ export class ConditionEvaluatorService {
             solutionSeenAt: { not: null },
             userChallenges: {
               some: {
-                status: 'PENDING',
+                status: UserChallengeStatus.PENDING,
                 startDateSetAt: null,
               },
             },
@@ -679,7 +740,7 @@ export class ConditionEvaluatorService {
       case 'IN_PROGRESS': {
         // ACTIVE 챌린지가 있는 유저
         const userChallenges = await this.prisma.userChallenge.findMany({
-          where: { status: 'ACTIVE' },
+          where: { status: UserChallengeStatus.ACTIVE },
           select: { userId: true },
           distinct: ['userId'],
         });
@@ -690,7 +751,7 @@ export class ConditionEvaluatorService {
       case 'COMPLETED': {
         // COMPLETED 챌린지가 있는 유저
         const userChallenges = await this.prisma.userChallenge.findMany({
-          where: { status: 'COMPLETED' },
+          where: { status: UserChallengeStatus.COMPLETED },
           select: { userId: true },
           distinct: ['userId'],
         });
@@ -739,7 +800,7 @@ export class ConditionEvaluatorService {
     // PENDING 상태이면서 activatedAt(시작일)이 타겟 날짜인 챌린지
     const userChallenges = await this.prisma.userChallenge.findMany({
       where: {
-        status: 'PENDING',
+        status: UserChallengeStatus.PENDING,
         activatedAt: {
           gte: targetDate,
           lte: targetDateEnd,
@@ -762,7 +823,7 @@ export class ConditionEvaluatorService {
    * REPORT_STATE: 심층 리포트 상태별 유저
    *
    * params:
-   * - state: UNREAD | ALL_READ
+   * - state: ReportState.UNREAD | ReportState.ALL_READ
    */
   private async evaluateReportState(
     params: ConditionParams,
@@ -776,7 +837,7 @@ export class ConditionEvaluatorService {
 
     let userIds: number[] = [];
 
-    if (state === 'UNREAD') {
+    if (state === ReportState.UNREAD) {
       // 읽지 않은 심층 리포트가 있는 유저
       const reports = await this.prisma.userDeepReport.findMany({
         where: {
@@ -786,7 +847,7 @@ export class ConditionEvaluatorService {
         distinct: ['userId'],
       });
       userIds = reports.map((r) => r.userId);
-    } else if (state === 'ALL_READ') {
+    } else if (state === ReportState.ALL_READ) {
       // 모든 심층 리포트를 읽은 유저 (리포트가 있고 모두 읽음)
       // 리포트가 있는 유저 중에서 읽지 않은 리포트가 없는 유저
       const usersWithReports = await this.prisma.userDeepReport.groupBy({
@@ -826,7 +887,7 @@ export class ConditionEvaluatorService {
         pushEnabled: true,
         ...(pointsMin !== undefined || pointsMax !== undefined
           ? {
-              point: {
+              points: {
                 ...(pointsMin !== undefined ? { gte: pointsMin } : {}),
                 ...(pointsMax !== undefined ? { lte: pointsMax } : {}),
               },
@@ -867,7 +928,7 @@ export class ConditionEvaluatorService {
     // N시간 내 만료 예정인 쿠폰을 가진 유저 (status가 ACTIVE인 쿠폰)
     const userCoupons = await this.prisma.userCoupon.findMany({
       where: {
-        status: 'ACTIVE',
+        status: 'ACTIVE', // UserCoupon status (ACTIVE/USED/EXPIRED)
         expiresAt: {
           gt: now,
           lte: expiryThreshold,
