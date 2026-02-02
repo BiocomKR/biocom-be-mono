@@ -136,11 +136,8 @@ export class MatchedScheduleDto {
   @ApiProperty()
   priority: number;
 
-  @ApiProperty()
-  conditionType: string;
-
-  @ApiPropertyOptional()
-  conditionParams?: Record<string, any>;
+  @ApiPropertyOptional({ description: 'AND 조건 배열' })
+  conditions?: Array<{ type: string; params: Record<string, any> }>;
 
   @ApiProperty({ description: '스케줄 활성화 여부' })
   isActive: boolean;

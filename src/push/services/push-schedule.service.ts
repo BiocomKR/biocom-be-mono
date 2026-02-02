@@ -51,9 +51,8 @@ export class PushScheduleService {
           endDate: dto.endDate ? stringToKSTDate(dto.endDate, 23, 59, 59) : null,
           isActive: dto.isActive ?? true,
           isTest: dto.isTest ?? true,
-          // 조건 기반 발송 필드
-          conditionType: dto.conditionType,
-          conditionParams: dto.conditionParams,
+          // 조건 기반 발송 필드 (AND 조합)
+          conditions: dto.conditions,
           landingType: dto.landingType,
           landingParams: dto.landingParams,
           personaMessages: dto.personaMessages,
@@ -211,9 +210,8 @@ export class PushScheduleService {
           }),
           ...(dto.isActive !== undefined && { isActive: dto.isActive }),
           ...(dto.isTest !== undefined && { isTest: dto.isTest }),
-          // 조건 기반 발송 필드
-          ...(dto.conditionType !== undefined && { conditionType: dto.conditionType }),
-          ...(dto.conditionParams !== undefined && { conditionParams: dto.conditionParams }),
+          // 조건 기반 발송 필드 (AND 조합)
+          ...(dto.conditions !== undefined && { conditions: dto.conditions }),
           ...(dto.landingType !== undefined && { landingType: dto.landingType }),
           ...(dto.landingParams !== undefined && { landingParams: dto.landingParams }),
           ...(dto.personaMessages !== undefined && { personaMessages: dto.personaMessages }),

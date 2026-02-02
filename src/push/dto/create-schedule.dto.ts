@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength, IsArray } from 'class-validator';
 import { PushScheduleType, PushCategory } from '../enums';
 import { AppBundleId } from '../../common/enums';
 
@@ -130,25 +130,19 @@ export class CreateScheduleDto {
   isTest?: boolean;
 
   // =====================================================
-  // 조건 기반 발송 필드
+  // 조건 기반 발송 필드 (AND 조합)
   // =====================================================
 
   @ApiPropertyOptional({
-    description: '조건 타입 (CHALLENGE_DAY, NO_ACCESS_HOURS 등)',
-    example: 'CHALLENGE_DAY',
+    description: 'AND 조건 배열 (모든 조건을 만족하는 유저에게 발송)',
+    example: [
+      { type: 'CHALLENGE_DAY', params: { day: 7 } },
+      { type: 'INCOMPLETE_TYPES', params: { types: ['DECLARATION'] } },
+    ],
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  conditionType?: string;
-
-  @ApiPropertyOptional({
-    description: '조건 파라미터 (JSON)',
-    example: { day: 7 },
-  })
-  @IsOptional()
-  @IsObject()
-  conditionParams?: Record<string, any>;
+  @IsArray()
+  conditions?: Array<{ type: string; params: Record<string, any> }>;
 
   @ApiPropertyOptional({
     description: '랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)',

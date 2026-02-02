@@ -98,6 +98,41 @@ export class ConditionEvaluatorService {
   }
 
   /**
+   * 다중 조건 AND 조합 평가
+   * 모든 조건을 만족하는 유저만 반환 (교집합)
+   */
+  async evaluateConditions(schedule: {
+    id: number;
+    conditions?: Array<{ type: string; params: Record<string, any> }> | null;
+  }): Promise<number[]> {
+    if (!schedule.conditions?.length) {
+      this.logger.warn(`⚠️ [ConditionEvaluator] 스케줄 ${schedule.id}: conditions가 없습니다`);
+      return [];
+    }
+
+    this.logger.log(
+      `🔍 [ConditionEvaluator] AND 조합 평가 시작: 스케줄 ${schedule.id}, 조건 ${schedule.conditions.length}개`,
+    );
+
+    // 각 조건별 유저 ID 조회 (병렬)
+    const results = await Promise.all(
+      schedule.conditions.map((c) => this.evaluateCondition(c.type, c.params)),
+    );
+
+    // 교집합 반환 (Set 사용으로 O(n) 보장)
+    const [first, ...rest] = results;
+    let acc = new Set(first);
+    for (const curr of rest) {
+      const set = new Set(curr);
+      acc = new Set([...acc].filter((id) => set.has(id)));
+    }
+
+    const userIds = [...acc];
+    this.logger.log(`✅ [ConditionEvaluator] AND 조합 결과: ${userIds.length}명`);
+    return userIds;
+  }
+
+  /**
    * 조건에 맞는 유저 ID 조회 (토큰 필터링 없이 - 미리보기용)
    */
   private async evaluateConditionRaw(
