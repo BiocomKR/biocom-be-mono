@@ -2118,10 +2118,8 @@ model PushNotificationSchedule {
   /// 타겟팅 쿼리 조건 (JSON)
   /// 예: { "marketingEnabled": true, "userIds": [1,2,3], "platforms": ["IOS", "ANDROID"] }
   targetQuery        Json?                      @map("target_query")
-  /// 조건 타입 (CHALLENGE_DAY, NO_ACCESS_HOURS 등)
-  conditionType      String?                    @map("condition_type") @db.VarChar(50)
-  /// 조건 파라미터 (JSON: { day: 7 }, { hours: 24 } 등)
-  conditionParams    Json?                      @map("condition_params")
+  /// AND 조건 배열 (JSON: [{ type: "CHALLENGE_DAY", params: { day: 1 } }, ...])
+  conditions         Json?
   /// 랜딩 타입 (HOME, LECTURE, MISSION_RECORD 등)
   landingType        String?                    @map("landing_type") @db.VarChar(50)
   /// 랜딩 파라미터 (day만 사용: { day: 7 })
@@ -2166,7 +2164,6 @@ model PushNotificationSchedule {
   @@index([scheduleType])
   @@index([nextExecutionAt])
   @@index([startDate, endDate])
-  @@index([conditionType])
   @@index([isTest])
   @@index([pushGroup])
   @@index([pushGroup, priority])

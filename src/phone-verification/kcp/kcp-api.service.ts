@@ -1,6 +1,5 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import {
   KcpCommonResponse,
@@ -26,17 +25,12 @@ export class KcpApiService {
 
   constructor(
     private readonly httpService: HttpService,
-    private readonly configService: ConfigService,
   ) {
-    // 테스트/운영 환경에 따른 URL 설정
-    const isProduction = this.configService.get('NODE_ENV') === 'prod';
+    //   운영 'https://spl.kcp.co.kr'
+    //   스테이징 'https://stg-spl.kcp.co.kr';
 
-    // TODO: 형님, KCP 담당자에게 환경 확인 필요!
-    // 임시로 운영 서버로 테스트 (실제 SMS 발송됨 주의!)
-    this.baseUrl = 'https://spl.kcp.co.kr'; // 운영 서버
-    // this.baseUrl = isProduction
-    //   ? 'https://spl.kcp.co.kr'
-    //   : 'https://stg-spl.kcp.co.kr';
+    // 현재 스테이징 환경 미사용으로 운영 서버 URL 적용
+    this.baseUrl = 'https://spl.kcp.co.kr';
 
     this.logger.log(`⚠️  KCP API 서버 (임시 운영): ${this.baseUrl}`);
   }

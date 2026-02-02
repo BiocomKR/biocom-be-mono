@@ -650,4 +650,139 @@ await prisma.productFile.create({
 
 ---
 
+## 이벤트 기반 푸시 알림 시스템
+
+### 개요
+특정 이벤트 발생 시 지연된 푸시 알림을 스케줄링하고, 발송 시점에 조건을 재평가하여 여전히 조건에 맞는 유저에게만 발송하는 시스템입니다.
+
+### 주요 컴포넌트
+
+**biocom-api:**
+- `QueueService.addEventPush()`: 이벤트 기반 delayed job 추가
+- `QueueService.cancelEventPush()`: 예약된 job 취소
+- `PushEventService`: 이벤트별 푸시 스케줄링 로직
+
+**biocom-mq:**
+- `PushNotificationProcessor (type: 'event')`: 이벤트 기반 푸시 처리
+- `ConditionEvaluatorService`: 조건 재평가
+- `RedisService`: 분산락 및 중복 발송 방지
+
+### 지원 이벤트 타입
+
+```typescript
+enum EventPushType {
+  NO_ACCESS_24H = 'NO_ACCESS_24H',     // 24시간 미접속
+  NO_ACCESS_48H = 'NO_ACCESS_48H',     // 48시간 미접속
+  CART_ABANDONED = 'CART_ABANDONED',   // 장바구니 방치
+  COUPON_EXPIRING = 'COUPON_EXPIRING', // 쿠폰 만료 임박
+  CHALLENGE_START_D1 = 'CHALLENGE_START_D1',   // 챌린지 시작 D-1
+  CHALLENGE_START_DDAY = 'CHALLENGE_START_DDAY', // 챌린지 시작 D-Day
+  MISSION_INCOMPLETE = 'MISSION_INCOMPLETE',   // 오늘 미션 미완료
+}
+```
+
+### 메시지 관리 (DB 기반)
+
+푸시 메시지는 **하드코딩이 아닌 DB(PushNotificationSchedule 테이블)에서 관리**됩니다.
+
+**PushNotificationSchedule 테이블 구조:**
+- `type`: 이벤트 타입 (EventPushType enum 값과 매칭)
+- `title`: 푸시 제목
+- `bodyTemplate`: 본문 템플릿 (변수 치환 지원)
+- `imageUrl`: 이미지 URL (선택)
+- `conditions`: 발송 조건 (JSON)
+- `landingType`, `landingParams`: 랜딩 정보
+- `isActive`: 활성화 여부
+
+**템플릿 변수 치환:**
+```
+{{변수명}} 형식으로 동적 값 삽입 가능
+예: "{{couponName}} 쿠폰이 내일 만료됩니다!"
+```
+
+**필수 스케줄 레코드:**
+관리자 페이지에서 각 이벤트 타입별로 스케줄을 생성해야 합니다:
+- `NO_ACCESS_24H`: 24시간 미접속 알림
+- `NO_ACCESS_48H`: 48시간 미접속 알림
+- `CART_ABANDONED`: 장바구니 방치 알림
+- `COUPON_EXPIRING`: 쿠폰 만료 임박 알림
+- `CHALLENGE_START_D1`: 챌린지 시작 D-1 알림
+
+### 사용 예시
+
+```typescript
+// 쿠폰 발급 시 만료 24시간 전 알림 예약
+await pushEventService.scheduleCouponExpiringPush(userId, userCouponId, expiresAt);
+
+// 장바구니 추가 시 방치 알림 예약
+await pushEventService.scheduleCartAbandonedPush(userId);
+
+// 결제 완료 시 장바구니 알림 취소
+await pushEventService.cancelCartAbandonedPush(userId);
+
+// 챌린지 시작일 설정 시 D-1 알림 예약
+await pushEventService.scheduleChallengeStartD1Push(userId, userChallengeId, startDate);
+```
+
+### 처리 흐름
+
+```
+[이벤트 발생] → [biocom-api]
+                    │
+                    ├─> QueueService.addEventPush()
+                    │   - delay 시간 계산
+                    │   - 조건 정보 포함
+                    │   - 중복 방지 jobId 생성
+                    ▼
+            [Redis Queue (delayed)]
+                    │
+                    │ delay 시간 경과 후
+                    ▼
+            [biocom-mq Worker]
+                    │
+                    ├─> 1. 분산락 획득 (SETNX)
+                    │   - 중복 처리 방지
+                    │
+                    ├─> 2. 중복 발송 체크 (markSent)
+                    │   - 24시간 내 동일 알림 방지
+                    │
+                    ├─> 3. 조건 재평가
+                    │   - 발송 시점에 여전히 조건 충족하는지 확인
+                    │   - 예: 24시간 미접속 알림 → 유저가 이미 접속했으면 취소
+                    │
+                    ├─> 4. 푸시 발송 (조건 충족 시만)
+                    │
+                    └─> 5. 분산락 해제
+```
+
+### 조건 재평가
+
+발송 시점에 `ConditionEvaluatorService.evaluateForUser()`를 호출하여 유저가 여전히 조건을 충족하는지 확인합니다.
+
+**예시:**
+- 장바구니 방치 알림: 24시간 후 발송 시점에 장바구니가 비어있으면 발송 취소
+- 미접속 알림: 24시간 후 발송 시점에 유저가 이미 접속했으면 발송 취소
+
+### 분산락
+
+Redis SETNX를 사용하여 동시에 여러 워커가 같은 job을 처리하는 것을 방지합니다.
+
+```typescript
+// biocom-mq/src/common/services/redis.service.ts
+async acquireLock(key: string, ttlMs: number): Promise<boolean>
+async releaseLock(key: string): Promise<void>
+async markSent(key: string, ttlMs: number): Promise<boolean>
+```
+
+### 중복 발송 방지
+
+`markSent()`를 사용하여 24시간 내 동일한 캠페인/스케줄에 대해 같은 유저에게 중복 발송을 방지합니다.
+
+```
+Redis Key: push:event:sent:{campaignId}:{userId}
+TTL: 24시간
+```
+
+---
+
 형님, 화이팅! 💪

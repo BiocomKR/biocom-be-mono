@@ -2,6 +2,8 @@ import * as winston from 'winston';
 import * as Transport from 'winston-transport';
 import * as os from 'os';
 import axios from 'axios';
+import { shouldSendSlackAlert } from './slack-alert.policy';
+import { shouldSendAlert } from './slack-alert-throttle';
 
 /**
  * Slack Transport 설정
@@ -235,10 +237,26 @@ class SlackTransport extends Transport {
       return;
     }
 
-    // 401, 404 에러는 Slack 알림 제외
-    // - 401: 인증 실패 (토큰 만료 등 정상적인 상황)
-    // - 404: 악성 크롤러 스캔 등 노이즈 방지
-    if (info.statusCode === 401 || info.statusCode === 404) {
+    // 알림 정책 기반 필터링
+    // - 상태 코드 (401, 403, 404, 405 등)
+    // - 경로 패턴 (스캐닝 봇, VPN 장비 스캔 등)
+    // - 메시지 패턴 (CORS violation, Cannot GET 등)
+    if (!shouldSendSlackAlert({
+      statusCode: info.statusCode,
+      url: info.url,
+      message: info.message,
+      error: info.error,
+    })) {
+      callback();
+      return;
+    }
+
+    // 동일 에러 반복 알림 방지 (5분 내 같은 에러 스킵)
+    if (!shouldSendAlert({
+      statusCode: info.statusCode,
+      url: info.url,
+      message: info.message,
+    })) {
       callback();
       return;
     }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FirebaseAdminModule } from './firebase-admin.module';
 import { FcmProvider } from './providers/fcm.provider';
@@ -9,10 +9,13 @@ import { PushTopicService } from './services/push-topic.service';
 // import { PushScheduleService } from './services/push-schedule.service'; // @deprecated - push-scheduler.service.ts로 통합됨
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
+import { ConditionEvaluatorService } from './services/condition-evaluator.service';
+import { PushEventService } from './services/push-event.service';
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
 import { PushTopicController } from './controllers/push-topic.controller';
 import { PrismaService } from '../common/services/prisma.service';
+import { QueuesModule } from '../queues/queues.module';
 
 /**
  * 푸시 알림 모듈
@@ -26,6 +29,7 @@ import { PrismaService } from '../common/services/prisma.service';
   imports: [
     FirebaseAdminModule,
     ScheduleModule.forRoot(), // 크론잡 활성화
+    forwardRef(() => QueuesModule), // 순환 참조 방지
   ],
   controllers: [
     PushTokenController,
@@ -45,6 +49,8 @@ import { PrismaService } from '../common/services/prisma.service';
     // PushScheduleService, // @deprecated - push-scheduler.service.ts로 통합됨
     PushCampaignService,
     PushSchedulerService,
+    ConditionEvaluatorService, // 조건 기반 타겟팅
+    PushEventService, // 이벤트 기반 푸시
     PrismaService,
   ],
   exports: [
@@ -55,6 +61,7 @@ import { PrismaService } from '../common/services/prisma.service';
     PushTopicService,
     // PushScheduleService, // @deprecated - push-scheduler.service.ts로 통합됨
     PushCampaignService,
+    PushEventService, // 이벤트 기반 푸시 export
   ],
 })
 export class PushModule {}

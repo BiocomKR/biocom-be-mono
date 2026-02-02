@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
 import { PushScheduleType, PushCampaignType, PushCampaignStatus } from '../enums';
 import { QueueService, PushNotificationType } from '../../queues/queue.service';
+import { ConditionEvaluatorService } from './condition-evaluator.service';
 
 /**
  * ============================================================================
@@ -48,6 +49,7 @@ export class PushCampaignService {
   constructor(
     private readonly prisma: PrismaService, // DB 접근용 (SQLAlchemy의 session과 유사)
     private readonly queueService: QueueService, // MQ를 통한 푸시 발송
+    private readonly conditionEvaluator: ConditionEvaluatorService, // 조건 기반 타겟팅
   ) {}
 
   /**
@@ -115,12 +117,27 @@ export class PushCampaignService {
 
       // ---------------------------------------------------------------
       // Step 1: 대상 유저 조회
-      // - schedule.targetQuery에 정의된 조건으로 유저 필터링
+      // - conditions 배열이 있으면 조건 기반 타겟팅 (AND 조합)
+      // - 없으면 targetQuery로 유저 필터링
       // - schedule.bundleId에 맞는 토큰을 가진 유저만 조회
       // - 테스트 모드면 testUserIds로 제한
       // ---------------------------------------------------------------
-      const targetQuery = schedule.targetQuery || {};
-      let targetUsers = await this.getTargetUsers(targetQuery, schedule.bundleId);
+      let targetUsers: number[];
+
+      // conditions 배열이 있으면 조건 기반 타겟팅 사용
+      const conditions = schedule.conditions as Array<{ type: string; params: Record<string, any> }> | null;
+      if (conditions && conditions.length > 0) {
+        this.logger.log(`🎯 [PushCampaignService] 조건 기반 타겟팅: ${conditions.length}개 조건 (AND)`);
+        targetUsers = await this.conditionEvaluator.evaluateConditions({
+          id: schedule.id,
+          conditions,
+        });
+        this.logger.log(`🎯 [PushCampaignService] 조건 평가 결과: ${targetUsers.length}명`);
+      } else {
+        // 기존 targetQuery 방식
+        const targetQuery = schedule.targetQuery || {};
+        targetUsers = await this.getTargetUsers(targetQuery, schedule.bundleId);
+      }
 
       // 테스트 모드면 testUserIds와 교집합
       if (schedule.isTest && schedule.testUserIds?.length > 0) {

@@ -26,10 +26,37 @@ export enum PushNotificationType {
 }
 
 /**
+ * 이벤트 기반 푸시 타입
+ */
+export enum EventPushType {
+  /** 24시간 미접속 */
+  NO_ACCESS_24H = 'NO_ACCESS_24H',
+  /** 48시간 미접속 */
+  NO_ACCESS_48H = 'NO_ACCESS_48H',
+  /** 장바구니 방치 */
+  CART_ABANDONED = 'CART_ABANDONED',
+  /** 쿠폰 만료 임박 */
+  COUPON_EXPIRING = 'COUPON_EXPIRING',
+  /** 챌린지 시작 D-1 */
+  CHALLENGE_START_D1 = 'CHALLENGE_START_D1',
+  /** 챌린지 시작 D-Day */
+  CHALLENGE_START_DDAY = 'CHALLENGE_START_DDAY',
+  /** 오늘 미션 미완료 */
+  MISSION_INCOMPLETE = 'MISSION_INCOMPLETE',
+}
+
+/**
+ * 조건 파라미터 타입
+ */
+export interface ConditionParams {
+  [key: string]: any;
+}
+
+/**
  * 푸시 알림 Job 데이터 인터페이스
  */
 export interface PushNotificationJobData {
-  type: 'user' | 'users' | 'all';
+  type: 'user' | 'users' | 'all' | 'event';
   userId?: number;
   userIds?: number[];
   message: PushMessage;
@@ -38,6 +65,11 @@ export interface PushNotificationJobData {
   filter?: {
     marketingEnabled?: boolean;
   };
+  // 이벤트 기반 푸시 전용 필드
+  eventType?: EventPushType;
+  conditions?: { type: string; params: ConditionParams }[];
+  campaignId?: number;
+  scheduleId?: number;
 }
 
 /**
@@ -235,5 +267,92 @@ export class QueueService {
     });
     this.logger.log(`🧬 [Queue] allergy-sync (master) job added: ${job.id}, syncType=${syncType}`);
     return job;
+  }
+
+  /**
+   * 이벤트 기반 지연 푸시 Job 추가
+   *
+   * 지정된 시간 후에 조건을 재평가하여 푸시 발송
+   *
+   * @param userId - 유저 ID
+   * @param eventType - 이벤트 타입
+   * @param message - 푸시 메시지
+   * @param delayMs - 지연 시간 (밀리초)
+   * @param conditions - 재평가할 조건 목록
+   * @param options - 추가 옵션 (캠페인 ID, 스케줄 ID 등)
+   */
+  async addEventPush(
+    userId: number,
+    eventType: EventPushType,
+    message: PushMessage,
+    delayMs: number,
+    conditions?: { type: string; params: ConditionParams }[],
+    options?: {
+      campaignId?: number;
+      scheduleId?: number;
+      notificationType?: PushNotificationType;
+      isTest?: boolean;
+    },
+  ) {
+    const jobData: PushNotificationJobData = {
+      type: 'event',
+      userId,
+      eventType,
+      message,
+      conditions,
+      campaignId: options?.campaignId,
+      scheduleId: options?.scheduleId,
+      notificationType: options?.notificationType || PushNotificationType.REMIND,
+      isTest: options?.isTest || false,
+    };
+
+    // 중복 방지를 위한 고유 Job ID 생성
+    const jobId = `event:${eventType}:${userId}:${options?.campaignId || options?.scheduleId || Date.now()}`;
+
+    const job = await this.pushQueue.add('send', jobData, {
+      delay: delayMs,
+      jobId, // 동일 ID로 중복 Job 방지
+      removeOnComplete: 100,
+      removeOnFail: 1000,
+    });
+
+    this.logger.log(
+      `⏰ [Queue] push-notification (event) job scheduled: ${job.id}, userId=${userId}, eventType=${eventType}, delayMs=${delayMs}`,
+    );
+    return job;
+  }
+
+  /**
+   * 이벤트 기반 푸시 Job 취소
+   *
+   * 유저가 조건을 충족하지 않게 되면 (예: 앱 접속) 예약된 Job을 취소
+   *
+   * @param eventType - 이벤트 타입
+   * @param userId - 유저 ID
+   * @param identifier - 캠페인 ID 또는 스케줄 ID
+   */
+  async cancelEventPush(
+    eventType: EventPushType,
+    userId: number,
+    identifier: number,
+  ): Promise<boolean> {
+    const jobId = `event:${eventType}:${userId}:${identifier}`;
+
+    try {
+      const job = await this.pushQueue.getJob(jobId);
+      if (job) {
+        await job.remove();
+        this.logger.log(
+          `🗑️ [Queue] push-notification (event) job cancelled: ${jobId}`,
+        );
+        return true;
+      }
+      return false;
+    } catch (error) {
+      this.logger.error(
+        `❌ [Queue] Failed to cancel event push job: ${jobId}, ${error.message}`,
+      );
+      return false;
+    }
   }
 }
