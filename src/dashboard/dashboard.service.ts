@@ -681,8 +681,15 @@ export class DashboardService {
       ORDER BY hour
     ` as any[];
 
-    // 현재 활성 사용자 (lastLoginAt 필드가 없으므로 0으로 설정)
-    const activeUsers = 0; // TODO: lastLoginAt 필드 추가 필요
+    // 현재 활성 사용자 (최근 15분 내 접속)
+    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+    const activeUsers = await this.prisma.user.count({
+      where: {
+        lastSeenAt: {
+          gte: fifteenMinutesAgo,
+        },
+      },
+    });
 
     return {
       currentTime: now,
