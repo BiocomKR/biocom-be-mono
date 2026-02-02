@@ -3,6 +3,7 @@ import * as Transport from 'winston-transport';
 import * as os from 'os';
 import axios from 'axios';
 import { shouldSendSlackAlert } from './slack-alert.policy';
+import { shouldSendAlert } from './slack-alert-throttle';
 
 /**
  * Slack Transport 설정
@@ -245,6 +246,16 @@ class SlackTransport extends Transport {
       url: info.url,
       message: info.message,
       error: info.error,
+    })) {
+      callback();
+      return;
+    }
+
+    // 동일 에러 반복 알림 방지 (5분 내 같은 에러 스킵)
+    if (!shouldSendAlert({
+      statusCode: info.statusCode,
+      url: info.url,
+      message: info.message,
     })) {
       callback();
       return;
