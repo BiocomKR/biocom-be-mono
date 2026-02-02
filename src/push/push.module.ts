@@ -9,6 +9,7 @@ import { PushTopicService } from './services/push-topic.service';
 // import { PushScheduleService } from './services/push-schedule.service'; // @deprecated - push-scheduler.service.ts로 통합됨
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
+import { ConditionEvaluatorService } from './services/condition-evaluator.service';
 import { PushTokenController } from './controllers/push-token.controller';
 import { PushNotificationController } from './controllers/push-notification.controller';
 import { PushTopicController } from './controllers/push-topic.controller';
@@ -45,6 +46,7 @@ import { PrismaService } from '../common/services/prisma.service';
     // PushScheduleService, // @deprecated - push-scheduler.service.ts로 통합됨
     PushCampaignService,
     PushSchedulerService,
+    ConditionEvaluatorService, // 조건 기반 타겟팅
     PrismaService,
   ],
   exports: [
