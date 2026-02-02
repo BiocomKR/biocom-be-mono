@@ -102,6 +102,48 @@ export class ConditionEvaluatorService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * 스케줄의 conditions 배열을 AND 조합으로 평가
+   * conditions가 없으면 단일 조건(conditionType) 사용 (하위 호환)
+   */
+  async evaluateConditions(schedule: {
+    id: number;
+    conditions?: { type: string; params: Record<string, any> }[] | null;
+  }): Promise<number[]> {
+    // conditions 배열이 있으면 AND 조합
+    if (schedule.conditions?.length) {
+      this.logger.log(
+        `🔍 [ConditionEvaluator] AND 조합 평가 시작: 스케줄 ${schedule.id}, 조건 ${schedule.conditions.length}개`,
+      );
+
+      const results = await Promise.all(
+        schedule.conditions.map((c) =>
+          this.evaluateCondition(c.type, c.params as ConditionParams),
+        ),
+      );
+
+      // 교집합 반환 (Set 사용으로 O(n) 보장)
+      const [first, ...rest] = results;
+      let acc = new Set(first);
+      for (const curr of rest) {
+        const set = new Set(curr);
+        acc = new Set([...acc].filter((id) => set.has(id)));
+      }
+
+      const userIds = [...acc];
+      this.logger.log(
+        `✅ [ConditionEvaluator] AND 조합 결과: ${userIds.length}명`,
+      );
+      return userIds;
+    }
+
+    // conditions 없음 - 빈 배열 반환 (하위 호환 제거됨)
+    this.logger.warn(
+      `⚠️ [ConditionEvaluator] 스케줄 ${schedule.id}: conditions가 없습니다`,
+    );
+    return [];
+  }
+
+  /**
    * 조건에 맞는 유저 ID 목록 반환
    */
   async evaluateCondition(
