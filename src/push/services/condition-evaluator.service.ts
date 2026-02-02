@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { getNowKST } from '../../common/utils/kst-date.util';
+import { UserChallengeStatus } from '../../common/enums/user-challenge-status.enum';
 
 /**
  * 조건 타입 정의
@@ -250,7 +251,7 @@ export class ConditionEvaluatorService {
     // 활성 챌린지가 있는 유저 조회
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
       where: {
-        status: 'ACTIVE',
+        status: UserChallengeStatus.ACTIVE,
       },
       select: {
         userId: true,
@@ -386,7 +387,7 @@ export class ConditionEvaluatorService {
   }
 
   /**
-   * INCOMPLETE_COUNT: 오늘 미완료 기록 수
+   * INCOMPLETE_COUNT: 오늘 미완료 미션 수 (ChallengeMission 기반)
    *
    * params:
    * - count: 정확한 개수
@@ -396,45 +397,62 @@ export class ConditionEvaluatorService {
     params: ConditionParams,
   ): Promise<number[]> {
     const { count, countMin, countMax } = params;
-    const today = this.getTodayDateString();
+    const now = getNowKST();
 
-    // 활성 챌린지 유저 조회
+    // 활성 챌린지 유저 조회 (activatedAt, productId 포함)
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: UserChallengeStatus.ACTIVE, activatedAt: { not: undefined } },
       select: {
         userId: true,
         id: true,
+        productId: true,
+        activatedAt: true,
       },
     });
 
     const matchedUserIds: number[] = [];
 
-    // 필수 기록 타입 (6개)
-    const requiredTypes = [
-      'WEIGHT',
-      'BREAKFAST',
-      'LUNCH',
-      'DINNER',
-      'EXERCISE',
-      'SLEEP',
-    ];
-
     for (const uc of activeUserChallenges) {
-      // 오늘 기록 조회
-      const todayRecords = await this.prisma.userRecord.findMany({
+      if (!uc.activatedAt) continue;
+
+      // 현재 일차 계산
+      const currentDay = this.calculateChallengeDay(uc.activatedAt, now);
+
+      // 오늘 일차의 미션 목록 조회
+      const todayMissions = await this.prisma.challengeMission.findMany({
+        where: {
+          productId: uc.productId,
+          day: currentDay,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      if (todayMissions.length === 0) continue;
+
+      // 완료된 미션 조회 (metadata.isCompleted = true)
+      const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId: uc.userId,
           userChallengeId: uc.id,
-          date: new Date(today),
+          metadata: {
+            path: ['isCompleted'],
+            equals: true,
+          },
         },
-        select: {
-          recordType: true,
-        },
+        select: { metadata: true },
       });
 
-      const completedTypes = new Set(todayRecords.map((r) => r.recordType));
-      const incompleteCount = requiredTypes.filter(
-        (t) => !completedTypes.has(t),
+      // 완료된 challengeMissionId 수집
+      const completedMissionIds = new Set(
+        completedRecords
+          .map((r) => (r.metadata as any)?.challengeMissionId)
+          .filter((id) => id !== undefined),
+      );
+
+      // 미완료 미션 수 계산
+      const incompleteCount = todayMissions.filter(
+        (m) => !completedMissionIds.has(m.id),
       ).length;
 
       let matched = false;
@@ -443,7 +461,7 @@ export class ConditionEvaluatorService {
         matched = incompleteCount === count;
       } else if (countMin !== undefined || countMax !== undefined) {
         const min = countMin ?? 0;
-        const max = countMax ?? 6;
+        const max = countMax ?? 999;
         matched = incompleteCount >= min && incompleteCount <= max;
       }
 
@@ -479,7 +497,7 @@ export class ConditionEvaluatorService {
 
     // 활성 챌린지 유저 조회
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: UserChallengeStatus.ACTIVE },
       select: {
         userId: true,
         id: true,
@@ -519,7 +537,7 @@ export class ConditionEvaluatorService {
   }
 
   /**
-   * COMPLETION_RATE: 오늘 기록 완료율
+   * COMPLETION_RATE: 오늘 미션 완료율 (ChallengeMission 기반)
    *
    * params:
    * - rate: 정확한 비율 (0~100)
@@ -529,48 +547,64 @@ export class ConditionEvaluatorService {
     params: ConditionParams,
   ): Promise<number[]> {
     const { rate, rateMin, rateMax } = params;
-    const today = this.getTodayDateString();
+    const now = getNowKST();
 
-    // 활성 챌린지 유저 조회
+    // 활성 챌린지 유저 조회 (activatedAt, productId 포함)
     const activeUserChallenges = await this.prisma.userChallenge.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: UserChallengeStatus.ACTIVE, activatedAt: { not: undefined } },
       select: {
         userId: true,
         id: true,
+        productId: true,
+        activatedAt: true,
       },
     });
 
     const matchedUserIds: number[] = [];
 
-    // 필수 기록 타입 (6개)
-    const requiredTypes = [
-      'WEIGHT',
-      'BREAKFAST',
-      'LUNCH',
-      'DINNER',
-      'EXERCISE',
-      'SLEEP',
-    ];
-    const totalRequired = requiredTypes.length;
-
     for (const uc of activeUserChallenges) {
-      // 오늘 기록 조회
-      const todayRecords = await this.prisma.userRecord.findMany({
+      if (!uc.activatedAt) continue;
+
+      // 현재 일차 계산
+      const currentDay = this.calculateChallengeDay(uc.activatedAt, now);
+
+      // 오늘 일차의 미션 목록 조회
+      const todayMissions = await this.prisma.challengeMission.findMany({
+        where: {
+          productId: uc.productId,
+          day: currentDay,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      if (todayMissions.length === 0) continue;
+
+      // 완료된 미션 조회 (metadata.isCompleted = true)
+      const completedRecords = await this.prisma.userRecord.findMany({
         where: {
           userId: uc.userId,
           userChallengeId: uc.id,
-          date: new Date(today),
+          metadata: {
+            path: ['isCompleted'],
+            equals: true,
+          },
         },
-        select: {
-          recordType: true,
-        },
+        select: { metadata: true },
       });
 
-      const completedTypes = new Set(todayRecords.map((r) => r.recordType));
-      const completedCount = requiredTypes.filter((t) =>
-        completedTypes.has(t),
+      // 완료된 challengeMissionId 수집
+      const completedMissionIds = new Set(
+        completedRecords
+          .map((r) => (r.metadata as any)?.challengeMissionId)
+          .filter((id) => id !== undefined),
+      );
+
+      // 완료율 계산
+      const completedCount = todayMissions.filter((m) =>
+        completedMissionIds.has(m.id),
       ).length;
-      const completionRate = (completedCount / totalRequired) * 100;
+      const completionRate = (completedCount / todayMissions.length) * 100;
 
       let matched = false;
 
@@ -649,7 +683,7 @@ export class ConditionEvaluatorService {
             solutionSeenAt: { not: null },
             userChallenges: {
               some: {
-                status: 'PENDING',
+                status: UserChallengeStatus.PENDING,
                 startDateSetAt: null,
               },
             },
@@ -679,7 +713,7 @@ export class ConditionEvaluatorService {
       case 'IN_PROGRESS': {
         // ACTIVE 챌린지가 있는 유저
         const userChallenges = await this.prisma.userChallenge.findMany({
-          where: { status: 'ACTIVE' },
+          where: { status: UserChallengeStatus.ACTIVE },
           select: { userId: true },
           distinct: ['userId'],
         });
@@ -690,7 +724,7 @@ export class ConditionEvaluatorService {
       case 'COMPLETED': {
         // COMPLETED 챌린지가 있는 유저
         const userChallenges = await this.prisma.userChallenge.findMany({
-          where: { status: 'COMPLETED' },
+          where: { status: UserChallengeStatus.COMPLETED },
           select: { userId: true },
           distinct: ['userId'],
         });
@@ -739,7 +773,7 @@ export class ConditionEvaluatorService {
     // PENDING 상태이면서 activatedAt(시작일)이 타겟 날짜인 챌린지
     const userChallenges = await this.prisma.userChallenge.findMany({
       where: {
-        status: 'PENDING',
+        status: UserChallengeStatus.PENDING,
         activatedAt: {
           gte: targetDate,
           lte: targetDateEnd,
@@ -826,7 +860,7 @@ export class ConditionEvaluatorService {
         pushEnabled: true,
         ...(pointsMin !== undefined || pointsMax !== undefined
           ? {
-              point: {
+              points: {
                 ...(pointsMin !== undefined ? { gte: pointsMin } : {}),
                 ...(pointsMax !== undefined ? { lte: pointsMax } : {}),
               },
@@ -867,7 +901,7 @@ export class ConditionEvaluatorService {
     // N시간 내 만료 예정인 쿠폰을 가진 유저 (status가 ACTIVE인 쿠폰)
     const userCoupons = await this.prisma.userCoupon.findMany({
       where: {
-        status: 'ACTIVE',
+        status: 'ACTIVE', // UserCoupon status (ACTIVE/USED/EXPIRED)
         expiresAt: {
           gt: now,
           lte: expiryThreshold,

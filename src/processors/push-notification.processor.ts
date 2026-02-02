@@ -10,13 +10,15 @@ import {
 } from '../push/interfaces/push-provider.interface';
 import { PushNotificationType } from '../push/enums';
 import { getNowKST } from '../common/utils/kst-date.util';
+import { ConditionEvaluatorService, ConditionParams } from '../push/services/condition-evaluator.service';
+import { RedisService } from '../common/services/redis.service';
 
 /**
  * 푸시 알림 Job 데이터 인터페이스
  */
 export interface PushNotificationJobData {
-  /** Job 타입: user (단일), users (다수), all (전체) */
-  type: 'user' | 'users' | 'all';
+  /** Job 타입: user (단일), users (다수), all (전체), event (이벤트 기반) */
+  type: 'user' | 'users' | 'all' | 'event';
 
   /** 유저 ID (type=user일 때) */
   userId?: number;
@@ -43,6 +45,40 @@ export interface PushNotificationJobData {
 
   /** 발송자 타입 (BIOCOM: 공통 메시지, PERSONA: 페르소나별 메시지) */
   senderType?: 'BIOCOM' | 'PERSONA';
+
+  // ===== 이벤트 기반 푸시 전용 필드 =====
+
+  /** 이벤트 타입 (type=event일 때) */
+  eventType?: EventPushType;
+
+  /** 조건 재평가용 파라미터 */
+  conditions?: { type: string; params: ConditionParams }[];
+
+  /** 캠페인 ID (중복 발송 방지용) */
+  campaignId?: number;
+
+  /** 스케줄 ID (로깅용) */
+  scheduleId?: number;
+}
+
+/**
+ * 이벤트 기반 푸시 타입
+ */
+export enum EventPushType {
+  /** 24시간 미접속 */
+  NO_ACCESS_24H = 'NO_ACCESS_24H',
+  /** 48시간 미접속 */
+  NO_ACCESS_48H = 'NO_ACCESS_48H',
+  /** 장바구니 방치 */
+  CART_ABANDONED = 'CART_ABANDONED',
+  /** 쿠폰 만료 임박 */
+  COUPON_EXPIRING = 'COUPON_EXPIRING',
+  /** 챌린지 시작 D-1 */
+  CHALLENGE_START_D1 = 'CHALLENGE_START_D1',
+  /** 챌린지 시작 D-Day */
+  CHALLENGE_START_DDAY = 'CHALLENGE_START_DDAY',
+  /** 오늘 미션 미완료 */
+  MISSION_INCOMPLETE = 'MISSION_INCOMPLETE',
 }
 
 /**
@@ -57,6 +93,8 @@ export class PushNotificationProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fcmProvider: FcmProvider,
+    private readonly conditionEvaluator: ConditionEvaluatorService,
+    private readonly redisService: RedisService,
   ) {
     super();
   }
@@ -80,6 +118,9 @@ export class PushNotificationProcessor extends WorkerHost {
           break;
         case 'all':
           result = await this.sendToAll(job.data);
+          break;
+        case 'event':
+          result = await this.sendToEvent(job.data);
           break;
         default:
           throw new Error(`Unknown job type: ${type}`);
@@ -489,5 +530,118 @@ export class PushNotificationProcessor extends WorkerHost {
         `❌ [PushProcessor] 토큰 상태 업데이트 실패: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * 이벤트 기반 푸시 전송
+   *
+   * Delayed Job이 실행될 때 조건을 재평가하여 여전히 조건에 맞는 유저에게만 발송
+   * 분산락을 통해 중복 발송 방지
+   */
+  private async sendToEvent(data: PushNotificationJobData) {
+    const { userId, message, eventType, conditions, campaignId, scheduleId } = data;
+
+    if (!userId) {
+      throw new Error('userId is required for type=event');
+    }
+
+    this.logger.log(
+      `🎯 [PushProcessor] 이벤트 기반 푸시 시작: userId=${userId}, eventType=${eventType}, scheduleId=${scheduleId}`,
+    );
+
+    // 1. 분산락 획득 (중복 처리 방지)
+    const lockKey = `push:event:lock:${campaignId || scheduleId}:${userId}`;
+    const lockAcquired = await this.redisService.acquireLock(lockKey, 30000); // 30초 TTL
+
+    if (!lockAcquired) {
+      this.logger.warn(
+        `⚠️ [PushProcessor] 분산락 획득 실패 (이미 처리 중): userId=${userId}`,
+      );
+      return {
+        success: false,
+        message: '이미 처리 중인 요청입니다',
+        sentCount: 0,
+        failureCount: 0,
+        skipped: true,
+      };
+    }
+
+    try {
+      // 2. 중복 발송 체크
+      const sentKey = `push:event:sent:${campaignId || scheduleId}:${userId}`;
+      const canSend = await this.redisService.markSent(sentKey, 86400000); // 24시간 TTL
+
+      if (!canSend) {
+        this.logger.warn(
+          `⚠️ [PushProcessor] 이미 발송됨: userId=${userId}, scheduleId=${scheduleId}`,
+        );
+        return {
+          success: false,
+          message: '이미 발송된 푸시입니다',
+          sentCount: 0,
+          failureCount: 0,
+          skipped: true,
+        };
+      }
+
+      // 3. 조건 재평가 (지연된 시간 동안 조건이 변경되었을 수 있음)
+      if (conditions && conditions.length > 0) {
+        const stillEligible = await this.checkConditionsForUser(userId, conditions);
+
+        if (!stillEligible) {
+          this.logger.log(
+            `ℹ️ [PushProcessor] 조건 재평가 실패 (조건 변경됨): userId=${userId}`,
+          );
+          return {
+            success: false,
+            message: '조건이 더 이상 충족되지 않습니다',
+            sentCount: 0,
+            failureCount: 0,
+            skipped: true,
+          };
+        }
+      }
+
+      // 4. 실제 푸시 발송
+      const result = await this.sendToUser({
+        ...data,
+        type: 'user',
+        userId,
+      });
+
+      this.logger.log(
+        `✅ [PushProcessor] 이벤트 기반 푸시 완료: userId=${userId}, success=${result.success}`,
+      );
+
+      return result;
+    } finally {
+      // 5. 분산락 해제
+      await this.redisService.releaseLock(lockKey);
+    }
+  }
+
+  /**
+   * 단일 유저에 대해 조건 목록 재평가
+   */
+  private async checkConditionsForUser(
+    userId: number,
+    conditions: { type: string; params: ConditionParams }[],
+  ): Promise<boolean> {
+    for (const condition of conditions) {
+      const result = await this.conditionEvaluator.evaluateForUser(
+        userId,
+        condition.type,
+        condition.params,
+      );
+
+      if (!result.matched) {
+        this.logger.debug(
+          `[ConditionCheck] 조건 미충족: userId=${userId}, type=${condition.type}`,
+        );
+        return false;
+      }
+    }
+
+    return true;
   }
 }
