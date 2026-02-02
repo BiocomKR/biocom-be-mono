@@ -245,102 +245,146 @@ export class PushNotificationController {
   }
 
   /**
-   * 조건 미리보기 - 대상 유저 수 조회 (발송 없이)
+   * 다중 조건 미리보기 (AND 조합) - 대상 유저 수 조회 (발송 없이)
+   * 프론트엔드에서 conditions 배열로 전송
    */
   @Post('condition/preview')
-  async previewCondition(
-    @Body() dto: { conditionType: string; conditionParams: Record<string, any> },
+  async previewConditions(
+    @Body() dto: {
+      conditions: Array<{ type: string; params: Record<string, any> }>;
+    },
   ) {
-    const result = await this.conditionEvaluator.previewCondition(
-      dto.conditionType,
-      dto.conditionParams,
-    );
+    // 밸리데이션: conditions가 없거나 빈 배열인 경우
+    if (!dto.conditions || dto.conditions.length === 0) {
+      return {
+        success: false,
+        message: '최소 하나의 조건이 필요합니다',
+        data: null,
+      };
+    }
 
-    return {
-      success: true,
-      data: result,
-    };
+    // 밸리데이션: 각 조건에 type이 있는지 확인
+    for (let i = 0; i < dto.conditions.length; i++) {
+      const condition = dto.conditions[i];
+      if (!condition.type) {
+        return {
+          success: false,
+          message: `조건 ${i + 1}: 조건 타입이 선택되지 않았습니다`,
+          data: null,
+        };
+      }
+    }
+
+    try {
+      const result = await this.conditionEvaluator.previewConditions(dto.conditions);
+
+      return {
+        success: true,
+        data: result,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || '조건 평가 중 오류가 발생했습니다',
+        data: null,
+      };
+    }
   }
 
   /**
-   * 조건 기반 테스터 발송 - isTester=true인 유저에게만 푸시 발송
+   * 조건 기반 테스터 발송 - isTester=true인 유저에게만 푸시 발송 (다중 조건 AND 조합)
    * MQ에 발송 요청을 추가하고 jobIds를 반환 (비동기 처리)
    */
   @Post('condition/send-to-testers')
   async sendToTesters(
     @Body() dto: {
-      conditionType: string;
-      conditionParams: Record<string, any>;
+      conditions: Array<{ type: string; params: Record<string, any> }>;
       title: string;
       body: string;
       imageUrl?: string;
       data?: Record<string, any>;
+      pushCode?: string;
+      pushType?: string;
     },
   ) {
-    // 조건에 맞는 테스터만 조회
-    const testerIds = await this.conditionEvaluator.evaluateConditionTestersOnly(
-      dto.conditionType,
-      dto.conditionParams,
-    );
-
-    if (testerIds.length === 0) {
+    // 밸리데이션: conditions가 없거나 빈 배열인 경우
+    if (!dto.conditions || dto.conditions.length === 0) {
       return {
         success: false,
-        message: '조건에 맞는 테스터가 없습니다',
+        message: '최소 하나의 조건이 필요합니다',
         data: { targetCount: 0, jobIds: [] },
       };
     }
 
-    // 해당 조건의 스케줄에서 pushCode, type 조회
-    // 테스트 발송은 비활성화된 스케줄도 테스트할 수 있어야 하므로 isActive 조건 제거
-    const schedule = await this.prisma.pushNotificationSchedule.findFirst({
-      where: {
-        conditionType: dto.conditionType,
-      },
-      select: {
-        pushCode: true,
-        type: true,
-      },
-    });
-
-    // 템플릿 치환
-    const titles = await this.templateService.substituteForUsers(dto.title, testerIds);
-    const bodies = await this.templateService.substituteForUsers(dto.body, testerIds);
-
-    // 개별 발송 (MQ에 요청 추가)
-    const jobIds: string[] = [];
-
-    for (const userId of testerIds) {
-      const title = titles.get(userId) || dto.title;
-      const body = bodies.get(userId) || dto.body;
-
-      const result = await this.pushNotificationService.sendToUser(
-        userId,
-        {
-          title,
-          body,
-          imageUrl: dto.imageUrl,
-          data: {
-            ...dto.data,
-            pushCode: schedule?.pushCode,
-            type: schedule?.type,
-          },
-        },
-        true, // isTest = true
-      );
-
-      if (result.jobId) {
-        jobIds.push(result.jobId);
+    // 밸리데이션: 각 조건에 type이 있는지 확인
+    for (let i = 0; i < dto.conditions.length; i++) {
+      const condition = dto.conditions[i];
+      if (!condition.type) {
+        return {
+          success: false,
+          message: `조건 ${i + 1}: 조건 타입이 선택되지 않았습니다`,
+          data: { targetCount: 0, jobIds: [] },
+        };
       }
     }
 
-    return {
-      success: true,
-      message: `${testerIds.length}명의 테스터에게 푸시 발송 요청이 접수되었습니다`,
-      data: {
-        targetCount: testerIds.length,
-        jobIds,
-      },
-    };
+    try {
+      // 조건에 맞는 테스터만 조회 (AND 조합)
+      const testerIds = await this.conditionEvaluator.evaluateConditionsTestersOnly(dto.conditions);
+
+      if (testerIds.length === 0) {
+        return {
+          success: false,
+          message: '조건에 맞는 테스터가 없습니다',
+          data: { targetCount: 0, jobIds: [] },
+        };
+      }
+
+      // 템플릿 치환
+      const titles = await this.templateService.substituteForUsers(dto.title, testerIds);
+      const bodies = await this.templateService.substituteForUsers(dto.body, testerIds);
+
+      // 개별 발송 (MQ에 요청 추가)
+      const jobIds: string[] = [];
+
+      for (const userId of testerIds) {
+        const title = titles.get(userId) || dto.title;
+        const body = bodies.get(userId) || dto.body;
+
+        const result = await this.pushNotificationService.sendToUser(
+          userId,
+          {
+            title,
+            body,
+            imageUrl: dto.imageUrl,
+            data: {
+              ...dto.data,
+              pushCode: dto.pushCode,
+              type: dto.pushType,
+            },
+          },
+          true, // isTest = true
+        );
+
+        if (result.jobId) {
+          jobIds.push(result.jobId);
+        }
+      }
+
+      return {
+        success: true,
+        message: `${testerIds.length}명의 테스터에게 푸시 발송 요청이 접수되었습니다`,
+        data: {
+          targetCount: testerIds.length,
+          jobIds,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.message || '테스터 발송 중 오류가 발생했습니다',
+        data: { targetCount: 0, jobIds: [] },
+      };
+    }
   }
 }

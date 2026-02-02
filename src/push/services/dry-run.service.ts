@@ -63,25 +63,26 @@ export class DryRunService {
     // 스케줄 목록 조회
     const schedules = await this.getConditionSchedules(activeOnly);
 
-    // 각 스케줄에 대해 mock 상태가 조건을 만족하는지 평가
+    // 각 스케줄에 대해 mock 상태가 조건을 만족하는지 평가 (AND 조합)
     const matchedSchedules: MatchedScheduleDto[] = [];
 
     for (const schedule of schedules) {
-      const matched = this.evaluateMockCondition(
-        schedule.conditionType,
-        schedule.conditionParams as Record<string, any>,
-        mockUserState,
+      const conditions = schedule.conditions as Array<{ type: string; params: Record<string, any> }> | null;
+      if (!conditions || conditions.length === 0) continue;
+
+      // 모든 조건을 만족해야 함 (AND)
+      const allMatched = conditions.every((c) =>
+        this.evaluateMockCondition(c.type, c.params, mockUserState),
       );
 
-      if (matched) {
+      if (allMatched) {
         matchedSchedules.push({
           id: schedule.id,
           name: schedule.name,
           pushCode: schedule.pushCode || undefined,
           pushGroup: schedule.pushGroup,
           priority: schedule.priority,
-          conditionType: schedule.conditionType!,
-          conditionParams: schedule.conditionParams as Record<string, any>,
+          conditions: conditions,
           isActive: schedule.isActive,
         });
       }
@@ -130,15 +131,18 @@ export class DryRunService {
     // 스케줄 목록 조회
     const schedules = await this.getConditionSchedules(activeOnly);
 
-    // 각 스케줄에 대해 유저가 조건을 만족하는지 평가
+    // 각 스케줄에 대해 유저가 조건을 만족하는지 평가 (AND 조합)
     const matchedSchedules: MatchedScheduleDto[] = [];
 
     for (const schedule of schedules) {
-      // 실제 DB 조건 평가
-      const matchedUserIds = await this.conditionEvaluator.evaluateCondition(
-        schedule.conditionType!,
-        schedule.conditionParams as Record<string, any>,
-      );
+      const conditions = schedule.conditions as Array<{ type: string; params: Record<string, any> }> | null;
+      if (!conditions || conditions.length === 0) continue;
+
+      // AND 조합 평가
+      const matchedUserIds = await this.conditionEvaluator.evaluateConditions({
+        id: schedule.id,
+        conditions,
+      });
 
       if (matchedUserIds.includes(userId)) {
         matchedSchedules.push({
@@ -147,8 +151,7 @@ export class DryRunService {
           pushCode: schedule.pushCode || undefined,
           pushGroup: schedule.pushGroup,
           priority: schedule.priority,
-          conditionType: schedule.conditionType!,
-          conditionParams: schedule.conditionParams as Record<string, any>,
+          conditions,
           isActive: schedule.isActive,
         });
       }
@@ -188,15 +191,16 @@ export class DryRunService {
       throw new BadRequestException(`스케줄을 찾을 수 없습니다: ${scheduleId}`);
     }
 
-    if (!schedule.conditionType) {
+    const conditions = schedule.conditions as Array<{ type: string; params: Record<string, any> }> | null;
+    if (!conditions || conditions.length === 0) {
       throw new BadRequestException('조건 기반 스케줄이 아닙니다');
     }
 
-    // 스케줄 조건에 매칭되는 유저 조회
-    const matchedUserIds = await this.conditionEvaluator.evaluateCondition(
-      schedule.conditionType,
-      schedule.conditionParams as Record<string, any>,
-    );
+    // 스케줄 조건에 매칭되는 유저 조회 (AND 조합)
+    const matchedUserIds = await this.conditionEvaluator.evaluateConditions({
+      id: schedule.id,
+      conditions,
+    });
 
     const totalCount = matchedUserIds.length;
 
@@ -236,15 +240,14 @@ export class DryRunService {
   private async getConditionSchedules(activeOnly: boolean = false) {
     return this.prisma.pushNotificationSchedule.findMany({
       where: {
-        conditionType: { not: null },
+        conditions: { not: null },
         ...(activeOnly ? { isActive: true } : {}),
       },
       select: {
         id: true,
         name: true,
         pushCode: true,
-        conditionType: true,
-        conditionParams: true,
+        conditions: true,
         pushGroup: true,
         priority: true,
         isActive: true,
