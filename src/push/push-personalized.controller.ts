@@ -10,7 +10,6 @@ import {
   TemplatePreviewDto,
   SendPersonalizedPushDto,
 } from './dto/personalized-push.dto';
-import { OPERATORS } from './enums';
 
 /**
  * 개인화 푸시 컨트롤러
@@ -54,25 +53,6 @@ export class PushPersonalizedController {
     return {
       success: true,
       data: conditions,
-    };
-  }
-
-  /**
-   * 연산자 목록 조회
-   */
-  @Get('operators')
-  @ApiOperation({ summary: '연산자 목록 조회' })
-  @ApiResponse({ status: 200, description: '연산자 목록' })
-  getOperators() {
-    const operators = Object.entries(OPERATORS).map(([code, def]) => ({
-      code,
-      label: def.label,
-      types: def.types,
-      valueCount: def.valueCount,
-    }));
-    return {
-      success: true,
-      data: operators,
     };
   }
 

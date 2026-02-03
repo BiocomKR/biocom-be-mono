@@ -32,7 +32,6 @@ import { ContentController } from './content/content.controller';
 import { PointController } from './point/point.controller';
 import { ShopController } from './shop/shop.controller';
 import { FeedbackController } from './shop/feedback.controller';
-import { ShippingController } from './shipping/shipping.controller';
 import { RefundController } from './refund/refund.controller';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { CartController } from './cart/cart.controller';
@@ -47,7 +46,6 @@ import { ContentService } from './content/content.service';
 import { PointService } from './point/point.service';
 import { ShopService } from './shop/shop.service';
 import { FeedbackService } from './shop/feedback.service';
-import { ShippingService } from './shipping/shipping.service';
 import { RefundService } from './refund/refund.service';
 import { DashboardService } from './dashboard/dashboard.service';
 import { CartService } from './cart/cart.service';
@@ -57,10 +55,7 @@ import { OrdersService } from './orders/orders.service';
 import { UtilsModule } from './utils/utils.module';
 import { IssueController } from './issue/issue.controller';
 import { IssueService } from './issue/issue.service';
-import { AppConfigModule } from './app-config/app-config.module';
 import { RecordsModule } from './records/records.module';
-import { SolutionController } from './solution/solution.controller';
-import { SolutionService } from './solution/solution.service';
 import { CouponController } from './coupon/coupon.controller';
 import { CouponService } from './coupon/coupon.service';
 import { PersonaModule } from './master/persona.module';
@@ -112,7 +107,6 @@ import { AnimalModule } from './master/animal.module';
     HealthTypeAnimalsModule, // 건강 타입 동물 관리 모듈
     QueuesModule,     // BullMQ 메시지 큐 모듈
     UtilsModule,      // 유틸리티 모듈 (이미지 변환 등)
-    AppConfigModule,  // 앱 설정 관리 모듈
     RecordsModule,    // 기록 통계 모듈
     PersonaModule,    // 페르소나 관리 모듈
     AnimalModule,     // 동물 관리 모듈
@@ -126,14 +120,12 @@ import { AnimalModule } from './master/animal.module';
     PointController,
     ShopController,
     FeedbackController,
-    ShippingController,
     RefundController,
     DashboardController,
     CartController,
     BannerController,
     OrdersController,
     IssueController,
-    SolutionController,
     CouponController,
   ],
   providers: [
@@ -145,14 +137,12 @@ import { AnimalModule } from './master/animal.module';
     PointService,
     ShopService,
     FeedbackService,
-    ShippingService,
     RefundService,
     DashboardService,
     CartService,
     BannerService,
     OrdersService,
     IssueService,
-    SolutionService,
     CouponService,
     {
       provide: APP_INTERCEPTOR,
