@@ -365,6 +365,7 @@ deploy_kubernetes() {
         --from-literal=GOOGLE_API_KEY="${GOOGLE_API_KEY:-}" \
         --from-literal=TOSS_PAYMENTS_SECRET_KEY="${TOSS_PAYMENTS_SECRET_KEY:-}" \
         --from-literal=SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}" \
+        --from-literal=SLACK_FEEDBACK_WEBHOOK_URL="${SLACK_FEEDBACK_WEBHOOK_URL:-}" \
         --from-literal=PUBLIC_DATA_PORTAL_API_KEY="${PUBLIC_DATA_PORTAL_API_KEY:-}"
 
     log_success "✅ Secret 동기화 완료!"
