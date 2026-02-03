@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsObject, IsEnum, MaxLength, MinLength, IsArray, IsInt } from 'class-validator';
 import { PushScheduleType, PushCategory } from '../enums';
 import { AppBundleId } from '../../common/enums';
 
@@ -180,6 +180,14 @@ export class CreateScheduleDto {
   @IsString()
   @MaxLength(20)
   senderType?: string;
+
+  @ApiPropertyOptional({
+    description: '상품(챌린지) ID (null이면 공용 푸시)',
+    example: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  productId?: number;
 
   @ApiProperty({
     description: '대상 앱 번들ID',

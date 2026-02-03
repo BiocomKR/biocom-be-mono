@@ -1,32 +1,37 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FcmProvider } from './fcm.provider';
-import * as admin from 'firebase-admin';
 
 describe('FcmProvider - 재시도 로직 테스트', () => {
   let provider: FcmProvider;
-  let mockFirebaseAdmin: any;
+  let mockFirebaseApps: any;
   let sendSpy: jest.SpyInstance;
+  let mockMessaging: any;
 
   beforeEach(async () => {
-    // Firebase Admin Mock
-    mockFirebaseAdmin = {
-      messaging: jest.fn().mockReturnValue({
-        send: jest.fn(),
-      }),
+    // Firebase Messaging Mock
+    mockMessaging = {
+      send: jest.fn(),
+    };
+
+    // Firebase Apps Mock (FIREBASE_APPS)
+    mockFirebaseApps = {
+      dev: { messaging: () => mockMessaging },
+      prod: { messaging: () => mockMessaging },
+      getAppForBundleId: jest.fn().mockReturnValue({ messaging: () => mockMessaging }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FcmProvider,
         {
-          provide: 'FIREBASE_ADMIN',
-          useValue: mockFirebaseAdmin,
+          provide: 'FIREBASE_APPS',
+          useValue: mockFirebaseApps,
         },
       ],
     }).compile();
 
     provider = module.get<FcmProvider>(FcmProvider);
-    sendSpy = mockFirebaseAdmin.messaging().send;
+    sendSpy = mockMessaging.send;
   });
 
   afterEach(() => {
@@ -92,7 +97,7 @@ describe('FcmProvider - 재시도 로직 테스트', () => {
 
       expect(result.success).toBe(false);
       expect(result.errorCode).toBe('messaging/server-unavailable');
-      expect(sendSpy).toHaveBeenCalledTimes(4); // 초기 3번 + 마지막 1번
+      expect(sendSpy).toHaveBeenCalledTimes(3); // 최대 3회 시도
     });
   });
 
@@ -156,6 +161,30 @@ describe('FcmProvider - 재시도 로직 테스트', () => {
       expect(result.success).toBe(true);
       expect(result.messageId).toBe('message-id-success');
       expect(sendSpy).toHaveBeenCalledTimes(1); // 재시도 없음
+    });
+  });
+
+  describe('bundleId 기반 앱 선택', () => {
+    it('dev bundleId 시 dev 앱 사용', async () => {
+      sendSpy.mockResolvedValue('message-id-dev');
+
+      await provider.sendToToken('test-token', {
+        title: '테스트',
+        body: 'dev 앱 테스트',
+      }, 3, 'kr.biocom.challenge.dev');
+
+      expect(mockFirebaseApps.getAppForBundleId).toHaveBeenCalledWith('kr.biocom.challenge.dev');
+    });
+
+    it('prod bundleId 시 prod 앱 사용', async () => {
+      sendSpy.mockResolvedValue('message-id-prod');
+
+      await provider.sendToToken('test-token', {
+        title: '테스트',
+        body: 'prod 앱 테스트',
+      }, 3, 'kr.biocom.challenge');
+
+      expect(mockFirebaseApps.getAppForBundleId).toHaveBeenCalledWith('kr.biocom.challenge');
     });
   });
 });

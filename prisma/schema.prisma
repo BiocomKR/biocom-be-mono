@@ -792,6 +792,7 @@ model Product {
   userSupplementRoutine        UserSupplementRoutine[]        @relation("UserSupplementRoutineProduct")
   userSupplementRoutineHistory UserSupplementRoutineHistory[] @relation("UserSupplementRoutineHistoryProduct")
   wishlistItems                Wishlist[]
+  pushNotificationSchedules    PushNotificationSchedule[]
 
   @@index([sku])
   @@index([categoryCode, status])
@@ -2156,9 +2157,13 @@ model PushNotificationSchedule {
   createdAt          DateTime                   @default(now()) @map("created_at")
   /// 수정일시
   updatedAt          DateTime?                  @updatedAt @map("updated_at")
+  /// 상품(챌린지) ID (null이면 공용)
+  productId          Int?                       @map("product_id")
+  product            Product?                   @relation(fields: [productId], references: [id])
   campaigns          PushNotificationCampaign[]
 
   @@index([type])
+  @@index([productId])
   @@index([category])
   @@index([isActive])
   @@index([scheduleType])

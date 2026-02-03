@@ -125,7 +125,7 @@ set_environment_config() {
 
     if [[ "$DEPLOY_ENV" == "prod" ]]; then
         # 운영 환경
-        [[ -z "$CLUSTER_NAME" ]] && CLUSTER_NAME="biocom-cluster-prod"
+        [[ -z "$CLUSTER_NAME" ]] && CLUSTER_NAME="cluster-api-prod"
         EXPECTED_PROJECT="api-prod-biocom"
         STATIC_IP_NAME="biocom-bo-api-prod-external-ip"
         CONFIGMAP_FILE="configmap-prod.yaml"
@@ -133,7 +133,7 @@ set_environment_config() {
         DEPLOYMENT_FILE="deployment-prod.yaml"
     else
         # 개발 환경
-        [[ -z "$CLUSTER_NAME" ]] && CLUSTER_NAME="biocom-cluster-dev"
+        [[ -z "$CLUSTER_NAME" ]] && CLUSTER_NAME="cluster-api-dev"
         EXPECTED_PROJECT="api-dev-biocom"
         STATIC_IP_NAME="biocom-bo-api-external-ip"
         CONFIGMAP_FILE="configmap.yaml"
@@ -365,6 +365,7 @@ deploy_kubernetes() {
         --from-literal=GOOGLE_API_KEY="${GOOGLE_API_KEY:-}" \
         --from-literal=TOSS_PAYMENTS_SECRET_KEY="${TOSS_PAYMENTS_SECRET_KEY:-}" \
         --from-literal=SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}" \
+        --from-literal=SLACK_FEEDBACK_WEBHOOK_URL="${SLACK_FEEDBACK_WEBHOOK_URL:-}" \
         --from-literal=PUBLIC_DATA_PORTAL_API_KEY="${PUBLIC_DATA_PORTAL_API_KEY:-}"
 
     log_success "✅ Secret 동기화 완료!"
@@ -405,6 +406,13 @@ deploy_kubernetes() {
     log_info "Service 배포 중..."
     kubectl apply -f service.yaml -n "$NAMESPACE"
 
+    # 개발 환경: 기존 pod 삭제 후 배포 (리소스 부족 대응)
+    if [[ "$DEPLOY_ENV" == "dev" ]]; then
+        log_info "🗑️ 개발 환경: 기존 pod 삭제 중..."
+        kubectl scale deployment/biocom-bo-api -n "$NAMESPACE" --replicas=0 --timeout=60s 2>/dev/null || true
+        sleep 5
+    fi
+
     # Deployment 배포
     log_info "Deployment 배포 중..."
     local image_url="$REGION-docker.pkg.dev/$PROJECT_ID/biocom-api/biocom-bo-api:$IMAGE_TAG"
@@ -415,6 +423,12 @@ deploy_kubernetes() {
     sed -i.bak "s|image: .*biocom-bo-api.*|image: $image_url|" "$deploy_file"
     kubectl apply -f "$deploy_file" -n "$NAMESPACE"
     rm -f "${deploy_file}.bak"
+
+    # 개발 환경: replicas 복원
+    if [[ "$DEPLOY_ENV" == "dev" ]]; then
+        log_info "📈 개발 환경: replicas 복원 중..."
+        kubectl scale deployment/biocom-bo-api -n "$NAMESPACE" --replicas=1 --timeout=60s
+    fi
 
     # Static IP 확인/생성
     ensure_static_ip
