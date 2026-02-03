@@ -4,6 +4,7 @@ import { AnswerIssueReportDto } from './dto/answer-issue-report.dto';
 import { CreateBoFeedbackDto } from './dto/create-bo-feedback.dto';
 import { getNowKST } from '../common/utils/kst-date.util';
 import { FeedbackStatus, IssueReportType } from '../common/enums';
+import { sendFeedbackSlackNotification } from '../common/utils/feedback-slack.util';
 
 @Injectable()
 export class IssueService {
@@ -189,6 +190,13 @@ export class IssueService {
         createdAt: getNowKST(),
       },
     });
+
+    // 슬랙 알림 전송 (비동기, 실패해도 피드백 등록에 영향 없음)
+    sendFeedbackSlackNotification({
+      category: dto.category,
+      content: dto.content,
+      fileCount: dto.fileIds?.length,
+    }).catch((err) => this.logger.error('슬랙 피드백 알림 실패', err));
 
     return {
       success: true,
