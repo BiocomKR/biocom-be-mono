@@ -157,31 +157,4 @@ export interface IPushProvider {
    * ```
    */
   validateToken(tokenData: any): Promise<boolean>;
-
-  /**
-   * Topic 구독
-   *
-   * @param tokens - FCM 토큰 배열
-   * @param topic - 토픽 이름
-   * @returns 구독 성공 여부
-   */
-  subscribeToTopic(tokens: string[], topic: string): Promise<boolean>;
-
-  /**
-   * Topic 구독 해제
-   *
-   * @param tokens - FCM 토큰 배열
-   * @param topic - 토픽 이름
-   * @returns 구독 해제 성공 여부
-   */
-  unsubscribeFromTopic(tokens: string[], topic: string): Promise<boolean>;
-
-  /**
-   * Topic으로 푸시 발송
-   *
-   * @param topic - 토픽 이름
-   * @param message - 발송할 메시지
-   * @returns 발송 결과
-   */
-  sendToTopic(topic: string, message: PushMessage): Promise<PushSendResult>;
 }

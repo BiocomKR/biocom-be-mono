@@ -1,11 +1,6 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import {
-  IPushProvider,
-  PUSH_PROVIDER_TOKEN,
-  PushMessage,
-  PushSendResult,
-} from '../interfaces/push-provider.interface';
+import { PushMessage } from '../interfaces/push-provider.interface';
 import { PushNotificationType, PushLogStatus } from '../enums';
 import { PushLogQueryDto } from '../dto/push-log-query.dto';
 import { PushLogListResponseDto, PushLogResponseDto } from '../dto/push-log-response.dto';
@@ -25,7 +20,6 @@ export class PushNotificationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(PUSH_PROVIDER_TOKEN) private readonly pushProvider: IPushProvider,
     private readonly queueService: QueueService,
   ) {}
 
@@ -416,97 +410,4 @@ export class PushNotificationService {
     }
   }
 
-  /**
-   * 마케팅 푸시 전송 (Topic 기반 - FCM 직접 발송)
-   *
-   * Topic 기반으로 마케팅 동의한 유저에게만 푸시 전송
-   * 이건 MQ로 이관하지 않고 FCM Topic으로 직접 발송
-   */
-  async sendMarketingBroadcast(message: {
-    title: string;
-    body: string;
-    imageUrl?: string;
-    data?: Record<string, any>;
-  }) {
-    this.logger.log(
-      `📣 [PushNotificationService] 마케팅 푸시 전송: title="${message.title}"`,
-    );
-
-    try {
-      const result = await this.pushProvider.sendToTopic('marketing', {
-        title: message.title,
-        body: message.body,
-        imageUrl: message.imageUrl,
-        data: {
-          ...message.data,
-          subType: 'MARKETING_BROADCAST',
-        },
-      });
-
-      await this.createTopicLog(
-        'marketing',
-        {
-          title: message.title,
-          body: message.body,
-          imageUrl: message.imageUrl,
-          data: message.data,
-        },
-        PushNotificationType.MARKETING,
-        result,
-      );
-
-      this.logger.log(
-        `✅ [PushNotificationService] 마케팅 푸시 전송 완료: success=${result.success}`,
-      );
-
-      return {
-        success: result.success,
-        message: result.success
-          ? '마케팅 푸시가 전송되었습니다'
-          : '마케팅 푸시 전송에 실패했습니다',
-        messageId: result.messageId,
-        errorCode: result.errorCode,
-        errorMessage: result.errorMessage,
-      };
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] 마케팅 푸시 전송 실패: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Topic 발송 로그 생성 (통계용)
-   */
-  private async createTopicLog(
-    topic: string,
-    message: PushMessage,
-    type: PushNotificationType,
-    result: PushSendResult,
-  ): Promise<void> {
-    try {
-      await this.prisma.pushNotificationLog.create({
-        data: {
-          title: message.title,
-          body: message.body,
-          type,
-          data: { ...message.data, topic },
-          success: result.success,
-          errorCode: result.errorCode,
-          errorMessage: result.errorMessage,
-          sentAt: getNowKST(),
-          isTest: false,
-        },
-      });
-      this.logger.debug(
-        `📝 [PushNotificationService] Topic 로그 생성 완료: topic=${topic}, success=${result.success}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `❌ [PushNotificationService] Topic 로그 생성 실패: ${error.message}`,
-      );
-    }
-  }
 }

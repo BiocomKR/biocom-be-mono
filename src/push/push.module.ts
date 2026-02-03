@@ -5,7 +5,6 @@ import { FcmProvider } from './providers/fcm.provider';
 import { PUSH_PROVIDER_TOKEN } from './interfaces/push-provider.interface';
 import { PushTokenService } from './services/push-token.service';
 import { PushNotificationService } from './services/push-notification.service';
-import { PushTopicService } from './services/push-topic.service';
 import { PushScheduleService } from './services/push-schedule.service';
 import { PushCampaignService } from './services/push-campaign.service';
 import { PushSchedulerService } from './services/push-scheduler.service';
@@ -51,7 +50,6 @@ import { PrismaService } from '../common/services/prisma.service';
     FcmProvider, // 기존 직접 주입 호환용 (점진적 마이그레이션)
     PushTokenService,
     PushNotificationService,
-    PushTopicService,
     PushScheduleService,
     PushCampaignService,
     PushSchedulerService,
@@ -66,7 +64,6 @@ import { PrismaService } from '../common/services/prisma.service';
     FcmProvider, // 기존 직접 주입 호환용 (점진적 마이그레이션)
     PushTokenService,
     PushNotificationService,
-    PushTopicService,
     PushScheduleService,
     PushCampaignService,
     PushSegmentService,
