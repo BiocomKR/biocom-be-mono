@@ -36,6 +36,7 @@
   },
   "homepage": "https://github.com/biocom/biocom-api#readme",
   "dependencies": {
+    "@biocom/shared": "workspace:*",
     "@google-cloud/storage": "^7.17.0",
     "@google/generative-ai": "^0.24.1",
     "@nestjs/axios": "^4.0.1",

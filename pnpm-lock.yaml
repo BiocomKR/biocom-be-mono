@@ -14,6 +14,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@biocom/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@google-cloud/storage':
         specifier: ^7.17.0
         version: 7.18.0
@@ -186,6 +189,9 @@ importers:
 
   apps/bo-api:
     dependencies:
+      '@biocom/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@google-cloud/storage':
         specifier: ^7.17.0
         version: 7.18.0
@@ -361,6 +367,9 @@ importers:
 
   apps/mq:
     dependencies:
+      '@biocom/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@bull-board/api':
         specifier: ^6.16.4
         version: 6.16.4(@bull-board/ui@6.16.4)

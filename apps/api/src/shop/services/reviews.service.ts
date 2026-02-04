@@ -6,7 +6,8 @@ import {
   ForbiddenException
 } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
-import { ReviewStatus, PointRelatedType } from '../../common/enums';
+import { ReviewStatus, PointRelatedType, OrderStatus } from '@biocom/shared';
+import { getNowKST } from '@biocom/shared';
 import {
   CreateReviewDto,
   UpdateReviewDto,
@@ -21,9 +22,7 @@ import {
   ReviewCommentPaginatedResponseDto
 } from '../dto/reviews/review.dto';
 import { Prisma } from '@prisma/client';
-import { getNowKST } from '../../common/utils/kst-date.util';
 import { getPointDescription } from '../../common/utils/point-description.util';
-import { OrderStatus } from '../../common/enums';
 
 @Injectable()
 export class ReviewsService {
