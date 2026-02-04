@@ -1,0 +1,108 @@
+# 🚚 CronJob - 배송 상태 동기화 배치
+# 30분마다 실행 (UTC 기준)
+# 플레이오토 API로 주문 상태 조회 후 DB 업데이트
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sync-shipping-status
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+    job-type: sync-shipping-status
+spec:
+  # Cron 표현식 (30분마다 실행: 0분, 30분)
+  # 분 시 일 월 요일
+  schedule: "*/30 * * * *"
+
+  # 성공한 Job 히스토리 보관 개수
+  successfulJobsHistoryLimit: 3
+
+  # 실패한 Job 히스토리 보관 개수
+  failedJobsHistoryLimit: 3
+
+  # 동시 실행 정책 (Forbid: 이전 작업이 끝나기 전까지 새 작업 시작 안 함)
+  # 멀티 팟 환경에서 Race Condition 방지
+  concurrencyPolicy: Forbid
+
+  # 스케줄 시작 데드라인 (초) - 300초 내에 시작되지 않으면 스킵
+  startingDeadlineSeconds: 300
+
+  jobTemplate:
+    spec:
+      # Job 완료 후 Pod 삭제까지 대기 시간 (초)
+      ttlSecondsAfterFinished: 300
+
+      # Job 실패 시 재시도 횟수
+      backoffLimit: 2
+
+      # Job 실행 시간 제한 (초) - 10분 내에 완료되어야 함
+      activeDeadlineSeconds: 600
+
+      template:
+        metadata:
+          labels:
+            app: biocom-api
+            job-type: sync-shipping-status
+        spec:
+          # 서비스 계정
+          serviceAccountName: biocom-api-sa
+
+          # 이미지 Pull Secret
+          imagePullSecrets:
+          - name: gcr-json-key
+
+          # Job 실패 시 재시작하지 않음
+          restartPolicy: Never
+
+          containers:
+          - name: sync-shipping-status
+            image: biocom-api
+            imagePullPolicy: Always
+
+            # 배치 실행 명령어 (DATABASE_URL 조합 후 실행)
+            command: ["/bin/sh", "-c"]
+            args:
+            - |
+              ENCODED_PASSWORD=$(node -e "console.log(encodeURIComponent(process.env.DB_PASSWORD))")
+              export DATABASE_URL="postgresql://${DB_USERNAME}:${ENCODED_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?${DATABASE_URL_OPTIONS}"
+              echo "DATABASE_URL configured"
+              exec node dist/src/main.js --run-scheduler sync-shipping-status
+
+            # 환경변수는 ConfigMap + Secret에서 가져옴
+            envFrom:
+            - configMapRef:
+                name: biocom-api-config
+            - secretRef:
+                name: biocom-api-secrets
+
+            # 볼륨 마운트 (Firebase 키 + 로그 디렉토리 + KCP 인증서)
+            volumeMounts:
+            - name: firebase-service-account-key
+              mountPath: /app/firebase
+              readOnly: true
+            - name: logs
+              mountPath: /app/logs
+            - name: kcp-cert-files
+              mountPath: /config/kcp-cert
+              readOnly: true
+
+            # 리소스 제한 (외부 API 호출 + DB 업데이트 고려)
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+
+          # 볼륨 정의
+          volumes:
+          - name: firebase-service-account-key
+            secret:
+              secretName: firebase-service-account-key
+          - name: logs
+            emptyDir: {}
+          - name: kcp-cert-files
+            secret:
+              secretName: kcp-cert-files

@@ -1,0 +1,8 @@
+###
+GET http://localhost:3000/api/auth/test
+
+
+
+###
+GET https://api-dev.biocom.ai.kr/api/management/api-keys
+X-API-KEY: 58d0e4d2-f473-4739-ae6c-5392caff05f1

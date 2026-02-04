@@ -1,0 +1,84 @@
+import {
+  Controller,
+  Post,
+  Body,
+  Logger,
+  HttpCode,
+  HttpStatus,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { WebhooksService } from '../services/webhooks.service';
+
+/**
+ * 토스페이먼츠 웹훅 컨트롤러
+ *
+ * 역할:
+ * - 토스페이먼츠 서버에서 전송하는 웹훅 이벤트 수신
+ * - 가상계좌 입금 완료, 결제 취소 등 비동기 결제 상태 변경 처리
+ *
+ * 주의사항:
+ * - 반드시 200 OK 응답 (토스가 재시도하지 않도록)
+ * - 멱등성 보장 (같은 웹훅이 여러 번 올 수 있음)
+ * - 10초 이내 응답 필수
+ *
+ * 참고: 토스페이먼츠는 웹훅 서명 검증을 제공하지 않음
+ * https://docs.tosspayments.com/guides/webhook
+ */
+@ApiTags('Webhooks')
+@Controller('webhooks/toss')
+export class WebhooksController {
+  private readonly logger = new Logger(WebhooksController.name);
+
+  constructor(private readonly webhooksService: WebhooksService) {}
+
+  /**
+   * 토스페이먼츠 결제 웹훅 수신
+   *
+   * @description
+   * 토스페이먼츠 서버가 결제 상태 변경 시 자동으로 호출하는 엔드포인트
+   *
+   * 처리 이벤트:
+   * - PAYMENT_STATUS_CHANGED: 결제 상태 변경
+   * - DEPOSIT_CALLBACK: 가상계좌 입금 완료
+   * - CANCEL_STATUS_CHANGED: 결제 취소 상태 변경
+   *
+   * @param webhookData - 토스가 보내는 웹훅 데이터
+   * @returns 200 OK (항상)
+   */
+  @Post('payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '토스페이먼츠 웹훅 수신',
+    description: '가상계좌 입금 완료, 결제 취소 등 비동기 결제 이벤트 처리',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '웹훅 수신 성공 (항상 200 반환)',
+    schema: {
+      example: { success: true },
+    },
+  })
+  async handleTossPaymentWebhook(@Body() webhookData: any) {
+    this.logger.log(
+      `🔔 토스 웹훅 수신: ${JSON.stringify(webhookData, null, 2)}`,
+    );
+
+    try {
+      // 웹훅 데이터 처리
+      await this.webhooksService.handleTossWebhook(webhookData);
+
+      this.logger.log(`✅ 토스 웹훅 처리 완료`);
+
+      // 토스에게 200 OK 응답 (필수!)
+      return { success: true };
+    } catch (error: any) {
+      this.logger.error(`❌ 토스 웹훅 처리 실패: ${error.message}`);
+      this.logger.error(error.stack);
+
+      // 내부 에러는 500 반환하여 토스가 재시도하도록 함
+      // 토스는 5xx 에러를 받으면 최대 7회 재시도
+      throw new InternalServerErrorException('웹훅 처리 중 오류 발생');
+    }
+  }
+}

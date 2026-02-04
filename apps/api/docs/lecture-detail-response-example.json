@@ -1,0 +1,306 @@
+{
+  "success": true,
+  "message": "강의가 성공적으로 조회되었습니다.",
+  "data": {
+    "id": 1,
+    "title": "1일차 - 21일 챌린지 시작하기",
+    "content": "<h2>챌린지 첫날을 환영합니다!</h2><p>오늘부터 여러분의 건강한 변화가 시작됩니다...</p>",
+    "type": "LECTURE",
+    "weekNumber": 1,
+    "dayNumber": 1,
+    "sortOrder": 1,
+    "isActive": true,
+    "viewCount": 152,
+    "challengeId": 1,
+    "createdAt": "2025-01-15T09:00:00.000Z",
+    "updatedAt": "2025-01-15T09:00:00.000Z",
+
+    "contentFiles": [
+      {
+        "id": 1,
+        "contentId": 1,
+        "fileId": 101,
+        "sortOrder": 0,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "file": {
+          "id": 101,
+          "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day1-thumbnail.jpg",
+          "fileName": "day1-thumbnail.jpg",
+          "fileSize": 524288,
+          "mimeType": "image/jpeg",
+          "uploadedAt": "2025-01-15T09:00:00.000Z"
+        }
+      },
+      {
+        "id": 2,
+        "contentId": 1,
+        "fileId": 102,
+        "sortOrder": 1,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "file": {
+          "id": 102,
+          "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/videos/day1-lecture.mp4",
+          "fileName": "day1-lecture.mp4",
+          "fileSize": 52428800,
+          "mimeType": "video/mp4",
+          "uploadedAt": "2025-01-15T09:00:00.000Z"
+        }
+      }
+    ],
+
+    "lectureQuizzes": [
+      {
+        "id": 1,
+        "lectureId": 1,
+        "quizId": 10,
+        "sortOrder": 0,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "quiz": {
+          "id": 10,
+          "question": "21일 챌린지의 핵심 원칙은 무엇인가요?",
+          "options": [
+            "매일 꾸준히 실천하기",
+            "완벽하게 수행하기",
+            "빠르게 결과 내기",
+            "다른 사람과 비교하기"
+          ],
+          "correctAnswer": 0,
+          "explanation": "21일 챌린지는 완벽함보다 꾸준함이 중요합니다. 매일 조금씩 실천하는 것이 습관 형성의 핵심입니다.",
+          "points": 300,
+          "isActive": true,
+          "createdAt": "2025-01-15T09:00:00.000Z",
+          "updatedAt": "2025-01-15T09:00:00.000Z"
+        }
+      },
+      {
+        "id": 2,
+        "lectureId": 1,
+        "quizId": 11,
+        "sortOrder": 1,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "quiz": {
+          "id": 11,
+          "question": "챌린지 기간 동안 건강한 식습관을 유지하기 위한 방법은?",
+          "options": [
+            "식사를 거르기",
+            "규칙적인 식사 시간 지키기",
+            "무조건 적게 먹기",
+            "간식 완전히 끊기"
+          ],
+          "correctAnswer": 1,
+          "explanation": "규칙적인 식사 시간을 지키는 것이 건강한 식습관의 기본입니다.",
+          "points": 300,
+          "isActive": true,
+          "createdAt": "2025-01-15T09:00:00.000Z",
+          "updatedAt": "2025-01-15T09:00:00.000Z"
+        }
+      }
+    ],
+
+    "lectureProducts": [
+      {
+        "id": 1,
+        "lectureId": 1,
+        "productId": 101,
+        "sortOrder": 0,
+        "createdAt": "2025-01-15T09:00:00.000Z",
+        "product": {
+          "id": 101,
+          "code": "CHALLENGE-21DAYS",
+          "name": "21일 건강 챌린지",
+          "categoryCode": "CHALLENGE",
+          "price": 99000,
+          "status": "ACTIVE",
+          "metadata": {
+            "challengeName": "21일 건강 챌린지",
+            "duration": 21,
+            "description": "21일간의 건강한 습관 형성 프로그램"
+          },
+          "createdAt": "2025-01-01T00:00:00.000Z",
+          "updatedAt": "2025-01-01T00:00:00.000Z"
+        }
+      }
+    ],
+
+    "challenge": {
+      "id": 1,
+      "name": "21일 건강 챌린지",
+      "metadata": {
+        "challengeName": "21일 건강 챌린지",
+        "duration": 21,
+        "description": "21일간의 건강한 습관 형성 프로그램"
+      }
+    },
+
+    "playlist": [
+      {
+        "id": 1,
+        "title": "1일차 - 21일 챌린지 시작하기",
+        "dayNumber": 1,
+        "weekNumber": 1,
+        "contentFiles": [
+          {
+            "id": 1,
+            "contentId": 1,
+            "fileId": 101,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 101,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day1-thumbnail.jpg",
+              "fileName": "day1-thumbnail.jpg",
+              "fileSize": 524288,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "2일차 - 건강한 아침 루틴 만들기",
+        "dayNumber": 2,
+        "weekNumber": 1,
+        "contentFiles": [
+          {
+            "id": 3,
+            "contentId": 2,
+            "fileId": 103,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 103,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day2-thumbnail.jpg",
+              "fileName": "day2-thumbnail.jpg",
+              "fileSize": 512000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "3일차 - 올바른 수분 섭취",
+        "dayNumber": 3,
+        "weekNumber": 1,
+        "contentFiles": [
+          {
+            "id": 5,
+            "contentId": 3,
+            "fileId": 105,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 105,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day3-thumbnail.jpg",
+              "fileName": "day3-thumbnail.jpg",
+              "fileSize": 498000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "4일차 - 스트레칭의 중요성",
+        "dayNumber": 4,
+        "weekNumber": 1,
+        "contentFiles": [
+          {
+            "id": 7,
+            "contentId": 4,
+            "fileId": 107,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 107,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day4-thumbnail.jpg",
+              "fileName": "day4-thumbnail.jpg",
+              "fileSize": 520000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "5일차 - 균형 잡힌 식단 구성",
+        "dayNumber": 5,
+        "weekNumber": 1,
+        "contentFiles": [
+          {
+            "id": 9,
+            "contentId": 5,
+            "fileId": 109,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 109,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day5-thumbnail.jpg",
+              "fileName": "day5-thumbnail.jpg",
+              "fileSize": 530000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "6일차 - 수면의 질 높이기",
+        "dayNumber": 6,
+        "weekNumber": 1,
+        "contentFiles": [
+          {
+            "id": 11,
+            "contentId": 6,
+            "fileId": 111,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 111,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day6-thumbnail.jpg",
+              "fileName": "day6-thumbnail.jpg",
+              "fileSize": 515000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "7일차 - 1주차 회고 및 점검",
+        "dayNumber": 7,
+        "weekNumber": 1,
+        "contentFiles": [
+          {
+            "id": 13,
+            "contentId": 7,
+            "fileId": 113,
+            "sortOrder": 0,
+            "createdAt": "2025-01-15T09:00:00.000Z",
+            "file": {
+              "id": 113,
+              "fileUrl": "https://storage.googleapis.com/biocom-files/lectures/thumbnails/day7-thumbnail.jpg",
+              "fileName": "day7-thumbnail.jpg",
+              "fileSize": 505000,
+              "mimeType": "image/jpeg",
+              "uploadedAt": "2025-01-15T09:00:00.000Z"
+            }
+          }
+        ]
+      }
+    ],
+
+    "quizStatus": {
+      "available": true,
+      "openDay": 1,
+      "message": null
+    }
+  },
+  "timestamp": "2025-11-03T12:30:45+09:00"
+}

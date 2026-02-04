@@ -1,0 +1,5 @@
+### send sms
+POST https://apis.aligo.in/send
+Content-Type: application/x-www-form-urlencoded
+
+key=4zkzeqbqzwtknfhlvbxvquw164wltc9c&user_id=biocom&sender=0220390295&receiver=01056060746&msg=[바이오컴] 인증번호는 123456 입니다.

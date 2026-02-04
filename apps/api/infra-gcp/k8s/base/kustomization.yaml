@@ -1,0 +1,28 @@
+# 🏗️ Base Kustomization - 공통 리소스 정의
+# 모든 환경에서 공유하는 기본 리소스
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 공통 리소스
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - backend-config.yaml
+  - pvc.yaml
+  # CronJobs
+  - cronjob-activate-challenges.yaml
+  - cronjob-check-push-schedules.yaml
+  - cronjob-create-supplements.yaml
+  - cronjob-expire-challenges.yaml
+  - cronjob-expire-coupons.yaml
+  - cronjob-iap-acknowledge-retry.yaml
+  - cronjob-sync-shipping-status.yaml
+  - cronjob-allergy-sync.yaml
+  - cronjob-sib-health-check.yaml
+
+# 공통 레이블
+commonLabels:
+  app: biocom-api
+  managed-by: kustomize

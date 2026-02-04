@@ -1,0 +1,18 @@
+# 🗄️ PersistentVolumeClaim - 영구 볼륨 클레임
+# Gemma AI 모델 저장용 볼륨
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gemma-model-pvc
+  namespace: biocom-api
+  labels:
+    app: biocom-api
+    component: ai-model-storage
+spec:
+  accessModes:
+    - ReadWriteOnce  # 단일 노드에서만 읽기/쓰기 가능
+  resources:
+    requests:
+      storage: 10Gi  # Gemma 모델 크기에 맞춰 조정 필요
+  storageClassName: standard  # GCP 표준 디스크 사용

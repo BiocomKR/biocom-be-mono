@@ -1,0 +1,388 @@
+import {
+  Controller,
+  Get,
+  Put,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  Request
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ApiResponseDto } from '../common/dto/api-response.dto';
+import { UsersService } from './users.service';
+import { ImwebApiService } from '../imweb/imweb-api.service';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdatePersonaDto } from './dto/update-persona.dto';
+import { UpdateMbtiDto } from './dto/update-mbti.dto';
+import { SearchImwebMembersResponseDto } from './dto/user-response.dto';
+import {
+  UserSettingsResponseDto,
+  UpdateUserSettingsDto,
+} from './dto/user-settings.dto';
+import { UserAnalyticsDto } from './dto/analytics.dto';
+import { ApiErrorResponseDto } from '../common/dto/api-response.dto';
+import { getNowKST } from '../common/utils/kst-date.util';
+
+/**
+ * 사용자 컨트롤러
+ * 일반 사용자용 API
+ */
+@ApiTags('헬스케어-사용자')
+@Controller('users')
+export class UsersController {
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly imwebApiService: ImwebApiService,
+  ) {}
+
+  /**
+   * 아임웹 회원 검색 (전화번호)
+   * 전화번호로 아임웹 회원을 검색하고 상세 정보를 조회
+   */
+  @Get('imweb/search-by-phone/:phone')
+  @ApiOperation({ 
+    summary: '아임웹 회원 검색 (전화번호)', 
+    description: '전화번호로 아임웹 회원을 검색하고 모든 회원의 상세 정보를 조회합니다.' 
+  })
+  @ApiParam({ 
+    name: 'phone', 
+    required: true, 
+    type: String, 
+    description: '검색할 전화번호 (예: 01056060746)' 
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: '회원 검색 성공',
+    type: SearchImwebMembersResponseDto,
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: '해당 전화번호로 등록된 회원을 찾을 수 없음',
+    type: ApiErrorResponseDto,
+  })
+  async searchImwebMembersByPhone(
+    @Param('phone') phone: string
+  ): Promise<ApiResponseDto> {
+    console.log('searchImwebMembersByPhone 호출됨, phone:', phone);
+    try {
+      const members = await this.imwebApiService.searchMembersByPhone(phone);
+      
+      return {
+        success: true,
+        message: '아임웹 회원 검색이 완료되었습니다.',
+        data: members,
+        timestamp: getNowKST(),
+      };
+    } catch (error) {
+      console.error('아임웹 회원 검색 에러:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * GA4 Analytics용 사용자 속성 조회
+   * 홈 화면 진입 시 호출하여 user properties 세팅에 사용
+   */
+  @Get('me/analytics')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'GA4 Analytics용 사용자 속성 조회',
+    description: '홈 화면 진입 시 GA4 user properties 세팅에 필요한 사용자 속성을 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Analytics 데이터 조회 성공',
+    type: UserAnalyticsDto,
+  })
+  async getAnalytics(@Request() req: any): Promise<ApiResponseDto> {
+    const userId = req.user.sub;
+    const analytics = await this.usersService.getAnalytics(userId);
+
+    return {
+      success: true,
+      message: 'Analytics 데이터를 조회했습니다.',
+      data: analytics,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 현재 로그인한 사용자 정보 조회
+   * JWT 토큰에서 사용자 ID를 추출하여 조회
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 정보 조회',
+    description: 'JWT 토큰을 통해 현재 로그인한 사용자의 정보를 조회합니다.'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: '사용자 조회 성공',
+    schema: {
+      example: {
+        success: true,
+        message: '사용자 정보를 조회했습니다.',
+        data: {
+          id: 1,
+          email: 'user1@example.com',
+          nickname: 'user1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z'
+        },
+        meta: {
+          version: 'v2',
+          timestamp: '2024-01-01T00:00:00.000Z'
+        },
+        timestamp: '2024-01-01T00:00:00.000Z'
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 404, 
+    description: '사용자를 찾을 수 없음' 
+  })
+  async findMe(
+    @Request() req: any
+  ): Promise<ApiResponseDto> {
+    // JWT payload에서 sub (user id) 추출
+    const userId = req.user.sub;
+    const user = await this.usersService.findOne(userId);
+
+    return {
+      success: true,
+      message: '사용자 정보를 조회했습니다.',
+      data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 현재 로그인한 사용자 정보 수정
+   * 이름, 휴대폰 번호 변경
+   */
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 정보 수정',
+    description: '현재 로그인한 사용자의 이름, 휴대폰 번호를 수정합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '사용자 정보 수정 성공',
+    schema: {
+      example: {
+        success: true,
+        message: '사용자 정보가 수정되었습니다.',
+        data: {
+          id: 1,
+          email: 'user1@example.com',
+          name: '김철수',
+          mobile: '01012345678',
+          points: 100,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z'
+        },
+        timestamp: '2024-01-02T00:00:00.000Z'
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: '사용자를 찾을 수 없음',
+    type: ApiErrorResponseDto
+  })
+  async updateMe(
+    @Request() req: any,
+    @Body() updateUserDto: UpdateUserDto
+  ): Promise<ApiResponseDto> {
+    // JWT payload에서 sub (user id) 추출
+    const userId = req.user.sub;
+    const user = await this.usersService.update(userId, updateUserDto);
+
+    return {
+      success: true,
+      message: '사용자 정보가 수정되었습니다.',
+      data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 현재 로그인한 사용자의 AI 페르소나 업데이트
+   * 페르소나 식별자만 안전하게 변경
+   */
+  @Patch('me/persona')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'AI 페르소나 업데이트',
+    description: '현재 로그인한 사용자의 AI 페르소나 식별자를 업데이트합니다. 페르소나 ID만 변경 가능합니다.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '페르소나 업데이트 성공',
+    schema: {
+      example: {
+        success: true,
+        message: 'AI 페르소나가 업데이트되었습니다.',
+        data: {
+          id: 1,
+          email: 'user1@example.com',
+          name: '김철수',
+          mobile: '01012345678',
+          points: 100,
+          aiPersonaId: 2,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z'
+        },
+        timestamp: '2024-01-02T00:00:00.000Z'
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: '페르소나를 찾을 수 없음',
+    type: ApiErrorResponseDto
+  })
+  @ApiResponse({
+    status: 409,
+    description: '비활성화된 페르소나',
+    type: ApiErrorResponseDto
+  })
+  async updatePersona(
+    @Request() req: any,
+    @Body() updatePersonaDto: UpdatePersonaDto
+  ): Promise<ApiResponseDto> {
+    // JWT payload에서 sub (user id) 추출
+    const userId = req.user.sub;
+    const user = await this.usersService.updatePersona(userId, updatePersonaDto.aiPersonaId);
+
+    return {
+      success: true,
+      message: 'AI 페르소나가 업데이트되었습니다.',
+      data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 현재 로그인한 사용자의 MBTI 업데이트
+   * MBTI 유형만 안전하게 변경
+   */
+  @Patch('me/mbti')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'MBTI 업데이트',
+    description: '현재 로그인한 사용자의 MBTI 유형을 업데이트합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'MBTI 업데이트 성공',
+    schema: {
+      example: {
+        success: true,
+        message: 'MBTI가 업데이트되었습니다.',
+        data: {
+          id: 1,
+          email: 'user1@example.com',
+          name: '김철수',
+          mobile: '01012345678',
+          mbti: 'INTJ',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z',
+        },
+        timestamp: '2024-01-02T00:00:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: '사용자를 찾을 수 없음',
+    type: ApiErrorResponseDto,
+  })
+  async updateMbti(
+    @Request() req: any,
+    @Body() updateMbtiDto: UpdateMbtiDto
+  ): Promise<ApiResponseDto> {
+    // JWT payload에서 sub (user id) 추출
+    const userId = req.user.sub;
+    const user = await this.usersService.updateMbti(userId, updateMbtiDto.mbti);
+
+    return {
+      success: true,
+      message: 'MBTI가 업데이트되었습니다.',
+      data: user,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 사용자 설정 조회
+   */
+  @Get('me/settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 설정 조회',
+    description: '푸시 알림 수신 동의 등 사용자 설정을 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '설정 조회 성공',
+    type: UserSettingsResponseDto,
+  })
+  async getSettings(@Request() req: any): Promise<ApiResponseDto> {
+    const userId = req.user.sub;
+    const settings = await this.usersService.getSettings(userId);
+
+    return {
+      success: true,
+      message: '설정을 조회했습니다.',
+      data: settings,
+      timestamp: getNowKST(),
+    };
+  }
+
+  /**
+   * 사용자 설정 업데이트
+   */
+  @Put('me/settings')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '내 설정 업데이트',
+    description: '푸시 알림 수신 동의 등 사용자 설정을 업데이트합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '설정 업데이트 성공',
+    type: UserSettingsResponseDto,
+  })
+  async updateSettings(
+    @Request() req: any,
+    @Body() dto: UpdateUserSettingsDto
+  ): Promise<ApiResponseDto> {
+    const userId = req.user.sub;
+    const settings = await this.usersService.updateSettings(userId, dto.pushEnabled);
+
+    return {
+      success: true,
+      message: '설정이 업데이트되었습니다.',
+      data: settings,
+      timestamp: getNowKST(),
+    };
+  }
+}

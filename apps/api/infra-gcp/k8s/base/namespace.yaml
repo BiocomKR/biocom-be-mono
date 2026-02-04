@@ -1,0 +1,14 @@
+# 📦 네임스페이스 정의
+# 애플리케이션을 격리된 환경에서 실행하기 위한 네임스페이스
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: biocom-api
+  labels:
+    name: biocom-api
+    environment: dev
+    managed-by: terraform
+  annotations:
+    description: "BIOCOM API 애플리케이션 네임스페이스"
+    contact: "biocom-team"
