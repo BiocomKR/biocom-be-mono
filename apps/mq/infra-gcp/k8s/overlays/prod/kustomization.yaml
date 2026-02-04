@@ -1,0 +1,22 @@
+# Prod Environment Kustomization - biocom-mq 운영 환경
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# 네임스페이스 지정
+namespace: biocom-api
+
+# Base 리소스 참조
+resources:
+  - ../../base
+  - configmap.yaml
+
+# 이미지 태그 (배포 시 동적으로 변경됨)
+images:
+  - name: biocom-mq
+    newName: asia-northeast3-docker.pkg.dev/api-prod-biocom/biocom-api/biocom-mq
+    newTag: "20260129012322"
+
+# 환경별 레이블
+commonLabels:
+  environment: prod

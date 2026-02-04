@@ -1,0 +1,172 @@
+# Deployment - biocom-mq Worker 배포 정의
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: biocom-mq
+  namespace: biocom-api
+  labels:
+    app: biocom-mq
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: biocom-mq
+  template:
+    metadata:
+      labels:
+        app: biocom-mq
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "20804"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: biocom-api-sa
+
+      imagePullSecrets:
+      - name: gcr-json-key
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+
+      containers:
+      - name: biocom-mq
+        image: biocom-mq
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 20804
+          name: http
+          protocol: TCP
+
+        envFrom:
+        - configMapRef:
+            name: biocom-mq-config
+        - secretRef:
+            name: biocom-mq-secrets
+
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 20804
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 20
+          successThreshold: 1
+
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 20804
+          initialDelaySeconds: 0
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 20804
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: firebase-service-account-key
+          mountPath: /app/firebase
+          readOnly: true
+
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: firebase-service-account-key
+        secret:
+          secretName: firebase-service-account-key
+
+      restartPolicy: Always
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - biocom-mq
+              topologyKey: kubernetes.io/hostname
+
+---
+# HorizontalPodAutoscaler - Worker 자동 스케일링
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: biocom-mq-hpa
+  namespace: biocom-api
+  labels:
+    app: biocom-mq
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: biocom-mq
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
