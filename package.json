@@ -1,0 +1,22 @@
+{
+  "name": "biocom-be-mono",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel start:local",
+    "dev:api": "pnpm --filter @biocom/api start:local",
+    "dev:bo": "pnpm --filter @biocom/bo-api start:local",
+    "dev:mq": "pnpm --filter @biocom/mq start:local",
+    "build": "pnpm -r build",
+    "build:api": "pnpm --filter @biocom/api build",
+    "build:bo": "pnpm --filter @biocom/bo-api build",
+    "build:mq": "pnpm --filter @biocom/mq build",
+    "prisma:generate": "pnpm --filter @biocom/prisma generate",
+    "prisma:push": "pnpm --filter @biocom/prisma push"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
