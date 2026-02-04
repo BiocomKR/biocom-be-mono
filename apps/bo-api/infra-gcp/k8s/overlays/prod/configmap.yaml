@@ -1,0 +1,105 @@
+# ConfigMap - biocom-bo-api 운영 환경 설정
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biocom-bo-api-config
+  namespace: biocom-bo-api
+  labels:
+    app: biocom-bo-api
+    environment: prod
+data:
+  # 데이터베이스 설정 (운영 DB - biocom-api와 동일, Private IP 사용)
+  DB_HOST: "10.83.0.4"
+  DB_PORT: "5432"
+  DB_NAME: "biocom"
+  DB_USERNAME: "biocom"
+  DATABASE_URL: "postgresql://biocom:qkdldhzjaProdelql0519@10.83.0.4:5432/biocom?connection_limit=10&pool_timeout=30&connect_timeout=10"
+
+  # 애플리케이션 설정
+  NODE_ENV: "production"
+  PORT: "10805"
+
+  # API 설정
+  API_PREFIX: "/api"
+  SWAGGER_PATH: "/docs"
+
+  # 로깅 설정
+  LOG_LEVEL: "warn"
+  LOG_FORMAT: "json"
+
+  # CORS 설정 (운영 백오피스 FE 도메인)
+  CORS_ORIGIN: "https://admin.biocom.ai.kr,https://bo.biocom.ai.kr,https://biocom-bo-v4.web.app,https://biocom-bo-v4.firebaseapp.com"
+
+  # JWT 설정
+  JWT_ACCESS_TOKEN_EXPIRES_IN: "3h"
+  JWT_REFRESH_TOKEN_EXPIRES_IN: "180d"
+
+  # Google Cloud Storage 설정 (운영 버킷)
+  GOOGLE_CLOUD_PROJECT_ID: "api-prod-biocom"
+  GCS_BUCKET_NAME: "api-prod-biocom-uploads"
+  GOOGLE_APPLICATION_CREDENTIALS: "/app/secrets/key.json"
+
+  # Firebase 설정
+  FIREBASE_SERVICE_ACCOUNT_PATH: "/app/firebase/firebase-key.json"
+
+  # 파일 업로드 설정
+  MAX_FILE_SIZE: "10485760"
+  ALLOWED_FILE_TYPES: "image/jpeg,image/png,image/gif,application/pdf"
+
+  # Rate Limiting 설정
+  RATE_LIMIT_TTL: "60"
+  RATE_LIMIT_LIMIT: "200"
+
+  # 기타 설정
+  TIMEZONE: "Asia/Seoul"
+
+  # Slack 알림 설정
+  SLACK_NOTIFICATION_ENABLED: "true"
+  PROJECT_NAME: "biocom-bo-api-prod"
+
+  # Redis 설정 (GKE 내부 - biocom-api 네임스페이스의 redis 사용)
+  REDIS_HOST: "redis-master.biocom-api.svc.cluster.local"
+  REDIS_PORT: "6379"
+
+  # biocom-api 내부 호출 URL (같은 클러스터, 다른 네임스페이스)
+  BIOCOM_API_URL: "http://biocom-api-service.biocom-api.svc.cluster.local"
+
+  # 공공데이터포털 API (공휴일 조회)
+  PUBLIC_DATA_PORTAL_HOLIDAY_ENDPOINT: "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService"
+
+  # OpenAI 설정
+  OPENAI_MODEL: "gpt-4o"
+  AI_ANALYSIS_TIMEOUT: "30000"
+
+  # Google Gemini AI 설정
+  GEMINI_MODEL: "gemini-2.5-flash-image-preview"
+  FACE_SLIMMING_TIMEOUT: "60000"
+
+  # Google Cloud Storage 버킷
+  GOOGLE_CLOUD_STORAGE_BUCKET: "api-dev-biocom-uploads"
+
+---
+# 로깅 설정용 ConfigMap (운영)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biocom-bo-api-logging
+  namespace: biocom-bo-api
+  labels:
+    app: biocom-bo-api
+    component: logging
+data:
+  logging.json: |
+    {
+      "level": "warn",
+      "format": "json",
+      "timestamp": true,
+      "colorize": false,
+      "metadata": true,
+      "fields": {
+        "service": "biocom-bo-api",
+        "environment": "prod",
+        "version": "1.0.0"
+      }
+    }

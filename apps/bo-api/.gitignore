@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment (민감정보 - 절대 커밋 금지)
+.env
+.env.local
+.env.dev
+.env.prod
+.env.*.local
+.env.secrets
+.env.secrets.*
+
+# Google Cloud Service Account Keys
+google-service-account-key*.json
+*-firebase-adminsdk-*.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Prisma
+prisma/*.db
+infra-gcp/terraform/.terraform/
+
+
+# Davia
+.davia/
+.claude/skills/davia-documentation/SKILL.md
+# Secrets (infra-gcp 폴더 포함)
+infra-gcp/.env*
+infra-gcp/k8s/secret.yaml

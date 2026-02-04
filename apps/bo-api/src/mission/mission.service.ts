@@ -1,0 +1,624 @@
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
+import { PrismaService } from '../common/services/prisma.service';
+import { Prisma } from '@prisma/client';
+import { getNowKST } from '../common/utils/kst-date.util';
+import { ProductStatus } from '../common/enums';
+
+/**
+ * 관리자 미션 관리 서비스
+ * 백오피스에서 미션을 생성, 수정, 삭제하는 기능
+ */
+@Injectable()
+export class MissionService {
+  private readonly logger = new Logger(MissionService.name);
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * 모든 미션 목록 조회 (관리자용)
+   * @param options 조회 옵션
+   */
+  async findAllMissions(options: {
+    page?: number;
+    limit?: number;
+    type?: string;
+    category?: string;
+    search?: string;
+  }) {
+    const { page = 1, limit = 10, type, category, search } = options;
+    const skip = (page - 1) * limit;
+
+    // 검색 조건 구성
+    const where: Prisma.MissionWhereInput = {};
+    
+    if (type) {
+      where.type = type;
+    }
+    
+    if (category) {
+      where.category = category;
+    }
+    
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { recordType: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const [missions, total] = await Promise.all([
+      this.prisma.mission.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [
+          { sortOrder: 'asc' },
+          { createdAt: 'desc' }
+        ],
+        include: {
+          challengeMissions: {
+            select: {
+              id: true,
+              productId: true,
+              day: true,
+              points: true,
+              product: {
+                select: {
+                  name: true,
+                  metadata: true
+                }
+              }
+            }
+          },
+          _count: {
+            select: {
+              challengeMissions: true
+            }
+          }
+        }
+      }),
+      this.prisma.mission.count({ where })
+    ]);
+
+    return {
+      missions,
+      pagination: {
+        current: page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  /**
+   * 미션 상세 조회
+   * @param id 미션 ID
+   */
+  async findMissionById(id: number) {
+    const mission = await this.prisma.mission.findUnique({
+      where: { id },
+      include: {
+        challengeMissions: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                metadata: true
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            challengeMissions: true
+          }
+        }
+      }
+    });
+
+    if (!mission) {
+      throw new NotFoundException('미션을 찾을 수 없습니다');
+    }
+
+    return mission;
+  }
+
+  /**
+   * 새로운 미션 생성
+   * @param data 미션 데이터
+   */
+  async createMission(data: {
+    name: string;
+    description?: string;
+    points: number;
+    requireUpload?: boolean;
+    sortOrder?: number;
+    category?: string;
+    type?: string;
+    recordType: string;
+    dailyLimit?: number;
+    dailyTimeLimitMinutes?: number;
+    specificDay?: number;
+    totalDays?: number;
+    uploadType?: string;
+    isActive?: boolean;
+    // 노출 조건
+    visibleFromDay?: number;
+    visibleToDay?: number;
+    recordableFromDay?: number;
+    recordableToDay?: number;
+    // 챌린지 종료 후 노출 설정 (복수)
+    visibleAfterSettings?: { productId: number; days: number | null }[];
+    // 권한
+    allowedUserTypes?: string[];
+    recordableUserTypes?: string[];
+    // 선행 조건
+    prerequisiteMissionId?: number;
+    // 포인트
+    maxPointsPerDay?: number;
+    // 주기
+    frequency?: string;
+  }) {
+    try {
+      // recordType 중복 확인
+      const existingMission = await this.prisma.mission.findUnique({
+        where: { recordType: data.recordType }
+      });
+
+      if (existingMission) {
+        throw new ConflictException('이미 존재하는 recordType입니다');
+      }
+
+      const mission = await this.prisma.mission.create({
+        data: {
+          name: data.name,
+          description: data.description,
+          points: data.points,
+          requireUpload: data.requireUpload ?? false,
+          sortOrder: data.sortOrder ?? 0,
+          category: data.category ?? 'DAILY',
+          type: data.type ?? 'MISSION',
+          recordType: data.recordType,
+          dailyLimit: data.dailyLimit ?? 1,
+          dailyTimeLimitMinutes: data.dailyTimeLimitMinutes,
+          specificDay: data.specificDay,
+          totalDays: data.totalDays ?? 21,
+          uploadType: data.uploadType,
+          isActive: data.isActive ?? true,
+          createdAt: getNowKST(),
+          // 노출 조건
+          visibleFromDay: data.visibleFromDay,
+          visibleToDay: data.visibleToDay,
+          recordableFromDay: data.recordableFromDay,
+          recordableToDay: data.recordableToDay,
+          // 챌린지 종료 후 노출 설정
+          visibleAfterSettings: data.visibleAfterSettings ?? [],
+          // 권한
+          allowedUserTypes: data.allowedUserTypes ?? [],
+          recordableUserTypes: data.recordableUserTypes ?? [],
+          // 선행 조건
+          prerequisiteMissionId: data.prerequisiteMissionId,
+          // 포인트
+          maxPointsPerDay: data.maxPointsPerDay,
+          // 주기
+          frequency: data.frequency ?? 'DAILY',
+        }
+      });
+
+      this.logger.log(`미션 생성 완료 - ${mission.name} (dailyLimit: ${mission.dailyLimit})`);
+      return mission;
+
+    } catch (error) {
+      this.logger.error('미션 생성 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 미션 정보 수정
+   * @param id 미션 ID
+   * @param data 수정할 데이터
+   */
+  async updateMission(id: number, data: {
+    name?: string;
+    description?: string;
+    points?: number;
+    requireUpload?: boolean;
+    sortOrder?: number;
+    category?: string;
+    type?: string;
+    recordType?: string;
+    dailyLimit?: number;
+    dailyTimeLimitMinutes?: number | null;
+    specificDay?: number;
+    totalDays?: number;
+    uploadType?: string;
+    isActive?: boolean;
+    // 노출 조건
+    visibleFromDay?: number | null;
+    visibleToDay?: number | null;
+    recordableFromDay?: number | null;
+    recordableToDay?: number | null;
+    // 챌린지 종료 후 노출 설정 (복수)
+    visibleAfterSettings?: { productId: number; days: number | null }[];
+    // 권한
+    allowedUserTypes?: string[];
+    recordableUserTypes?: string[];
+    // 선행 조건
+    prerequisiteMissionId?: number | null;
+    // 포인트
+    maxPointsPerDay?: number | null;
+    // 주기
+    frequency?: string;
+    // 포인트 지급 설정
+    pointsConfig?: {
+      afterChallengeDays?: number;     // 챌린지 종료 후 N일까지 포인트 지급
+      subscriberUnlimited?: boolean;   // 구독자 무제한 여부
+    } | null;
+  }) {
+    try {
+      // 미션 존재 여부 확인
+      const existingMission = await this.prisma.mission.findUnique({
+        where: { id }
+      });
+
+      if (!existingMission) {
+        throw new NotFoundException('미션을 찾을 수 없습니다');
+      }
+
+      // recordType 중복 확인 (다른 미션과)
+      if (data.recordType && data.recordType !== existingMission.recordType) {
+        const duplicate = await this.prisma.mission.findFirst({
+          where: {
+            recordType: data.recordType,
+            id: { not: id }
+          }
+        });
+
+        if (duplicate) {
+          throw new ConflictException('이미 존재하는 recordType입니다');
+        }
+      }
+
+      // 허용된 필드만 추출 (스키마에 없는 필드 제거)
+      const {
+        name,
+        description,
+        points,
+        requireUpload,
+        sortOrder,
+        category,
+        type,
+        recordType,
+        dailyLimit,
+        dailyTimeLimitMinutes,
+        specificDay,
+        totalDays,
+        uploadType,
+        isActive,
+        visibleFromDay,
+        visibleToDay,
+        recordableFromDay,
+        recordableToDay,
+        visibleAfterSettings,
+        allowedUserTypes,
+        recordableUserTypes,
+        prerequisiteMissionId,
+        maxPointsPerDay,
+        frequency,
+        pointsConfig,
+      } = data;
+
+      const mission = await this.prisma.mission.update({
+        where: { id },
+        data: {
+          name,
+          description,
+          points,
+          requireUpload,
+          sortOrder,
+          category,
+          type,
+          recordType,
+          dailyLimit,
+          dailyTimeLimitMinutes,
+          specificDay,
+          totalDays,
+          uploadType,
+          isActive,
+          visibleFromDay,
+          visibleToDay,
+          recordableFromDay,
+          recordableToDay,
+          visibleAfterSettings,
+          allowedUserTypes,
+          recordableUserTypes,
+          prerequisiteMissionId,
+          maxPointsPerDay,
+          frequency,
+          pointsConfig,
+          updatedAt: getNowKST()
+        }
+      });
+
+      this.logger.log(`미션 수정 완료 - ${mission.name} (dailyLimit: ${mission.dailyLimit})`);
+      return mission;
+
+    } catch (error) {
+      this.logger.error('미션 수정 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 미션 삭제
+   * @param id 미션 ID
+   */
+  async deleteMission(id: number) {
+    try {
+      // 미션 존재 여부 확인
+      const existingMission = await this.prisma.mission.findUnique({
+        where: { id },
+        include: {
+          challengeMissions: true
+        }
+      });
+
+      if (!existingMission) {
+        throw new NotFoundException('미션을 찾을 수 없습니다');
+      }
+
+      // 연결된 챌린지 미션이 있는지 확인
+      if (existingMission.challengeMissions.length > 0) {
+        throw new BadRequestException('챌린지에서 사용 중인 미션은 삭제할 수 없습니다');
+      }
+
+      // Soft delete: isActive = false
+      await this.prisma.mission.update({
+        where: { id },
+        data: { isActive: false }
+      });
+
+      this.logger.log(`미션 비활성화(soft delete) 완료 - ID: ${id}`);
+
+    } catch (error) {
+      this.logger.error('미션 삭제 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 미션 활성/비활성 전환
+   * @param id 미션 ID
+   */
+  async toggleMissionStatus(id: number) {
+    try {
+      const existingMission = await this.prisma.mission.findUnique({
+        where: { id }
+      });
+
+      if (!existingMission) {
+        throw new NotFoundException('미션을 찾을 수 없습니다');
+      }
+
+      const mission = await this.prisma.mission.update({
+        where: { id },
+        data: {
+          isActive: !existingMission.isActive,
+          updatedAt: getNowKST()
+        }
+      });
+
+      this.logger.log(`미션 상태 전환 - ${mission.name}: ${mission.isActive ? '활성' : '비활성'}`);
+      return mission;
+
+    } catch (error) {
+      this.logger.error('미션 상태 전환 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 미션 dailyLimit 업데이트
+   * @param id 미션 ID
+   * @param dailyLimit 새로운 일일 제한 횟수
+   */
+  async updateMissionDailyLimit(id: number, dailyLimit: number) {
+    try {
+      const existingMission = await this.prisma.mission.findUnique({
+        where: { id }
+      });
+
+      if (!existingMission) {
+        throw new NotFoundException('미션을 찾을 수 없습니다');
+      }
+
+      if (dailyLimit < 1) {
+        throw new BadRequestException('dailyLimit은 1 이상이어야 합니다');
+      }
+
+      const mission = await this.prisma.mission.update({
+        where: { id },
+        data: {
+          dailyLimit,
+          updatedAt: getNowKST()
+        }
+      });
+
+      this.logger.log(`미션 dailyLimit 업데이트 - ${mission.name}: ${mission.dailyLimit}`);
+      return mission;
+
+    } catch (error) {
+      this.logger.error('미션 dailyLimit 업데이트 실패:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * recordType 중복 검사
+   * @param recordType 검사할 recordType
+   * @param excludeId 제외할 미션 ID (수정 시)
+   */
+  async checkRecordTypeDuplicate(recordType: string, excludeId?: number) {
+    const where: Prisma.MissionWhereInput = {
+      recordType,
+    };
+
+    if (excludeId) {
+      where.id = { not: excludeId };
+    }
+
+    const existing = await this.prisma.mission.findFirst({ where });
+
+    return {
+      isDuplicate: !!existing,
+      message: existing ? '이미 사용 중인 recordType입니다' : '사용 가능한 recordType입니다',
+    };
+  }
+
+  /**
+   * 미션 전체 통계 조회 (목록 페이지용)
+   */
+  async getMissionOverallStats() {
+    const [total, active, daily, weekly, special] = await Promise.all([
+      this.prisma.mission.count(),
+      this.prisma.mission.count({ where: { isActive: true } }),
+      this.prisma.mission.count({ where: { category: 'DAILY' } }),
+      this.prisma.mission.count({ where: { category: 'WEEKLY' } }),
+      this.prisma.mission.count({ where: { category: 'SPECIAL' } }),
+    ]);
+
+    return {
+      total,
+      active,
+      inactive: total - active,
+      byCategory: {
+        daily,
+        weekly,
+        special,
+      },
+    };
+  }
+
+  /**
+   * 미션 통계 조회
+   * @param id 미션 ID
+   */
+  async getMissionStats(id: number) {
+    try {
+      const mission = await this.prisma.mission.findUnique({
+        where: { id }
+      });
+
+      if (!mission) {
+        throw new NotFoundException('미션을 찾을 수 없습니다');
+      }
+
+      // 미션 시도 통계 (user_records 기반)
+      const allRecords = await this.prisma.userRecord.findMany({
+        where: {
+          metadata: {
+            path: ['missionId'],
+            equals: id
+          }
+        },
+        select: {
+          metadata: true
+        }
+      });
+
+      // isCompleted 기준으로 그룹화
+      const completedCount = allRecords.filter(r => (r.metadata as any)?.isCompleted === true).length;
+      const incompleteCount = allRecords.filter(r => (r.metadata as any)?.isCompleted !== true).length;
+
+      // 일별 완료 통계 (최근 30일)
+      const thirtyDaysAgo = getNowKST();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const recentRecords = await this.prisma.userRecord.findMany({
+        where: {
+          metadata: {
+            path: ['missionId'],
+            equals: id
+          },
+          createdAt: {
+            gte: thirtyDaysAgo
+          }
+        },
+        select: {
+          metadata: true
+        }
+      });
+
+      // day별로 그룹화 (완료된 것만)
+      const dailyStatsMap = new Map<number, number>();
+      recentRecords.forEach(r => {
+        const metadata = r.metadata as any;
+        if (metadata?.isCompleted === true && metadata?.day) {
+          const day = metadata.day;
+          dailyStatsMap.set(day, (dailyStatsMap.get(day) || 0) + 1);
+        }
+      });
+
+      const dailyStats = Array.from(dailyStatsMap.entries())
+        .map(([day, count]) => ({ day, _count: { id: count } }))
+        .sort((a, b) => a.day - b.day);
+
+      // 챌린지별 사용 현황
+      const challengeUsage = await this.prisma.challengeMission.findMany({
+        where: {
+          missionId: id
+        },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              metadata: true
+            }
+          }
+        }
+      });
+
+      const totalAttempts = allRecords.length;
+      const completedAttempts = completedCount;
+      const incompleteAttempts = incompleteCount;
+
+      return {
+        mission: {
+          id: mission.id,
+          name: mission.name,
+          type: mission.type,
+          dailyLimit: mission.dailyLimit,
+          isActive: mission.isActive
+        },
+        stats: {
+          totalAttempts,
+          completedAttempts,
+          incompleteAttempts,
+          completionRate: totalAttempts > 0 ? (completedAttempts / totalAttempts * 100).toFixed(1) : '0'
+        },
+        dailyStats,
+        challengeUsage: challengeUsage.map(cu => {
+          const metadata = cu.product.metadata as any;
+          return {
+            productId: cu.productId,
+            challengeName: metadata?.challengeName || cu.product.name,
+            day: cu.day,
+            points: cu.points,
+            isActive: cu.product.status === ProductStatus.ACTIVE
+          };
+        })
+      };
+
+    } catch (error) {
+      this.logger.error('미션 통계 조회 실패:', error);
+      throw error;
+    }
+  }
+}
